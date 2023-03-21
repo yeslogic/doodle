@@ -1,3 +1,5 @@
+use std::fs;
+
 #[derive(Copy, Clone, Debug)]
 enum ByteSet {
     Any,
@@ -5,7 +7,7 @@ enum ByteSet {
     Not(u8),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum Format {
     Zero,
     Unit,
@@ -13,6 +15,17 @@ enum Format {
     Alt(Box<Format>, Box<Format>),
     Cat(Box<Format>, Box<Format>),
     Repeat(Box<Format>, Box<Format>),
+    Array(usize, Box<Format>),
+    Map(fn(&Value) -> Value, Box<Format>),
+}
+
+#[derive(Debug)]
+enum Value {
+    Unit,
+    U8(u8),
+    U16(u16),
+    Pair(Box<Value>, Box<Value>),
+    Seq(Vec<Value>),
 }
 
 #[derive(Debug)]
@@ -20,7 +33,6 @@ struct Lookahead {
     pattern: Vec<ByteSet>,
 }
 
-#[derive(Debug)]
 enum DetFormat {
     Zero,
     Unit,
@@ -29,6 +41,35 @@ enum DetFormat {
     Cat(Box<DetFormat>, Box<DetFormat>),
     While(Lookahead, Box<DetFormat>),
     Until(Lookahead, Box<DetFormat>),
+    Array(usize, Box<DetFormat>),
+    Map(fn(&Value) -> Value, Box<DetFormat>),
+}
+
+impl Value {
+    pub fn usize_or_panic(&self) -> usize {
+        match *self {
+            Value::U8(n) => usize::from(n),
+            Value::U16(n) => usize::from(n),
+            Value::Unit | Value::Pair(_, _) | Value::Seq(_) => panic!("value is not number"),
+        }
+    }
+
+    pub fn map_u16be_minus_two(&self) -> Self {
+        if let Value::Pair(fst, snd) = self {
+            if let Value::U8(hi) = **fst {
+                if let Value::U8(lo) = **snd {
+                    let n = (u16::from(hi) << 8) + u16::from(lo);
+                    Value::U16(n - 2)
+                } else {
+                    panic!("second is not u8")
+                }
+            } else {
+                panic!("first is not u8")
+            }
+        } else {
+            panic!("value is not pair")
+        }
+    }
 }
 
 impl ByteSet {
@@ -88,49 +129,6 @@ impl ByteSet {
 }
 
 impl Format {
-    /*
-    pub fn parse(&self, input: &[u8]) -> Option<usize> {
-        match self {
-            Format::Zero => None,
-            Format::Unit => Some(0),
-            Format::Byte(bs) => {
-                if input.len() > 0 {
-                    if bs.contains(input[0]) {
-                        Some(1)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            Format::Alt(a, b) => a.parse(input).or(b.parse(input)),
-            Format::Cat(a, b) => {
-                if let Some(ca) = a.parse(input) {
-                    if let Some(cb) = b.parse(&input[ca..]) {
-                        Some(ca + cb)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            Format::Repeat(a, b) => {
-                let mut c = 0;
-                while let Some(ca) = a.parse(&input[c..]) {
-                    c += ca;
-                }
-                if let Some(cb) = b.parse(&input[c..]) {
-                    Some(c + cb)
-                } else {
-                    None
-                }
-            }
-        }
-    }
-    */
-
     pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
             Format::Zero => false,
@@ -161,6 +159,10 @@ impl Format {
             Format::Repeat(_a, _b) => {
                 true // FIXME
             }
+            Format::Array(_index, _a) => {
+                true // FIXME
+            }
+            Format::Map(_f, a) => a.might_match_lookahead(input, next),
         }
     }
 }
@@ -250,6 +252,10 @@ impl Lookahead {
                     None
                 }
             }
+            Format::Array(_index, _a) => {
+                Some(Lookahead::empty()) // FIXME ?
+            }
+            Format::Map(_f, a) => Lookahead::from(a, len),
         }
     }
 }
@@ -287,12 +293,135 @@ impl DetFormat {
                     Err("cannot find valid lookahead for repeat".to_string())
                 }
             }
+            Format::Array(index, a) => {
+                let da = Box::new(DetFormat::compile(a)?);
+                Ok(DetFormat::Array(*index, da))
+            }
+            Format::Map(f, a) => {
+                let da = Box::new(DetFormat::compile(a)?);
+                Ok(DetFormat::Map(*f, da))
+            }
+        }
+    }
+
+    pub fn parse(&self, stack: &mut Vec<Value>, input: &[u8]) -> Option<(usize, Value)> {
+        match self {
+            DetFormat::Zero => None,
+            DetFormat::Unit => Some((0, Value::Unit)),
+            DetFormat::Byte(bs) => {
+                if input.len() > 0 {
+                    if bs.contains(input[0]) {
+                        Some((1, Value::U8(input[0])))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            DetFormat::If(look, a, b) => {
+                if look.matches(input) {
+                    a.parse(stack, input)
+                } else {
+                    b.parse(stack, input)
+                }
+            }
+            DetFormat::Cat(a, b) => {
+                if let Some((ca, va)) = a.parse(stack, input) {
+                    stack.push(va);
+                    if let Some((cb, vb)) = b.parse(stack, &input[ca..]) {
+                        let va = stack.pop().unwrap();
+                        Some((ca + cb, Value::Pair(Box::new(va), Box::new(vb))))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            DetFormat::While(look, a) => {
+                let mut c = 0;
+                let mut v = Vec::new();
+                while look.matches(input) {
+                    if let Some((ca, va)) = a.parse(stack, &input[c..]) {
+                        c += ca;
+                        v.push(va);
+                    } else {
+                        return None;
+                    }
+                }
+                Some((c, Value::Seq(v)))
+            }
+            DetFormat::Until(look, a) => {
+                let mut c = 0;
+                let mut v = Vec::new();
+                while !look.matches(&input[c..]) {
+                    if let Some((ca, va)) = a.parse(stack, &input[c..]) {
+                        c += ca;
+                        v.push(va);
+                    } else {
+                        return None;
+                    }
+                }
+                Some((c, Value::Seq(v)))
+            }
+            DetFormat::Array(index, a) => {
+                let mut c = 0;
+                let mut v = Vec::new();
+                let count = stack[stack.len() - index - 1].usize_or_panic();
+                for _i in 0..count {
+                    if let Some((ca, va)) = a.parse(stack, &input[c..]) {
+                        c += ca;
+                        v.push(va);
+                    } else {
+                        return None;
+                    }
+                }
+                Some((c, Value::Seq(v)))
+            }
+            DetFormat::Map(f, a) => {
+                if let Some((ca, va)) = a.parse(stack, input) {
+                    Some((ca, f(&va)))
+                } else {
+                    None
+                }
+            }
         }
     }
 }
 
-fn main() -> Result<(), String> {
-    let jpeg = Format::Repeat(
+fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
+    let input = fs::read("test.jpg")?;
+
+    fn marker(b: u8) -> Format {
+        Format::Cat(
+            Box::new(Format::Byte(ByteSet::Is(0xFF))),
+            Box::new(Format::Byte(ByteSet::Is(b))),
+        )
+    }
+
+    let soi = marker(0xD8);
+    let eoi = marker(0xD9);
+    let length = Format::Map(
+        Value::map_u16be_minus_two,
+        Box::new(Format::Cat(
+            Box::new(Format::Byte(ByteSet::Any)),
+            Box::new(Format::Byte(ByteSet::Any)),
+        )),
+    );
+    let var = Format::Cat(
+        Box::new(length.clone()),
+        Box::new(Format::Array(0, Box::new(Format::Byte(ByteSet::Any)))),
+    );
+    let app0 = Format::Cat(Box::new(marker(0xE0)), Box::new(var.clone()));
+    let dqt = Format::Cat(Box::new(marker(0xDB)), Box::new(var.clone()));
+    let sof0 = Format::Cat(Box::new(marker(0xC0)), Box::new(var.clone()));
+    let dht = Format::Cat(Box::new(marker(0xC4)), Box::new(var.clone()));
+    let chunk = Format::Alt(
+        Box::new(dqt.clone()),
+        Box::new(Format::Alt(Box::new(sof0.clone()), Box::new(dht.clone()))),
+    );
+    let ecs = Format::Repeat(
         Box::new(Format::Alt(
             Box::new(Format::Byte(ByteSet::Not(0xFF))),
             Box::new(Format::Cat(
@@ -300,12 +429,22 @@ fn main() -> Result<(), String> {
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
             )),
         )),
+        Box::new(eoi),
+    );
+    let sos = Format::Cat(
+        Box::new(Format::Cat(Box::new(marker(0xDA)), Box::new(var.clone()))),
+        Box::new(ecs),
+    );
+    let jpeg = Format::Cat(
+        Box::new(soi),
         Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::Is(0xFF))),
-            Box::new(Format::Byte(ByteSet::Is(0xD9))),
+            Box::new(app0),
+            Box::new(Format::Repeat(Box::new(chunk.clone()), Box::new(sos))),
         )),
     );
     let det_jpeg = DetFormat::compile(&jpeg)?;
-    println!("{:?}", det_jpeg);
+    let mut stack = Vec::new();
+    let res = det_jpeg.parse(&mut stack, &input);
+    println!("{:?}", res);
     Ok(())
 }
