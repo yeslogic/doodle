@@ -5,7 +5,7 @@ enum ByteSet {
     Not(u8),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Format {
     Zero,
     Unit,
@@ -131,45 +131,35 @@ impl Format {
     }
     */
 
-    pub fn can_match_lookahead(&self, input: &[ByteSet]) -> Option<usize> {
+    pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
-            Format::Zero => None,
-            Format::Unit => Some(0),
+            Format::Zero => false,
+            Format::Unit => {
+                if let Format::Unit = next {
+                    true
+                } else {
+                    next.might_match_lookahead(input, Format::Unit)
+                }
+            }
             Format::Byte(bs) => {
                 if input.len() > 0 {
                     if ByteSet::disjoint(bs, &input[0]) {
-                        None
+                        false
                     } else {
-                        Some(1)
+                        next.might_match_lookahead(&input[1..], Format::Unit)
                     }
                 } else {
-                    Some(1)
+                    true
                 }
             }
-            Format::Alt(a, b) => a
-                .can_match_lookahead(input)
-                .or(b.can_match_lookahead(input)),
+            Format::Alt(a, b) => {
+                a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
+            }
             Format::Cat(a, b) => {
-                if let Some(ca) = a.can_match_lookahead(input) {
-                    if let Some(cb) = b.can_match_lookahead(&input[ca..]) {
-                        Some(ca + cb)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
             }
-            Format::Repeat(a, b) => {
-                let mut c = 0;
-                while let Some(ca) = a.can_match_lookahead(&input[c..]) {
-                    c += ca;
-                }
-                if let Some(cb) = b.can_match_lookahead(&input[c..]) {
-                    Some(c + cb)
-                } else {
-                    None
-                }
+            Format::Repeat(_a, _b) => {
+                true // FIXME
             }
         }
     }
@@ -201,7 +191,7 @@ impl Lookahead {
     pub fn new(a: &Format, b: &Format) -> Option<Self> {
         const LEN: usize = 2;
         let pa = Lookahead::from(a, LEN)?;
-        if b.can_match_lookahead(&pa.pattern).is_none() {
+        if !b.might_match_lookahead(&pa.pattern, Format::Unit) {
             Some(pa)
         } else {
             None
