@@ -14,7 +14,7 @@ enum Format {
     Byte(ByteSet),
     Alt(Box<Format>, Box<Format>),
     Cat(Box<Format>, Box<Format>),
-    Repeat(Box<Format>, Box<Format>),
+    Star(Box<Format>),
     Array(usize, Box<Format>),
     Map(fn(&Value) -> Value, Box<Format>),
 }
@@ -156,7 +156,7 @@ impl Format {
             Format::Cat(a, b) => {
                 a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
             }
-            Format::Repeat(_a, _b) => {
+            Format::Star(_a) => {
                 true // FIXME
             }
             Format::Array(_index, _a) => {
@@ -226,7 +226,7 @@ impl Lookahead {
             Format::Zero => None,
             Format::Unit => Some(Lookahead::empty()),
             Format::Byte(bs) => Some(Lookahead::single(bs.clone())),
-            Format::Alt(a, b) | Format::Repeat(a, b) => {
+            Format::Alt(a, b) => {
                 if let Some(pa) = Lookahead::from(a, len) {
                     if let Some(pb) = Lookahead::from(b, len) {
                         Some(Lookahead::alt(&pa, &pb))
@@ -252,6 +252,9 @@ impl Lookahead {
                     None
                 }
             }
+            Format::Star(_a) => {
+                Some(Lookahead::empty()) // FIXME ?
+            }
             Format::Array(_index, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
@@ -261,14 +264,14 @@ impl Lookahead {
 }
 
 impl DetFormat {
-    pub fn compile(f: &Format) -> Result<DetFormat, String> {
+    pub fn compile(f: &Format, opt_next: Option<&Format>) -> Result<DetFormat, String> {
         match f {
             Format::Zero => Ok(DetFormat::Zero),
             Format::Unit => Ok(DetFormat::Unit),
             Format::Byte(bs) => Ok(DetFormat::Byte(bs.clone())),
             Format::Alt(a, b) => {
-                let da = Box::new(DetFormat::compile(a)?);
-                let db = Box::new(DetFormat::compile(b)?);
+                let da = Box::new(DetFormat::compile(a, opt_next)?);
+                let db = Box::new(DetFormat::compile(b, opt_next)?);
                 if let Some(l) = Lookahead::new(a, b) {
                     Ok(DetFormat::If(l, da, db))
                 } else if let Some(l) = Lookahead::new(b, a) {
@@ -278,27 +281,31 @@ impl DetFormat {
                 }
             }
             Format::Cat(a, b) => {
-                let da = Box::new(DetFormat::compile(a)?);
-                let db = Box::new(DetFormat::compile(b)?);
+                let da = Box::new(DetFormat::compile(a, Some(&b))?);
+                let db = Box::new(DetFormat::compile(b, opt_next)?);
                 Ok(DetFormat::Cat(da, db))
             }
-            Format::Repeat(a, b) => {
-                let da = Box::new(DetFormat::compile(a)?);
-                let db = Box::new(DetFormat::compile(b)?);
-                if let Some(l) = Lookahead::new(a, b) {
-                    Ok(DetFormat::Cat(Box::new(DetFormat::While(l, da)), db))
-                } else if let Some(l) = Lookahead::new(b, a) {
-                    Ok(DetFormat::Cat(Box::new(DetFormat::Until(l, da)), db))
+            Format::Star(a) => {
+                // FIXME next should be a|opt_next ?
+                let da = Box::new(DetFormat::compile(a, None)?);
+                if let Some(next) = opt_next {
+                    if let Some(l) = Lookahead::new(a, next) {
+                        Ok(DetFormat::While(l, da))
+                    } else if let Some(l) = Lookahead::new(next, a) {
+                        Ok(DetFormat::Until(l, da))
+                    } else {
+                        Err("cannot find valid lookahead for star".to_string())
+                    }
                 } else {
-                    Err("cannot find valid lookahead for repeat".to_string())
+                    Ok(DetFormat::While(Lookahead::empty(), da))
                 }
             }
             Format::Array(index, a) => {
-                let da = Box::new(DetFormat::compile(a)?);
+                let da = Box::new(DetFormat::compile(a, opt_next)?);
                 Ok(DetFormat::Array(*index, da))
             }
             Format::Map(f, a) => {
-                let da = Box::new(DetFormat::compile(a)?);
+                let da = Box::new(DetFormat::compile(a, opt_next)?);
                 Ok(DetFormat::Map(*f, da))
             }
         }
@@ -421,16 +428,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         Box::new(dqt.clone()),
         Box::new(Format::Alt(Box::new(sof0.clone()), Box::new(dht.clone()))),
     );
-    let ecs = Format::Repeat(
-        Box::new(Format::Alt(
-            Box::new(Format::Byte(ByteSet::Not(0xFF))),
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0x00))),
-            )),
+    let ecs = Format::Star(Box::new(Format::Alt(
+        Box::new(Format::Byte(ByteSet::Not(0xFF))),
+        Box::new(Format::Cat(
+            Box::new(Format::Byte(ByteSet::Is(0xFF))),
+            Box::new(Format::Byte(ByteSet::Is(0x00))),
         )),
-        Box::new(eoi),
-    );
+    )));
     let sos = Format::Cat(
         Box::new(Format::Cat(Box::new(marker(0xDA)), Box::new(var.clone()))),
         Box::new(ecs),
@@ -439,10 +443,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         Box::new(soi),
         Box::new(Format::Cat(
             Box::new(app0),
-            Box::new(Format::Repeat(Box::new(chunk.clone()), Box::new(sos))),
+            Box::new(Format::Cat(
+                Box::new(Format::Star(Box::new(chunk.clone()))),
+                Box::new(Format::Cat(Box::new(sos), Box::new(eoi))),
+            )),
         )),
     );
-    let det_jpeg = DetFormat::compile(&jpeg)?;
+    let det_jpeg = DetFormat::compile(&jpeg, None)?;
     let mut stack = Vec::new();
     let res = det_jpeg.parse(&mut stack, &input);
     println!("{:?}", res);
