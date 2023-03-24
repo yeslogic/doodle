@@ -192,7 +192,7 @@ impl Lookahead {
 
     pub fn new(a: &Format, b: &Format) -> Option<Self> {
         const LEN: usize = 2;
-        let pa = Lookahead::from(a, LEN)?;
+        let pa = Lookahead::from(a, LEN, Format::Unit)?;
         if !b.might_match_lookahead(&pa.pattern, Format::Unit) {
             Some(pa)
         } else {
@@ -221,36 +221,38 @@ impl Lookahead {
         return true;
     }
 
-    pub fn from(f: &Format, len: usize) -> Option<Lookahead> {
+    pub fn from(f: &Format, len: usize, next: Format) -> Option<Lookahead> {
         match f {
             Format::Zero => None,
-            Format::Unit => Some(Lookahead::empty()),
-            Format::Byte(bs) => Some(Lookahead::single(bs.clone())),
-            Format::Alt(a, b) => {
-                if let Some(pa) = Lookahead::from(a, len) {
-                    if let Some(pb) = Lookahead::from(b, len) {
-                        Some(Lookahead::alt(&pa, &pb))
-                    } else {
-                        None
-                    }
+            Format::Unit => {
+                if let Format::Unit = next {
+                    Some(Lookahead::empty())
                 } else {
-                    None
+                    Lookahead::from(&next, len, Format::Unit)
+                }
+            }
+            Format::Byte(bs) => {
+                let pa = Lookahead::single(bs.clone());
+                if len > 1 {
+                    // FIXME do we still need to check for Format::Zero?
+                    let pb = Lookahead::from(&next, len - 1, Format::Unit)?;
+                    Some(Lookahead::cat(&pa, &pb))
+                } else {
+                    Some(pa)
+                }
+            }
+            Format::Alt(a, b) => {
+                let ra = Lookahead::from(a, len, next.clone());
+                let rb = Lookahead::from(b, len, next);
+                match (ra, rb) {
+                    (None, None) => None,
+                    (Some(pa), None) => Some(pa),
+                    (None, Some(pb)) => Some(pb),
+                    (Some(pa), Some(pb)) => Some(Lookahead::alt(&pa, &pb)),
                 }
             }
             Format::Cat(a, b) => {
-                if let Some(pa) = Lookahead::from(a, len) {
-                    if pa.pattern.len() < len {
-                        if let Some(pb) = Lookahead::from(b, len - pa.pattern.len()) {
-                            Some(Lookahead::cat(&pa, &pb))
-                        } else {
-                            None
-                        }
-                    } else {
-                        Some(pa)
-                    }
-                } else {
-                    None
-                }
+                Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
             }
             Format::Star(_a) => {
                 Some(Lookahead::empty()) // FIXME ?
@@ -258,7 +260,7 @@ impl Lookahead {
             Format::Array(_index, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
-            Format::Map(_f, a) => Lookahead::from(a, len),
+            Format::Map(_f, a) => Lookahead::from(a, len, next),
         }
     }
 }
