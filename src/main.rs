@@ -33,16 +33,16 @@ struct Lookahead {
     pattern: Vec<ByteSet>,
 }
 
-enum DetFormat {
+enum Decoder {
     Zero,
     Unit,
     Byte(ByteSet),
-    If(Lookahead, Box<DetFormat>, Box<DetFormat>),
-    Cat(Box<DetFormat>, Box<DetFormat>),
-    While(Lookahead, Box<DetFormat>),
-    Until(Lookahead, Box<DetFormat>),
-    Array(usize, Box<DetFormat>),
-    Map(fn(&Value) -> Value, Box<DetFormat>),
+    If(Lookahead, Box<Decoder>, Box<Decoder>),
+    Cat(Box<Decoder>, Box<Decoder>),
+    While(Lookahead, Box<Decoder>),
+    Until(Lookahead, Box<Decoder>),
+    Array(usize, Box<Decoder>),
+    Map(fn(&Value) -> Value, Box<Decoder>),
 }
 
 impl Value {
@@ -263,59 +263,59 @@ impl Lookahead {
     }
 }
 
-impl DetFormat {
-    pub fn compile(f: &Format, opt_next: Option<&Format>) -> Result<DetFormat, String> {
+impl Decoder {
+    pub fn compile(f: &Format, opt_next: Option<&Format>) -> Result<Decoder, String> {
         match f {
-            Format::Zero => Ok(DetFormat::Zero),
-            Format::Unit => Ok(DetFormat::Unit),
-            Format::Byte(bs) => Ok(DetFormat::Byte(bs.clone())),
+            Format::Zero => Ok(Decoder::Zero),
+            Format::Unit => Ok(Decoder::Unit),
+            Format::Byte(bs) => Ok(Decoder::Byte(bs.clone())),
             Format::Alt(a, b) => {
-                let da = Box::new(DetFormat::compile(a, opt_next)?);
-                let db = Box::new(DetFormat::compile(b, opt_next)?);
+                let da = Box::new(Decoder::compile(a, opt_next)?);
+                let db = Box::new(Decoder::compile(b, opt_next)?);
                 if let Some(l) = Lookahead::new(a, b) {
-                    Ok(DetFormat::If(l, da, db))
+                    Ok(Decoder::If(l, da, db))
                 } else if let Some(l) = Lookahead::new(b, a) {
-                    Ok(DetFormat::If(l, db, da))
+                    Ok(Decoder::If(l, db, da))
                 } else {
                     Err("cannot find valid lookahead for alt".to_string())
                 }
             }
             Format::Cat(a, b) => {
-                let da = Box::new(DetFormat::compile(a, Some(&b))?);
-                let db = Box::new(DetFormat::compile(b, opt_next)?);
-                Ok(DetFormat::Cat(da, db))
+                let da = Box::new(Decoder::compile(a, Some(&b))?);
+                let db = Box::new(Decoder::compile(b, opt_next)?);
+                Ok(Decoder::Cat(da, db))
             }
             Format::Star(a) => {
                 // FIXME next should be a|opt_next ?
-                let da = Box::new(DetFormat::compile(a, None)?);
+                let da = Box::new(Decoder::compile(a, None)?);
                 if let Some(next) = opt_next {
                     if let Some(l) = Lookahead::new(a, next) {
-                        Ok(DetFormat::While(l, da))
+                        Ok(Decoder::While(l, da))
                     } else if let Some(l) = Lookahead::new(next, a) {
-                        Ok(DetFormat::Until(l, da))
+                        Ok(Decoder::Until(l, da))
                     } else {
                         Err("cannot find valid lookahead for star".to_string())
                     }
                 } else {
-                    Ok(DetFormat::While(Lookahead::empty(), da))
+                    Ok(Decoder::While(Lookahead::empty(), da))
                 }
             }
             Format::Array(index, a) => {
-                let da = Box::new(DetFormat::compile(a, opt_next)?);
-                Ok(DetFormat::Array(*index, da))
+                let da = Box::new(Decoder::compile(a, opt_next)?);
+                Ok(Decoder::Array(*index, da))
             }
             Format::Map(f, a) => {
-                let da = Box::new(DetFormat::compile(a, opt_next)?);
-                Ok(DetFormat::Map(*f, da))
+                let da = Box::new(Decoder::compile(a, opt_next)?);
+                Ok(Decoder::Map(*f, da))
             }
         }
     }
 
     pub fn parse(&self, stack: &mut Vec<Value>, input: &[u8]) -> Option<(usize, Value)> {
         match self {
-            DetFormat::Zero => None,
-            DetFormat::Unit => Some((0, Value::Unit)),
-            DetFormat::Byte(bs) => {
+            Decoder::Zero => None,
+            Decoder::Unit => Some((0, Value::Unit)),
+            Decoder::Byte(bs) => {
                 if input.len() > 0 {
                     if bs.contains(input[0]) {
                         Some((1, Value::U8(input[0])))
@@ -326,14 +326,14 @@ impl DetFormat {
                     None
                 }
             }
-            DetFormat::If(look, a, b) => {
+            Decoder::If(look, a, b) => {
                 if look.matches(input) {
                     a.parse(stack, input)
                 } else {
                     b.parse(stack, input)
                 }
             }
-            DetFormat::Cat(a, b) => {
+            Decoder::Cat(a, b) => {
                 if let Some((ca, va)) = a.parse(stack, input) {
                     stack.push(va);
                     if let Some((cb, vb)) = b.parse(stack, &input[ca..]) {
@@ -346,7 +346,7 @@ impl DetFormat {
                     None
                 }
             }
-            DetFormat::While(look, a) => {
+            Decoder::While(look, a) => {
                 let mut c = 0;
                 let mut v = Vec::new();
                 while look.matches(input) {
@@ -359,7 +359,7 @@ impl DetFormat {
                 }
                 Some((c, Value::Seq(v)))
             }
-            DetFormat::Until(look, a) => {
+            Decoder::Until(look, a) => {
                 let mut c = 0;
                 let mut v = Vec::new();
                 while !look.matches(&input[c..]) {
@@ -372,7 +372,7 @@ impl DetFormat {
                 }
                 Some((c, Value::Seq(v)))
             }
-            DetFormat::Array(index, a) => {
+            Decoder::Array(index, a) => {
                 let mut c = 0;
                 let mut v = Vec::new();
                 let count = stack[stack.len() - index - 1].usize_or_panic();
@@ -386,7 +386,7 @@ impl DetFormat {
                 }
                 Some((c, Value::Seq(v)))
             }
-            DetFormat::Map(f, a) => {
+            Decoder::Map(f, a) => {
                 if let Some((ca, va)) = a.parse(stack, input) {
                     Some((ca, f(&va)))
                 } else {
@@ -452,7 +452,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             )),
         )),
     );
-    let det_jpeg = DetFormat::compile(&jpeg, None)?;
+    let det_jpeg = Decoder::compile(&jpeg, None)?;
     let mut stack = Vec::new();
     let res = det_jpeg.parse(&mut stack, &input);
     println!("{:?}", res);
