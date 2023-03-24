@@ -14,18 +14,20 @@ enum Format {
     Byte(ByteSet),
     Alt(Box<Format>, Box<Format>),
     Cat(Box<Format>, Box<Format>),
+    Record(Vec<(String, Format)>),
     Star(Box<Format>),
     Array(usize, Box<Format>),
     Map(fn(&Value) -> Value, Box<Format>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Value {
     Unit,
     U8(u8),
     U16(u16),
     Pair(Box<Value>, Box<Value>),
     Seq(Vec<Value>),
+    Record(Vec<(String, Value)>),
 }
 
 #[derive(Debug)]
@@ -39,6 +41,7 @@ enum Decoder {
     Byte(ByteSet),
     If(Lookahead, Box<Decoder>, Box<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
+    Record(Vec<(String, Decoder)>),
     While(Lookahead, Box<Decoder>),
     Until(Lookahead, Box<Decoder>),
     Array(usize, Box<Decoder>),
@@ -50,7 +53,9 @@ impl Value {
         match *self {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
-            Value::Unit | Value::Pair(_, _) | Value::Seq(_) => panic!("value is not number"),
+            Value::Unit | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
+                panic!("value is not number")
+            }
         }
     }
 
@@ -156,6 +161,15 @@ impl Format {
             Format::Cat(a, b) => {
                 a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
             }
+            Format::Record(fields) => {
+                if fields.is_empty() {
+                    next.might_match_lookahead(input, Format::Unit)
+                } else {
+                    fields[0]
+                        .1
+                        .might_match_lookahead(input, Format::Record(fields[1..].to_vec()))
+                }
+            }
             Format::Star(_a) => {
                 true // FIXME
             }
@@ -254,6 +268,13 @@ impl Lookahead {
             Format::Cat(a, b) => {
                 Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
             }
+            Format::Record(fields) => {
+                if fields.is_empty() {
+                    Some(Lookahead::empty())
+                } else {
+                    Lookahead::from(&fields[0].1, len, Format::Record(fields[1..].to_vec()))
+                }
+            }
             Format::Star(_a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
@@ -286,6 +307,20 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, Some(&b))?);
                 let db = Box::new(Decoder::compile(b, opt_next)?);
                 Ok(Decoder::Cat(da, db))
+            }
+            Format::Record(fields) => {
+                let mut dfields = Vec::new();
+                for i in 0..fields.len() {
+                    let (name, f) = &fields[i];
+                    let opt_next = if i + 1 < fields.len() {
+                        Some(&fields[i + 1].1)
+                    } else {
+                        None
+                    };
+                    let df = Decoder::compile(f, opt_next)?;
+                    dfields.push((name.clone(), df));
+                }
+                Ok(Decoder::Record(dfields))
             }
             Format::Star(a) => {
                 // FIXME next should be a|opt_next ?
@@ -347,6 +382,20 @@ impl Decoder {
                 } else {
                     None
                 }
+            }
+            Decoder::Record(fields) => {
+                let mut c = 0;
+                let mut v = Vec::new();
+                for (name, f) in fields {
+                    let (cf, vf) = f.parse(stack, &input[c..])?;
+                    c += cf;
+                    v.push((name.clone(), vf.clone()));
+                    stack.push(vf);
+                }
+                for _ in fields {
+                    stack.pop();
+                }
+                Some((c, Value::Record(v)))
             }
             Decoder::While(look, a) => {
                 let mut c = 0;
@@ -418,10 +467,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             Box::new(Format::Byte(ByteSet::Any)),
         )),
     );
-    let var = Format::Cat(
-        Box::new(length.clone()),
-        Box::new(Format::Array(0, Box::new(Format::Byte(ByteSet::Any)))),
-    );
+    let var = Format::Record(vec![
+        ("length".to_string(), length.clone()),
+        (
+            "data".to_string(),
+            Format::Array(0, Box::new(Format::Byte(ByteSet::Any))),
+        ),
+    ]);
     let app0 = Format::Cat(Box::new(marker(0xE0)), Box::new(var.clone()));
     let dqt = Format::Cat(Box::new(marker(0xDB)), Box::new(var.clone()));
     let sof0 = Format::Cat(Box::new(marker(0xC0)), Box::new(var.clone()));
@@ -430,6 +482,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         Box::new(dqt.clone()),
         Box::new(Format::Alt(Box::new(sof0.clone()), Box::new(dht.clone()))),
     );
+    let sos = Format::Cat(Box::new(marker(0xDA)), Box::new(var.clone()));
     let ecs = Format::Star(Box::new(Format::Alt(
         Box::new(Format::Byte(ByteSet::Not(0xFF))),
         Box::new(Format::Map(
@@ -440,20 +493,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             )),
         )),
     )));
-    let sos = Format::Cat(
-        Box::new(Format::Cat(Box::new(marker(0xDA)), Box::new(var.clone()))),
-        Box::new(ecs),
-    );
-    let jpeg = Format::Cat(
-        Box::new(soi),
-        Box::new(Format::Cat(
-            Box::new(app0),
-            Box::new(Format::Cat(
-                Box::new(Format::Star(Box::new(chunk.clone()))),
-                Box::new(Format::Cat(Box::new(sos), Box::new(eoi))),
-            )),
-        )),
-    );
+    let jpeg = Format::Record(vec![
+        ("soi".to_string(), soi),
+        ("app0".to_string(), app0),
+        ("chunks".to_string(), Format::Star(Box::new(chunk.clone()))),
+        ("sos".to_string(), sos),
+        ("ecs".to_string(), ecs),
+        ("eoi".to_string(), eoi),
+    ]);
     let det_jpeg = Decoder::compile(&jpeg, None)?;
     let mut stack = Vec::new();
     let res = det_jpeg.parse(&mut stack, &input);
