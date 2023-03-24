@@ -430,9 +430,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     );
     let ecs = Format::Star(Box::new(Format::Alt(
         Box::new(Format::Byte(ByteSet::Not(0xFF))),
-        Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::Is(0xFF))),
-            Box::new(Format::Byte(ByteSet::Is(0x00))),
+        Box::new(Format::Map(
+            |_| Value::U8(0),
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0x00))),
+            )),
         )),
     )));
     let sos = Format::Cat(
