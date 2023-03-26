@@ -14,6 +14,7 @@ enum Format {
     Byte(ByteSet),
     Alt(Box<Format>, Box<Format>),
     Cat(Box<Format>, Box<Format>),
+    Tuple(Vec<Format>),
     Record(Vec<(String, Format)>),
     Star(Box<Format>),
     Array(usize, Box<Format>),
@@ -41,6 +42,7 @@ enum Decoder {
     Byte(ByteSet),
     If(Lookahead, Box<Decoder>, Box<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
+    Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
     While(Lookahead, Box<Decoder>),
     Until(Lookahead, Box<Decoder>),
@@ -161,6 +163,13 @@ impl Format {
             Format::Cat(a, b) => {
                 a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
             }
+            Format::Tuple(fields) => {
+                if fields.is_empty() {
+                    next.might_match_lookahead(input, Format::Unit)
+                } else {
+                    fields[0].might_match_lookahead(input, Format::Tuple(fields[1..].to_vec()))
+                }
+            }
             Format::Record(fields) => {
                 if fields.is_empty() {
                     next.might_match_lookahead(input, Format::Unit)
@@ -268,6 +277,13 @@ impl Lookahead {
             Format::Cat(a, b) => {
                 Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
             }
+            Format::Tuple(fields) => {
+                if fields.is_empty() {
+                    Some(Lookahead::empty())
+                } else {
+                    Lookahead::from(&fields[0], len, Format::Tuple(fields[1..].to_vec()))
+                }
+            }
             Format::Record(fields) => {
                 if fields.is_empty() {
                     Some(Lookahead::empty())
@@ -307,6 +323,20 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, Some(&b))?);
                 let db = Box::new(Decoder::compile(b, opt_next)?);
                 Ok(Decoder::Cat(da, db))
+            }
+            Format::Tuple(fields) => {
+                let mut dfields = Vec::new();
+                for i in 0..fields.len() {
+                    let f = &fields[i];
+                    let opt_next = if i + 1 < fields.len() {
+                        Some(&fields[i + 1])
+                    } else {
+                        None
+                    };
+                    let df = Decoder::compile(f, opt_next)?;
+                    dfields.push(df);
+                }
+                Ok(Decoder::Tuple(dfields))
             }
             Format::Record(fields) => {
                 let mut dfields = Vec::new();
@@ -382,6 +412,20 @@ impl Decoder {
                 } else {
                     None
                 }
+            }
+            Decoder::Tuple(fields) => {
+                let mut c = 0;
+                let mut v = Vec::new();
+                for f in fields {
+                    let (cf, vf) = f.parse(stack, &input[c..])?;
+                    c += cf;
+                    v.push(vf.clone());
+                    stack.push(vf);
+                }
+                for _ in fields {
+                    stack.pop();
+                }
+                Some((c, Value::Seq(v)))
             }
             Decoder::Record(fields) => {
                 let mut c = 0;
