@@ -7,6 +7,22 @@ enum ByteSet {
     Not(u8),
 }
 
+#[derive(Clone, Debug)]
+enum Value {
+    Unit,
+    U8(u8),
+    U16(u16),
+    Pair(Box<Value>, Box<Value>),
+    Seq(Vec<Value>),
+    Record(Vec<(String, Value)>),
+}
+
+#[derive(Clone)]
+enum Expr {
+    Const(Value),
+    Index(usize),
+}
+
 #[derive(Clone)]
 enum Format {
     Zero,
@@ -17,18 +33,8 @@ enum Format {
     Tuple(Vec<Format>),
     Record(Vec<(String, Format)>),
     Star(Box<Format>),
-    Array(usize, Box<Format>),
+    Array(Expr, Box<Format>),
     Map(fn(&Value) -> Value, Box<Format>),
-}
-
-#[derive(Clone, Debug)]
-enum Value {
-    Unit,
-    U8(u8),
-    U16(u16),
-    Pair(Box<Value>, Box<Value>),
-    Seq(Vec<Value>),
-    Record(Vec<(String, Value)>),
 }
 
 #[derive(Debug)]
@@ -46,7 +52,7 @@ enum Decoder {
     Record(Vec<(String, Decoder)>),
     While(Lookahead, Box<Decoder>),
     Until(Lookahead, Box<Decoder>),
-    Array(usize, Box<Decoder>),
+    Array(Expr, Box<Decoder>),
     Map(fn(&Value) -> Value, Box<Decoder>),
 }
 
@@ -75,6 +81,15 @@ impl Value {
             }
         } else {
             panic!("value is not pair")
+        }
+    }
+}
+
+impl Expr {
+    pub fn eval(&self, stack: &[Value]) -> Value {
+        match self {
+            Expr::Const(v) => v.clone(),
+            Expr::Index(index) => stack[stack.len() - 1 - index].clone(),
         }
     }
 }
@@ -182,7 +197,7 @@ impl Format {
             Format::Star(_a) => {
                 true // FIXME
             }
-            Format::Array(_index, _a) => {
+            Format::Array(_expr, _a) => {
                 true // FIXME
             }
             Format::Map(_f, a) => a.might_match_lookahead(input, next),
@@ -294,7 +309,7 @@ impl Lookahead {
             Format::Star(_a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
-            Format::Array(_index, _a) => {
+            Format::Array(_expr, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
             Format::Map(_f, a) => Lookahead::from(a, len, next),
@@ -367,9 +382,9 @@ impl Decoder {
                     Ok(Decoder::While(Lookahead::empty(), da))
                 }
             }
-            Format::Array(index, a) => {
+            Format::Array(expr, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
-                Ok(Decoder::Array(*index, da))
+                Ok(Decoder::Array(expr.clone(), da))
             }
             Format::Map(f, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
@@ -467,10 +482,10 @@ impl Decoder {
                 }
                 Some((c, Value::Seq(v)))
             }
-            Decoder::Array(index, a) => {
+            Decoder::Array(expr, a) => {
                 let mut c = 0;
                 let mut v = Vec::new();
-                let count = stack[stack.len() - index - 1].usize_or_panic();
+                let count = expr.eval(stack).usize_or_panic();
                 for _i in 0..count {
                     if let Some((ca, va)) = a.parse(stack, &input[c..]) {
                         c += ca;
@@ -515,7 +530,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         ("length".to_string(), length.clone()),
         (
             "data".to_string(),
-            Format::Array(0, Box::new(Format::Byte(ByteSet::Any))),
+            Format::Array(Expr::Index(0), Box::new(Format::Byte(ByteSet::Any))),
         ),
     ]);
     let app0 = Format::Cat(Box::new(marker(0xE0)), Box::new(var.clone()));
