@@ -153,6 +153,15 @@ impl ByteSet {
 }
 
 impl Format {
+    fn from_string(s: &str) -> Format {
+        let v = s
+            .as_bytes()
+            .iter()
+            .map(|b| Format::Byte(ByteSet::Is(*b)))
+            .collect();
+        Format::Tuple(v)
+    }
+
     pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
             Format::Zero => false,
@@ -523,6 +532,10 @@ impl Decoder {
     }
 }
 
+fn any_bytes() -> Format {
+    Format::Star(Box::new(Format::Byte(ByteSet::Any)))
+}
+
 fn jpeg_format() -> Format {
     fn marker(b: u8) -> Format {
         Format::Cat(
@@ -531,34 +544,42 @@ fn jpeg_format() -> Format {
         )
     }
 
+    fn var_data(f: Format) -> Format {
+        let length = Format::Map(
+            Value::map_u16be_minus_two,
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Any)),
+                Box::new(Format::Byte(ByteSet::Any)),
+            )),
+        );
+        Format::Record(vec![
+            ("length".to_string(), length.clone()),
+            (
+                "data".to_string(),
+                Format::Slice(Expr::Index(0), Box::new(f)),
+            ),
+        ])
+    }
+
+    fn chunk(b: u8, f: Format) -> Format {
+        Format::Cat(Box::new(marker(b)), Box::new(var_data(f)))
+    }
+
     let soi = marker(0xD8);
     let eoi = marker(0xD9);
-    let length = Format::Map(
-        Value::map_u16be_minus_two,
-        Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::Any)),
-            Box::new(Format::Byte(ByteSet::Any)),
-        )),
-    );
-    let var = Format::Record(vec![
-        ("length".to_string(), length.clone()),
-        (
-            "data".to_string(),
-            Format::Slice(
-                Expr::Index(0),
-                Box::new(Format::Star(Box::new(Format::Byte(ByteSet::Any)))),
-            ),
-        ),
+    let app0_data = Format::Record(vec![
+        ("identifier".to_string(), Format::from_string("JFIF\0")),
+        ("blah".to_string(), any_bytes()),
     ]);
-    let app0 = Format::Cat(Box::new(marker(0xE0)), Box::new(var.clone()));
-    let dqt = Format::Cat(Box::new(marker(0xDB)), Box::new(var.clone()));
-    let sof0 = Format::Cat(Box::new(marker(0xC0)), Box::new(var.clone()));
-    let dht = Format::Cat(Box::new(marker(0xC4)), Box::new(var.clone()));
-    let chunk = Format::Alt(
+    let app0 = chunk(0xE0, app0_data);
+    let dqt = chunk(0xDB, any_bytes());
+    let sof0 = chunk(0xC0, any_bytes());
+    let dht = chunk(0xC4, any_bytes());
+    let any_chunk = Format::Alt(
         Box::new(dqt.clone()),
         Box::new(Format::Alt(Box::new(sof0.clone()), Box::new(dht.clone()))),
     );
-    let sos = Format::Cat(Box::new(marker(0xDA)), Box::new(var.clone()));
+    let sos = chunk(0xDA, any_bytes());
     let ecs = Format::Star(Box::new(Format::Alt(
         Box::new(Format::Byte(ByteSet::Not(0xFF))),
         Box::new(Format::Map(
@@ -572,7 +593,7 @@ fn jpeg_format() -> Format {
     let jpeg = Format::Record(vec![
         ("soi".to_string(), soi),
         ("app0".to_string(), app0),
-        ("chunks".to_string(), Format::Star(Box::new(chunk.clone()))),
+        ("chunks".to_string(), Format::Star(Box::new(any_chunk))),
         ("sos".to_string(), sos),
         ("ecs".to_string(), ecs),
         ("eoi".to_string(), eoi),
