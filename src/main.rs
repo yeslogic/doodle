@@ -519,7 +519,11 @@ impl Decoder {
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval(stack).usize_or_panic();
-                a.parse(stack, &input[..size])
+                if let Some((_c, v)) = a.parse(stack, &input[..size]) {
+                    Some((size, v))
+                } else {
+                    None
+                }
             }
             Decoder::Map(f, a) => {
                 if let Some((ca, va)) = a.parse(stack, input) {
