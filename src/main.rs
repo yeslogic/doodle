@@ -120,42 +120,21 @@ impl ByteSet {
         match (*a, *b) {
             (ByteSet::Any, _) => ByteSet::Any,
             (_, ByteSet::Any) => ByteSet::Any,
-            (ByteSet::Is(m), ByteSet::Is(n)) => {
-                if m == n {
-                    ByteSet::Is(m)
-                } else {
-                    ByteSet::Any
-                }
-            }
-            (ByteSet::Not(m), ByteSet::Not(n)) => {
-                if m == n {
-                    ByteSet::Not(m)
-                } else {
-                    ByteSet::Any
-                }
-            }
-            (ByteSet::Is(m), ByteSet::Not(n)) => {
-                if m != n {
-                    ByteSet::Not(n)
-                } else {
-                    ByteSet::Any
-                }
-            }
-            (ByteSet::Not(m), ByteSet::Is(n)) => {
-                if m != n {
-                    ByteSet::Not(m)
-                } else {
-                    ByteSet::Any
-                }
-            }
+            (ByteSet::Is(m), ByteSet::Is(n)) if m == n => ByteSet::Is(m),
+            (ByteSet::Is(_), ByteSet::Is(_)) => ByteSet::Any,
+            (ByteSet::Not(m), ByteSet::Not(n)) if m == n => ByteSet::Not(m),
+            (ByteSet::Not(_), ByteSet::Not(_)) => ByteSet::Any,
+            (ByteSet::Is(m), ByteSet::Not(n)) if m != n => ByteSet::Not(n),
+            (ByteSet::Is(_), ByteSet::Not(_)) => ByteSet::Any,
+            (ByteSet::Not(m), ByteSet::Is(n)) if m != n => ByteSet::Not(m),
+            (ByteSet::Not(_), ByteSet::Is(_)) => ByteSet::Any,
         }
     }
 }
 
 impl Format {
-    fn from_string(s: &str) -> Format {
-        let v = s
-            .as_bytes()
+    fn from_bytes(bytes: &[u8]) -> Format {
+        let v = bytes
             .iter()
             .map(|b| Format::Byte(ByteSet::Is(*b)))
             .collect();
@@ -165,46 +144,31 @@ impl Format {
     pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
             Format::Zero => false,
-            Format::Unit => {
-                if let Format::Unit = next {
-                    true
-                } else {
-                    next.might_match_lookahead(input, Format::Unit)
-                }
-            }
-            Format::Byte(bs) => {
-                if input.len() > 0 {
-                    if ByteSet::disjoint(bs, &input[0]) {
-                        false
-                    } else {
-                        next.might_match_lookahead(&input[1..], Format::Unit)
-                    }
-                } else {
-                    true
-                }
-            }
+            Format::Unit => match next {
+                Format::Unit => true,
+                next => next.might_match_lookahead(input, Format::Unit),
+            },
+            Format::Byte(bs) => match input.split_first() {
+                Some((b, _)) if ByteSet::disjoint(bs, b) => false,
+                Some((_, input)) => next.might_match_lookahead(input, Format::Unit),
+                None => true,
+            },
             Format::Alt(a, b) => {
                 a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
             }
             Format::Cat(a, b) => {
                 a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
             }
-            Format::Tuple(fields) => {
-                if fields.is_empty() {
-                    next.might_match_lookahead(input, Format::Unit)
-                } else {
-                    fields[0].might_match_lookahead(input, Format::Tuple(fields[1..].to_vec()))
+            Format::Tuple(fields) => match fields.split_first() {
+                None => next.might_match_lookahead(input, Format::Unit),
+                Some((a, fields)) => a.might_match_lookahead(input, Format::Tuple(fields.to_vec())),
+            },
+            Format::Record(fields) => match fields.split_first() {
+                None => next.might_match_lookahead(input, Format::Unit),
+                Some(((_, a), fields)) => {
+                    a.might_match_lookahead(input, Format::Record(fields.to_vec()))
                 }
-            }
-            Format::Record(fields) => {
-                if fields.is_empty() {
-                    next.might_match_lookahead(input, Format::Unit)
-                } else {
-                    fields[0]
-                        .1
-                        .might_match_lookahead(input, Format::Record(fields[1..].to_vec()))
-                }
-            }
+            },
             Format::Star(_a) => {
                 true // FIXME
             }
@@ -276,13 +240,10 @@ impl Lookahead {
     pub fn from(f: &Format, len: usize, next: Format) -> Option<Lookahead> {
         match f {
             Format::Zero => None,
-            Format::Unit => {
-                if let Format::Unit = next {
-                    Some(Lookahead::empty())
-                } else {
-                    Lookahead::from(&next, len, Format::Unit)
-                }
-            }
+            Format::Unit => match next {
+                Format::Unit => Some(Lookahead::empty()),
+                next => Lookahead::from(&next, len, Format::Unit),
+            },
             Format::Byte(bs) => {
                 let pa = Lookahead::single(bs.clone());
                 if len > 1 {
@@ -306,20 +267,14 @@ impl Lookahead {
             Format::Cat(a, b) => {
                 Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
             }
-            Format::Tuple(fields) => {
-                if fields.is_empty() {
-                    Some(Lookahead::empty())
-                } else {
-                    Lookahead::from(&fields[0], len, Format::Tuple(fields[1..].to_vec()))
-                }
-            }
-            Format::Record(fields) => {
-                if fields.is_empty() {
-                    Some(Lookahead::empty())
-                } else {
-                    Lookahead::from(&fields[0].1, len, Format::Record(fields[1..].to_vec()))
-                }
-            }
+            Format::Tuple(fields) => match fields.split_first() {
+                None => Some(Lookahead::empty()),
+                Some((a, fields)) => Lookahead::from(a, len, Format::Tuple(fields.to_vec())),
+            },
+            Format::Record(fields) => match fields.split_first() {
+                None => Some(Lookahead::empty()),
+                Some(((_, a), fields)) => Lookahead::from(a, len, Format::Record(fields.to_vec())),
+            },
             Format::Star(_a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
@@ -357,31 +312,25 @@ impl Decoder {
                 Ok(Decoder::Cat(da, db))
             }
             Format::Tuple(fields) => {
-                let mut dfields = Vec::new();
-                for i in 0..fields.len() {
-                    let f = &fields[i];
-                    let opt_next = if i + 1 < fields.len() {
-                        Some(&fields[i + 1])
-                    } else {
-                        None
-                    };
-                    let df = Decoder::compile(f, opt_next)?;
+                let mut dfields = Vec::with_capacity(fields.len());
+                let mut fields = fields.iter().peekable();
+
+                while let Some(f) = fields.next() {
+                    let df = Decoder::compile(f, fields.peek().copied())?;
                     dfields.push(df);
                 }
+
                 Ok(Decoder::Tuple(dfields))
             }
             Format::Record(fields) => {
-                let mut dfields = Vec::new();
-                for i in 0..fields.len() {
-                    let (name, f) = &fields[i];
-                    let opt_next = if i + 1 < fields.len() {
-                        Some(&fields[i + 1].1)
-                    } else {
-                        None
-                    };
-                    let df = Decoder::compile(f, opt_next)?;
+                let mut dfields = Vec::with_capacity(fields.len());
+                let mut fields = fields.iter().peekable();
+
+                while let Some((name, f)) = fields.next() {
+                    let df = Decoder::compile(f, fields.peek().map(|(_, f)| f))?;
                     dfields.push((name.clone(), df));
                 }
+
                 Ok(Decoder::Record(dfields))
             }
             Format::Star(a) => {
@@ -548,7 +497,7 @@ fn jpeg_format() -> Format {
     let soi = marker(0xD8);
     let eoi = marker(0xD9);
     let app0_data = Format::Record(vec![
-        ("identifier".to_string(), Format::from_string("JFIF\0")),
+        ("identifier".to_string(), Format::from_bytes(b"JFIF\0")),
         ("blah".to_string(), any_bytes()),
     ]);
     let app0 = chunk(0xE0, app0_data);
