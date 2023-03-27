@@ -379,7 +379,7 @@ impl Decoder {
                         Err("cannot find valid lookahead for star".to_string())
                     }
                 } else {
-                    Ok(Decoder::While(Lookahead::empty(), da))
+                    Ok(Decoder::While(Lookahead::single(ByteSet::Any), da))
                 }
             }
             Format::Array(expr, a) => {
@@ -459,7 +459,7 @@ impl Decoder {
             Decoder::While(look, a) => {
                 let mut c = 0;
                 let mut v = Vec::new();
-                while look.matches(input) {
+                while look.matches(&input[c..]) {
                     if let Some((ca, va)) = a.parse(stack, &input[c..]) {
                         c += ca;
                         v.push(va);
