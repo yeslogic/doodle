@@ -419,12 +419,9 @@ impl Decoder {
             Decoder::Zero => None,
             Decoder::Unit => Some((0, Value::Unit)),
             Decoder::Byte(bs) => {
-                if input.len() > 0 {
-                    if bs.contains(input[0]) {
-                        Some((1, Value::U8(input[0])))
-                    } else {
-                        None
-                    }
+                let (&b, _) = input.split_first()?;
+                if bs.contains(b) {
+                    Some((1, Value::U8(b)))
                 } else {
                     None
                 }
@@ -437,17 +434,11 @@ impl Decoder {
                 }
             }
             Decoder::Cat(a, b) => {
-                if let Some((ca, va)) = a.parse(stack, input) {
-                    stack.push(va);
-                    if let Some((cb, vb)) = b.parse(stack, &input[ca..]) {
-                        let va = stack.pop().unwrap();
-                        Some((ca + cb, Value::Pair(Box::new(va), Box::new(vb))))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+                let (ca, va) = a.parse(stack, input)?;
+                stack.push(va);
+                let (cb, vb) = b.parse(stack, &input[ca..])?;
+                let va = stack.pop().unwrap();
+                Some((ca + cb, Value::Pair(Box::new(va), Box::new(vb))))
             }
             Decoder::Tuple(fields) => {
                 let mut c = 0;
@@ -481,12 +472,9 @@ impl Decoder {
                 let mut c = 0;
                 let mut v = Vec::new();
                 while look.matches(&input[c..]) {
-                    if let Some((ca, va)) = a.parse(stack, &input[c..]) {
-                        c += ca;
-                        v.push(va);
-                    } else {
-                        return None;
-                    }
+                    let (ca, va) = a.parse(stack, &input[c..])?;
+                    c += ca;
+                    v.push(va);
                 }
                 Some((c, Value::Seq(v)))
             }
@@ -494,12 +482,9 @@ impl Decoder {
                 let mut c = 0;
                 let mut v = Vec::new();
                 while !look.matches(&input[c..]) {
-                    if let Some((ca, va)) = a.parse(stack, &input[c..]) {
-                        c += ca;
-                        v.push(va);
-                    } else {
-                        return None;
-                    }
+                    let (ca, va) = a.parse(stack, &input[c..])?;
+                    c += ca;
+                    v.push(va);
                 }
                 Some((c, Value::Seq(v)))
             }
@@ -508,29 +493,20 @@ impl Decoder {
                 let mut v = Vec::new();
                 let count = expr.eval(stack).usize_or_panic();
                 for _i in 0..count {
-                    if let Some((ca, va)) = a.parse(stack, &input[c..]) {
-                        c += ca;
-                        v.push(va);
-                    } else {
-                        return None;
-                    }
+                    let (ca, va) = a.parse(stack, &input[c..])?;
+                    c += ca;
+                    v.push(va);
                 }
                 Some((c, Value::Seq(v)))
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval(stack).usize_or_panic();
-                if let Some((_c, v)) = a.parse(stack, &input[..size]) {
-                    Some((size, v))
-                } else {
-                    None
-                }
+                let (_c, v) = a.parse(stack, &input[..size])?;
+                Some((size, v))
             }
             Decoder::Map(f, a) => {
-                if let Some((ca, va)) = a.parse(stack, input) {
-                    Some((ca, f(&va)))
-                } else {
-                    None
-                }
+                let (ca, va) = a.parse(stack, input)?;
+                Some((ca, f(&va)))
             }
         }
     }
