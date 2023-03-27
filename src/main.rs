@@ -34,6 +34,7 @@ enum Format {
     Record(Vec<(String, Format)>),
     Star(Box<Format>),
     Array(Expr, Box<Format>),
+    Slice(Expr, Box<Format>),
     Map(fn(&Value) -> Value, Box<Format>),
 }
 
@@ -53,6 +54,7 @@ enum Decoder {
     While(Lookahead, Box<Decoder>),
     Until(Lookahead, Box<Decoder>),
     Array(Expr, Box<Decoder>),
+    Slice(Expr, Box<Decoder>),
     Map(fn(&Value) -> Value, Box<Decoder>),
 }
 
@@ -200,6 +202,9 @@ impl Format {
             Format::Array(_expr, _a) => {
                 true // FIXME
             }
+            Format::Slice(_expr, _a) => {
+                true // FIXME
+            }
             Format::Map(_f, a) => a.might_match_lookahead(input, next),
         }
     }
@@ -312,6 +317,9 @@ impl Lookahead {
             Format::Array(_expr, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
+            Format::Slice(_expr, _a) => {
+                Some(Lookahead::empty()) // FIXME ?
+            }
             Format::Map(_f, a) => Lookahead::from(a, len, next),
         }
     }
@@ -385,6 +393,10 @@ impl Decoder {
             Format::Array(expr, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 Ok(Decoder::Array(expr.clone(), da))
+            }
+            Format::Slice(expr, a) => {
+                let da = Box::new(Decoder::compile(a, None)?);
+                Ok(Decoder::Slice(expr.clone(), da))
             }
             Format::Map(f, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
@@ -496,6 +508,10 @@ impl Decoder {
                 }
                 Some((c, Value::Seq(v)))
             }
+            Decoder::Slice(expr, a) => {
+                let size = expr.eval(stack).usize_or_panic();
+                a.parse(stack, &input[..size])
+            }
             Decoder::Map(f, a) => {
                 if let Some((ca, va)) = a.parse(stack, input) {
                     Some((ca, f(&va)))
@@ -507,9 +523,7 @@ impl Decoder {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    let input = fs::read("test.jpg")?;
-
+fn jpeg_format() -> Format {
     fn marker(b: u8) -> Format {
         Format::Cat(
             Box::new(Format::Byte(ByteSet::Is(0xFF))),
@@ -530,7 +544,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         ("length".to_string(), length.clone()),
         (
             "data".to_string(),
-            Format::Array(Expr::Index(0), Box::new(Format::Byte(ByteSet::Any))),
+            Format::Slice(
+                Expr::Index(0),
+                Box::new(Format::Star(Box::new(Format::Byte(ByteSet::Any)))),
+            ),
         ),
     ]);
     let app0 = Format::Cat(Box::new(marker(0xE0)), Box::new(var.clone()));
@@ -560,9 +577,15 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         ("ecs".to_string(), ecs),
         ("eoi".to_string(), eoi),
     ]);
-    let det_jpeg = Decoder::compile(&jpeg, None)?;
+    jpeg
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
+    let input = fs::read("test.jpg")?;
+    let f = jpeg_format();
+    let decoder = Decoder::compile(&f, None)?;
     let mut stack = Vec::new();
-    let res = det_jpeg.parse(&mut stack, &input);
+    let res = decoder.parse(&mut stack, &input);
     println!("{:?}", res);
     Ok(())
 }
