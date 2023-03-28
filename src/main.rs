@@ -363,14 +363,18 @@ impl Decoder {
         }
     }
 
-    pub fn parse(&self, stack: &mut Vec<Value>, input: &[u8]) -> Option<(usize, Value)> {
+    pub fn parse<'input>(
+        &self,
+        stack: &mut Vec<Value>,
+        input: &'input [u8],
+    ) -> Option<(Value, &'input [u8])> {
         match self {
             Decoder::Zero => None,
-            Decoder::Unit => Some((0, Value::Unit)),
+            Decoder::Unit => Some((Value::Unit, input)),
             Decoder::Byte(bs) => {
-                let (&b, _) = input.split_first()?;
+                let (&b, input) = input.split_first()?;
                 if bs.contains(b) {
-                    Some((1, Value::U8(b)))
+                    Some((Value::U8(b), input))
                 } else {
                     None
                 }
@@ -383,79 +387,84 @@ impl Decoder {
                 }
             }
             Decoder::Cat(a, b) => {
-                let (ca, va) = a.parse(stack, input)?;
+                let (va, input) = a.parse(stack, input)?;
                 stack.push(va);
-                let (cb, vb) = b.parse(stack, &input[ca..])?;
+                let (vb, input) = b.parse(stack, input)?;
                 let va = stack.pop().unwrap();
-                Some((ca + cb, Value::Pair(Box::new(va), Box::new(vb))))
+                Some((Value::Pair(Box::new(va), Box::new(vb)), input))
             }
             Decoder::Tuple(fields) => {
-                let mut c = 0;
-                let mut v = Vec::new();
+                let mut input = input;
+                let mut v = Vec::with_capacity(fields.len());
                 for f in fields {
-                    let (cf, vf) = f.parse(stack, &input[c..])?;
-                    c += cf;
+                    let (vf, next_input) = f.parse(stack, input)?;
+                    input = next_input;
                     v.push(vf.clone());
                     stack.push(vf);
                 }
                 for _ in fields {
                     stack.pop();
                 }
-                Some((c, Value::Seq(v)))
+                Some((Value::Seq(v), input))
             }
             Decoder::Record(fields) => {
-                let mut c = 0;
-                let mut v = Vec::new();
+                let mut input = input;
+                let mut v = Vec::with_capacity(fields.len());
                 for (name, f) in fields {
-                    let (cf, vf) = f.parse(stack, &input[c..])?;
-                    c += cf;
+                    let (vf, next_input) = f.parse(stack, input)?;
+                    input = next_input;
                     v.push((name.clone(), vf.clone()));
                     stack.push(vf);
                 }
                 for _ in fields {
                     stack.pop();
                 }
-                Some((c, Value::Record(v)))
+                Some((Value::Record(v), input))
             }
             Decoder::While(look, a) => {
-                let mut c = 0;
+                let mut input = input;
                 let mut v = Vec::new();
-                while look.matches(&input[c..]) {
-                    let (ca, va) = a.parse(stack, &input[c..])?;
-                    c += ca;
+                while look.matches(input) {
+                    let (va, next_input) = a.parse(stack, input)?;
+                    input = next_input;
                     v.push(va);
                 }
-                Some((c, Value::Seq(v)))
+                Some((Value::Seq(v), input))
             }
             Decoder::Until(look, a) => {
-                let mut c = 0;
+                let mut input = input;
                 let mut v = Vec::new();
-                while !look.matches(&input[c..]) {
-                    let (ca, va) = a.parse(stack, &input[c..])?;
-                    c += ca;
+                while !look.matches(input) {
+                    let (va, next_input) = a.parse(stack, input)?;
+                    input = next_input;
                     v.push(va);
                 }
-                Some((c, Value::Seq(v)))
+                Some((Value::Seq(v), input))
             }
             Decoder::Array(expr, a) => {
-                let mut c = 0;
-                let mut v = Vec::new();
+                let mut input = input;
                 let count = expr.eval(stack).usize_or_panic();
-                for _i in 0..count {
-                    let (ca, va) = a.parse(stack, &input[c..])?;
-                    c += ca;
+                let mut v = Vec::with_capacity(count);
+                for _ in 0..count {
+                    let (va, next_input) = a.parse(stack, input)?;
+                    input = next_input;
                     v.push(va);
                 }
-                Some((c, Value::Seq(v)))
+                Some((Value::Seq(v), input))
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval(stack).usize_or_panic();
-                let (_c, v) = a.parse(stack, &input[..size])?;
-                Some((size, v))
+                if size <= input.len() {
+                    let (slice, input) = input.split_at(size);
+                    let (v, _) = a.parse(stack, slice)?;
+                    Some((v, input))
+                } else {
+                    None
+                }
             }
             Decoder::Map(f, a) => {
-                let (ca, va) = a.parse(stack, input)?;
-                Some((ca, f(&va)))
+                let (va, input) = a.parse(stack, input)?;
+                Some((f(&va), input))
             }
         }
     }
