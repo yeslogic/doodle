@@ -226,15 +226,8 @@ impl Lookahead {
         }
     */
     pub fn matches(&self, input: &[u8]) -> bool {
-        if self.pattern.len() > input.len() {
-            return false;
-        }
-        for i in 0..self.pattern.len() {
-            if !self.pattern[i].contains(input[i]) {
-                return false;
-            }
-        }
-        return true;
+        self.pattern.len() <= input.len()
+            && Iterator::zip(self.pattern.iter(), input.iter()).all(|(p, b)| p.contains(*b))
     }
 
     pub fn from(f: &Format, len: usize, next: Format) -> Option<Lookahead> {
