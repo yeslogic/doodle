@@ -19,8 +19,14 @@ enum Value {
 
 #[derive(Clone)]
 enum Expr {
-    Const(Value),
     Var(usize),
+    Unit,
+    U8(u8),
+    U16(u16),
+    Sub(Box<Expr>, Box<Expr>),
+    Pair(Box<Expr>, Box<Expr>),
+    Seq(Vec<Expr>),
+    Record(Vec<(String, Expr)>),
 }
 
 #[derive(Clone)]
@@ -58,40 +64,38 @@ enum Decoder {
     Map(fn(&Value) -> Value, Box<Decoder>),
 }
 
-impl Value {
-    pub fn usize_or_panic(&self) -> usize {
-        match *self {
+impl Expr {
+    fn eval(&self, stack: &[Value]) -> Value {
+        match self {
+            Expr::Var(index) => stack[stack.len() - index - 1].clone(),
+            Expr::Unit => Value::Unit,
+            Expr::U8(x) => Value::U8(*x),
+            Expr::U16(x) => Value::U16(*x),
+            Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(x - y),
+                (Value::U16(x), Value::U16(y)) => Value::U16(x - y),
+                (_, _) => panic!("mismatched operands"),
+            },
+            Expr::Pair(expr0, expr1) => {
+                Value::Pair(Box::new(expr0.eval(stack)), Box::new(expr1.eval(stack)))
+            }
+            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::Record(fields) => Value::Record(
+                fields
+                    .iter()
+                    .map(|(label, expr)| (label.clone(), expr.eval(stack)))
+                    .collect(),
+            ),
+        }
+    }
+
+    fn eval_usize(&self, stack: &[Value]) -> usize {
+        match self.eval(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::Unit | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
                 panic!("value is not number")
             }
-        }
-    }
-
-    pub fn map_u16be_minus_two(&self) -> Self {
-        if let Value::Pair(fst, snd) = self {
-            if let Value::U8(hi) = **fst {
-                if let Value::U8(lo) = **snd {
-                    let n = (u16::from(hi) << 8) + u16::from(lo);
-                    Value::U16(n - 2)
-                } else {
-                    panic!("second is not u8")
-                }
-            } else {
-                panic!("first is not u8")
-            }
-        } else {
-            panic!("value is not pair")
-        }
-    }
-}
-
-impl Expr {
-    pub fn eval(&self, stack: &[Value]) -> Value {
-        match self {
-            Expr::Const(v) => v.clone(),
-            Expr::Var(index) => stack[stack.len() - 1 - index].clone(),
         }
     }
 }
@@ -436,7 +440,7 @@ impl Decoder {
             }
             Decoder::Array(expr, a) => {
                 let mut input = input;
-                let count = expr.eval(stack).usize_or_panic();
+                let count = expr.eval_usize(stack);
                 let mut v = Vec::with_capacity(count);
                 for _ in 0..count {
                     let (va, next_input) = a.parse(stack, input)?;
@@ -446,7 +450,7 @@ impl Decoder {
                 Some((Value::Seq(v), input))
             }
             Decoder::Slice(expr, a) => {
-                let size = expr.eval(stack).usize_or_panic();
+                let size = expr.eval_usize(stack);
                 if size <= input.len() {
                     let (slice, input) = input.split_at(size);
                     let (v, _) = a.parse(stack, slice)?;
@@ -467,6 +471,22 @@ fn any_bytes() -> Format {
     Format::Star(Box::new(Format::Byte(ByteSet::Any)))
 }
 
+fn u16be() -> Format {
+    Format::Map(
+        |value| match value {
+            Value::Pair(fst, snd) => match (fst.as_ref(), snd.as_ref()) {
+                (Value::U8(hi), Value::U8(lo)) => Value::U16(u16::from_be_bytes([*hi, *lo])),
+                (_, _) => panic!("expected (U8, U8)"),
+            },
+            _ => panic!("expected (_, _)"),
+        },
+        Box::new(Format::Cat(
+            Box::new(Format::Byte(ByteSet::Any)),
+            Box::new(Format::Byte(ByteSet::Any)),
+        )),
+    )
+}
+
 fn jpeg_format() -> Format {
     fn marker(b: u8) -> Format {
         Format::Cat(
@@ -475,17 +495,16 @@ fn jpeg_format() -> Format {
         )
     }
 
-    fn var_data(f: Format) -> Format {
-        let length = Format::Map(
-            Value::map_u16be_minus_two,
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Any)),
-                Box::new(Format::Byte(ByteSet::Any)),
-            )),
-        );
+    fn var_data(data: Format) -> Format {
         Format::Record(vec![
-            ("length".to_string(), length.clone()),
-            ("data".to_string(), Format::Slice(Expr::Var(0), Box::new(f))),
+            ("length".to_string(), u16be()),
+            (
+                "data".to_string(),
+                Format::Slice(
+                    Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U16(2))),
+                    Box::new(data),
+                ),
+            ),
         ])
     }
 
