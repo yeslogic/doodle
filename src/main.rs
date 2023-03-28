@@ -20,7 +20,7 @@ enum Value {
 #[derive(Clone)]
 enum Expr {
     Const(Value),
-    Index(usize),
+    Var(usize),
 }
 
 #[derive(Clone)]
@@ -91,7 +91,7 @@ impl Expr {
     pub fn eval(&self, stack: &[Value]) -> Value {
         match self {
             Expr::Const(v) => v.clone(),
-            Expr::Index(index) => stack[stack.len() - 1 - index].clone(),
+            Expr::Var(index) => stack[stack.len() - 1 - index].clone(),
         }
     }
 }
@@ -483,10 +483,7 @@ fn jpeg_format() -> Format {
         );
         Format::Record(vec![
             ("length".to_string(), length.clone()),
-            (
-                "data".to_string(),
-                Format::Slice(Expr::Index(0), Box::new(f)),
-            ),
+            ("data".to_string(), Format::Slice(Expr::Var(0), Box::new(f))),
         ])
     }
 
