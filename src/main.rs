@@ -471,6 +471,18 @@ fn any_bytes() -> Format {
     Format::Star(Box::new(Format::Byte(ByteSet::Any)))
 }
 
+fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
+    let mut formats = formats.into_iter();
+    let format = formats.next().unwrap_or(Format::Zero);
+    formats.fold(format, |acc, format| {
+        Format::Alt(Box::new(acc), Box::new(format))
+    })
+}
+
+fn u8() -> Format {
+    Format::Byte(ByteSet::Any)
+}
+
 fn u16be() -> Format {
     Format::Map(
         |value| match value {
@@ -488,45 +500,55 @@ fn u16be() -> Format {
 }
 
 fn jpeg_format() -> Format {
-    fn marker(b: u8) -> Format {
+    fn marker(id: u8) -> Format {
         Format::Cat(
             Box::new(Format::Byte(ByteSet::Is(0xFF))),
-            Box::new(Format::Byte(ByteSet::Is(b))),
+            Box::new(Format::Byte(ByteSet::Is(id))),
         )
     }
 
-    fn var_data(data: Format) -> Format {
+    fn marker_segment(id: u8, data: Format) -> Format {
         Format::Record(vec![
+            ("marker".to_string(), marker(id)),
             ("length".to_string(), u16be()),
             (
                 "data".to_string(),
                 Format::Slice(
-                    Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U16(2))),
+                    Expr::Sub(
+                        Box::new(Expr::Var(0)), // length
+                        Box::new(Expr::U16(2)),
+                    ),
                     Box::new(data),
                 ),
             ),
         ])
     }
 
-    fn chunk(b: u8, f: Format) -> Format {
-        Format::Cat(Box::new(marker(b)), Box::new(var_data(f)))
-    }
-
-    let soi = marker(0xD8);
-    let eoi = marker(0xD9);
     let app0_data = Format::Record(vec![
         ("identifier".to_string(), Format::from_bytes(b"JFIF\0")),
-        ("blah".to_string(), any_bytes()),
+        ("version-major".to_string(), u8()),
+        ("version-minor".to_string(), u8()),
+        ("density-units".to_string(), u8()), // 0 | 1 | 2
+        ("density-x".to_string(), u16be()),  // != 0
+        ("density-y".to_string(), u16be()),  // != 0
+        ("thumbnail-width".to_string(), u8()),
+        ("thumbnail-height".to_string(), u8()),
+        (
+            "thumbnail-pixels".to_string(),
+            Format::Array(
+                Expr::Var(0), // thumbnail-height
+                Box::new(Format::Array(
+                    Expr::Var(1), // thumbnail-width
+                    Box::new(Format::Record(vec![
+                        ("r".to_string(), u8()),
+                        ("g".to_string(), u8()),
+                        ("b".to_string(), u8()),
+                    ])),
+                )),
+            ),
+        ),
     ]);
-    let app0 = chunk(0xE0, app0_data);
-    let dqt = chunk(0xDB, any_bytes());
-    let sof0 = chunk(0xC0, any_bytes());
-    let dht = chunk(0xC4, any_bytes());
-    let any_chunk = Format::Alt(
-        Box::new(dqt.clone()),
-        Box::new(Format::Alt(Box::new(sof0.clone()), Box::new(dht.clone()))),
-    );
-    let sos = chunk(0xDA, any_bytes());
+
     let ecs = Format::Star(Box::new(Format::Alt(
         Box::new(Format::Byte(ByteSet::Not(0xFF))),
         Box::new(Format::Map(
@@ -537,14 +559,29 @@ fn jpeg_format() -> Format {
             )),
         )),
     )));
+
+    let sof0 = marker_segment(0xC0, any_bytes());
+    let dht = marker_segment(0xC4, any_bytes());
+    let sos = marker_segment(0xDA, any_bytes());
+    let dqt = marker_segment(0xDB, any_bytes());
+    let soi = marker(0xD8);
+    let eoi = marker(0xD9);
+    let app0 = marker_segment(0xE0, app0_data);
+
+    let table_or_misc = alts([dqt, sof0, dht]);
+
     let jpeg = Format::Record(vec![
         ("soi".to_string(), soi),
         ("app0".to_string(), app0),
-        ("chunks".to_string(), Format::Star(Box::new(any_chunk))),
+        (
+            "segments".to_string(),
+            Format::Star(Box::new(table_or_misc)),
+        ),
         ("sos".to_string(), sos),
         ("ecs".to_string(), ecs),
         ("eoi".to_string(), eoi),
     ]);
+
     jpeg
 }
 
