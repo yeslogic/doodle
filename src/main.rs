@@ -576,15 +576,30 @@ fn jpeg_format() -> Format {
 
     let sof0 = marker_segment(0xC0, any_bytes()); // Start of frame (baseline jpeg)
     let dht = marker_segment(0xC4, any_bytes()); // Define Huffman Table
+    let dac = marker_segment(0xCC, any_bytes()); // Define arithmetic coding conditioning
     let soi = marker(0xD8); // Start of image
     let eoi = marker(0xD9); // End of of image
     let sos = marker_segment(0xDA, any_bytes()); // Start of scan
     let dqt = marker_segment(0xDB, any_bytes()); // Define quantization table
+    let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
+    let dri = marker_segment(0xDD, any_bytes()); // Define restart interval
     let app0 = marker_segment(0xE0, app0_data); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
     let com = marker_segment(0xFE, any_bytes()); // Extension data (comment)
 
-    let table_or_misc = alts([dqt, dht, /* TODO: ... */ com]);
-    let frame_header = alts([sof0 /* TODO: ... sof15 */]);
+    let table_or_misc = alts([
+        dqt.clone(), // Define quantization table
+        dht.clone(), // Define Huffman Table
+        dac.clone(), // Define arithmetic coding conditioning
+        dri.clone(), // Define restart interval
+        app0.clone(),
+        // TODO: ... app15
+        com.clone(), // Comment
+    ]);
+
+    let frame_header = alts([
+        sof0.clone(),
+        // TODO: ... sof15
+    ]);
 
     let scan = Format::Record(vec![
         (
@@ -603,7 +618,7 @@ fn jpeg_format() -> Format {
         ),
         ("header".to_string(), frame_header),
         ("scan".to_string(), scan.clone()),
-        // TODO: ("dnl".to_string(), optional(dnl)),
+        // TODO: ("dnl".to_string(), alts([dnl, Format::Unit])), // Error: "cannot find valid lookahead for star"
         // TODO: ("scans".to_string(), Format::Star(Box::new(scan))), // Error: "cannot find valid lookahead for star"
     ]);
 
