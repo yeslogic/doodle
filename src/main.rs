@@ -578,7 +578,7 @@ fn jpeg_format() -> Format {
                 Format::Record(vec![
                     ("id".to_string(), u8()),
                     ("sampling-factor".to_string(), u8()), // { horizontal <- u4, vertical <- u4 }
-                    ("destination".to_string(), u8()),     // 0 |..| 3
+                    ("quantization-table-id".to_string(), u8()),
                 ]),
             ),
         ),
@@ -587,8 +587,8 @@ fn jpeg_format() -> Format {
     // DHT: Define Huffman table (See ITU T.81 Section B.2.4.2)
     let dht_data = repeat(Format::Record(vec![
         // class <- u4 //= 0 | 1;
-        // destination <- u4 //= 1 |..| 4;
-        ("class-destination".to_string(), u8()),
+        // table-id <- u4 //= 1 |..| 4;
+        ("class-table-id".to_string(), u8()),
         ("num-codes".to_string(), repeat_count(Expr::U8(16), u8())),
         ("values".to_string(), any_bytes()), // List.map num-codes (\n => repeat-count n u8);
     ]));
@@ -596,8 +596,8 @@ fn jpeg_format() -> Format {
     // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
     let dac_data = repeat(Format::Record(vec![
         // class <- u4 //= 0 | 1;
-        // destination <- u4 //= 1 |..| 4;
-        ("class-destination".to_string(), u8()),
+        // table-id <- u4 //= 1 |..| 4;
+        ("class-table-id".to_string(), u8()),
         ("value".to_string(), u8()),
     ]));
 
@@ -610,7 +610,9 @@ fn jpeg_format() -> Format {
                 Expr::Var(0), // num-image-components
                 Format::Record(vec![
                     ("component-selector".to_string(), u8()), // ???
-                    ("destination".to_string(), u8()),        // { dc <- u4, ac <- u4 }
+                    // dc-entropy-coding-table-id <- u4;
+                    // ac-entropy-coding-table-id <- u4;
+                    ("entropy-coding-table-ids".to_string(), u8()),
                 ]),
             ),
         ),
@@ -622,8 +624,8 @@ fn jpeg_format() -> Format {
     // DQT: Define quantization table  (See ITU T.81 Section B.2.4.1)
     let dqt_data = Format::Record(vec![
         // precision <- u4 //= 0 | 1;
-        // destination <- u4 //= 1 |..| 4;
-        ("precision-destination".to_string(), u8()),
+        // table-id <- u4 //= 1 |..| 4;
+        ("precision-table-id".to_string(), u8()),
         // elements <- match precision {
         //   0 => repeat-count 64 u8,
         //   1 => repeat-count 64 u16be,
