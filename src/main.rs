@@ -563,6 +563,24 @@ fn jpeg_format() -> Format {
         ),
     ]);
 
+    let sos_data = Format::Record(vec![
+        ("num-image-components".to_string(), u8()), // 1-4
+        (
+            "image-components".to_string(),
+            Format::Array(
+                Expr::Var(0), // num-components
+                Box::new(Format::Record(vec![
+                    ("component-selector".to_string(), u8()), // ???
+                    ("table-destination".to_string(), u8()),  // { dc <- u4, ac <- u4 }
+                ])),
+            ),
+        ),
+        ("start-spectral-selection".to_string(), u8()), // ???
+        ("end-spectral-selection".to_string(), u8()),   // ???
+        ("approximation-bit-position".to_string(), u8()), // { high <- u4, low <- u4 }
+    ]);
+
+    // TODO: Restart markers (rst0-rst7)
     let ecs = Format::Star(Box::new(Format::Alt(
         Box::new(Format::Byte(ByteSet::Not(0xFF))),
         Box::new(Format::Map(
@@ -579,7 +597,7 @@ fn jpeg_format() -> Format {
     let dac = marker_segment(0xCC, any_bytes()); // Define arithmetic coding conditioning
     let soi = marker(0xD8); // Start of image
     let eoi = marker(0xD9); // End of of image
-    let sos = marker_segment(0xDA, any_bytes()); // Start of scan
+    let sos = marker_segment(0xDA, sos_data); // Start of scan
     let dqt = marker_segment(0xDB, any_bytes()); // Define quantization table
     let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
     let dri = marker_segment(0xDD, any_bytes()); // Define restart interval
