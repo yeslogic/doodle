@@ -754,8 +754,8 @@ fn jpeg_format() -> Format {
         Value::Record(vec![("restart".to_string(), Value::U8(number))])
     }
 
-    let scan_data = repeat(alts([
-        // FIXME: Extract into separate ECS repetition
+    // MCU: Minimum coded unit
+    let mcu = alts([
         Format::Byte(ByteSet::Not(0xFF)),
         Format::Map(
             |_| Value::U8(0xFF),
@@ -764,6 +764,12 @@ fn jpeg_format() -> Format {
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
             )),
         ),
+    ]);
+
+    // A series of entropy coded segments separated by restart markers
+    let scan_data = repeat(alts([
+        // FIXME: Extract into separate ECS repetition
+        mcu, // TODO: repeat(mcu),
         // FIXME: Restart markers should cycle in order from rst0-rst7
         Format::Map(|_| restart(0), Box::new(rst0)), // FIXME Restart marker 0
         Format::Map(|_| restart(1), Box::new(rst1)), // FIXME Restart marker 1
