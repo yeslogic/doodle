@@ -7,7 +7,7 @@ enum ByteSet {
     Not(u8),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 enum Value {
     Unit,
     U8(u8),
@@ -35,6 +35,7 @@ enum Func {
     Fst,
     Snd,
     U16Be,
+    Stream,
 }
 
 /// Binary format descriptions
@@ -160,6 +161,13 @@ impl Func {
                     (_, _) => panic!("expected (U8, U8)"),
                 },
                 _ => panic!("U16Be: expected (_, _)"),
+            },
+            Func::Stream => match arg {
+                Value::Seq(vs) => {
+                    // FIXME could also condense nested sequences
+                    Value::Seq(vs.into_iter().filter(|v| *v != Value::Unit).collect())
+                }
+                _ => panic!("Stream: expected Seq"),
             },
         }
     }
@@ -792,11 +800,6 @@ fn jpeg_format() -> Format {
         // sof15.clone(),
     ]);
 
-    // NOTE: hack to help find restart markers in the scan data
-    fn restart(number: u8) -> Expr {
-        Expr::Record(vec![("restart".to_string(), Expr::U8(number))])
-    }
-
     // MCU: Minimum coded unit
     let mcu = alts([
         Format::Byte(ByteSet::Not(0xFF)),
@@ -810,19 +813,22 @@ fn jpeg_format() -> Format {
     ]);
 
     // A series of entropy coded segments separated by restart markers
-    let scan_data = repeat(alts([
-        // FIXME: Extract into separate ECS repetition
-        mcu, // TODO: repeat(mcu),
-        // FIXME: Restart markers should cycle in order from rst0-rst7
-        Format::Map(Func::Expr(restart(0)), Box::new(rst0)), // FIXME Restart marker 0
-        Format::Map(Func::Expr(restart(1)), Box::new(rst1)), // FIXME Restart marker 1
-        Format::Map(Func::Expr(restart(2)), Box::new(rst2)), // FIXME Restart marker 2
-        Format::Map(Func::Expr(restart(3)), Box::new(rst3)), // FIXME Restart marker 3
-        Format::Map(Func::Expr(restart(4)), Box::new(rst4)), // FIXME Restart marker 4
-        Format::Map(Func::Expr(restart(5)), Box::new(rst5)), // FIXME Restart marker 5
-        Format::Map(Func::Expr(restart(6)), Box::new(rst6)), // FIXME Restart marker 6
-        Format::Map(Func::Expr(restart(7)), Box::new(rst7)), // FIXME Restart marker 7
-    ]));
+    let scan_data = Format::Map(
+        Func::Stream,
+        Box::new(repeat(alts([
+            // FIXME: Extract into separate ECS repetition
+            mcu, // TODO: repeat(mcu),
+            // FIXME: Restart markers should cycle in order from rst0-rst7
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst0)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst1)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst2)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst3)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst4)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst5)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst6)),
+            Format::Map(Func::Expr(Expr::Unit), Box::new(rst7)),
+        ]))),
+    );
 
     let scan = record([
         ("segments", repeat(table_or_misc.clone())),
