@@ -709,12 +709,24 @@ fn jpeg_format() -> Format {
     let dqt = marker_segment(0xDB, dqt_data.clone()); // Define quantization table
     let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
     let dri = marker_segment(0xDD, dri_data.clone()); // Define restart interval
-    let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
-    let app1 = marker_segment(0xE1, any_bytes()); // EXIF
-    let app2 = marker_segment(0xE2, any_bytes()); // FlashPix / ICC
-    let app13 = marker_segment(0xED, any_bytes()); // PhotoShop Save As
-    let app14 = marker_segment(0xEE, any_bytes()); // Adobe
-    let app15 = marker_segment(0xEF, any_bytes()); // GraphicConverter
+    let _dhp = marker_segment(0xDE, any_bytes()); // Define hierarchical progression
+    let _exp = marker_segment(0xDF, any_bytes()); // Expand reference components
+    let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF/JFXX/AVI1/...)
+    let app1 = marker_segment(0xE1, any_bytes()); // Application segment 1 (EXIF/XMP/XAP/...)
+    let app2 = marker_segment(0xE2, any_bytes()); // Application segment 2 (FlashPix/ICC/...)
+    let app3 = marker_segment(0xE3, any_bytes()); // Application segment 3 (Kodak/...)
+    let app4 = marker_segment(0xE4, any_bytes()); // Application segment 4 (FlashPix/...)
+    let app5 = marker_segment(0xE5, any_bytes()); // Application segment 5 (Ricoh/...)
+    let app6 = marker_segment(0xE6, any_bytes()); // Application segment 6 (GoPro/...)
+    let app7 = marker_segment(0xE7, any_bytes()); // Application segment 7 (Pentax/Qualcomm/...)
+    let app8 = marker_segment(0xE8, any_bytes()); // Application segment 8 (Spiff/...)
+    let app9 = marker_segment(0xE9, any_bytes()); // Application segment 9 (MediaJukebox/...)
+    let app10 = marker_segment(0xEA, any_bytes()); // Application segment 10 (PhotoStudio)
+    let app11 = marker_segment(0xEB, any_bytes()); // Application segment 11 (HDR)
+    let app12 = marker_segment(0xEC, any_bytes()); // Application segment 12 (PictureInfo/Ducky)
+    let app13 = marker_segment(0xED, any_bytes()); // Application segment 13 (PhotoShop/Adobe_CM)
+    let app14 = marker_segment(0xEE, any_bytes()); // Application segment 14 (Adobe)
+    let app15 = marker_segment(0xEF, any_bytes()); // Application segment 15 (GraphicConverter)
     let com = marker_segment(0xFE, any_bytes()); // Extension data (comment)
 
     let table_or_misc = alts([
@@ -725,7 +737,16 @@ fn jpeg_format() -> Format {
         app0.clone(),
         app1.clone(),
         app2.clone(),
-        // TODO: app3..app12
+        app3.clone(),
+        app4.clone(),
+        app5.clone(),
+        app6.clone(),
+        app7.clone(),
+        app8.clone(),
+        app9.clone(),
+        app10.clone(),
+        app11.clone(),
+        app12.clone(),
         app13.clone(),
         app14.clone(),
         app15.clone(),
