@@ -501,9 +501,15 @@ fn u16be() -> Format {
 
 fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
-        Format::Cat(
-            Box::new(Format::Byte(ByteSet::Is(0xFF))),
-            Box::new(Format::Byte(ByteSet::Is(id))),
+        Format::Map(
+            |value| match value {
+                Value::Pair(_, snd) => (**snd).clone(),
+                _ => panic!("expected (_, _)"),
+            },
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(id))),
+            )),
         )
     }
 
