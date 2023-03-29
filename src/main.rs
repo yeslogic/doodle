@@ -692,6 +692,14 @@ fn jpeg_format() -> Format {
     let _sof13 = marker_segment(0xCD, sof_data.clone()); // Start of frame (differential sequential, arithmetic)
     let _sof14 = marker_segment(0xCE, sof_data.clone()); // Start of frame (differential progressive, arithmetic)
     let _sof15 = marker_segment(0xCF, sof_data.clone()); // Start of frame (differential lossless, arithmetic)
+    let rst0 = marker(0xD0); // Restart marker 0
+    let rst1 = marker(0xD1); // Restart marker 1
+    let rst2 = marker(0xD2); // Restart marker 2
+    let rst3 = marker(0xD3); // Restart marker 3
+    let rst4 = marker(0xD4); // Restart marker 4
+    let rst5 = marker(0xD5); // Restart marker 5
+    let rst6 = marker(0xD6); // Restart marker 6
+    let rst7 = marker(0xD7); // Restart marker 7
     let soi = marker(0xD8); // Start of image
     let eoi = marker(0xD9); // End of of image
     let sos = marker_segment(0xDA, sos_data.clone()); // Start of scan
@@ -738,8 +746,13 @@ fn jpeg_format() -> Format {
         // sof15.clone(),
     ]);
 
-    // TODO: Restart markers (rst0-rst7)
-    let ecs = repeat(alts([
+    // NOTE: hack to help find restart markers in the scan data
+    fn restart(number: u8) -> Value {
+        Value::Record(vec![("restart".to_string(), Value::U8(number))])
+    }
+
+    let scan_data = repeat(alts([
+        // FIXME: Extract into separate ECS repetition
         Format::Byte(ByteSet::Not(0xFF)),
         Format::Map(
             |_| Value::U8(0xFF),
@@ -748,68 +761,21 @@ fn jpeg_format() -> Format {
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
             )),
         ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 0
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD0))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 1
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD1))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 2
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD2))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 3
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD3))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 4
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD4))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 5
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD5))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 6
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD6))),
-            )),
-        ),
-        Format::Map(
-            |_| Value::U8(0xFF), // FIXME reset marker 7
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0xD7))),
-            )),
-        ),
+        // FIXME: Restart markers should cycle in order from rst0-rst7
+        Format::Map(|_| restart(0), Box::new(rst0)), // FIXME Restart marker 0
+        Format::Map(|_| restart(1), Box::new(rst1)), // FIXME Restart marker 1
+        Format::Map(|_| restart(2), Box::new(rst2)), // FIXME Restart marker 2
+        Format::Map(|_| restart(3), Box::new(rst3)), // FIXME Restart marker 3
+        Format::Map(|_| restart(4), Box::new(rst4)), // FIXME Restart marker 4
+        Format::Map(|_| restart(5), Box::new(rst5)), // FIXME Restart marker 5
+        Format::Map(|_| restart(6), Box::new(rst6)), // FIXME Restart marker 6
+        Format::Map(|_| restart(7), Box::new(rst7)), // FIXME Restart marker 7
     ]));
 
     let scan = record([
         ("segments", repeat(table_or_misc.clone())),
         ("sos", sos.clone()),
-        ("ecs", ecs.clone()),
+        ("data", scan_data.clone()),
     ]);
 
     let frame = record([
