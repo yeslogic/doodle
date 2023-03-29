@@ -34,8 +34,8 @@ enum Format {
     /// A format that always fails
     Fail,
     /// A format that always succeeds, consuming no input
-    Unit,
     /// A format that succeeds if it matches the given byte set
+    Empty,
     Byte(ByteSet),
     /// A format that succeeds if either format succeeds
     Alt(Box<Format>, Box<Format>),
@@ -66,7 +66,7 @@ struct Lookahead {
 /// Decoders with a fixed amount of lookahead
 enum Decoder {
     Fail,
-    Unit,
+    Empty,
     Byte(ByteSet),
     If(Lookahead, Box<Decoder>, Box<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
@@ -163,13 +163,13 @@ impl Format {
     pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
             Format::Fail => false,
-            Format::Unit => match next {
-                Format::Unit => true,
-                next => next.might_match_lookahead(input, Format::Unit),
+            Format::Empty => match next {
+                Format::Empty => true,
+                next => next.might_match_lookahead(input, Format::Empty),
             },
             Format::Byte(bs) => match input.split_first() {
                 Some((b, _)) if ByteSet::disjoint(bs, b) => false,
-                Some((_, input)) => next.might_match_lookahead(input, Format::Unit),
+                Some((_, input)) => next.might_match_lookahead(input, Format::Empty),
                 None => true,
             },
             Format::Alt(a, b) => {
@@ -179,11 +179,11 @@ impl Format {
                 a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
             }
             Format::Tuple(fields) => match fields.split_first() {
-                None => next.might_match_lookahead(input, Format::Unit),
+                None => next.might_match_lookahead(input, Format::Empty),
                 Some((a, fields)) => a.might_match_lookahead(input, Format::Tuple(fields.to_vec())),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => next.might_match_lookahead(input, Format::Unit),
+                None => next.might_match_lookahead(input, Format::Empty),
                 Some(((_, a), fields)) => {
                     a.might_match_lookahead(input, Format::Record(fields.to_vec()))
                 }
@@ -227,8 +227,8 @@ impl Lookahead {
 
     pub fn new(a: &Format, b: &Format) -> Option<Lookahead> {
         const LEN: usize = 2;
-        let pa = Lookahead::from(a, LEN, Format::Unit)?;
-        if !b.might_match_lookahead(&pa.pattern, Format::Unit) {
+        let pa = Lookahead::from(a, LEN, Format::Empty)?;
+        if !b.might_match_lookahead(&pa.pattern, Format::Empty) {
             Some(pa)
         } else {
             None
@@ -252,15 +252,15 @@ impl Lookahead {
     pub fn from(f: &Format, len: usize, next: Format) -> Option<Lookahead> {
         match f {
             Format::Fail => None,
-            Format::Unit => match next {
-                Format::Unit => Some(Lookahead::empty()),
-                next => Lookahead::from(&next, len, Format::Unit),
+            Format::Empty => match next {
+                Format::Empty => Some(Lookahead::empty()),
+                next => Lookahead::from(&next, len, Format::Empty),
             },
             Format::Byte(bs) => {
                 let pa = Lookahead::single(bs.clone());
                 if len > 1 {
                     // FIXME do we still need to check for Format::Zero?
-                    let pb = Lookahead::from(&next, len - 1, Format::Unit)?;
+                    let pb = Lookahead::from(&next, len - 1, Format::Empty)?;
                     Some(Lookahead::cat(&pa, &pb))
                 } else {
                     Some(pa)
@@ -280,11 +280,11 @@ impl Lookahead {
                 Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
             }
             Format::Tuple(fields) => match fields.split_first() {
-                None => Lookahead::from(&next, len, Format::Unit),
+                None => Lookahead::from(&next, len, Format::Empty),
                 Some((a, fields)) => Lookahead::from(a, len, Format::Tuple(fields.to_vec())),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => Lookahead::from(&next, len, Format::Unit),
+                None => Lookahead::from(&next, len, Format::Empty),
                 Some(((_, a), fields)) => Lookahead::from(a, len, Format::Record(fields.to_vec())),
             },
             Format::Repeat(_a) => {
@@ -305,7 +305,7 @@ impl Decoder {
     pub fn compile(f: &Format, opt_next: Option<&Format>) -> Result<Decoder, String> {
         match f {
             Format::Fail => Ok(Decoder::Fail),
-            Format::Unit => Ok(Decoder::Unit),
+            Format::Empty => Ok(Decoder::Empty),
             Format::Byte(bs) => Ok(Decoder::Byte(bs.clone())),
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
@@ -390,7 +390,7 @@ impl Decoder {
     ) -> Option<(Value, &'input [u8])> {
         match self {
             Decoder::Fail => None,
-            Decoder::Unit => Some((Value::Unit, input)),
+            Decoder::Empty => Some((Value::Unit, input)),
             Decoder::Byte(bs) => {
                 let (&b, input) = input.split_first()?;
                 if bs.contains(b) {
