@@ -699,6 +699,11 @@ fn jpeg_format() -> Format {
     let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
     let dri = marker_segment(0xDD, any_bytes()); // Define restart interval
     let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
+    let app1 = marker_segment(0xE1, any_bytes()); // EXIF
+    let app2 = marker_segment(0xE2, any_bytes()); // FlashPix / ICC
+    let app13 = marker_segment(0xED, any_bytes()); // PhotoShop Save As
+    let app14 = marker_segment(0xEE, any_bytes()); // Adobe
+    let app15 = marker_segment(0xEF, any_bytes()); // GraphicConverter
     let com = marker_segment(0xFE, any_bytes()); // Extension data (comment)
 
     let table_or_misc = alts([
@@ -707,7 +712,12 @@ fn jpeg_format() -> Format {
         dac.clone(), // Define arithmetic coding conditioning
         dri.clone(), // Define restart interval
         app0.clone(),
-        // TODO: ... app15
+        app1.clone(),
+        app2.clone(),
+        // TODO: app3..app12
+        app13.clone(),
+        app14.clone(),
+        app15.clone(),
         com.clone(), // Comment
     ]);
 
