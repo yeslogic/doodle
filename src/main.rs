@@ -803,7 +803,7 @@ fn jpeg_format() -> Format {
     ]);
 
     let frame = record([
-        ("app0", app0.clone()),
+        ("app0", alts([app0.clone(), app1.clone()])),
         ("segments", repeat(table_or_misc.clone())),
         ("header", frame_header.clone()),
         ("scan", scan.clone()),
