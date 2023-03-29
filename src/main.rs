@@ -29,24 +29,42 @@ enum Expr {
     Record(Vec<(String, Expr)>),
 }
 
+/// Binary format descriptions
+///
+/// A subset of binary formats can be modelled as [regular expressions]:
+///
+/// ```text
+/// ⟦ Fail ⟧                    = ∅                     empty set
+/// ⟦ Empty ⟧                   = ε                     empty byte string
+/// ⟦ Byte(Any) ⟧               = .                     any byte
+/// ⟦ Byte(Is(b)) ⟧             = b                     literal byte
+/// ⟦ Alt(f0, f1) ⟧             = ⟦ f0 ⟧ | ⟦ f0 ⟧       alternation
+/// ⟦ Cat(f0, f1) ⟧             = ⟦ f0 ⟧ ⟦ f0 ⟧         concatenation
+/// ⟦ Tuple([f0, ..., fn]) ⟧    = ⟦ f0 ⟧ ... ⟦ fn ⟧     concatenation
+/// ⟦ Repeat(f) ⟧               = ⟦ f0 ⟧*               Kleene star
+/// ```
+///
+/// Note that the data dependency present in record formats means that these
+/// formats no longer describe regular languages.
+///
+/// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
 #[derive(Clone)]
 enum Format {
-    /// A format that always fails
+    /// A format that never matches
     Fail,
-    /// A format that always succeeds, consuming no input
-    /// A format that succeeds if it matches the given byte set
+    /// A format that matches the empty byte string
     Empty,
+    /// Matches a byte in the given byte set
     Byte(ByteSet),
-    /// A format that succeeds if either format succeeds
+    /// Matches the union of the byte strings matched by the two formats
     Alt(Box<Format>, Box<Format>),
-    /// The concatenation of two formats where the second format can depend on
-    /// the decoded value of the first format
+    /// Matches the set of byte strings matched by the first format, followed by
+    /// the second format
     Cat(Box<Format>, Box<Format>),
-    /// A sequence of formats where later formats can depend on the
-    /// decoded value of earlier formats
+    /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
-    /// A sequence of named formats where later formats can depend on the
-    /// decoded value of earlier formats
+    /// Matches a sequence of named formats where later formats can depend on
+    /// the decoded value of earlier formats
     Record(Vec<(String, Format)>),
     /// Repeat a format zero-or-more times
     Repeat(Box<Format>),
@@ -408,9 +426,7 @@ impl Decoder {
             }
             Decoder::Cat(a, b) => {
                 let (va, input) = a.parse(stack, input)?;
-                stack.push(va);
                 let (vb, input) = b.parse(stack, input)?;
-                let va = stack.pop().unwrap();
                 Some((Value::Pair(Box::new(va), Box::new(vb)), input))
             }
             Decoder::Tuple(fields) => {
@@ -420,10 +436,6 @@ impl Decoder {
                     let (vf, next_input) = f.parse(stack, input)?;
                     input = next_input;
                     v.push(vf.clone());
-                    stack.push(vf);
-                }
-                for _ in fields {
-                    stack.pop();
                 }
                 Some((Value::Seq(v), input))
             }
