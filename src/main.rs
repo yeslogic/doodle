@@ -10,6 +10,7 @@ enum ByteSet {
 #[derive(Clone, PartialEq, Debug)]
 enum Value {
     Unit,
+    Bool(bool),
     U8(u8),
     U16(u16),
     Pair(Box<Value>, Box<Value>),
@@ -84,6 +85,8 @@ enum Format {
     Slice(Expr, Box<Format>),
     /// Transform a decoded value with a function
     Map(Func, Box<Format>),
+    /// Conditional format
+    If(Expr, Box<Format>, Box<Format>),
 }
 
 #[derive(Debug)]
@@ -91,12 +94,17 @@ struct Lookahead {
     pattern: Vec<ByteSet>,
 }
 
+enum Cond {
+    Expr(Expr),
+    Peek(Lookahead),
+}
+
 /// Decoders with a fixed amount of lookahead
 enum Decoder {
     Fail,
     Empty,
     Byte(ByteSet),
-    If(Lookahead, Box<Decoder>, Box<Decoder>),
+    If(Cond, Box<Decoder>, Box<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
@@ -132,11 +140,18 @@ impl Expr {
         }
     }
 
+    fn eval_bool(&self, stack: &[Value]) -> bool {
+        match self.eval(stack) {
+            Value::Bool(b) => b,
+            _ => panic!("value is not bool"),
+        }
+    }
+
     fn eval_usize(&self, stack: &[Value]) -> usize {
         match self.eval(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
-            Value::Unit | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
+            Value::Unit | Value::Bool(_) | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
                 panic!("value is not number")
             }
         }
@@ -256,6 +271,9 @@ impl Format {
                 true // FIXME
             }
             Format::Map(_f, a) => a.might_match_lookahead(input, next),
+            Format::If(_expr, a, b) => {
+                a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
+            }
         }
     }
 }
@@ -355,6 +373,18 @@ impl Lookahead {
                 Some(Lookahead::empty()) // FIXME ?
             }
             Format::Map(_f, a) => Lookahead::from(a, len, next),
+            Format::If(_expr, a, b) => {
+                Lookahead::from(&Format::Alt(a.clone(), b.clone()), len, next)
+            }
+        }
+    }
+}
+
+impl Cond {
+    fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
+        match self {
+            Cond::Expr(expr) => expr.eval_bool(stack),
+            Cond::Peek(look) => look.matches(input),
         }
     }
 }
@@ -368,10 +398,10 @@ impl Decoder {
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 let db = Box::new(Decoder::compile(b, opt_next)?);
-                if let Some(l) = Lookahead::new(a, b) {
-                    Ok(Decoder::If(l, da, db))
-                } else if let Some(l) = Lookahead::new(b, a) {
-                    Ok(Decoder::If(l, db, da))
+                if let Some(look) = Lookahead::new(a, b) {
+                    Ok(Decoder::If(Cond::Peek(look), da, db))
+                } else if let Some(look) = Lookahead::new(b, a) {
+                    Ok(Decoder::If(Cond::Peek(look), db, da))
                 } else {
                     Err("cannot find valid lookahead for alt".to_string())
                 }
@@ -438,6 +468,11 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 Ok(Decoder::Map(f.clone(), da))
             }
+            Format::If(expr, a, b) => {
+                let da = Box::new(Decoder::compile(a, opt_next)?);
+                let db = Box::new(Decoder::compile(b, opt_next)?);
+                Ok(Decoder::If(Cond::Expr(expr.clone()), da, db))
+            }
         }
     }
 
@@ -457,8 +492,8 @@ impl Decoder {
                     None
                 }
             }
-            Decoder::If(look, a, b) => {
-                if look.matches(input) {
+            Decoder::If(cond, a, b) => {
+                if cond.eval(stack, input) {
                     a.parse(stack, input)
                 } else {
                     b.parse(stack, input)
