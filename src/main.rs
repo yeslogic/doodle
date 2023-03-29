@@ -587,15 +587,20 @@ fn jpeg_format() -> Format {
 
     let table_or_misc = alts([dqt, sof0, dht]);
     let scan = Format::Record(vec![("sos".to_string(), sos), ("ecs".to_string(), ecs)]);
-
-    let jpeg = Format::Record(vec![
-        ("soi".to_string(), soi),
+    let frame = Format::Record(vec![
         ("app0".to_string(), app0),
         (
             "segments".to_string(),
             Format::Star(Box::new(table_or_misc)),
         ),
-        ("scan".to_string(), scan),
+        ("scan".to_string(), scan.clone()),
+        // TODO: ("dnl".to_string(), optional(dnl)),
+        // TODO: ("scans".to_string(), Format::Star(Box::new(scan))), // Error: "cannot find valid lookahead for star"
+    ]);
+
+    let jpeg = Format::Record(vec![
+        ("soi".to_string(), soi),
+        ("frame".to_string(), frame),
         ("eoi".to_string(), eoi),
     ]);
 
