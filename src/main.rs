@@ -31,17 +31,31 @@ enum Expr {
 
 #[derive(Clone)]
 enum Format {
-    Zero,
+    /// A format that always fails
+    Fail,
+    /// A format that always succeeds, consuming no input
     Unit,
+    /// A format that succeeds if it matches the given byte set
     Byte(ByteSet),
+    /// A format that succeeds if either format succeeds
     Alt(Box<Format>, Box<Format>),
+    /// The concatenation of two formats where the second format can depend on
+    /// the decoded value of the first format
     Cat(Box<Format>, Box<Format>),
+    /// A sequence of formats where later formats can depend on the
+    /// decoded value of earlier formats
     Tuple(Vec<Format>),
+    /// A sequence of named formats where later formats can depend on the
+    /// decoded value of earlier formats
     Record(Vec<(String, Format)>),
-    Star(Box<Format>),
-    Array(Expr, Box<Format>),
+    /// Repeat a format zero-or-more times
+    Repeat(Box<Format>),
+    /// Repeat a format an exact number of times
+    RepeatCount(Expr, Box<Format>),
+    /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
-    Map(fn(&Value) -> Value, Box<Format>),
+    /// Transform a decoded value with a function
+    Map(fn(&Value) -> Value, Box<Format>), // TODO: Decouple from `Value`
 }
 
 #[derive(Debug)]
@@ -49,8 +63,9 @@ struct Lookahead {
     pattern: Vec<ByteSet>,
 }
 
+/// Decoders with a fixed amount of lookahead
 enum Decoder {
-    Zero,
+    Fail,
     Unit,
     Byte(ByteSet),
     If(Lookahead, Box<Decoder>, Box<Decoder>),
@@ -59,9 +74,9 @@ enum Decoder {
     Record(Vec<(String, Decoder)>),
     While(Lookahead, Box<Decoder>),
     Until(Lookahead, Box<Decoder>),
-    Array(Expr, Box<Decoder>),
+    RepeatCount(Expr, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
-    Map(fn(&Value) -> Value, Box<Decoder>),
+    Map(fn(&Value) -> Value, Box<Decoder>), // TODO: Decouple from `Value`
 }
 
 impl Expr {
@@ -147,7 +162,7 @@ impl Format {
 
     pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
-            Format::Zero => false,
+            Format::Fail => false,
             Format::Unit => match next {
                 Format::Unit => true,
                 next => next.might_match_lookahead(input, Format::Unit),
@@ -173,10 +188,10 @@ impl Format {
                     a.might_match_lookahead(input, Format::Record(fields.to_vec()))
                 }
             },
-            Format::Star(_a) => {
+            Format::Repeat(_a) => {
                 true // FIXME
             }
-            Format::Array(_expr, _a) => {
+            Format::RepeatCount(_expr, _a) => {
                 true // FIXME
             }
             Format::Slice(_expr, _a) => {
@@ -236,7 +251,7 @@ impl Lookahead {
 
     pub fn from(f: &Format, len: usize, next: Format) -> Option<Lookahead> {
         match f {
-            Format::Zero => None,
+            Format::Fail => None,
             Format::Unit => match next {
                 Format::Unit => Some(Lookahead::empty()),
                 next => Lookahead::from(&next, len, Format::Unit),
@@ -272,10 +287,10 @@ impl Lookahead {
                 None => Lookahead::from(&next, len, Format::Unit),
                 Some(((_, a), fields)) => Lookahead::from(a, len, Format::Record(fields.to_vec())),
             },
-            Format::Star(_a) => {
+            Format::Repeat(_a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
-            Format::Array(_expr, _a) => {
+            Format::RepeatCount(_expr, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
             Format::Slice(_expr, _a) => {
@@ -289,7 +304,7 @@ impl Lookahead {
 impl Decoder {
     pub fn compile(f: &Format, opt_next: Option<&Format>) -> Result<Decoder, String> {
         match f {
-            Format::Zero => Ok(Decoder::Zero),
+            Format::Fail => Ok(Decoder::Fail),
             Format::Unit => Ok(Decoder::Unit),
             Format::Byte(bs) => Ok(Decoder::Byte(bs.clone())),
             Format::Alt(a, b) => {
@@ -338,7 +353,7 @@ impl Decoder {
 
                 Ok(Decoder::Record(dfields))
             }
-            Format::Star(a) => {
+            Format::Repeat(a) => {
                 // FIXME next should be a|opt_next ?
                 let da = Box::new(Decoder::compile(a, None)?);
                 if let Some(next) = opt_next {
@@ -353,9 +368,9 @@ impl Decoder {
                     Ok(Decoder::While(Lookahead::single(ByteSet::Any), da))
                 }
             }
-            Format::Array(expr, a) => {
+            Format::RepeatCount(expr, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
-                Ok(Decoder::Array(expr.clone(), da))
+                Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::Slice(expr, a) => {
                 let da = Box::new(Decoder::compile(a, None)?);
@@ -374,7 +389,7 @@ impl Decoder {
         input: &'input [u8],
     ) -> Option<(Value, &'input [u8])> {
         match self {
-            Decoder::Zero => None,
+            Decoder::Fail => None,
             Decoder::Unit => Some((Value::Unit, input)),
             Decoder::Byte(bs) => {
                 let (&b, input) = input.split_first()?;
@@ -446,7 +461,7 @@ impl Decoder {
                 }
                 Some((Value::Seq(v), input))
             }
-            Decoder::Array(expr, a) => {
+            Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
                 let count = expr.eval_usize(stack);
                 let mut v = Vec::with_capacity(count);
@@ -475,16 +490,28 @@ impl Decoder {
     }
 }
 
-fn any_bytes() -> Format {
-    Format::Star(Box::new(Format::Byte(ByteSet::Any)))
-}
-
 fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
     let mut formats = formats.into_iter();
-    let format = formats.next().unwrap_or(Format::Zero);
+    let format = formats.next().unwrap_or(Format::Fail);
     formats.fold(format, |acc, format| {
         Format::Alt(Box::new(acc), Box::new(format))
     })
+}
+
+// fn optional(format: Format) -> Format {
+//     alts([format, Format::Unit])
+// }
+
+fn repeat(format: Format) -> Format {
+    Format::Repeat(Box::new(format))
+}
+
+fn repeat_count(len: Expr, format: Format) -> Format {
+    Format::RepeatCount(len, Box::new(format))
+}
+
+fn any_bytes() -> Format {
+    repeat(Format::Byte(ByteSet::Any))
 }
 
 fn u8() -> Format {
@@ -549,25 +576,25 @@ fn jpeg_format() -> Format {
         ("thumbnail-height".to_string(), u8()),
         (
             "thumbnail-pixels".to_string(),
-            Format::Array(
+            repeat_count(
                 Expr::Var(0), // thumbnail-height
-                Box::new(Format::Array(
+                repeat_count(
                     Expr::Var(1), // thumbnail-width
-                    Box::new(Format::Record(vec![
+                    Format::Record(vec![
                         ("r".to_string(), u8()),
                         ("g".to_string(), u8()),
                         ("b".to_string(), u8()),
-                    ])),
-                )),
+                    ]),
+                ),
             ),
         ),
     ]);
 
     let sos_data = Format::Record(vec![
-        ("num-image-components".to_string(), u8()), // 1-4
+        ("num-image-components".to_string(), u8()), // 1 |..| 4
         (
             "image-components".to_string(),
-            Format::Array(
+            Format::RepeatCount(
                 Expr::Var(0), // num-components
                 Box::new(Format::Record(vec![
                     ("component-selector".to_string(), u8()), // ???
@@ -581,23 +608,23 @@ fn jpeg_format() -> Format {
     ]);
 
     // TODO: Restart markers (rst0-rst7)
-    let ecs = Format::Star(Box::new(Format::Alt(
-        Box::new(Format::Byte(ByteSet::Not(0xFF))),
-        Box::new(Format::Map(
+    let ecs = repeat(alts([
+        Format::Byte(ByteSet::Not(0xFF)),
+        Format::Map(
             |_| Value::U8(0xFF),
             Box::new(Format::Cat(
                 Box::new(Format::Byte(ByteSet::Is(0xFF))),
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
             )),
-        )),
-    )));
+        ),
+    ]));
 
     let dqt_data = Format::Record(vec![
         // precision <- u4; -- 0 | 1
         // destination <- u4; -- 1 |..| 4
         // elements <- match precision {
-        //   0 => repeat-len 64 u8,
-        //   1 => repeat-len 64 u16be,
+        //   0 => repeat-count 64 u8,
+        //   1 => repeat-count 64 u16be,
         // };
         ("precision-destination".to_string(), u8()),
         ("elements".to_string(), any_bytes()),
@@ -631,24 +658,18 @@ fn jpeg_format() -> Format {
     ]);
 
     let scan = Format::Record(vec![
-        (
-            "segments".to_string(),
-            Format::Star(Box::new(table_or_misc.clone())),
-        ),
+        ("segments".to_string(), repeat(table_or_misc.clone())),
         ("sos".to_string(), sos),
         ("ecs".to_string(), ecs),
     ]);
 
     let frame = Format::Record(vec![
         ("app0".to_string(), app0),
-        (
-            "segments".to_string(),
-            Format::Star(Box::new(table_or_misc)),
-        ),
+        ("segments".to_string(), repeat(table_or_misc)),
         ("header".to_string(), frame_header),
         ("scan".to_string(), scan.clone()),
-        // TODO: ("dnl".to_string(), alts([dnl, Format::Unit])), // Error: "cannot find valid lookahead for star"
-        // TODO: ("scans".to_string(), Format::Star(Box::new(scan))), // Error: "cannot find valid lookahead for star"
+        // TODO: ("dnl".to_string(), optional(dnl)), // Error: "cannot find valid lookahead for star"
+        // TODO: ("scans".to_string(), repeat(scan)), // Error: "cannot find valid lookahead for star"
     ]);
 
     let jpeg = Format::Record(vec![
