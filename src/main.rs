@@ -313,7 +313,11 @@ impl Decoder {
                 let mut fields = fields.iter().peekable();
 
                 while let Some(f) = fields.next() {
-                    let df = Decoder::compile(f, fields.peek().copied())?;
+                    let opt_next = match fields.peek() {
+                        Some(opt_next) => Some(*opt_next),
+                        None => opt_next,
+                    };
+                    let df = Decoder::compile(f, opt_next)?;
                     dfields.push(df);
                 }
 
@@ -324,7 +328,11 @@ impl Decoder {
                 let mut fields = fields.iter().peekable();
 
                 while let Some((name, f)) = fields.next() {
-                    let df = Decoder::compile(f, fields.peek().map(|(_, f)| f))?;
+                    let opt_next = match fields.peek() {
+                        Some((_, opt_next)) => Some(opt_next),
+                        None => opt_next,
+                    };
+                    let df = Decoder::compile(f, opt_next)?;
                     dfields.push((name.clone(), df));
                 }
 
@@ -408,6 +416,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for (name, f) in fields {
+                    println!("field: {name}");
                     let (vf, next_input) = f.parse(stack, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
@@ -419,16 +428,18 @@ impl Decoder {
                 Some((Value::Record(v), input))
             }
             Decoder::While(look, a) => {
+                println!("while: {look:?}");
                 let mut input = input;
                 let mut v = Vec::new();
                 while look.matches(input) {
-                    let (va, next_input) = a.parse(stack, input)?;
+                    let (va, next_input) = a.parse(stack, input).unwrap();
                     input = next_input;
                     v.push(va);
                 }
                 Some((Value::Seq(v), input))
             }
             Decoder::Until(look, a) => {
+                println!("until: {look:?}");
                 let mut input = input;
                 let mut v = Vec::new();
                 while !look.matches(input) {
@@ -575,6 +586,7 @@ fn jpeg_format() -> Format {
     let app0 = marker_segment(0xE0, app0_data);
 
     let table_or_misc = alts([dqt, sof0, dht]);
+    let scan = Format::Record(vec![("sos".to_string(), sos), ("ecs".to_string(), ecs)]);
 
     let jpeg = Format::Record(vec![
         ("soi".to_string(), soi),
@@ -583,8 +595,7 @@ fn jpeg_format() -> Format {
             "segments".to_string(),
             Format::Star(Box::new(table_or_misc)),
         ),
-        ("sos".to_string(), sos),
-        ("ecs".to_string(), ecs),
+        ("scan".to_string(), scan),
         ("eoi".to_string(), eoi),
     ]);
 
