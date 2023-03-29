@@ -642,7 +642,7 @@ fn jpeg_format() -> Format {
         ("approximation-bit-position", u8()), // { high <- u4, low <- u4 }
     ]);
 
-    // DQT: Define quantization table  (See ITU T.81 Section B.2.4.1)
+    // DQT: Define quantization table (See ITU T.81 Section B.2.4.1)
     let dqt_data = record([
         // precision <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
@@ -653,6 +653,9 @@ fn jpeg_format() -> Format {
         // };
         ("elements", any_bytes()),
     ]);
+
+    // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
+    let dri_data = record([("restart-interval", u16be())]);
 
     // APP0: Application segment 0
     let app0_data = record([
@@ -705,7 +708,7 @@ fn jpeg_format() -> Format {
     let sos = marker_segment(0xDA, sos_data.clone()); // Start of scan
     let dqt = marker_segment(0xDB, dqt_data.clone()); // Define quantization table
     let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
-    let dri = marker_segment(0xDD, any_bytes()); // Define restart interval
+    let dri = marker_segment(0xDD, dri_data.clone()); // Define restart interval
     let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
     let app1 = marker_segment(0xE1, any_bytes()); // EXIF
     let app2 = marker_segment(0xE2, any_bytes()); // FlashPix / ICC
