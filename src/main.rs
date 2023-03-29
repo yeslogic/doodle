@@ -592,13 +592,18 @@ fn jpeg_format() -> Format {
         )),
     )));
 
+    let dqt_data = Format::Record(vec![
+        ("precision-destination".to_string(), u8()), // { precision <- u4, destination <- u4 }
+        ("elements".to_string(), any_bytes()), // repeat-len 64 (match precision { 0 => u8, 1 => u16be })
+    ]);
+
     let sof0 = marker_segment(0xC0, any_bytes()); // Start of frame (baseline jpeg)
     let dht = marker_segment(0xC4, any_bytes()); // Define Huffman Table
     let dac = marker_segment(0xCC, any_bytes()); // Define arithmetic coding conditioning
     let soi = marker(0xD8); // Start of image
     let eoi = marker(0xD9); // End of of image
     let sos = marker_segment(0xDA, sos_data); // Start of scan
-    let dqt = marker_segment(0xDB, any_bytes()); // Define quantization table
+    let dqt = marker_segment(0xDB, dqt_data); // Define quantization table
     let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
     let dri = marker_segment(0xDD, any_bytes()); // Define restart interval
     let app0 = marker_segment(0xE0, app0_data); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
