@@ -498,6 +498,14 @@ fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
     })
 }
 
+fn record<Label: ToString>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+    Format::Record(
+        (fields.into_iter())
+            .map(|(label, format)| (label.to_string(), format))
+            .collect(),
+    )
+}
+
 // fn optional(format: Format) -> Format {
 //     alts([format, Format::Unit])
 // }
@@ -549,11 +557,11 @@ fn jpeg_format() -> Format {
     }
 
     fn marker_segment(id: u8, data: Format) -> Format {
-        Format::Record(vec![
-            ("marker".to_string(), marker(id)),
-            ("length".to_string(), u16be()),
+        record([
+            ("marker", marker(id)),
+            ("length", u16be()),
             (
-                "data".to_string(),
+                "data",
                 Format::Slice(
                     Expr::Sub(
                         Box::new(Expr::Var(0)), // length
@@ -566,94 +574,90 @@ fn jpeg_format() -> Format {
     }
 
     // SOF: Frame header (See ITU T.81 Section B.2.2)
-    let sof_data = Format::Record(vec![
-        ("sample-precision".to_string(), u8()),
-        ("num-lines".to_string(), u16be()),
-        ("num-samples-per-line".to_string(), u16be()),
-        ("num-image-components".to_string(), u8()),
+    let sof_data = record([
+        ("sample-precision", u8()),
+        ("num-lines", u16be()),
+        ("num-samples-per-line", u16be()),
+        ("num-image-components", u8()),
         (
-            "image-components".to_string(),
+            "image-components",
             repeat_count(
                 Expr::Var(0), // num-image-components
-                Format::Record(vec![
-                    ("id".to_string(), u8()),
-                    ("sampling-factor".to_string(), u8()), // { horizontal <- u4, vertical <- u4 }
-                    ("quantization-table-id".to_string(), u8()),
+                record([
+                    ("id", u8()),
+                    ("sampling-factor", u8()), // { horizontal <- u4, vertical <- u4 }
+                    ("quantization-table-id", u8()),
                 ]),
             ),
         ),
     ]);
 
     // DHT: Define Huffman table (See ITU T.81 Section B.2.4.2)
-    let dht_data = repeat(Format::Record(vec![
+    let dht_data = repeat(record([
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
-        ("class-table-id".to_string(), u8()),
-        ("num-codes".to_string(), repeat_count(Expr::U8(16), u8())),
-        ("values".to_string(), any_bytes()), // List.map num-codes (\n => repeat-count n u8);
+        ("class-table-id", u8()),
+        ("num-codes", repeat_count(Expr::U8(16), u8())),
+        ("values", any_bytes()), // List.map num-codes (\n => repeat-count n u8);
     ]));
 
     // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
-    let dac_data = repeat(Format::Record(vec![
+    let dac_data = repeat(record([
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
-        ("class-table-id".to_string(), u8()),
-        ("value".to_string(), u8()),
+        ("class-table-id", u8()),
+        ("value", u8()),
     ]));
 
     // SOS: Scan header (See ITU T.81 Section B.2.3)
-    let sos_data = Format::Record(vec![
-        ("num-image-components".to_string(), u8()), // 1 |..| 4
+    let sos_data = record([
+        ("num-image-components", u8()), // 1 |..| 4
         (
-            "image-components".to_string(),
+            "image-components",
             repeat_count(
                 Expr::Var(0), // num-image-components
-                Format::Record(vec![
-                    ("component-selector".to_string(), u8()), // ???
+                record([
+                    ("component-selector", u8()), // ???
                     // dc-entropy-coding-table-id <- u4;
                     // ac-entropy-coding-table-id <- u4;
-                    ("entropy-coding-table-ids".to_string(), u8()),
+                    ("entropy-coding-table-ids", u8()),
                 ]),
             ),
         ),
-        ("start-spectral-selection".to_string(), u8()), // ???
-        ("end-spectral-selection".to_string(), u8()),   // ???
-        ("approximation-bit-position".to_string(), u8()), // { high <- u4, low <- u4 }
+        ("start-spectral-selection", u8()),   // ???
+        ("end-spectral-selection", u8()),     // ???
+        ("approximation-bit-position", u8()), // { high <- u4, low <- u4 }
     ]);
 
     // DQT: Define quantization table  (See ITU T.81 Section B.2.4.1)
-    let dqt_data = Format::Record(vec![
+    let dqt_data = record([
         // precision <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
-        ("precision-table-id".to_string(), u8()),
+        ("precision-table-id", u8()),
         // elements <- match precision {
         //   0 => repeat-count 64 u8,
         //   1 => repeat-count 64 u16be,
         // };
-        ("elements".to_string(), any_bytes()),
+        ("elements", any_bytes()),
     ]);
 
     // APP0: Application segment 0
-    let app0_data = Format::Record(vec![
-        ("identifier".to_string(), Format::from_bytes(b"JFIF\0")),
-        ("version-major".to_string(), u8()),
-        ("version-minor".to_string(), u8()),
-        ("density-units".to_string(), u8()), // 0 | 1 | 2
-        ("density-x".to_string(), u16be()),  // != 0
-        ("density-y".to_string(), u16be()),  // != 0
-        ("thumbnail-width".to_string(), u8()),
-        ("thumbnail-height".to_string(), u8()),
+    let app0_data = record([
+        ("identifier", Format::from_bytes(b"JFIF\0")),
+        ("version-major", u8()),
+        ("version-minor", u8()),
+        ("density-units", u8()), // 0 | 1 | 2
+        ("density-x", u16be()),  // != 0
+        ("density-y", u16be()),  // != 0
+        ("thumbnail-width", u8()),
+        ("thumbnail-height", u8()),
         (
-            "thumbnail-pixels".to_string(),
+            "thumbnail-pixels",
             repeat_count(
                 Expr::Var(0), // thumbnail-height
                 repeat_count(
                     Expr::Var(1), // thumbnail-width
-                    Format::Record(vec![
-                        ("r".to_string(), u8()),
-                        ("g".to_string(), u8()),
-                        ("b".to_string(), u8()),
-                    ]),
+                    record([("r", u8()), ("g", u8()), ("b", u8())]),
                 ),
             ),
         ),
@@ -723,25 +727,25 @@ fn jpeg_format() -> Format {
         ),
     ]));
 
-    let scan = Format::Record(vec![
-        ("segments".to_string(), repeat(table_or_misc.clone())),
-        ("sos".to_string(), sos),
-        ("ecs".to_string(), ecs),
+    let scan = record([
+        ("segments", repeat(table_or_misc.clone())),
+        ("sos", sos.clone()),
+        ("ecs", ecs.clone()),
     ]);
 
-    let frame = Format::Record(vec![
-        ("app0".to_string(), app0),
-        ("segments".to_string(), repeat(table_or_misc)),
-        ("header".to_string(), frame_header),
-        ("scan".to_string(), scan.clone()),
-        // TODO: ("dnl".to_string(), optional(dnl)), // Error: "cannot find valid lookahead for star"
-        // TODO: ("scans".to_string(), repeat(scan)), // Error: "cannot find valid lookahead for star"
+    let frame = record([
+        ("app0", app0.clone()),
+        ("segments", repeat(table_or_misc.clone())),
+        ("header", frame_header.clone()),
+        ("scan", scan.clone()),
+        // TODO: ("dnl", optional(dnl)), // Error: "cannot find valid lookahead for star"
+        // TODO: ("scans", repeat(scan)), // Error: "cannot find valid lookahead for star"
     ]);
 
-    let jpeg = Format::Record(vec![
-        ("soi".to_string(), soi),
-        ("frame".to_string(), frame),
-        ("eoi".to_string(), eoi),
+    let jpeg = record([
+        ("soi", soi.clone()),
+        ("frame", frame.clone()),
+        ("eoi", eoi.clone()),
     ]);
 
     jpeg
