@@ -29,6 +29,14 @@ enum Expr {
     Record(Vec<(String, Expr)>),
 }
 
+#[derive(Clone)]
+enum Func {
+    Expr(Expr),
+    Fst,
+    Snd,
+    U16Be,
+}
+
 /// Binary format descriptions
 ///
 /// A subset of binary formats can be modelled as [regular expressions]:
@@ -74,7 +82,7 @@ enum Format {
     /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
     /// Transform a decoded value with a function
-    Map(fn(&Value) -> Value, Box<Format>), // TODO: Decouple from `Value`
+    Map(Func, Box<Format>),
 }
 
 #[derive(Debug)]
@@ -95,7 +103,7 @@ enum Decoder {
     Until(Lookahead, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
-    Map(fn(&Value) -> Value, Box<Decoder>), // TODO: Decouple from `Value`
+    Map(Func, Box<Decoder>),
 }
 
 impl Expr {
@@ -130,6 +138,29 @@ impl Expr {
             Value::Unit | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
                 panic!("value is not number")
             }
+        }
+    }
+}
+
+impl Func {
+    fn eval(&self, arg: Value) -> Value {
+        match self {
+            Func::Expr(e) => e.eval(&[]),
+            Func::Fst => match arg {
+                Value::Pair(fst, _snd) => *fst,
+                _ => panic!("Fst: expected (_, _)"),
+            },
+            Func::Snd => match arg {
+                Value::Pair(_fst, snd) => *snd,
+                _ => panic!("Snd: expected (_, _)"),
+            },
+            Func::U16Be => match arg {
+                Value::Pair(fst, snd) => match (fst.as_ref(), snd.as_ref()) {
+                    (Value::U8(hi), Value::U8(lo)) => Value::U16(u16::from_be_bytes([*hi, *lo])),
+                    (_, _) => panic!("expected (U8, U8)"),
+                },
+                _ => panic!("U16Be: expected (_, _)"),
+            },
         }
     }
 }
@@ -397,7 +428,7 @@ impl Decoder {
             }
             Format::Map(f, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
-                Ok(Decoder::Map(*f, da))
+                Ok(Decoder::Map(f.clone(), da))
             }
         }
     }
@@ -497,7 +528,7 @@ impl Decoder {
             }
             Decoder::Map(f, a) => {
                 let (va, input) = a.parse(stack, input)?;
-                Some((f(&va), input))
+                Some((f.eval(va), input))
             }
         }
     }
@@ -541,13 +572,7 @@ fn u8() -> Format {
 
 fn u16be() -> Format {
     Format::Map(
-        |value| match value {
-            Value::Pair(fst, snd) => match (fst.as_ref(), snd.as_ref()) {
-                (Value::U8(hi), Value::U8(lo)) => Value::U16(u16::from_be_bytes([*hi, *lo])),
-                (_, _) => panic!("expected (U8, U8)"),
-            },
-            _ => panic!("expected (_, _)"),
-        },
+        Func::U16Be,
         Box::new(Format::Cat(
             Box::new(Format::Byte(ByteSet::Any)),
             Box::new(Format::Byte(ByteSet::Any)),
@@ -558,10 +583,7 @@ fn u16be() -> Format {
 fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
-            |value| match value {
-                Value::Pair(_, snd) => (**snd).clone(),
-                _ => panic!("expected (_, _)"),
-            },
+            Func::Snd,
             Box::new(Format::Cat(
                 Box::new(Format::Byte(ByteSet::Is(0xFF))),
                 Box::new(Format::Byte(ByteSet::Is(id))),
@@ -771,15 +793,15 @@ fn jpeg_format() -> Format {
     ]);
 
     // NOTE: hack to help find restart markers in the scan data
-    fn restart(number: u8) -> Value {
-        Value::Record(vec![("restart".to_string(), Value::U8(number))])
+    fn restart(number: u8) -> Expr {
+        Expr::Record(vec![("restart".to_string(), Expr::U8(number))])
     }
 
     // MCU: Minimum coded unit
     let mcu = alts([
         Format::Byte(ByteSet::Not(0xFF)),
         Format::Map(
-            |_| Value::U8(0xFF),
+            Func::Expr(Expr::U8(0xFF)),
             Box::new(Format::Cat(
                 Box::new(Format::Byte(ByteSet::Is(0xFF))),
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
@@ -792,14 +814,14 @@ fn jpeg_format() -> Format {
         // FIXME: Extract into separate ECS repetition
         mcu, // TODO: repeat(mcu),
         // FIXME: Restart markers should cycle in order from rst0-rst7
-        Format::Map(|_| restart(0), Box::new(rst0)), // FIXME Restart marker 0
-        Format::Map(|_| restart(1), Box::new(rst1)), // FIXME Restart marker 1
-        Format::Map(|_| restart(2), Box::new(rst2)), // FIXME Restart marker 2
-        Format::Map(|_| restart(3), Box::new(rst3)), // FIXME Restart marker 3
-        Format::Map(|_| restart(4), Box::new(rst4)), // FIXME Restart marker 4
-        Format::Map(|_| restart(5), Box::new(rst5)), // FIXME Restart marker 5
-        Format::Map(|_| restart(6), Box::new(rst6)), // FIXME Restart marker 6
-        Format::Map(|_| restart(7), Box::new(rst7)), // FIXME Restart marker 7
+        Format::Map(Func::Expr(restart(0)), Box::new(rst0)), // FIXME Restart marker 0
+        Format::Map(Func::Expr(restart(1)), Box::new(rst1)), // FIXME Restart marker 1
+        Format::Map(Func::Expr(restart(2)), Box::new(rst2)), // FIXME Restart marker 2
+        Format::Map(Func::Expr(restart(3)), Box::new(rst3)), // FIXME Restart marker 3
+        Format::Map(Func::Expr(restart(4)), Box::new(rst4)), // FIXME Restart marker 4
+        Format::Map(Func::Expr(restart(5)), Box::new(rst5)), // FIXME Restart marker 5
+        Format::Map(Func::Expr(restart(6)), Box::new(rst6)), // FIXME Restart marker 6
+        Format::Map(Func::Expr(restart(7)), Box::new(rst7)), // FIXME Restart marker 7
     ]));
 
     let scan = record([
