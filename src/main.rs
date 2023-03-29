@@ -416,7 +416,6 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for (name, f) in fields {
-                    println!("field: {name}");
                     let (vf, next_input) = f.parse(stack, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
@@ -428,7 +427,6 @@ impl Decoder {
                 Some((Value::Record(v), input))
             }
             Decoder::While(look, a) => {
-                println!("while: {look:?}");
                 let mut input = input;
                 let mut v = Vec::new();
                 while look.matches(input) {
@@ -439,7 +437,6 @@ impl Decoder {
                 Some((Value::Seq(v), input))
             }
             Decoder::Until(look, a) => {
-                println!("until: {look:?}");
                 let mut input = input;
                 let mut v = Vec::new();
                 while !look.matches(input) {
