@@ -40,6 +40,7 @@ enum Expr {
 /// ⟦ Byte(Is(b)) ⟧             = b                     literal byte
 /// ⟦ Alt(f0, f1) ⟧             = ⟦ f0 ⟧ | ⟦ f0 ⟧       alternation
 /// ⟦ Cat(f0, f1) ⟧             = ⟦ f0 ⟧ ⟦ f0 ⟧         concatenation
+/// ⟦ Tuple([]) ⟧               = ε                     empty byte string
 /// ⟦ Tuple([f0, ..., fn]) ⟧    = ⟦ f0 ⟧ ... ⟦ fn ⟧     concatenation
 /// ⟦ Repeat(f) ⟧               = ⟦ f0 ⟧*               Kleene star
 /// ```
