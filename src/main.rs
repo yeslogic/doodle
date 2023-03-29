@@ -593,8 +593,14 @@ fn jpeg_format() -> Format {
     )));
 
     let dqt_data = Format::Record(vec![
-        ("precision-destination".to_string(), u8()), // { precision <- u4, destination <- u4 }
-        ("elements".to_string(), any_bytes()), // repeat-len 64 (match precision { 0 => u8, 1 => u16be })
+        // precision <- u4; -- 0 | 1
+        // destination <- u4; -- 1 |..| 4
+        // elements <- match precision {
+        //   0 => repeat-len 64 u8,
+        //   1 => repeat-len 64 u16be,
+        // };
+        ("precision-destination".to_string(), u8()),
+        ("elements".to_string(), any_bytes()),
     ]);
 
     let sof0 = marker_segment(0xC0, any_bytes()); // Start of frame (baseline jpeg)
