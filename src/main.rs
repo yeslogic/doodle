@@ -796,7 +796,7 @@ fn jpeg_format() -> Format {
     ]);
 
     let frame = Format::Record(vec![
-        ("app0".to_string(), app0),
+        ("app".to_string(), alts([app0, app1])),
         ("segments".to_string(), repeat(table_or_misc)),
         ("header".to_string(), frame_header),
         ("scan".to_string(), scan.clone()),
