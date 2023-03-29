@@ -657,16 +657,29 @@ fn jpeg_format() -> Format {
         ),
     ]);
 
-    let sof0 = marker_segment(0xC0, sof_data); // Start of frame (baseline jpeg)
-    let dht = marker_segment(0xC4, dht_data); // Define Huffman Table
-    let dac = marker_segment(0xCC, dac_data); // Define arithmetic coding conditioning
+    let sof0 = marker_segment(0xC0, sof_data.clone()); // Start of frame (baseline jpeg)
+    let _sof1 = marker_segment(0xC1, sof_data.clone()); // Start of frame (extended sequential, huffman)
+    let _sof2 = marker_segment(0xC2, sof_data.clone()); // Start of frame (progressive, huffman)
+    let _sof3 = marker_segment(0xC3, sof_data.clone()); // Start of frame (lossless, huffman)
+    let dht = marker_segment(0xC4, dht_data.clone()); // Define Huffman Table
+    let _sof5 = marker_segment(0xC5, sof_data.clone()); // Start of frame (differential sequential, huffman)
+    let _sof6 = marker_segment(0xC6, sof_data.clone()); // Start of frame (differential progressive, huffman)
+    let _sof7 = marker_segment(0xC7, sof_data.clone()); // Start of frame (differential lossless, huffman)
+    let _jpeg = marker_segment(0xC8, any_bytes()); // Reserved for JPEG extension
+    let _sof9 = marker_segment(0xC9, sof_data.clone()); // Start of frame (extended sequential, arithmetic)
+    let _sof10 = marker_segment(0xCA, sof_data.clone()); // Start of frame (progressive, arithmetic)
+    let _sof11 = marker_segment(0xCB, sof_data.clone()); // Start of frame (lossless, arithmetic)
+    let dac = marker_segment(0xCC, dac_data.clone()); // Define arithmetic coding conditioning
+    let _sof13 = marker_segment(0xCD, sof_data.clone()); // Start of frame (differential sequential, arithmetic)
+    let _sof14 = marker_segment(0xCE, sof_data.clone()); // Start of frame (differential progressive, arithmetic)
+    let _sof15 = marker_segment(0xCF, sof_data.clone()); // Start of frame (differential lossless, arithmetic)
     let soi = marker(0xD8); // Start of image
     let eoi = marker(0xD9); // End of of image
-    let sos = marker_segment(0xDA, sos_data); // Start of scan
-    let dqt = marker_segment(0xDB, dqt_data); // Define quantization table
+    let sos = marker_segment(0xDA, sos_data.clone()); // Start of scan
+    let dqt = marker_segment(0xDB, dqt_data.clone()); // Define quantization table
     let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
     let dri = marker_segment(0xDD, any_bytes()); // Define restart interval
-    let app0 = marker_segment(0xE0, app0_data); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
+    let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF (len >=14) / JFXX (len >= 6) / AVI MJPEG)
     let com = marker_segment(0xFE, any_bytes()); // Extension data (comment)
 
     let table_or_misc = alts([
@@ -681,7 +694,19 @@ fn jpeg_format() -> Format {
 
     let frame_header = alts([
         sof0.clone(),
-        // TODO: ... sof15
+        // TODO: Error: "cannot find valid lookahead for star"
+        // sof1.clone(),
+        // sof2.clone(),
+        // sof3.clone(),
+        // sof5.clone(),
+        // sof6.clone(),
+        // sof7.clone(),
+        // sof9.clone(),
+        // sof10.clone(),
+        // sof11.clone(),
+        // sof13.clone(),
+        // sof14.clone(),
+        // sof15.clone(),
     ]);
 
     // TODO: Restart markers (rst0-rst7)
