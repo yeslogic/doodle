@@ -188,15 +188,15 @@ impl Format {
 }
 
 impl Lookahead {
-    pub fn empty() -> Self {
+    pub fn empty() -> Lookahead {
         Lookahead { pattern: vec![] }
     }
 
-    pub fn single(bs: ByteSet) -> Self {
+    pub fn single(bs: ByteSet) -> Lookahead {
         Lookahead { pattern: vec![bs] }
     }
 
-    pub fn alt(a: &Self, b: &Self) -> Self {
+    pub fn alt(a: &Lookahead, b: &Lookahead) -> Lookahead {
         Lookahead {
             pattern: Iterator::zip(a.pattern.iter(), b.pattern.iter())
                 .map(|(ba, bb)| ByteSet::union(&ba, bb))
@@ -204,13 +204,13 @@ impl Lookahead {
         }
     }
 
-    pub fn cat(a: &Self, b: &Self) -> Self {
+    pub fn cat(a: &Lookahead, b: &Lookahead) -> Lookahead {
         let mut pattern = a.pattern.clone();
         pattern.extend(b.pattern.iter());
         Lookahead { pattern }
     }
 
-    pub fn new(a: &Format, b: &Format) -> Option<Self> {
+    pub fn new(a: &Format, b: &Format) -> Option<Lookahead> {
         const LEN: usize = 2;
         let pa = Lookahead::from(a, LEN, Format::Unit)?;
         if !b.might_match_lookahead(&pa.pattern, Format::Unit) {
