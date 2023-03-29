@@ -738,6 +738,62 @@ fn jpeg_format() -> Format {
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
             )),
         ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 0
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD0))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 1
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD1))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 2
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD2))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 3
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD3))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 4
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD4))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 5
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD5))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 6
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD6))),
+            )),
+        ),
+        Format::Map(
+            |_| Value::U8(0xFF), // FIXME reset marker 7
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0xD7))),
+            )),
+        ),
     ]));
 
     let scan = record([
