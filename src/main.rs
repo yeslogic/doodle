@@ -197,11 +197,11 @@ impl Lookahead {
     }
 
     pub fn alt(a: &Self, b: &Self) -> Self {
-        let mut pattern = Vec::new();
-        for i in 0..std::cmp::min(a.pattern.len(), b.pattern.len()) {
-            pattern.push(ByteSet::union(&a.pattern[i], &b.pattern[i]));
+        Lookahead {
+            pattern: Iterator::zip(a.pattern.iter(), b.pattern.iter())
+                .map(|(ba, bb)| ByteSet::union(&ba, bb))
+                .collect(),
         }
-        Lookahead { pattern }
     }
 
     pub fn cat(a: &Self, b: &Self) -> Self {
