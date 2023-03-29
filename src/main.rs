@@ -265,11 +265,11 @@ impl Lookahead {
                 Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
             }
             Format::Tuple(fields) => match fields.split_first() {
-                None => Some(Lookahead::empty()),
+                None => Lookahead::from(&next, len, Format::Unit),
                 Some((a, fields)) => Lookahead::from(a, len, Format::Tuple(fields.to_vec())),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => Some(Lookahead::empty()),
+                None => Lookahead::from(&next, len, Format::Unit),
                 Some(((_, a), fields)) => Lookahead::from(a, len, Format::Record(fields.to_vec())),
             },
             Format::Star(_a) => {
