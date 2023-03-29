@@ -20,10 +20,8 @@ enum Value {
 
 #[derive(Clone)]
 enum Expr {
+    Const(Value),
     Var(usize),
-    Unit,
-    U8(u8),
-    U16(u16),
     Sub(Box<Expr>, Box<Expr>),
     Pair(Box<Expr>, Box<Expr>),
     Seq(Vec<Expr>),
@@ -118,10 +116,8 @@ enum Decoder {
 impl Expr {
     fn eval(&self, stack: &[Value]) -> Value {
         match self {
+            Expr::Const(v) => v.clone(),
             Expr::Var(index) => stack[stack.len() - index - 1].clone(),
-            Expr::Unit => Value::Unit,
-            Expr::U8(x) => Value::U8(*x),
-            Expr::U16(x) => Value::U16(*x),
             Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x - y),
                 (Value::U16(x), Value::U16(y)) => Value::U16(x - y),
@@ -643,7 +639,7 @@ fn jpeg_format() -> Format {
                 Format::Slice(
                     Expr::Sub(
                         Box::new(Expr::Var(0)), // length
-                        Box::new(Expr::U16(2)),
+                        Box::new(Expr::Const(Value::U16(2))),
                     ),
                     Box::new(data),
                 ),
@@ -675,7 +671,7 @@ fn jpeg_format() -> Format {
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
         ("class-table-id", u8()),
-        ("num-codes", repeat_count(Expr::U8(16), u8())),
+        ("num-codes", repeat_count(Expr::Const(Value::U8(16)), u8())),
         ("values", any_bytes()), // List.map num-codes (\n => repeat-count n u8);
     ]));
 
@@ -839,7 +835,7 @@ fn jpeg_format() -> Format {
     let mcu = alts([
         Format::Byte(ByteSet::Not(0xFF)),
         Format::Map(
-            Func::Expr(Expr::U8(0xFF)),
+            Func::Expr(Expr::Const(Value::U8(0xFF))),
             Box::new(Format::Cat(
                 Box::new(Format::Byte(ByteSet::Is(0xFF))),
                 Box::new(Format::Byte(ByteSet::Is(0x00))),
@@ -854,14 +850,14 @@ fn jpeg_format() -> Format {
             // FIXME: Extract into separate ECS repetition
             mcu, // TODO: repeat(mcu),
             // FIXME: Restart markers should cycle in order from rst0-rst7
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst0)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst1)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst2)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst3)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst4)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst5)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst6)),
-            Format::Map(Func::Expr(Expr::Unit), Box::new(rst7)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst0)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst1)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst2)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst3)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst4)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst5)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst6)),
+            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst7)),
         ]))),
     );
 
