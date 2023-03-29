@@ -565,6 +565,73 @@ fn jpeg_format() -> Format {
         ])
     }
 
+    // SOF: Frame header (See ITU T.81 Section B.2.2)
+    let sof_data = Format::Record(vec![
+        ("sample-precision".to_string(), u8()),
+        ("num-lines".to_string(), u16be()),
+        ("num-samples-per-line".to_string(), u16be()),
+        ("num-image-components".to_string(), u8()),
+        (
+            "image-components".to_string(),
+            repeat_count(
+                Expr::Var(0), // num-image-components
+                Format::Record(vec![
+                    ("id".to_string(), u8()),
+                    ("sampling-factor".to_string(), u8()), // { horizontal <- u4, vertical <- u4 }
+                    ("destination".to_string(), u8()),     // 0 |..| 3
+                ]),
+            ),
+        ),
+    ]);
+
+    // DHT: Define Huffman table (See ITU T.81 Section B.2.4.2)
+    let dht_data = repeat(Format::Record(vec![
+        // class <- u4 //= 0 | 1;
+        // destination <- u4 //= 1 |..| 4;
+        ("class-destination".to_string(), u8()),
+        ("num-codes".to_string(), repeat_count(Expr::U8(16), u8())),
+        ("values".to_string(), any_bytes()), // List.map num-codes (\n => repeat-count n u8);
+    ]));
+
+    // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
+    let dac_data = repeat(Format::Record(vec![
+        // class <- u4 //= 0 | 1;
+        // destination <- u4 //= 1 |..| 4;
+        ("class-destination".to_string(), u8()),
+        ("value".to_string(), u8()),
+    ]));
+
+    // SOS: Scan header (See ITU T.81 Section B.2.3)
+    let sos_data = Format::Record(vec![
+        ("num-image-components".to_string(), u8()), // 1 |..| 4
+        (
+            "image-components".to_string(),
+            repeat_count(
+                Expr::Var(0), // num-image-components
+                Format::Record(vec![
+                    ("component-selector".to_string(), u8()), // ???
+                    ("destination".to_string(), u8()),        // { dc <- u4, ac <- u4 }
+                ]),
+            ),
+        ),
+        ("start-spectral-selection".to_string(), u8()), // ???
+        ("end-spectral-selection".to_string(), u8()),   // ???
+        ("approximation-bit-position".to_string(), u8()), // { high <- u4, low <- u4 }
+    ]);
+
+    // DQT: Define quantization table  (See ITU T.81 Section B.2.4.1)
+    let dqt_data = Format::Record(vec![
+        // precision <- u4 //= 0 | 1;
+        // destination <- u4 //= 1 |..| 4;
+        ("precision-destination".to_string(), u8()),
+        // elements <- match precision {
+        //   0 => repeat-count 64 u8,
+        //   1 => repeat-count 64 u16be,
+        // };
+        ("elements".to_string(), any_bytes()),
+    ]);
+
+    // APP0: Application segment 0
     let app0_data = Format::Record(vec![
         ("identifier".to_string(), Format::from_bytes(b"JFIF\0")),
         ("version-major".to_string(), u8()),
@@ -590,49 +657,9 @@ fn jpeg_format() -> Format {
         ),
     ]);
 
-    let sos_data = Format::Record(vec![
-        ("num-image-components".to_string(), u8()), // 1 |..| 4
-        (
-            "image-components".to_string(),
-            Format::RepeatCount(
-                Expr::Var(0), // num-components
-                Box::new(Format::Record(vec![
-                    ("component-selector".to_string(), u8()), // ???
-                    ("table-destination".to_string(), u8()),  // { dc <- u4, ac <- u4 }
-                ])),
-            ),
-        ),
-        ("start-spectral-selection".to_string(), u8()), // ???
-        ("end-spectral-selection".to_string(), u8()),   // ???
-        ("approximation-bit-position".to_string(), u8()), // { high <- u4, low <- u4 }
-    ]);
-
-    // TODO: Restart markers (rst0-rst7)
-    let ecs = repeat(alts([
-        Format::Byte(ByteSet::Not(0xFF)),
-        Format::Map(
-            |_| Value::U8(0xFF),
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0x00))),
-            )),
-        ),
-    ]));
-
-    let dqt_data = Format::Record(vec![
-        // precision <- u4; -- 0 | 1
-        // destination <- u4; -- 1 |..| 4
-        // elements <- match precision {
-        //   0 => repeat-count 64 u8,
-        //   1 => repeat-count 64 u16be,
-        // };
-        ("precision-destination".to_string(), u8()),
-        ("elements".to_string(), any_bytes()),
-    ]);
-
-    let sof0 = marker_segment(0xC0, any_bytes()); // Start of frame (baseline jpeg)
-    let dht = marker_segment(0xC4, any_bytes()); // Define Huffman Table
-    let dac = marker_segment(0xCC, any_bytes()); // Define arithmetic coding conditioning
+    let sof0 = marker_segment(0xC0, sof_data); // Start of frame (baseline jpeg)
+    let dht = marker_segment(0xC4, dht_data); // Define Huffman Table
+    let dac = marker_segment(0xCC, dac_data); // Define arithmetic coding conditioning
     let soi = marker(0xD8); // Start of image
     let eoi = marker(0xD9); // End of of image
     let sos = marker_segment(0xDA, sos_data); // Start of scan
@@ -656,6 +683,18 @@ fn jpeg_format() -> Format {
         sof0.clone(),
         // TODO: ... sof15
     ]);
+
+    // TODO: Restart markers (rst0-rst7)
+    let ecs = repeat(alts([
+        Format::Byte(ByteSet::Not(0xFF)),
+        Format::Map(
+            |_| Value::U8(0xFF),
+            Box::new(Format::Cat(
+                Box::new(Format::Byte(ByteSet::Is(0xFF))),
+                Box::new(Format::Byte(ByteSet::Is(0x00))),
+            )),
+        ),
+    ]));
 
     let scan = Format::Record(vec![
         ("segments".to_string(), repeat(table_or_misc.clone())),
