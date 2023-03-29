@@ -765,10 +765,14 @@ fn jpeg_format() -> Format {
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let input = fs::read("test.jpg")?;
-    let f = jpeg_format();
-    let decoder = Decoder::compile(&f, None)?;
+
+    let format = jpeg_format();
+    let decoder = Decoder::compile(&format, None)?;
+
     let mut stack = Vec::new();
-    let res = decoder.parse(&mut stack, &input);
-    println!("{:?}", res);
+    let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
+
+    println!("{:?}", val);
+
     Ok(())
 }
