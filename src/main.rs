@@ -683,6 +683,31 @@ fn u32le() -> Format {
     )
 }
 
+fn png_format() -> Format {
+    let chunk = record([
+        ("length", u32be()), // FIXME < 2^31
+        (
+            "type", // FIXME ASCII
+            Format::Tuple(vec![
+                Format::Byte(ByteSet::Any),
+                Format::Byte(ByteSet::Any),
+                Format::Byte(ByteSet::Any),
+                Format::Byte(ByteSet::Any),
+            ]),
+        ),
+        (
+            "data",
+            Format::RepeatCount(Expr::Var(1), Box::new(Format::Byte(ByteSet::Any))),
+        ),
+        ("crc", u32be()), // FIXME check this
+    ]);
+
+    record([
+        ("signature", Format::from_bytes(b"\x89PNG\r\n\x1A\n")),
+        ("chunks", Format::Repeat(Box::new(chunk))),
+    ])
+}
+
 fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
@@ -986,7 +1011,7 @@ fn jpeg_format() -> Format {
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let input = fs::read("test.jpg")?;
 
-    let format = jpeg_format();
+    let format = alts([jpeg_format(), png_format()]);
     let decoder = Decoder::compile(&format, None)?;
 
     let mut stack = Vec::new();
