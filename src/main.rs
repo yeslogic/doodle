@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 
 #[derive(Copy, Clone, Debug)]
@@ -1009,7 +1010,9 @@ fn jpeg_format() -> Format {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    let input = fs::read("test.jpg")?;
+    let args: Vec<String> = env::args().collect();
+    let filename = if args.len() < 2 { "test.jpg" } else { &args[1] };
+    let input = fs::read(filename)?;
 
     let format = alts([jpeg_format(), png_format()]);
     let decoder = Decoder::compile(&format, None)?;
