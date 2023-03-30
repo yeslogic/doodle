@@ -1,11 +1,70 @@
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 enum ByteSet {
-    Any,
-    Is(u8),
-    Not(u8),
+    Includes(HashSet<u8>),
+    Excludes(HashSet<u8>),
+}
+
+impl ByteSet {
+    pub fn any() -> ByteSet {
+        ByteSet::Excludes(HashSet::new())
+    }
+
+    pub fn is(b: u8) -> ByteSet {
+        ByteSet::Includes(HashSet::from([b]))
+    }
+
+    pub fn not(b: u8) -> ByteSet {
+        ByteSet::Excludes(HashSet::from([b]))
+    }
+
+    pub fn contains(&self, b: u8) -> bool {
+        match self {
+            ByteSet::Includes(included) => included.contains(&b),
+            ByteSet::Excludes(excluded) => !excluded.contains(&b),
+        }
+    }
+
+    pub fn is_disjoint(bs0: &ByteSet, bs1: &ByteSet) -> bool {
+        match (bs0, bs1) {
+            // Easy: check that the sets of included bytes are disjoint
+            (ByteSet::Includes(included0), ByteSet::Includes(included1)) => {
+                HashSet::is_disjoint(included0, included1)
+            }
+            // If the set of included bytes are a subset of the excluded bytes,
+            // then the byte sets are disjoint
+            (ByteSet::Includes(included), ByteSet::Excludes(excluded))
+            | (ByteSet::Excludes(excluded), ByteSet::Includes(included)) => {
+                HashSet::is_subset(included, excluded)
+            }
+            // Hard: enumerate these by brute force - they are disjoint if all
+            // bytes are contained in one byte set or the other set
+            (ByteSet::Excludes(excluded0), ByteSet::Excludes(excluded1)) => {
+                (0..=u8::MAX).all(|b| !excluded0.contains(&b) || !excluded1.contains(&b))
+            }
+        }
+    }
+
+    pub fn union(bs0: &ByteSet, bs1: &ByteSet) -> ByteSet {
+        match (bs0, bs1) {
+            (ByteSet::Includes(included0), ByteSet::Includes(included1)) => {
+                ByteSet::Includes(HashSet::union(included0, included1).copied().collect())
+            }
+            // Remove the included bytes from the excluded bytes
+            (ByteSet::Includes(included), ByteSet::Excludes(excluded))
+            | (ByteSet::Excludes(excluded), ByteSet::Includes(included)) => {
+                ByteSet::Excludes(HashSet::difference(excluded, included).copied().collect())
+            }
+            (ByteSet::Excludes(excluded0), ByteSet::Excludes(excluded1)) => ByteSet::Excludes(
+                HashSet::intersection(excluded0, excluded1)
+                    .copied()
+                    .collect(),
+            ),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -215,47 +274,11 @@ impl Func {
     }
 }
 
-impl ByteSet {
-    pub fn contains(&self, a: u8) -> bool {
-        match *self {
-            ByteSet::Any => true,
-            ByteSet::Is(b) => a == b,
-            ByteSet::Not(b) => a != b,
-        }
-    }
-
-    pub fn disjoint(a: &Self, b: &Self) -> bool {
-        match (*a, *b) {
-            (ByteSet::Any, _) => false,
-            (_, ByteSet::Any) => false,
-            (ByteSet::Is(m), ByteSet::Is(n)) => m != n,
-            (ByteSet::Not(m), ByteSet::Is(n)) => m == n,
-            (ByteSet::Is(m), ByteSet::Not(n)) => m == n,
-            (ByteSet::Not(_), ByteSet::Not(_)) => false,
-        }
-    }
-
-    pub fn union(a: &Self, b: &Self) -> ByteSet {
-        match (*a, *b) {
-            (ByteSet::Any, _) => ByteSet::Any,
-            (_, ByteSet::Any) => ByteSet::Any,
-            (ByteSet::Is(m), ByteSet::Is(n)) if m == n => ByteSet::Is(m),
-            (ByteSet::Is(_), ByteSet::Is(_)) => ByteSet::Any,
-            (ByteSet::Not(m), ByteSet::Not(n)) if m == n => ByteSet::Not(m),
-            (ByteSet::Not(_), ByteSet::Not(_)) => ByteSet::Any,
-            (ByteSet::Is(m), ByteSet::Not(n)) if m != n => ByteSet::Not(n),
-            (ByteSet::Is(_), ByteSet::Not(_)) => ByteSet::Any,
-            (ByteSet::Not(m), ByteSet::Is(n)) if m != n => ByteSet::Not(m),
-            (ByteSet::Not(_), ByteSet::Is(_)) => ByteSet::Any,
-        }
-    }
-}
-
 impl Format {
     fn from_bytes(bytes: &[u8]) -> Format {
         let v = bytes
             .iter()
-            .map(|b| Format::Byte(ByteSet::Is(*b)))
+            .map(|b| Format::Byte(ByteSet::is(*b)))
             .collect();
         Format::Tuple(v)
     }
@@ -268,7 +291,7 @@ impl Format {
                 next => next.might_match_lookahead(input, Format::Empty),
             },
             Format::Byte(bs) => match input.split_first() {
-                Some((b, _)) if ByteSet::disjoint(bs, b) => false,
+                Some((b, _)) if ByteSet::is_disjoint(bs, b) => false,
                 Some((_, input)) => next.might_match_lookahead(input, Format::Empty),
                 None => true,
             },
@@ -324,7 +347,7 @@ impl Lookahead {
 
     pub fn cat(a: &Lookahead, b: &Lookahead) -> Lookahead {
         let mut pattern = a.pattern.clone();
-        pattern.extend(b.pattern.iter());
+        pattern.extend(b.pattern.iter().cloned());
         Lookahead { pattern }
     }
 
@@ -481,7 +504,7 @@ impl Decoder {
                         Err("cannot find valid lookahead for star".to_string())
                     }
                 } else {
-                    Ok(Decoder::While(Lookahead::single(ByteSet::Any), da))
+                    Ok(Decoder::While(Lookahead::single(ByteSet::any()), da))
                 }
             }
             Format::RepeatCount(expr, a) => {
@@ -634,19 +657,19 @@ fn repeat_count(len: Expr, format: Format) -> Format {
 }
 
 fn any_bytes() -> Format {
-    repeat(Format::Byte(ByteSet::Any))
+    repeat(Format::Byte(ByteSet::any()))
 }
 
 fn u8() -> Format {
-    Format::Byte(ByteSet::Any)
+    Format::Byte(ByteSet::any())
 }
 
 fn u16be() -> Format {
     Format::Map(
         Func::U16Be,
         Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::Any)),
-            Box::new(Format::Byte(ByteSet::Any)),
+            Box::new(Format::Byte(ByteSet::any())),
+            Box::new(Format::Byte(ByteSet::any())),
         )),
     )
 }
@@ -655,8 +678,8 @@ fn u16le() -> Format {
     Format::Map(
         Func::U16Le,
         Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::Any)),
-            Box::new(Format::Byte(ByteSet::Any)),
+            Box::new(Format::Byte(ByteSet::any())),
+            Box::new(Format::Byte(ByteSet::any())),
         )),
     )
 }
@@ -665,10 +688,10 @@ fn u32be() -> Format {
     Format::Map(
         Func::U32Be,
         Box::new(Format::Tuple(vec![
-            Format::Byte(ByteSet::Any),
-            Format::Byte(ByteSet::Any),
-            Format::Byte(ByteSet::Any),
-            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::any()),
+            Format::Byte(ByteSet::any()),
+            Format::Byte(ByteSet::any()),
+            Format::Byte(ByteSet::any()),
         ])),
     )
 }
@@ -677,10 +700,10 @@ fn u32le() -> Format {
     Format::Map(
         Func::U32Le,
         Box::new(Format::Tuple(vec![
-            Format::Byte(ByteSet::Any),
-            Format::Byte(ByteSet::Any),
-            Format::Byte(ByteSet::Any),
-            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::any()),
+            Format::Byte(ByteSet::any()),
+            Format::Byte(ByteSet::any()),
+            Format::Byte(ByteSet::any()),
         ])),
     )
 }
@@ -691,15 +714,15 @@ fn png_format() -> Format {
         (
             "type", // FIXME ASCII
             Format::Tuple(vec![
-                Format::Byte(ByteSet::Any),
-                Format::Byte(ByteSet::Any),
-                Format::Byte(ByteSet::Any),
-                Format::Byte(ByteSet::Any),
+                Format::Byte(ByteSet::any()),
+                Format::Byte(ByteSet::any()),
+                Format::Byte(ByteSet::any()),
+                Format::Byte(ByteSet::any()),
             ]),
         ),
         (
             "data",
-            Format::RepeatCount(Expr::Var(1), Box::new(Format::Byte(ByteSet::Any))),
+            Format::RepeatCount(Expr::Var(1), Box::new(Format::Byte(ByteSet::any()))),
         ),
         ("crc", u32be()), // FIXME check this
     ]);
@@ -715,8 +738,8 @@ fn jpeg_format() -> Format {
         Format::Map(
             Func::Snd,
             Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(id))),
+                Box::new(Format::Byte(ByteSet::is(0xFF))),
+                Box::new(Format::Byte(ByteSet::is(id))),
             )),
         )
     }
@@ -866,21 +889,21 @@ fn jpeg_format() -> Format {
     let app1_data = alts([app1_exif, app1_xmp]);
 
     let sof0 = marker_segment(0xC0, sof_data.clone()); // Start of frame (baseline jpeg)
-    let _sof1 = marker_segment(0xC1, sof_data.clone()); // Start of frame (extended sequential, huffman)
-    let _sof2 = marker_segment(0xC2, sof_data.clone()); // Start of frame (progressive, huffman)
-    let _sof3 = marker_segment(0xC3, sof_data.clone()); // Start of frame (lossless, huffman)
+    let sof1 = marker_segment(0xC1, sof_data.clone()); // Start of frame (extended sequential, huffman)
+    let sof2 = marker_segment(0xC2, sof_data.clone()); // Start of frame (progressive, huffman)
+    let sof3 = marker_segment(0xC3, sof_data.clone()); // Start of frame (lossless, huffman)
     let dht = marker_segment(0xC4, dht_data.clone()); // Define Huffman Table
-    let _sof5 = marker_segment(0xC5, sof_data.clone()); // Start of frame (differential sequential, huffman)
-    let _sof6 = marker_segment(0xC6, sof_data.clone()); // Start of frame (differential progressive, huffman)
-    let _sof7 = marker_segment(0xC7, sof_data.clone()); // Start of frame (differential lossless, huffman)
+    let sof5 = marker_segment(0xC5, sof_data.clone()); // Start of frame (differential sequential, huffman)
+    let sof6 = marker_segment(0xC6, sof_data.clone()); // Start of frame (differential progressive, huffman)
+    let sof7 = marker_segment(0xC7, sof_data.clone()); // Start of frame (differential lossless, huffman)
     let _jpeg = marker_segment(0xC8, any_bytes()); // Reserved for JPEG extension
-    let _sof9 = marker_segment(0xC9, sof_data.clone()); // Start of frame (extended sequential, arithmetic)
-    let _sof10 = marker_segment(0xCA, sof_data.clone()); // Start of frame (progressive, arithmetic)
-    let _sof11 = marker_segment(0xCB, sof_data.clone()); // Start of frame (lossless, arithmetic)
+    let sof9 = marker_segment(0xC9, sof_data.clone()); // Start of frame (extended sequential, arithmetic)
+    let sof10 = marker_segment(0xCA, sof_data.clone()); // Start of frame (progressive, arithmetic)
+    let sof11 = marker_segment(0xCB, sof_data.clone()); // Start of frame (lossless, arithmetic)
     let dac = marker_segment(0xCC, dac_data.clone()); // Define arithmetic coding conditioning
-    let _sof13 = marker_segment(0xCD, sof_data.clone()); // Start of frame (differential sequential, arithmetic)
-    let _sof14 = marker_segment(0xCE, sof_data.clone()); // Start of frame (differential progressive, arithmetic)
-    let _sof15 = marker_segment(0xCF, sof_data.clone()); // Start of frame (differential lossless, arithmetic)
+    let sof13 = marker_segment(0xCD, sof_data.clone()); // Start of frame (differential sequential, arithmetic)
+    let sof14 = marker_segment(0xCE, sof_data.clone()); // Start of frame (differential progressive, arithmetic)
+    let sof15 = marker_segment(0xCF, sof_data.clone()); // Start of frame (differential lossless, arithmetic)
     let rst0 = marker(0xD0); // Restart marker 0
     let rst1 = marker(0xD1); // Restart marker 1
     let rst2 = marker(0xD2); // Restart marker 2
@@ -941,29 +964,28 @@ fn jpeg_format() -> Format {
 
     let frame_header = alts([
         sof0.clone(),
-        // TODO: Error: "cannot find valid lookahead for star"
-        // sof1.clone(),
-        // sof2.clone(),
-        // sof3.clone(),
-        // sof5.clone(),
-        // sof6.clone(),
-        // sof7.clone(),
-        // sof9.clone(),
-        // sof10.clone(),
-        // sof11.clone(),
-        // sof13.clone(),
-        // sof14.clone(),
-        // sof15.clone(),
+        sof1.clone(),
+        sof2.clone(),
+        sof3.clone(),
+        sof5.clone(),
+        sof6.clone(),
+        sof7.clone(),
+        sof9.clone(),
+        sof10.clone(),
+        sof11.clone(),
+        sof13.clone(),
+        sof14.clone(),
+        sof15.clone(),
     ]);
 
     // MCU: Minimum coded unit
     let mcu = alts([
-        Format::Byte(ByteSet::Not(0xFF)),
+        Format::Byte(ByteSet::not(0xFF)),
         Format::Map(
             Func::Expr(Expr::Const(Value::U8(0xFF))),
             Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::Is(0xFF))),
-                Box::new(Format::Byte(ByteSet::Is(0x00))),
+                Box::new(Format::Byte(ByteSet::is(0xFF))),
+                Box::new(Format::Byte(ByteSet::is(0x00))),
             )),
         ),
     ]);
