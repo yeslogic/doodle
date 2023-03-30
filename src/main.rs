@@ -379,9 +379,10 @@ impl Lookahead {
                     (Some(pa), Some(pb)) => Some(Lookahead::alt(&pa, &pb)),
                 }
             }
-            Format::Cat(a, b) => {
-                Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next)))
-            }
+            Format::Cat(a, b) => match **b {
+                Format::Empty => Lookahead::from(a, len, next),
+                _ => Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next))),
+            },
             Format::Tuple(fields) => match fields.split_first() {
                 None => Lookahead::from(&next, len, Format::Empty),
                 Some((a, fields)) => Lookahead::from(a, len, Format::Tuple(fields.to_vec())),
