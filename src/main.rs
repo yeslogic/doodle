@@ -804,6 +804,40 @@ fn jpeg_format() -> Format {
         ),
     ]);
 
+    let app1_exif = record([
+        ("identifier", Format::from_bytes(b"Exif\0\0")),
+        (
+            "big-endian",
+            alts([
+                Format::Map(
+                    Func::Expr(Expr::Const(Value::Bool(false))),
+                    Box::new(Format::from_bytes(b"II*\0")),
+                ),
+                Format::Map(
+                    Func::Expr(Expr::Const(Value::Bool(true))),
+                    Box::new(Format::from_bytes(b"MM\0*")),
+                ),
+            ]),
+        ),
+        (
+            "offset",
+            Format::If(Expr::Var(0), Box::new(u32be()), Box::new(u32le())),
+        ),
+        ("exif", any_bytes()),
+    ]);
+
+    let app1_xmp = record([
+        (
+            "identifier",
+            Format::from_bytes(b"http://ns.adobe.com/xap/1.0/\0"),
+        ),
+        ("xmp", any_bytes()),
+        // FIXME there are other APP1 formats
+        // see https://exiftool.org/TagNames/JPEG.html
+    ]);
+
+    let app1_data = alts([app1_exif, app1_xmp]);
+
     let sof0 = marker_segment(0xC0, sof_data.clone()); // Start of frame (baseline jpeg)
     let _sof1 = marker_segment(0xC1, sof_data.clone()); // Start of frame (extended sequential, huffman)
     let _sof2 = marker_segment(0xC2, sof_data.clone()); // Start of frame (progressive, huffman)
@@ -837,7 +871,7 @@ fn jpeg_format() -> Format {
     let _dhp = marker_segment(0xDE, any_bytes()); // Define hierarchical progression
     let _exp = marker_segment(0xDF, any_bytes()); // Expand reference components
     let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF/JFXX/AVI1/...)
-    let app1 = marker_segment(0xE1, any_bytes()); // Application segment 1 (EXIF/XMP/XAP/...)
+    let app1 = marker_segment(0xE1, app1_data.clone()); // Application segment 1 (EXIF/XMP/XAP/...)
     let app2 = marker_segment(0xE2, any_bytes()); // Application segment 2 (FlashPix/ICC/...)
     let app3 = marker_segment(0xE3, any_bytes()); // Application segment 3 (Kodak/...)
     let app4 = marker_segment(0xE4, any_bytes()); // Application segment 4 (FlashPix/...)
