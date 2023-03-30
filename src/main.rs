@@ -2,39 +2,30 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use serde::Serialize;
 
 use crate::byte_set::ByteSet;
 
 mod byte_set;
 
-#[derive(Clone, PartialEq, Debug, Serialize)]
-pub enum Value {
+#[derive(Clone, Debug)]
+pub enum Expr {
+    Var(usize),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
-    Tuple(Vec<Value>),
-    Record(Vec<(String, Value)>),
-    Seq(Vec<Value>),
-}
-
-impl Value {
-    const UNIT: Value = Value::Tuple(Vec::new());
-}
-
-#[derive(Clone, Debug)]
-enum Expr {
-    Const(Value),
-    Var(usize),
     Sub(Box<Expr>, Box<Expr>),
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
     Seq(Vec<Expr>),
 }
 
+impl Expr {
+    const UNIT: Expr = Expr::Tuple(Vec::new());
+}
+
 #[derive(Clone, Debug)]
-enum Func {
+pub enum Func {
     Expr(Expr),
     TupleProj(usize),
     RecordProj(String),
@@ -66,7 +57,7 @@ enum Func {
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
 #[derive(Clone, Debug)]
-enum Format {
+pub enum Format {
     /// A format that never matches
     Fail,
     /// A format that matches the empty byte string
@@ -104,18 +95,18 @@ enum Format {
 }
 
 #[derive(Clone, Debug)]
-struct Switch {
+pub struct Switch {
     accept: Option<usize>,
     branches: Vec<(ByteSet, Switch)>,
 }
 
-enum Cond {
+pub enum Cond {
     Expr(Expr),
     Switch(Switch),
 }
 
 /// Decoders with a fixed amount of lookahead
-enum Decoder {
+pub enum Decoder {
     Fail,
     Empty,
     EndOfInput,
@@ -131,105 +122,6 @@ enum Decoder {
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Func, Box<Decoder>),
-}
-
-impl Expr {
-    fn eval(&self, stack: &[Value]) -> Value {
-        match self {
-            Expr::Const(v) => v.clone(),
-            Expr::Var(index) => stack[stack.len() - index - 1].clone(),
-            Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
-            Expr::Record(fields) => Value::Record(
-                fields
-                    .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval(stack)))
-                    .collect(),
-            ),
-            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
-        }
-    }
-
-    fn eval_bool(&self, stack: &[Value]) -> bool {
-        match self.eval(stack) {
-            Value::Bool(b) => b,
-            _ => panic!("value is not bool"),
-        }
-    }
-
-    fn eval_usize(&self, stack: &[Value]) -> usize {
-        match self.eval(stack) {
-            Value::U8(n) => usize::from(n),
-            Value::U16(n) => usize::from(n),
-            Value::U32(n) => usize::try_from(n).unwrap(),
-            Value::Bool(_) | Value::Tuple(_) | Value::Record(_) | Value::Seq(_) => {
-                panic!("value is not number")
-            }
-        }
-    }
-}
-
-impl Func {
-    fn eval(&self, arg: Value) -> Value {
-        match self {
-            Func::Expr(e) => e.eval(&[]),
-            Func::TupleProj(i) => match arg {
-                Value::Tuple(vs) => vs[*i].clone(),
-                _ => panic!("TupleProj: expected tuple"),
-            },
-            Func::RecordProj(label) => match arg {
-                Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
-                    Some((_, v)) => v.clone(),
-                    None => panic!("RecordProj: {label} not found in record"),
-                },
-                _ => panic!("RecordProj: expected record"),
-            },
-            Func::U16Be => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    _ => panic!("expected (U8, U8)"),
-                },
-                _ => panic!("U16Be: expected (_, _)"),
-            },
-            Func::U16Le => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    _ => panic!("expected (U8, U8)"),
-                },
-                _ => panic!("U16Be: expected (_, _)"),
-            },
-            Func::U32Be => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
-                    }
-                    _ => panic!("expected (U8, U8, U8, U8)"),
-                },
-                _ => panic!("U32Be: expected (_, _, _, _)"),
-            },
-            Func::U32Le => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
-                    }
-                    _ => panic!("expected (U8, U8, U8, U8)"),
-                },
-                _ => panic!("U32Be: expected (_, _, _, _)"),
-            },
-            Func::Stream => match arg {
-                Value::Seq(vs) => {
-                    // FIXME could also condense nested sequences
-                    Value::Seq(vs.into_iter().filter(|v| *v != Value::UNIT).collect())
-                }
-                _ => panic!("Stream: expected Seq"),
-            },
-        }
-    }
 }
 
 impl Format {
@@ -257,7 +149,7 @@ impl Format {
 }
 
 #[derive(Debug)]
-enum Next<'a> {
+pub enum Next<'a> {
     Empty,
     Cat(&'a Format, &'a Next<'a>),
     Tuple(&'a [Format], &'a Next<'a>),
@@ -420,15 +312,6 @@ impl Switch {
     }
 }
 
-impl Cond {
-    fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
-        match self {
-            Cond::Expr(expr) => expr.eval_bool(stack),
-            Cond::Switch(switch) => switch.matches(input) == Some(0),
-        }
-    }
-}
-
 impl Decoder {
     pub fn compile(f: &Format, next: &Next) -> Result<Decoder, String> {
         match f {
@@ -534,13 +417,141 @@ impl Decoder {
             }
         }
     }
+}
+
+mod semantics {
+    use serde::Serialize;
+
+    use super::{Cond, Decoder, Expr, Func};
+
+    #[derive(Clone, PartialEq, Debug, Serialize)]
+    pub enum Value {
+        Bool(bool),
+        U8(u8),
+        U16(u16),
+        U32(u32),
+        Tuple(Vec<Value>),
+        Record(Vec<(String, Value)>),
+        Seq(Vec<Value>),
+    }
+
+    impl Value {
+        pub const UNIT: Value = Value::Tuple(Vec::new());
+    }
+
+    pub fn eval(stack: &[Value], expr: &Expr) -> Value {
+        match expr {
+            Expr::Var(index) => stack[stack.len() - index - 1].clone(),
+            Expr::Bool(b) => Value::Bool(*b),
+            Expr::U8(x) => Value::U8(*x),
+            Expr::U16(x) => Value::U16(*x),
+            Expr::U32(x) => Value::U32(*x),
+            Expr::Sub(x, y) => match (eval(stack, x), eval(stack, y)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
+                (_, _) => panic!("mismatched operands"),
+            },
+            Expr::Tuple(exprs) => {
+                Value::Tuple(exprs.iter().map(|expr| eval(stack, expr)).collect())
+            }
+            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| eval(stack, expr)).collect()),
+            Expr::Record(fields) => Value::Record(
+                fields
+                    .iter()
+                    .map(|(label, expr)| (label.clone(), eval(stack, expr)))
+                    .collect(),
+            ),
+        }
+    }
+
+    fn eval_bool(stack: &[Value], expr: &Expr) -> bool {
+        match eval(stack, expr) {
+            Value::Bool(b) => b,
+            _ => panic!("value is not bool"),
+        }
+    }
+
+    fn eval_usize(stack: &[Value], expr: &Expr) -> usize {
+        match eval(stack, expr) {
+            Value::U8(n) => usize::from(n),
+            Value::U16(n) => usize::from(n),
+            Value::U32(n) => usize::try_from(n).unwrap(),
+            Value::Bool(_) | Value::Tuple(_) | Value::Seq(_) | Value::Record(_) => {
+                panic!("value is not number")
+            }
+        }
+    }
+
+    fn eval_func_app(stack: &[Value], func: &Func, arg: Value) -> Value {
+        match func {
+            Func::Expr(e) => eval(stack, e),
+            Func::TupleProj(i) => match arg {
+                Value::Tuple(vs) => vs[*i].clone(),
+                _ => panic!("TupleProj: expected tuple"),
+            },
+            Func::RecordProj(label) => match arg {
+                Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
+                    Some((_, v)) => v.clone(),
+                    None => panic!("RecordProj: {label} not found in record"),
+                },
+                _ => panic!("RecordProj: expected record"),
+            },
+            Func::U16Be => match arg {
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
+                    _ => panic!("U16Be: expected (U8, U8)"),
+                },
+                _ => panic!("U16Be: expected (_, _)"),
+            },
+            Func::U16Le => match arg {
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
+                    _ => panic!("U16Le: expected (U8, U8)"),
+                },
+                _ => panic!("U16Le: expected (_, _)"),
+            },
+            Func::U32Be => match arg {
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                        Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
+                    }
+                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
+                },
+                _ => panic!("U32Be: expected (_, _, _, _)"),
+            },
+            Func::U32Le => match arg {
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                        Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
+                    }
+                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
+                },
+                _ => panic!("U32Le: expected (_, _, _, _)"),
+            },
+            Func::Stream => match arg {
+                Value::Seq(vs) => {
+                    // FIXME could also condense nested sequences
+                    Value::Seq(vs.into_iter().filter(|v| *v != Value::UNIT).collect())
+                }
+                _ => panic!("Stream: expected Seq"),
+            },
+        }
+    }
+
+    fn eval_cond(stack: &[Value], cond: &Cond, input: &[u8]) -> bool {
+        match cond {
+            Cond::Expr(expr) => eval_bool(stack, expr),
+            Cond::Switch(switch) => switch.matches(input) == Some(0),
+        }
+    }
 
     pub fn parse<'input>(
-        &self,
         stack: &mut Vec<Value>,
+        dec: &Decoder,
         input: &'input [u8],
     ) -> Option<(Value, &'input [u8])> {
-        match self {
+        match dec {
             Decoder::Fail => None,
             Decoder::Empty => Some((Value::UNIT, input)),
             Decoder::EndOfInput => match input {
@@ -556,26 +567,26 @@ impl Decoder {
                 }
             }
             Decoder::If(cond, a, b) => {
-                if cond.eval(stack, input) {
-                    a.parse(stack, input)
+                if eval_cond(stack, cond, input) {
+                    parse(stack, a, input)
                 } else {
-                    b.parse(stack, input)
+                    parse(stack, b, input)
                 }
             }
             Decoder::Switch(switch, branches) => {
                 let index = switch.matches(input)?;
-                branches[index].parse(stack, input)
+                parse(stack, &branches[index], input)
             }
             Decoder::Cat(a, b) => {
-                let (va, input) = a.parse(stack, input)?;
-                let (vb, input) = b.parse(stack, input)?;
+                let (va, input) = parse(stack, a, input)?;
+                let (vb, input) = parse(stack, b, input)?;
                 Some((Value::Tuple(vec![va, vb]), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for f in fields {
-                    let (vf, next_input) = f.parse(stack, input)?;
+                    let (vf, next_input) = parse(stack, f, input)?;
                     input = next_input;
                     v.push(vf.clone());
                 }
@@ -585,7 +596,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for (name, f) in fields {
-                    let (vf, next_input) = f.parse(stack, input)?;
+                    let (vf, next_input) = parse(stack, f, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
                     stack.push(vf);
@@ -599,7 +610,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 while switch.matches(input) == Some(0) {
-                    let (va, next_input) = a.parse(stack, input)?;
+                    let (va, next_input) = parse(stack, a, input)?;
                     input = next_input;
                     v.push(va);
                 }
@@ -609,7 +620,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(stack, input)?;
+                    let (va, next_input) = parse(stack, a, input)?;
                     input = next_input;
                     v.push(va);
                     if switch.matches(input) == Some(0) {
@@ -620,38 +631,38 @@ impl Decoder {
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
-                let count = expr.eval_usize(stack);
+                let count = eval_usize(stack, expr);
                 let mut v = Vec::with_capacity(count);
                 for _ in 0..count {
-                    let (va, next_input) = a.parse(stack, input)?;
+                    let (va, next_input) = parse(stack, a, input)?;
                     input = next_input;
                     v.push(va);
                 }
                 Some((Value::Seq(v), input))
             }
             Decoder::Slice(expr, a) => {
-                let size = expr.eval_usize(stack);
+                let size = eval_usize(stack, expr);
                 if size <= input.len() {
                     let (slice, input) = input.split_at(size);
-                    let (v, _) = a.parse(stack, slice)?;
+                    let (v, _) = parse(stack, a, slice)?;
                     Some((v, input))
                 } else {
                     None
                 }
             }
             Decoder::WithRelativeOffset(expr, a) => {
-                let offset = expr.eval_usize(stack);
+                let offset = eval_usize(stack, expr);
                 if offset <= input.len() {
                     let (_, slice) = input.split_at(offset);
-                    let (v, _) = a.parse(stack, slice)?;
+                    let (v, _) = parse(stack, a, slice)?;
                     Some((v, input))
                 } else {
                     None
                 }
             }
             Decoder::Map(f, a) => {
-                let (va, input) = a.parse(stack, input)?;
-                Some((f.eval(va), input))
+                let (va, input) = parse(stack, a, input)?;
+                Some((eval_func_app(stack, f, va), input))
             }
         }
     }
@@ -660,7 +671,7 @@ impl Decoder {
 mod render_tree {
     use std::{fmt, io};
 
-    use crate::Value;
+    use crate::semantics::Value;
 
     pub fn print_value(value: &Value) {
         Context::new(io::stdout()).write_value(value).unwrap()
@@ -978,14 +989,8 @@ fn tiff_format() -> Format {
         (
             "is-big-endian",
             alts([
-                Format::Map(
-                    Func::Expr(Expr::Const(Value::Bool(false))),
-                    Box::new(is_bytes(b"II")),
-                ),
-                Format::Map(
-                    Func::Expr(Expr::Const(Value::Bool(true))),
-                    Box::new(is_bytes(b"MM")),
-                ),
+                Format::Map(Func::Expr(Expr::Bool(false)), Box::new(is_bytes(b"II"))),
+                Format::Map(Func::Expr(Expr::Bool(true)), Box::new(is_bytes(b"MM"))),
             ]),
         ),
         (
@@ -1000,7 +1005,7 @@ fn tiff_format() -> Format {
             "ifd",
             Format::WithRelativeOffset(
                 // TODO: Offset from start of the TIFF header
-                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::Const(Value::U32(8)))),
+                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
                 Box::new(Format::If(
                     Expr::Var(2),
                     Box::new(ifd(true)),
@@ -1032,7 +1037,7 @@ fn jpeg_format() -> Format {
                 Format::Slice(
                     Expr::Sub(
                         Box::new(Expr::Var(0)), // length
-                        Box::new(Expr::Const(Value::U16(2))),
+                        Box::new(Expr::U16(2)),
                     ),
                     Box::new(data),
                 ),
@@ -1064,7 +1069,7 @@ fn jpeg_format() -> Format {
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
         ("class-table-id", u8()),
-        ("num-codes", repeat_count(Expr::Const(Value::U8(16)), u8())),
+        ("num-codes", repeat_count(Expr::U8(16), u8())),
         ("values", any_bytes()), // List.map num-codes (\n => repeat-count n u8);
     ]);
 
@@ -1285,7 +1290,7 @@ fn jpeg_format() -> Format {
     let mcu = alts([
         not_byte(0xFF),
         Format::Map(
-            Func::Expr(Expr::Const(Value::U8(0xFF))),
+            Func::Expr(Expr::U8(0xFF)),
             Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(0x00)])),
         ),
     ]);
@@ -1297,14 +1302,14 @@ fn jpeg_format() -> Format {
             // FIXME: Extract into separate ECS repetition
             mcu, // TODO: repeat(mcu),
             // FIXME: Restart markers should cycle in order from rst0-rst7
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst0)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst1)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst2)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst3)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst4)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst5)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst6)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst7)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst0)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst1)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst2)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst3)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst4)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst5)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst6)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst7)),
         ]))),
     );
 
@@ -1367,7 +1372,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let decoder = Decoder::compile(&format, &Next::Empty)?;
 
     let mut stack = Vec::new();
-    let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
+    let (val, _) = semantics::parse(&mut stack, &decoder, &input).ok_or("parse failure")?;
 
     match args.output {
         OutputFormat::Debug => println!("{val:?}"),
@@ -1380,18 +1385,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
 #[cfg(test)]
 mod tests {
+    use super::semantics::Value;
     use super::*;
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let mut stack = Vec::new();
-        let (val, remain) = d.parse(&mut stack, input).unwrap();
+        let (val, remain) = semantics::parse(&mut stack, d, input).unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain, tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let mut stack = Vec::new();
-        assert!(d.parse(&mut stack, input).is_none());
+        assert!(semantics::parse(&mut stack, d, input).is_none());
     }
 
     #[test]
