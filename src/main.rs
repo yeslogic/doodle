@@ -13,6 +13,7 @@ enum Value {
     Bool(bool),
     U8(u8),
     U16(u16),
+    U32(u32),
     Pair(Box<Value>, Box<Value>),
     Seq(Vec<Value>),
     Record(Vec<(String, Value)>),
@@ -34,6 +35,9 @@ enum Func {
     Fst,
     Snd,
     U16Be,
+    U16Le,
+    U32Be,
+    U32Le,
     Stream,
 }
 
@@ -147,6 +151,7 @@ impl Expr {
         match self.eval(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
+            Value::U32(n) => n as usize, // FIXME
             Value::Unit | Value::Bool(_) | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
                 panic!("value is not number")
             }
@@ -172,6 +177,31 @@ impl Func {
                     (_, _) => panic!("expected (U8, U8)"),
                 },
                 _ => panic!("U16Be: expected (_, _)"),
+            },
+            Func::U16Le => match arg {
+                Value::Pair(fst, snd) => match (fst.as_ref(), snd.as_ref()) {
+                    (Value::U8(lo), Value::U8(hi)) => Value::U16(u16::from_le_bytes([*lo, *hi])),
+                    (_, _) => panic!("expected (U8, U8)"),
+                },
+                _ => panic!("U16Be: expected (_, _)"),
+            },
+            Func::U32Be => match arg {
+                Value::Seq(vs) => match vs.as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                        Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
+                    }
+                    _ => panic!("expected [U8, U8, U8, U8]"),
+                },
+                _ => panic!("U32Be: expected [_, _, _, _]"),
+            },
+            Func::U32Le => match arg {
+                Value::Seq(vs) => match vs.as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                        Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
+                    }
+                    _ => panic!("expected [U8, U8, U8, U8]"),
+                },
+                _ => panic!("U32Be: expected [_, _, _, _]"),
             },
             Func::Stream => match arg {
                 Value::Seq(vs) => {
@@ -616,6 +646,40 @@ fn u16be() -> Format {
             Box::new(Format::Byte(ByteSet::Any)),
             Box::new(Format::Byte(ByteSet::Any)),
         )),
+    )
+}
+
+fn u16le() -> Format {
+    Format::Map(
+        Func::U16Le,
+        Box::new(Format::Cat(
+            Box::new(Format::Byte(ByteSet::Any)),
+            Box::new(Format::Byte(ByteSet::Any)),
+        )),
+    )
+}
+
+fn u32be() -> Format {
+    Format::Map(
+        Func::U32Be,
+        Box::new(Format::Tuple(vec![
+            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::Any),
+        ])),
+    )
+}
+
+fn u32le() -> Format {
+    Format::Map(
+        Func::U32Le,
+        Box::new(Format::Tuple(vec![
+            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::Any),
+            Format::Byte(ByteSet::Any),
+        ])),
     )
 }
 
