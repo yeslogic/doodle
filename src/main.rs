@@ -841,22 +841,59 @@ fn u32le() -> Format {
 }
 
 fn png_format() -> Format {
-    let chunk = record([
-        ("length", u32be()), // FIXME < 2^31
-        (
-            "type", // FIXME ASCII
-            Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]),
-        ),
-        (
-            "data",
-            Format::RepeatCount(Expr::Var(1), Box::new(any_byte())),
-        ),
-        ("crc", u32be()), // FIXME check this
+    fn chunk(tag: Format, data: Format) -> Format {
+        record([
+            ("length", u32be()), // FIXME < 2^31
+            ("tag", tag),
+            ("data", Format::Slice(Expr::Var(1), Box::new(data))),
+            ("crc", u32be()), // FIXME check this
+        ])
+    }
+
+    //let any_tag = Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]); // FIXME ASCII
+
+    let ihdr_tag = is_bytes(b"IHDR");
+    let ihdr_data = record([
+        ("width", u32be()),
+        ("height", u32be()),
+        ("bit-depth", u8()),
+        ("color-type", u8()),
+        ("compression-method", u8()),
+        ("filter-method", u8()),
+        ("interlace-method", u8()),
+    ]);
+
+    let idat_tag = is_bytes(b"IDAT");
+    let idat_data = any_bytes();
+
+    let iend_tag = is_bytes(b"IEND");
+    let iend_data = Format::Empty; // FIXME ensure IEND length = 0
+
+    let other_tag = alts([
+        is_bytes(b"PLTE"),
+        is_bytes(b"bKGD"),
+        is_bytes(b"pHYs"),
+        is_bytes(b"tIME"),
+        is_bytes(b"tRNS"),
+        // FIXME other tags excluding IHDR/IDAT/IEND
     ]);
 
     record([
         ("signature", is_bytes(b"\x89PNG\r\n\x1A\n")),
-        ("chunks", Format::Repeat(Box::new(chunk))),
+        ("ihdr", chunk(ihdr_tag, ihdr_data)),
+        (
+            "chunks",
+            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
+        ),
+        (
+            "idat",
+            Format::Repeat1(Box::new(chunk(idat_tag, idat_data))),
+        ),
+        (
+            "more-chunks",
+            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
+        ),
+        ("iend", chunk(iend_tag, iend_data)),
     ])
 }
 
