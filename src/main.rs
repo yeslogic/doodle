@@ -355,10 +355,15 @@ impl Lookahead {
         Lookahead { pattern }
     }
 
-    pub fn new(a: &Format, b: &Format) -> Option<Lookahead> {
+    /// Find a lookahead that only the first format matches
+    pub fn new(a: &Format, b: &Format, opt_next: Option<&Format>) -> Option<Lookahead> {
         const LEN: usize = 2;
-        let pa = Lookahead::from(a, LEN, Format::Empty)?;
-        if !b.might_match_lookahead(&pa.pattern, Format::Empty) {
+        let next = match opt_next {
+            None => Format::Empty,
+            Some(next) => next.clone(),
+        };
+        let pa = Lookahead::from(a, LEN, next.clone())?;
+        if !b.might_match_lookahead(&pa.pattern, next) {
             Some(pa)
         } else {
             None
@@ -461,9 +466,9 @@ impl Decoder {
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 let db = Box::new(Decoder::compile(b, opt_next)?);
-                if let Some(look) = Lookahead::new(a, b) {
+                if let Some(look) = Lookahead::new(a, b, opt_next) {
                     Ok(Decoder::If(Cond::Peek(look), da, db))
-                } else if let Some(look) = Lookahead::new(b, a) {
+                } else if let Some(look) = Lookahead::new(b, a, opt_next) {
                     Ok(Decoder::If(Cond::Peek(look), db, da))
                 } else {
                     Err("cannot find valid lookahead for alt".to_string())
@@ -505,21 +510,22 @@ impl Decoder {
                 Ok(Decoder::Record(dfields))
             }
             Format::Repeat(a) => {
-                // FIXME next should be a|opt_next ?
                 let da = Box::new(Decoder::compile(a, None)?);
-                if let Some(next) = opt_next {
-                    if let Some(l) = Lookahead::new(a, next) {
-                        Ok(Decoder::While(l, da))
-                    } else if let Some(l) = Lookahead::new(next, a) {
-                        Ok(Decoder::Until(l, da))
+                if opt_next.is_some() {
+                    let aplus = Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())));
+                    if let Some(look) = Lookahead::new(&aplus, &Format::Empty, opt_next) {
+                        Ok(Decoder::While(look, da))
+                    } else if let Some(look) = Lookahead::new(&Format::Empty, &aplus, opt_next) {
+                        Ok(Decoder::Until(look, da))
                     } else {
-                        Err("cannot find valid lookahead for star".to_string())
+                        Err("cannot find valid lookahead for repeat".to_string())
                     }
                 } else {
                     Ok(Decoder::While(Lookahead::single(ByteSet::any()), da))
                 }
             }
             Format::RepeatCount(expr, a) => {
+                // FIXME probably not right
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
