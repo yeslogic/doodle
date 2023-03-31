@@ -283,6 +283,23 @@ impl Format {
         Format::Tuple(v)
     }
 
+    fn nullable(&self) -> bool {
+        match self {
+            Format::Fail => false,
+            Format::Empty => true,
+            Format::Byte(_) => false,
+            Format::Alt(a, b) => a.nullable() || b.nullable(),
+            Format::Cat(a, b) => a.nullable() && b.nullable(),
+            Format::Tuple(fields) => fields.iter().all(|f| f.nullable()),
+            Format::Record(fields) => fields.iter().all(|(_, f)| f.nullable()),
+            Format::Repeat(_a) => true,
+            Format::RepeatCount(_expr, _a) => true,
+            Format::Slice(_expr, _a) => true,
+            Format::Map(_f, a) => a.nullable(),
+            Format::If(_expr, a, b) => a.nullable() || b.nullable(),
+        }
+    }
+
     pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
         match self {
             Format::Fail => false,
@@ -510,6 +527,9 @@ impl Decoder {
                 Ok(Decoder::Record(dfields))
             }
             Format::Repeat(a) => {
+                if a.nullable() {
+                    return Err("cannot repeat nullable format".to_string());
+                }
                 let da = Box::new(Decoder::compile(a, None)?);
                 if opt_next.is_some() {
                     let aplus = Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())));
