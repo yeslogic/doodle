@@ -1,71 +1,9 @@
-use std::collections::HashSet;
 use std::env;
 use std::fs;
 
-#[derive(Clone, Debug)]
-enum ByteSet {
-    Includes(HashSet<u8>),
-    Excludes(HashSet<u8>),
-}
+use crate::byte_set::ByteSet;
 
-impl ByteSet {
-    pub fn any() -> ByteSet {
-        ByteSet::Excludes(HashSet::new())
-    }
-
-    pub fn is(b: u8) -> ByteSet {
-        ByteSet::Includes(HashSet::from([b]))
-    }
-
-    pub fn not(b: u8) -> ByteSet {
-        ByteSet::Excludes(HashSet::from([b]))
-    }
-
-    pub fn contains(&self, b: u8) -> bool {
-        match self {
-            ByteSet::Includes(included) => included.contains(&b),
-            ByteSet::Excludes(excluded) => !excluded.contains(&b),
-        }
-    }
-
-    pub fn is_disjoint(bs0: &ByteSet, bs1: &ByteSet) -> bool {
-        match (bs0, bs1) {
-            // Easy: check that the sets of included bytes are disjoint
-            (ByteSet::Includes(included0), ByteSet::Includes(included1)) => {
-                HashSet::is_disjoint(included0, included1)
-            }
-            // If the set of included bytes are a subset of the excluded bytes,
-            // then the byte sets are disjoint
-            (ByteSet::Includes(included), ByteSet::Excludes(excluded))
-            | (ByteSet::Excludes(excluded), ByteSet::Includes(included)) => {
-                HashSet::is_subset(included, excluded)
-            }
-            // Hard: enumerate these by brute force - they are disjoint if all
-            // bytes are contained in one byte set or the other set
-            (ByteSet::Excludes(excluded0), ByteSet::Excludes(excluded1)) => {
-                (0..=u8::MAX).all(|b| excluded0.contains(&b) || excluded1.contains(&b))
-            }
-        }
-    }
-
-    pub fn union(bs0: &ByteSet, bs1: &ByteSet) -> ByteSet {
-        match (bs0, bs1) {
-            (ByteSet::Includes(included0), ByteSet::Includes(included1)) => {
-                ByteSet::Includes(HashSet::union(included0, included1).copied().collect())
-            }
-            // Remove the included bytes from the excluded bytes
-            (ByteSet::Includes(included), ByteSet::Excludes(excluded))
-            | (ByteSet::Excludes(excluded), ByteSet::Includes(included)) => {
-                ByteSet::Excludes(HashSet::difference(excluded, included).copied().collect())
-            }
-            (ByteSet::Excludes(excluded0), ByteSet::Excludes(excluded1)) => ByteSet::Excludes(
-                HashSet::intersection(excluded0, excluded1)
-                    .copied()
-                    .collect(),
-            ),
-        }
-    }
-}
+mod byte_set;
 
 #[derive(Clone, PartialEq, Debug)]
 enum Value {
@@ -278,7 +216,7 @@ impl Format {
     fn from_bytes(bytes: &[u8]) -> Format {
         let v = bytes
             .iter()
-            .map(|b| Format::Byte(ByteSet::is(*b)))
+            .map(|b| Format::Byte(ByteSet::from([*b])))
             .collect();
         Format::Tuple(v)
     }
@@ -567,7 +505,7 @@ impl Decoder {
                         Err("cannot find valid lookahead for repeat".to_string())
                     }
                 } else {
-                    Ok(Decoder::While(Lookahead::single(ByteSet::any()), da))
+                    Ok(Decoder::While(Lookahead::single(ByteSet::full()), da))
                 }
             }
             Format::RepeatCount(expr, a) => {
@@ -720,31 +658,37 @@ fn repeat_count(len: Expr, format: Format) -> Format {
     Format::RepeatCount(len, Box::new(format))
 }
 
+fn is_byte(b: u8) -> Format {
+    Format::Byte(ByteSet::from([b]))
+}
+
+fn not_byte(b: u8) -> Format {
+    Format::Byte(!ByteSet::from([b]))
+}
+
+fn any_byte() -> Format {
+    Format::Byte(ByteSet::full())
+}
+
 fn any_bytes() -> Format {
-    repeat(Format::Byte(ByteSet::any()))
+    repeat(any_byte())
 }
 
 fn u8() -> Format {
-    Format::Byte(ByteSet::any())
+    any_byte()
 }
 
 fn u16be() -> Format {
     Format::Map(
         Func::U16Be,
-        Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::any())),
-            Box::new(Format::Byte(ByteSet::any())),
-        )),
+        Box::new(Format::Cat(Box::new(any_byte()), Box::new(any_byte()))),
     )
 }
 
 fn u16le() -> Format {
     Format::Map(
         Func::U16Le,
-        Box::new(Format::Cat(
-            Box::new(Format::Byte(ByteSet::any())),
-            Box::new(Format::Byte(ByteSet::any())),
-        )),
+        Box::new(Format::Cat(Box::new(any_byte()), Box::new(any_byte()))),
     )
 }
 
@@ -752,10 +696,10 @@ fn u32be() -> Format {
     Format::Map(
         Func::U32Be,
         Box::new(Format::Tuple(vec![
-            Format::Byte(ByteSet::any()),
-            Format::Byte(ByteSet::any()),
-            Format::Byte(ByteSet::any()),
-            Format::Byte(ByteSet::any()),
+            any_byte(),
+            any_byte(),
+            any_byte(),
+            any_byte(),
         ])),
     )
 }
@@ -764,10 +708,10 @@ fn u32le() -> Format {
     Format::Map(
         Func::U32Le,
         Box::new(Format::Tuple(vec![
-            Format::Byte(ByteSet::any()),
-            Format::Byte(ByteSet::any()),
-            Format::Byte(ByteSet::any()),
-            Format::Byte(ByteSet::any()),
+            any_byte(),
+            any_byte(),
+            any_byte(),
+            any_byte(),
         ])),
     )
 }
@@ -777,16 +721,11 @@ fn png_format() -> Format {
         ("length", u32be()), // FIXME < 2^31
         (
             "type", // FIXME ASCII
-            Format::Tuple(vec![
-                Format::Byte(ByteSet::any()),
-                Format::Byte(ByteSet::any()),
-                Format::Byte(ByteSet::any()),
-                Format::Byte(ByteSet::any()),
-            ]),
+            Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]),
         ),
         (
             "data",
-            Format::RepeatCount(Expr::Var(1), Box::new(Format::Byte(ByteSet::any()))),
+            Format::RepeatCount(Expr::Var(1), Box::new(any_byte())),
         ),
         ("crc", u32be()), // FIXME check this
     ]);
@@ -801,10 +740,7 @@ fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
             Func::Snd,
-            Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::is(0xFF))),
-                Box::new(Format::Byte(ByteSet::is(id))),
-            )),
+            Box::new(Format::Cat(Box::new(is_byte(0xFF)), Box::new(is_byte(id)))),
         )
     }
 
@@ -1044,12 +980,12 @@ fn jpeg_format() -> Format {
 
     // MCU: Minimum coded unit
     let mcu = alts([
-        Format::Byte(ByteSet::not(0xFF)),
+        not_byte(0xFF),
         Format::Map(
             Func::Expr(Expr::Const(Value::U8(0xFF))),
             Box::new(Format::Cat(
-                Box::new(Format::Byte(ByteSet::is(0xFF))),
-                Box::new(Format::Byte(ByteSet::is(0x00))),
+                Box::new(is_byte(0xFF)),
+                Box::new(is_byte(0x00)),
             )),
         ),
     ]);
@@ -1116,19 +1052,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn byteset_is_disjoint() {
-        let not_00 = &ByteSet::not(0x00);
-        let not_255 = &ByteSet::not(0xFF);
-        let is_00 = &ByteSet::is(0x00);
-        let is_255 = &ByteSet::is(0xFF);
-        assert!(!ByteSet::is_disjoint(not_00, not_00));
-        assert!(!ByteSet::is_disjoint(not_00, not_255));
-        assert!(ByteSet::is_disjoint(not_00, is_00));
-        assert!(!ByteSet::is_disjoint(not_00, is_255));
-        assert!(ByteSet::is_disjoint(is_00, is_255));
-    }
-
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let mut stack = Vec::new();
         let (val, remain) = d.parse(&mut stack, input).unwrap();
@@ -1159,7 +1082,7 @@ mod tests {
 
     #[test]
     fn compile_byte_is() {
-        let f = Format::Byte(ByteSet::is(0x00));
+        let f = is_byte(0x00);
         let d = Decoder::compile(&f, None).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
@@ -1169,7 +1092,7 @@ mod tests {
 
     #[test]
     fn compile_byte_not() {
-        let f = Format::Byte(ByteSet::not(0x00));
+        let f = not_byte(0x00);
         let d = Decoder::compile(&f, None).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
@@ -1179,10 +1102,7 @@ mod tests {
 
     #[test]
     fn compile_alt_byte() {
-        let f = alts([
-            Format::Byte(ByteSet::is(0x00)),
-            Format::Byte(ByteSet::is(0xFF)),
-        ]);
+        let f = alts([is_byte(0x00), is_byte(0xFF)]);
         let d = Decoder::compile(&f, None).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
@@ -1192,10 +1112,7 @@ mod tests {
 
     #[test]
     fn compile_alt_ambiguous() {
-        let f = alts([
-            Format::Byte(ByteSet::is(0x00)),
-            Format::Byte(ByteSet::is(0x00)),
-        ]);
+        let f = alts([is_byte(0x00), is_byte(0x00)]);
         assert!(Decoder::compile(&f, None).is_err());
     }
 
@@ -1207,7 +1124,7 @@ mod tests {
 
     #[test]
     fn compile_alt_opt() {
-        let f = alts([Format::Empty, Format::Byte(ByteSet::is(0x00))]);
+        let f = alts([Format::Empty, is_byte(0x00)]);
         let d = Decoder::compile(&f, None).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[], &[], Value::Unit);
@@ -1217,8 +1134,8 @@ mod tests {
     #[test]
     fn compile_alt_opt_next() {
         let f = Format::Cat(
-            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
-            Box::new(Format::Byte(ByteSet::is(0xFF))),
+            Box::new(alts([Format::Empty, is_byte(0x00)])),
+            Box::new(is_byte(0xFF)),
         );
         let d = Decoder::compile(&f, None).unwrap();
         accepts(
@@ -1240,8 +1157,8 @@ mod tests {
     #[test]
     fn compile_alt_opt_opt() {
         let f = Format::Cat(
-            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
-            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0xFF))])),
+            Box::new(alts([Format::Empty, is_byte(0x00)])),
+            Box::new(alts([Format::Empty, is_byte(0xFF)])),
         );
         let d = Decoder::compile(&f, None).unwrap();
         accepts(
@@ -1279,15 +1196,15 @@ mod tests {
     #[test]
     fn compile_alt_opt_ambiguous() {
         let f = Format::Cat(
-            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
-            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
+            Box::new(alts([Format::Empty, is_byte(0x00)])),
+            Box::new(alts([Format::Empty, is_byte(0x00)])),
         );
         assert!(Decoder::compile(&f, None).is_err());
     }
 
     #[test]
     fn compile_repeat() {
-        let f = repeat(Format::Byte(ByteSet::is(0x00)));
+        let f = repeat(is_byte(0x00));
         let d = Decoder::compile(&f, None).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1302,15 +1219,15 @@ mod tests {
 
     #[test]
     fn compile_repeat_repeat() {
-        let f = repeat(repeat(Format::Byte(ByteSet::is(0x00))));
+        let f = repeat(repeat(is_byte(0x00)));
         assert!(Decoder::compile(&f, None).is_err());
     }
 
     #[test]
     fn compile_cat_repeat() {
         let f = Format::Cat(
-            Box::new(repeat(Format::Byte(ByteSet::is(0x00)))),
-            Box::new(repeat(Format::Byte(ByteSet::is(0xFF)))),
+            Box::new(repeat(is_byte(0x00))),
+            Box::new(repeat(is_byte(0xFF))),
         );
         let d = Decoder::compile(&f, None).unwrap();
         accepts(
@@ -1354,8 +1271,8 @@ mod tests {
     #[test]
     fn compile_cat_repeat_ambiguous() {
         let f = Format::Cat(
-            Box::new(repeat(Format::Byte(ByteSet::is(0x00)))),
-            Box::new(repeat(Format::Byte(ByteSet::is(0x00)))),
+            Box::new(repeat(is_byte(0x00))),
+            Box::new(repeat(is_byte(0x00))),
         );
         assert!(Decoder::compile(&f, None).is_err());
     }
@@ -1363,9 +1280,9 @@ mod tests {
     #[test]
     fn compile_repeat_fields() {
         let f = record([
-            ("first", repeat(Format::Byte(ByteSet::is(0x00)))),
-            ("second", repeat(Format::Byte(ByteSet::is(0xFF)))),
-            ("third", repeat(Format::Byte(ByteSet::is(0x7F)))),
+            ("first", repeat(is_byte(0x00))),
+            ("second", repeat(is_byte(0xFF))),
+            ("third", repeat(is_byte(0x7F))),
         ]);
         assert!(Decoder::compile(&f, None).is_ok());
     }
@@ -1373,9 +1290,9 @@ mod tests {
     #[test]
     fn compile_repeat_fields_ambiguous() {
         let f = record([
-            ("first", repeat(Format::Byte(ByteSet::is(0x00)))),
-            ("second", repeat(Format::Byte(ByteSet::is(0xFF)))),
-            ("third", repeat(Format::Byte(ByteSet::is(0x00)))),
+            ("first", repeat(is_byte(0x00))),
+            ("second", repeat(is_byte(0xFF))),
+            ("third", repeat(is_byte(0x00))),
         ]);
         assert!(Decoder::compile(&f, None).is_err());
     }
@@ -1383,7 +1300,7 @@ mod tests {
     #[test]
     fn compile_repeat_fields_okay() {
         let f = record([
-            ("first", repeat(Format::Byte(ByteSet::is(0x00)))),
+            ("first", repeat(is_byte(0x00))),
             (
                 "second-and-third",
                 alts([
@@ -1391,12 +1308,9 @@ mod tests {
                     record([
                         (
                             "second",
-                            Format::Cat(
-                                Box::new(Format::Byte(ByteSet::is(0xFF))),
-                                Box::new(repeat(Format::Byte(ByteSet::is(0xFF)))),
-                            ),
+                            Format::Cat(Box::new(is_byte(0xFF)), Box::new(repeat(is_byte(0xFF)))),
                         ),
-                        ("third", repeat(Format::Byte(ByteSet::is(0x00)))),
+                        ("third", repeat(is_byte(0x00))),
                     ]),
                 ]),
             ),
