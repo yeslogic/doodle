@@ -1113,3 +1113,359 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn byteset_is_disjoint() {
+        let not_00 = &ByteSet::not(0x00);
+        let not_255 = &ByteSet::not(0xFF);
+        let is_00 = &ByteSet::is(0x00);
+        let is_255 = &ByteSet::is(0xFF);
+        assert!(!ByteSet::is_disjoint(not_00, not_00));
+        assert!(!ByteSet::is_disjoint(not_00, not_255));
+        assert!(ByteSet::is_disjoint(not_00, is_00));
+        assert!(!ByteSet::is_disjoint(not_00, is_255));
+        assert!(ByteSet::is_disjoint(is_00, is_255));
+    }
+
+    fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
+        let mut stack = Vec::new();
+        let (val, remain) = d.parse(&mut stack, input).unwrap();
+        assert_eq!(val, expect);
+        assert_eq!(remain, tail);
+    }
+
+    fn rejects(d: &Decoder, input: &[u8]) {
+        let mut stack = Vec::new();
+        assert!(d.parse(&mut stack, input).is_none());
+    }
+
+    #[test]
+    fn compile_fail() {
+        let f = Format::Fail;
+        let d = Decoder::compile(&f, None).unwrap();
+        rejects(&d, &[]);
+        rejects(&d, &[0x00]);
+    }
+
+    #[test]
+    fn compile_empty() {
+        let f = Format::Empty;
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(&d, &[], &[], Value::Unit);
+        accepts(&d, &[0x00], &[0x00], Value::Unit);
+    }
+
+    #[test]
+    fn compile_byte_is() {
+        let f = Format::Byte(ByteSet::is(0x00));
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(&d, &[0x00], &[], Value::U8(0));
+        accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
+        rejects(&d, &[0xFF]);
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_byte_not() {
+        let f = Format::Byte(ByteSet::not(0x00));
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(&d, &[0xFF], &[], Value::U8(0xFF));
+        accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
+        rejects(&d, &[0x00]);
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt_byte() {
+        let f = alts([
+            Format::Byte(ByteSet::is(0x00)),
+            Format::Byte(ByteSet::is(0xFF)),
+        ]);
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(&d, &[0x00], &[], Value::U8(0x00));
+        accepts(&d, &[0xFF], &[], Value::U8(0xFF));
+        rejects(&d, &[0x11]);
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt_ambiguous() {
+        let f = alts([
+            Format::Byte(ByteSet::is(0x00)),
+            Format::Byte(ByteSet::is(0x00)),
+        ]);
+        assert!(Decoder::compile(&f, None).is_err());
+    }
+
+    #[test]
+    fn compile_alt_empty() {
+        let f = alts([Format::Empty, Format::Empty]);
+        assert!(Decoder::compile(&f, None).is_err());
+    }
+
+    #[test]
+    fn compile_alt_opt() {
+        let f = alts([Format::Empty, Format::Byte(ByteSet::is(0x00))]);
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(&d, &[0x00], &[], Value::U8(0x00));
+        accepts(&d, &[], &[], Value::Unit);
+        accepts(&d, &[0xFF], &[0xFF], Value::Unit);
+    }
+
+    #[test]
+    fn compile_alt_opt_next() {
+        let f = Format::Cat(
+            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
+            Box::new(Format::Byte(ByteSet::is(0xFF))),
+        );
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Pair(Box::new(Value::U8(0)), Box::new(Value::U8(0xFF))),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Pair(Box::new(Value::Unit), Box::new(Value::U8(0xFF))),
+        );
+        rejects(&d, &[0x00]);
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt_opt_opt() {
+        let f = Format::Cat(
+            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
+            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0xFF))])),
+        );
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Pair(Box::new(Value::U8(0)), Box::new(Value::U8(0xFF))),
+        );
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Pair(Box::new(Value::U8(0)), Box::new(Value::Unit)),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Pair(Box::new(Value::Unit), Box::new(Value::U8(0xFF))),
+        );
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Pair(Box::new(Value::Unit), Box::new(Value::Unit)),
+        );
+        accepts(
+            &d,
+            &[0x7F],
+            &[0x7F],
+            Value::Pair(Box::new(Value::Unit), Box::new(Value::Unit)),
+        );
+    }
+
+    #[test]
+    fn compile_alt_opt_ambiguous() {
+        let f = Format::Cat(
+            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
+            Box::new(alts([Format::Empty, Format::Byte(ByteSet::is(0x00))])),
+        );
+        assert!(Decoder::compile(&f, None).is_err());
+    }
+
+    #[test]
+    fn compile_repeat() {
+        let f = repeat(Format::Byte(ByteSet::is(0x00)));
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(&d, &[], &[], Value::Seq(vec![]));
+        accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
+        accepts(
+            &d,
+            &[0x00, 0x00],
+            &[],
+            Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)]),
+        );
+        rejects(&d, &[0x00, 0xFF]);
+    }
+
+    #[test]
+    fn compile_repeat_repeat() {
+        let f = repeat(repeat(Format::Byte(ByteSet::is(0x00))));
+        assert!(Decoder::compile(&f, None).is_err());
+    }
+
+    #[test]
+    fn compile_cat_repeat() {
+        let f = Format::Cat(
+            Box::new(repeat(Format::Byte(ByteSet::is(0x00)))),
+            Box::new(repeat(Format::Byte(ByteSet::is(0xFF)))),
+        );
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Pair(Box::new(Value::Seq(vec![])), Box::new(Value::Seq(vec![]))),
+        );
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Pair(
+                Box::new(Value::Seq(vec![Value::U8(0x00)])),
+                Box::new(Value::Seq(vec![])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Pair(
+                Box::new(Value::Seq(vec![])),
+                Box::new(Value::Seq(vec![Value::U8(0xFF)])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Pair(
+                Box::new(Value::Seq(vec![Value::U8(0x00)])),
+                Box::new(Value::Seq(vec![Value::U8(0xFF)])),
+            ),
+        );
+        rejects(&d, &[0x7F]);
+        rejects(&d, &[0xFF, 0x00]);
+        rejects(&d, &[0x00, 0xFF, 0x00]);
+    }
+
+    #[test]
+    fn compile_cat_repeat_ambiguous() {
+        let f = Format::Cat(
+            Box::new(repeat(Format::Byte(ByteSet::is(0x00)))),
+            Box::new(repeat(Format::Byte(ByteSet::is(0x00)))),
+        );
+        assert!(Decoder::compile(&f, None).is_err());
+    }
+
+    #[test]
+    fn compile_repeat_fields() {
+        let f = record([
+            ("first", repeat(Format::Byte(ByteSet::is(0x00)))),
+            ("second", repeat(Format::Byte(ByteSet::is(0xFF)))),
+            ("third", repeat(Format::Byte(ByteSet::is(0x7F)))),
+        ]);
+        assert!(Decoder::compile(&f, None).is_ok());
+    }
+
+    #[test]
+    fn compile_repeat_fields_ambiguous() {
+        let f = record([
+            ("first", repeat(Format::Byte(ByteSet::is(0x00)))),
+            ("second", repeat(Format::Byte(ByteSet::is(0xFF)))),
+            ("third", repeat(Format::Byte(ByteSet::is(0x00)))),
+        ]);
+        assert!(Decoder::compile(&f, None).is_err());
+    }
+
+    #[test]
+    fn compile_repeat_fields_okay() {
+        let f = record([
+            ("first", repeat(Format::Byte(ByteSet::is(0x00)))),
+            (
+                "second-and-third",
+                alts([
+                    Format::Empty,
+                    record([
+                        (
+                            "second",
+                            Format::Cat(
+                                Box::new(Format::Byte(ByteSet::is(0xFF))),
+                                Box::new(repeat(Format::Byte(ByteSet::is(0xFF)))),
+                            ),
+                        ),
+                        ("third", repeat(Format::Byte(ByteSet::is(0x00)))),
+                    ]),
+                ]),
+            ),
+        ]);
+        let d = Decoder::compile(&f, None).unwrap();
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Record(vec![
+                ("first".to_string(), Value::Seq(vec![])),
+                ("second-and-third".to_string(), Value::Unit),
+            ]),
+        );
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Record(vec![
+                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+                ("second-and-third".to_string(), Value::Unit),
+            ]),
+        );
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Record(vec![
+                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+                (
+                    "second-and-third".to_string(),
+                    Value::Record(vec![
+                        (
+                            "second".to_string(),
+                            Value::Pair(Box::new(Value::U8(0xFF)), Box::new(Value::Seq(vec![]))),
+                        ),
+                        ("third".to_string(), Value::Seq(vec![])),
+                    ]),
+                ),
+            ]),
+        );
+        accepts(
+            &d,
+            &[0x00, 0xFF, 0x00],
+            &[],
+            Value::Record(vec![
+                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+                (
+                    "second-and-third".to_string(),
+                    Value::Record(vec![
+                        (
+                            "second".to_string(),
+                            Value::Pair(Box::new(Value::U8(0xFF)), Box::new(Value::Seq(vec![]))),
+                        ),
+                        ("third".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+                    ]),
+                ),
+            ]),
+        );
+        accepts(
+            &d,
+            &[0x00, 0x7F],
+            &[0x7F],
+            Value::Record(vec![
+                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+                ("second-and-third".to_string(), Value::Unit),
+            ]),
+        );
+    }
+}
