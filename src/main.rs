@@ -303,13 +303,17 @@ impl Format {
             }
             Format::Tuple(fields) => match fields.split_first() {
                 None => next.might_match_lookahead(input, Format::Empty),
-                Some((a, fields)) => a.might_match_lookahead(input, Format::Tuple(fields.to_vec())),
+                Some((a, fields)) => a.might_match_lookahead(
+                    input,
+                    Format::Cat(Box::new(Format::Tuple(fields.to_vec())), Box::new(next)),
+                ),
             },
             Format::Record(fields) => match fields.split_first() {
                 None => next.might_match_lookahead(input, Format::Empty),
-                Some(((_, a), fields)) => {
-                    a.might_match_lookahead(input, Format::Record(fields.to_vec()))
-                }
+                Some(((_, a), fields)) => a.might_match_lookahead(
+                    input,
+                    Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
+                ),
             },
             Format::Repeat(_a) => {
                 true // FIXME
@@ -408,11 +412,19 @@ impl Lookahead {
             },
             Format::Tuple(fields) => match fields.split_first() {
                 None => Lookahead::from(&next, len, Format::Empty),
-                Some((a, fields)) => Lookahead::from(a, len, Format::Tuple(fields.to_vec())),
+                Some((a, fields)) => Lookahead::from(
+                    a,
+                    len,
+                    Format::Cat(Box::new(Format::Tuple(fields.to_vec())), Box::new(next)),
+                ),
             },
             Format::Record(fields) => match fields.split_first() {
                 None => Lookahead::from(&next, len, Format::Empty),
-                Some(((_, a), fields)) => Lookahead::from(a, len, Format::Record(fields.to_vec())),
+                Some(((_, a), fields)) => Lookahead::from(
+                    a,
+                    len,
+                    Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
+                ),
             },
             Format::Repeat(_a) => {
                 Some(Lookahead::empty()) // FIXME ?
