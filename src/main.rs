@@ -315,9 +315,10 @@ impl Format {
             Format::Alt(a, b) => {
                 a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
             }
-            Format::Cat(a, b) => {
-                a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next)))
-            }
+            Format::Cat(a, b) => match **b {
+                Format::Empty => a.might_match_lookahead(input, next),
+                _ => a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next))),
+            },
             Format::Tuple(fields) => match fields.split_first() {
                 None => next.might_match_lookahead(input, Format::Empty),
                 Some((a, fields)) => a.might_match_lookahead(
@@ -332,9 +333,11 @@ impl Format {
                     Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
                 ),
             },
-            Format::Repeat(_a) => {
-                true // FIXME
-            }
+            Format::Repeat(a) => Format::Alt(
+                Box::new(Format::Empty),
+                Box::new(Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())))),
+            )
+            .might_match_lookahead(input, next),
             Format::RepeatCount(_expr, _a) => {
                 true // FIXME
             }
@@ -448,9 +451,14 @@ impl Lookahead {
                     Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
                 ),
             },
-            Format::Repeat(_a) => {
-                Some(Lookahead::empty()) // FIXME ?
-            }
+            Format::Repeat(a) => Lookahead::from(
+                &Format::Alt(
+                    Box::new(Format::Empty),
+                    Box::new(Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())))),
+                ),
+                len,
+                next,
+            ),
             Format::RepeatCount(_expr, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
