@@ -287,7 +287,7 @@ impl Format {
         match self {
             Format::Fail => false,
             Format::Empty => match next {
-                Format::Empty => true,
+                Format::Empty => input.is_empty(),
                 next => next.might_match_lookahead(input, Format::Empty),
             },
             Format::Byte(bs) => match input.split_first() {
