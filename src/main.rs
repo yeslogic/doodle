@@ -506,14 +506,24 @@ impl Decoder {
             }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
-                let mut fields = fields.iter().peekable();
+                let mut fields = fields.as_slice();
 
-                while let Some(f) = fields.next() {
-                    let opt_next = match fields.peek() {
-                        Some(opt_next) => Some(*opt_next),
-                        None => opt_next,
+                while let Some((f, remain)) = fields.split_first() {
+                    fields = remain;
+                    let df = match (remain.is_empty(), opt_next) {
+                        (true, None) => Decoder::compile(f, None)?,
+                        (true, Some(next)) => Decoder::compile(f, Some(next))?,
+                        (false, None) => {
+                            Decoder::compile(f, Some(&Format::Tuple(remain.to_vec())))?
+                        }
+                        (false, Some(next)) => Decoder::compile(
+                            f,
+                            Some(&Format::Cat(
+                                Box::new(Format::Tuple(remain.to_vec())),
+                                Box::new(next.clone()),
+                            )),
+                        )?,
                     };
-                    let df = Decoder::compile(f, opt_next)?;
                     dfields.push(df);
                 }
 
@@ -521,14 +531,24 @@ impl Decoder {
             }
             Format::Record(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
-                let mut fields = fields.iter().peekable();
+                let mut fields = fields.as_slice();
 
-                while let Some((name, f)) = fields.next() {
-                    let opt_next = match fields.peek() {
-                        Some((_, opt_next)) => Some(opt_next),
-                        None => opt_next,
+                while let Some(((name, f), remain)) = fields.split_first() {
+                    fields = remain;
+                    let df = match (remain.is_empty(), opt_next) {
+                        (true, None) => Decoder::compile(f, None)?,
+                        (true, Some(next)) => Decoder::compile(f, Some(next))?,
+                        (false, None) => {
+                            Decoder::compile(f, Some(&Format::Record(remain.to_vec())))?
+                        }
+                        (false, Some(next)) => Decoder::compile(
+                            f,
+                            Some(&Format::Cat(
+                                Box::new(Format::Record(remain.to_vec())),
+                                Box::new(next.clone()),
+                            )),
+                        )?,
                     };
-                    let df = Decoder::compile(f, opt_next)?;
                     dfields.push((name.clone(), df));
                 }
 
