@@ -117,7 +117,20 @@ impl<const LEN: usize> From<[u8; LEN]> for ByteSet {
 
 impl fmt::Debug for ByteSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_set().entries(self.iter()).finish()
+        if self.len() < 128 {
+            f.debug_set().entries(self.iter()).finish()
+        } else {
+            f.write_str("!")?;
+            f.debug_set().entries((!self).iter()).finish()
+        }
+    }
+}
+
+impl ops::Not for &ByteSet {
+    type Output = ByteSet;
+
+    fn not(self) -> ByteSet {
+        self.complement()
     }
 }
 
@@ -125,7 +138,7 @@ impl ops::Not for ByteSet {
     type Output = ByteSet;
 
     fn not(self) -> ByteSet {
-        self.complement()
+        !&self
     }
 }
 
@@ -198,5 +211,15 @@ mod tests {
         assert!(ByteSet::is_disjoint(&not_00, &is_00));
         assert!(!ByteSet::is_disjoint(&not_00, &is_255));
         assert!(ByteSet::is_disjoint(&is_00, &is_255));
+    }
+
+    #[test]
+    fn test_debug_below_128() {
+        assert_eq!(format!("{:?}", ByteSet::from([32, 1])), "{1, 32}");
+    }
+
+    #[test]
+    fn test_debug_above_128() {
+        assert_eq!(format!("{:?}", !ByteSet::from([32, 1])), "!{1, 32}");
     }
 }
