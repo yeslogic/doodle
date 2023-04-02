@@ -43,7 +43,7 @@ impl ByteSet {
             // Hard: enumerate these by brute force - they are disjoint if all
             // bytes are contained in one byte set or the other set
             (ByteSet::Excludes(excluded0), ByteSet::Excludes(excluded1)) => {
-                (0..=u8::MAX).all(|b| !excluded0.contains(&b) || !excluded1.contains(&b))
+                (0..=u8::MAX).all(|b| excluded0.contains(&b) || excluded1.contains(&b))
             }
         }
     }
