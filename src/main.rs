@@ -629,7 +629,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 while look.matches(input) {
-                    let (va, next_input) = a.parse(stack, input).unwrap();
+                    let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
                 }
