@@ -506,20 +506,19 @@ impl Decoder {
             }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
-                let mut fields = fields.as_slice();
+                let mut fields = fields.iter();
 
-                while let Some((f, remain)) = fields.split_first() {
-                    fields = remain;
-                    let df = match (remain.is_empty(), opt_next) {
+                while let Some(f) = fields.next() {
+                    let df = match (fields.len() == 0, opt_next) {
                         (true, None) => Decoder::compile(f, None)?,
                         (true, Some(next)) => Decoder::compile(f, Some(next))?,
                         (false, None) => {
-                            Decoder::compile(f, Some(&Format::Tuple(remain.to_vec())))?
+                            Decoder::compile(f, Some(&Format::Tuple(fields.as_slice().to_vec())))?
                         }
                         (false, Some(next)) => Decoder::compile(
                             f,
                             Some(&Format::Cat(
-                                Box::new(Format::Tuple(remain.to_vec())),
+                                Box::new(Format::Tuple(fields.as_slice().to_vec())),
                                 Box::new(next.clone()),
                             )),
                         )?,
@@ -531,20 +530,19 @@ impl Decoder {
             }
             Format::Record(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
-                let mut fields = fields.as_slice();
+                let mut fields = fields.iter();
 
-                while let Some(((name, f), remain)) = fields.split_first() {
-                    fields = remain;
-                    let df = match (remain.is_empty(), opt_next) {
+                while let Some((name, f)) = fields.next() {
+                    let df = match (fields.len() == 0, opt_next) {
                         (true, None) => Decoder::compile(f, None)?,
                         (true, Some(next)) => Decoder::compile(f, Some(next))?,
                         (false, None) => {
-                            Decoder::compile(f, Some(&Format::Record(remain.to_vec())))?
+                            Decoder::compile(f, Some(&Format::Record(fields.as_slice().to_vec())))?
                         }
                         (false, Some(next)) => Decoder::compile(
                             f,
                             Some(&Format::Cat(
-                                Box::new(Format::Record(remain.to_vec())),
+                                Box::new(Format::Record(fields.as_slice().to_vec())),
                                 Box::new(next.clone()),
                             )),
                         )?,
