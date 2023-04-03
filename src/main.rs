@@ -72,6 +72,8 @@ enum Format {
     Byte(ByteSet),
     /// Matches the union of the byte strings matched by the two formats
     Alt(Box<Format>, Box<Format>),
+    /// Matches the union of the byte strings matched by all the formats
+    Switch(Vec<Format>),
     /// Matches the set of byte strings matched by the first format, followed by
     /// the second format
     Cat(Box<Format>, Box<Format>),
@@ -226,6 +228,7 @@ impl Format {
             Format::Empty => true,
             Format::Byte(_) => false,
             Format::Alt(a, b) => a.nullable() || b.nullable(),
+            Format::Switch(branches) => branches.iter().any(|f| f.nullable()),
             Format::Cat(a, b) => a.nullable() && b.nullable(),
             Format::Tuple(fields) => fields.iter().all(|f| f.nullable()),
             Format::Record(fields) => fields.iter().all(|(_, f)| f.nullable()),
@@ -253,6 +256,14 @@ impl Format {
             Format::Alt(a, b) => {
                 a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
             }
+            Format::Switch(branches) => match branches.split_first() {
+                None => false,
+                Some((branch, branches)) => Format::Alt(
+                    Box::new(branch.clone()),
+                    Box::new(Format::Switch(branches.to_vec())),
+                )
+                .might_match_lookahead(input, next),
+            },
             Format::Cat(a, b) => match **b {
                 Format::Empty => a.might_match_lookahead(input, next),
                 _ => a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next))),
@@ -372,6 +383,17 @@ impl Lookahead {
                     (Some(pa), Some(pb)) => Some(Lookahead::alt(&pa, &pb)),
                 }
             }
+            Format::Switch(branches) => match branches.split_first() {
+                None => None,
+                Some((branch, branches)) => Lookahead::from(
+                    &Format::Alt(
+                        Box::new(branch.clone()),
+                        Box::new(Format::Switch(branches.to_vec())),
+                    ),
+                    len,
+                    next,
+                ),
+            },
             Format::Cat(a, b) => match **b {
                 Format::Empty => Lookahead::from(a, len, next),
                 _ => Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next))),
@@ -443,6 +465,16 @@ impl Decoder {
                     Err("cannot find valid lookahead for alt".to_string())
                 }
             }
+            Format::Switch(branches) => match branches.split_first() {
+                None => Ok(Decoder::Fail),
+                Some((branch, branches)) => Decoder::compile(
+                    &Format::Alt(
+                        Box::new(branch.clone()),
+                        Box::new(Format::Switch(branches.to_vec())),
+                    ),
+                    opt_next,
+                ),
+            },
             Format::Cat(a, b) => {
                 let next = opt_next.unwrap_or(&Format::Empty);
                 let da = Box::new(Decoder::compile(
@@ -772,11 +804,7 @@ mod render_tree {
 }
 
 fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
-    let mut formats = formats.into_iter();
-    let format = formats.next().unwrap_or(Format::Fail);
-    formats.fold(format, |acc, format| {
-        Format::Alt(Box::new(acc), Box::new(format))
-    })
+    Format::Switch(formats.into_iter().collect())
 }
 
 fn record<Label: ToString>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
