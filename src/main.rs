@@ -10,14 +10,17 @@ mod byte_set;
 
 #[derive(Clone, PartialEq, Debug, Serialize)]
 pub enum Value {
-    Unit,
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
-    Pair(Box<Value>, Box<Value>),
-    Seq(Vec<Value>),
+    Tuple(Vec<Value>),
     Record(Vec<(String, Value)>),
+    Seq(Vec<Value>),
+}
+
+impl Value {
+    const UNIT: Value = Value::Tuple(Vec::new());
 }
 
 #[derive(Clone, Debug)]
@@ -25,16 +28,16 @@ enum Expr {
     Const(Value),
     Var(usize),
     Sub(Box<Expr>, Box<Expr>),
-    Pair(Box<Expr>, Box<Expr>),
-    Seq(Vec<Expr>),
+    Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
+    Seq(Vec<Expr>),
 }
 
 #[derive(Clone, Debug)]
 enum Func {
     Expr(Expr),
-    Fst,
-    Snd,
+    TupleProj(usize),
+    RecordProj(String),
     U16Be,
     U16Le,
     U32Be,
@@ -135,16 +138,14 @@ impl Expr {
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Pair(expr0, expr1) => {
-                Value::Pair(Box::new(expr0.eval(stack)), Box::new(expr1.eval(stack)))
-            }
-            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
             Expr::Record(fields) => Value::Record(
                 fields
                     .iter()
                     .map(|(label, expr)| (label.clone(), expr.eval(stack)))
                     .collect(),
             ),
+            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
         }
     }
 
@@ -160,7 +161,7 @@ impl Expr {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
-            Value::Unit | Value::Bool(_) | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
+            Value::Bool(_) | Value::Tuple(_) | Value::Record(_) | Value::Seq(_) => {
                 panic!("value is not number")
             }
         }
@@ -171,50 +172,53 @@ impl Func {
     fn eval(&self, arg: Value) -> Value {
         match self {
             Func::Expr(e) => e.eval(&[]),
-            Func::Fst => match arg {
-                Value::Pair(fst, _snd) => *fst,
-                _ => panic!("Fst: expected (_, _)"),
+            Func::TupleProj(i) => match arg {
+                Value::Tuple(vs) => vs[*i].clone(),
+                _ => panic!("TupleProj: expected tuple"),
             },
-            Func::Snd => match arg {
-                Value::Pair(_fst, snd) => *snd,
-                _ => panic!("Snd: expected (_, _)"),
+            Func::RecordProj(label) => match arg {
+                Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
+                    Some((_, v)) => v.clone(),
+                    None => panic!("RecordProj: {label} not found in record"),
+                },
+                _ => panic!("RecordProj: expected record"),
             },
             Func::U16Be => match arg {
-                Value::Pair(fst, snd) => match (fst.as_ref(), snd.as_ref()) {
-                    (Value::U8(hi), Value::U8(lo)) => Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    (_, _) => panic!("expected (U8, U8)"),
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
+                    _ => panic!("expected (U8, U8)"),
                 },
                 _ => panic!("U16Be: expected (_, _)"),
             },
             Func::U16Le => match arg {
-                Value::Pair(fst, snd) => match (fst.as_ref(), snd.as_ref()) {
-                    (Value::U8(lo), Value::U8(hi)) => Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    (_, _) => panic!("expected (U8, U8)"),
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
+                    _ => panic!("expected (U8, U8)"),
                 },
                 _ => panic!("U16Be: expected (_, _)"),
             },
             Func::U32Be => match arg {
-                Value::Seq(vs) => match vs.as_slice() {
+                Value::Tuple(vs) => match vs.as_slice() {
                     [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                         Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
                     }
-                    _ => panic!("expected [U8, U8, U8, U8]"),
+                    _ => panic!("expected (U8, U8, U8, U8)"),
                 },
-                _ => panic!("U32Be: expected [_, _, _, _]"),
+                _ => panic!("U32Be: expected (_, _, _, _)"),
             },
             Func::U32Le => match arg {
-                Value::Seq(vs) => match vs.as_slice() {
+                Value::Tuple(vs) => match vs.as_slice() {
                     [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                         Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
                     }
-                    _ => panic!("expected [U8, U8, U8, U8]"),
+                    _ => panic!("expected (U8, U8, U8, U8)"),
                 },
-                _ => panic!("U32Be: expected [_, _, _, _]"),
+                _ => panic!("U32Be: expected (_, _, _, _)"),
             },
             Func::Stream => match arg {
                 Value::Seq(vs) => {
                     // FIXME could also condense nested sequences
-                    Value::Seq(vs.into_iter().filter(|v| *v != Value::Unit).collect())
+                    Value::Seq(vs.into_iter().filter(|v| *v != Value::UNIT).collect())
                 }
                 _ => panic!("Stream: expected Seq"),
             },
@@ -524,7 +528,7 @@ impl Decoder {
     ) -> Option<(Value, &'input [u8])> {
         match self {
             Decoder::Fail => None,
-            Decoder::Empty => Some((Value::Unit, input)),
+            Decoder::Empty => Some((Value::UNIT, input)),
             Decoder::Byte(bs) => {
                 let (&b, input) = input.split_first()?;
                 if bs.contains(b) {
@@ -547,7 +551,7 @@ impl Decoder {
             Decoder::Cat(a, b) => {
                 let (va, input) = a.parse(stack, input)?;
                 let (vb, input) = b.parse(stack, input)?;
-                Some((Value::Pair(Box::new(va), Box::new(vb)), input))
+                Some((Value::Tuple(vec![va, vb]), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
@@ -557,7 +561,7 @@ impl Decoder {
                     input = next_input;
                     v.push(vf.clone());
                 }
-                Some((Value::Seq(v), input))
+                Some((Value::Tuple(v), input))
             }
             Decoder::Record(fields) => {
                 let mut input = input;
@@ -631,31 +635,27 @@ mod render_tree {
 
     fn is_atomic_value(value: &Value) -> bool {
         match value {
-            Value::Unit => true,
             Value::Bool(_) => true,
             Value::U8(_) => true,
             Value::U16(_) => true,
             Value::U32(_) => true,
-            Value::Pair(_, _) => false,
-            Value::Seq(vals) => vals.is_empty(),
+            Value::Tuple(vals) => vals.is_empty(),
             Value::Record(fields) => fields.is_empty(),
+            Value::Seq(vals) => vals.is_empty(),
         }
     }
 
     pub fn print_value(gutter: &mut Vec<bool>, value: &Value) {
         match value {
-            Value::Unit => print!("()"),
             Value::Bool(true) => print!("true"),
             Value::Bool(false) => print!("false"),
             Value::U8(i) => print!("{i}"),
             Value::U16(i) => print!("{i}"),
             Value::U32(i) => print!("{i}"),
-            Value::Pair(val0, val1) => {
-                print_field_value_continue(gutter, 0, val0);
-                print_field_value_last(gutter, 1, val1);
-            }
+            Value::Tuple(vals) if vals.is_empty() => print!("()"),
             Value::Seq(vals) if vals.is_empty() => print!("[]"),
-            Value::Seq(vals) => {
+            Value::Record(vals) if vals.is_empty() => print!("{{}}"),
+            Value::Tuple(vals) | Value::Seq(vals) => {
                 if vals.len() > SEQ_PREVIEW_LEN && vals.iter().all(is_atomic_value) {
                     let last_index = vals.len() - 1;
                     for (index, val) in vals[0..SEQ_PREVIEW_LEN].iter().enumerate() {
@@ -673,7 +673,6 @@ mod render_tree {
                     print_field_value_last(gutter, last_index, &vals[last_index]);
                 }
             }
-            Value::Record(vals) if vals.is_empty() => print!("{{}}"),
             Value::Record(fields) => {
                 let last_index = fields.len() - 1;
                 for (label, val) in &fields[..last_index] {
@@ -782,14 +781,14 @@ fn u8() -> Format {
 fn u16be() -> Format {
     Format::Map(
         Func::U16Be,
-        Box::new(Format::Cat(Box::new(any_byte()), Box::new(any_byte()))),
+        Box::new(Format::Tuple(vec![any_byte(), any_byte()])),
     )
 }
 
 fn u16le() -> Format {
     Format::Map(
         Func::U16Le,
-        Box::new(Format::Cat(Box::new(any_byte()), Box::new(any_byte()))),
+        Box::new(Format::Tuple(vec![any_byte(), any_byte()])),
     )
 }
 
@@ -909,8 +908,8 @@ fn tiff_format() -> Format {
 fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
-            Func::Snd,
-            Box::new(Format::Cat(Box::new(is_byte(0xFF)), Box::new(is_byte(id)))),
+            Func::TupleProj(1),
+            Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(id)])),
         )
     }
 
@@ -1177,10 +1176,7 @@ fn jpeg_format() -> Format {
         not_byte(0xFF),
         Format::Map(
             Func::Expr(Expr::Const(Value::U8(0xFF))),
-            Box::new(Format::Cat(
-                Box::new(is_byte(0xFF)),
-                Box::new(is_byte(0x00)),
-            )),
+            Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(0x00)])),
         ),
     ]);
 
@@ -1191,14 +1187,14 @@ fn jpeg_format() -> Format {
             // FIXME: Extract into separate ECS repetition
             mcu, // TODO: repeat(mcu),
             // FIXME: Restart markers should cycle in order from rst0-rst7
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst0)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst1)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst2)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst3)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst4)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst5)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst6)),
-            Format::Map(Func::Expr(Expr::Const(Value::Unit)), Box::new(rst7)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst0)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst1)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst2)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst3)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst4)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst5)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst6)),
+            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst7)),
         ]))),
     );
 
@@ -1291,8 +1287,8 @@ mod tests {
     fn compile_empty() {
         let f = Format::Empty;
         let d = Decoder::compile(&f, &Next::Empty).unwrap();
-        accepts(&d, &[], &[], Value::Unit);
-        accepts(&d, &[0x00], &[0x00], Value::Unit);
+        accepts(&d, &[], &[], Value::UNIT);
+        accepts(&d, &[0x00], &[0x00], Value::UNIT);
     }
 
     #[test]
@@ -1342,8 +1338,8 @@ mod tests {
         let f = alts([Format::Empty, is_byte(0x00)]);
         let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
-        accepts(&d, &[], &[], Value::Unit);
-        accepts(&d, &[0xFF], &[0xFF], Value::Unit);
+        accepts(&d, &[], &[], Value::UNIT);
+        accepts(&d, &[0xFF], &[0xFF], Value::UNIT);
     }
 
     #[test]
@@ -1357,13 +1353,13 @@ mod tests {
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Pair(Box::new(Value::U8(0)), Box::new(Value::U8(0xFF))),
+            Value::Tuple(vec![Value::U8(0), Value::U8(0xFF)]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Pair(Box::new(Value::Unit), Box::new(Value::U8(0xFF))),
+            Value::Tuple(vec![Value::UNIT, Value::U8(0xFF)]),
         );
         rejects(&d, &[0x00]);
         rejects(&d, &[]);
@@ -1380,31 +1376,27 @@ mod tests {
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Pair(Box::new(Value::U8(0)), Box::new(Value::U8(0xFF))),
+            Value::Tuple(vec![Value::U8(0), Value::U8(0xFF)]),
         );
         accepts(
             &d,
             &[0x00],
             &[],
-            Value::Pair(Box::new(Value::U8(0)), Box::new(Value::Unit)),
+            Value::Tuple(vec![Value::U8(0), Value::UNIT]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Pair(Box::new(Value::Unit), Box::new(Value::U8(0xFF))),
+            Value::Tuple(vec![Value::UNIT, Value::U8(0xFF)]),
         );
-        accepts(
-            &d,
-            &[],
-            &[],
-            Value::Pair(Box::new(Value::Unit), Box::new(Value::Unit)),
-        );
+        accepts(&d, &[], &[], Value::Tuple(vec![Value::UNIT, Value::UNIT]));
+        accepts(&d, &[], &[], Value::Tuple(vec![Value::UNIT, Value::UNIT]));
         accepts(
             &d,
             &[0x7F],
             &[0x7F],
-            Value::Pair(Box::new(Value::Unit), Box::new(Value::Unit)),
+            Value::Tuple(vec![Value::UNIT, Value::UNIT]),
         );
     }
 
@@ -1476,34 +1468,28 @@ mod tests {
             &d,
             &[],
             &[],
-            Value::Pair(Box::new(Value::Seq(vec![])), Box::new(Value::Seq(vec![]))),
+            Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![])]),
         );
         accepts(
             &d,
             &[0x00],
             &[],
-            Value::Pair(
-                Box::new(Value::Seq(vec![Value::U8(0x00)])),
-                Box::new(Value::Seq(vec![])),
-            ),
+            Value::Tuple(vec![Value::Seq(vec![Value::U8(0x00)]), Value::Seq(vec![])]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Pair(
-                Box::new(Value::Seq(vec![])),
-                Box::new(Value::Seq(vec![Value::U8(0xFF)])),
-            ),
+            Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![Value::U8(0xFF)])]),
         );
         accepts(
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Pair(
-                Box::new(Value::Seq(vec![Value::U8(0x00)])),
-                Box::new(Value::Seq(vec![Value::U8(0xFF)])),
-            ),
+            Value::Tuple(vec![
+                Value::Seq(vec![Value::U8(0x00)]),
+                Value::Seq(vec![Value::U8(0xFF)]),
+            ]),
         );
         rejects(&d, &[0x7F]);
         rejects(&d, &[0xFF, 0x00]);
@@ -1564,7 +1550,7 @@ mod tests {
             &[],
             Value::Record(vec![
                 ("first".to_string(), Value::Seq(vec![])),
-                ("second-and-third".to_string(), Value::Unit),
+                ("second-and-third".to_string(), Value::UNIT),
             ]),
         );
         accepts(
@@ -1573,7 +1559,7 @@ mod tests {
             &[],
             Value::Record(vec![
                 ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
-                ("second-and-third".to_string(), Value::Unit),
+                ("second-and-third".to_string(), Value::UNIT),
             ]),
         );
         accepts(
@@ -1587,7 +1573,7 @@ mod tests {
                     Value::Record(vec![
                         (
                             "second".to_string(),
-                            Value::Pair(Box::new(Value::U8(0xFF)), Box::new(Value::Seq(vec![]))),
+                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
                         ),
                         ("third".to_string(), Value::Seq(vec![])),
                     ]),
@@ -1605,7 +1591,7 @@ mod tests {
                     Value::Record(vec![
                         (
                             "second".to_string(),
-                            Value::Pair(Box::new(Value::U8(0xFF)), Box::new(Value::Seq(vec![]))),
+                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
                         ),
                         ("third".to_string(), Value::Seq(vec![Value::U8(0x00)])),
                     ]),
@@ -1618,7 +1604,7 @@ mod tests {
             &[0x7F],
             Value::Record(vec![
                 ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
-                ("second-and-third".to_string(), Value::Unit),
+                ("second-and-third".to_string(), Value::UNIT),
             ]),
         );
     }
