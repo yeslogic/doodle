@@ -96,14 +96,17 @@ enum Format {
     If(Expr, Box<Format>, Box<Format>),
 }
 
-#[derive(Debug)]
-struct Lookahead {
-    pattern: Vec<ByteSet>,
+#[derive(Clone, Debug)]
+struct ByteSwitch {
+    branches: Vec<(ByteSet, Switch)>,
 }
+
+#[derive(Clone, Debug)]
+struct Switch(Option<usize>, ByteSwitch);
 
 enum Cond {
     Expr(Expr),
-    Peek(Lookahead),
+    Switch(Switch),
 }
 
 /// Decoders with a fixed amount of lookahead
@@ -112,11 +115,11 @@ enum Decoder {
     Empty,
     Byte(ByteSet),
     If(Cond, Box<Decoder>, Box<Decoder>),
+    Switch(Switch, Vec<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
-    While(Lookahead, Box<Decoder>),
-    Until(Lookahead, Box<Decoder>),
+    While(Switch, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -240,202 +243,195 @@ impl Format {
             Format::WithRelativeOffset(_, _) => true,
         }
     }
+}
 
-    pub fn might_match_lookahead(&self, input: &[ByteSet], next: Format) -> bool {
-        match self {
-            Format::Fail => false,
-            Format::Empty => match next {
-                Format::Empty => input.is_empty(),
-                next => next.might_match_lookahead(input, Format::Empty),
-            },
-            Format::Byte(bs) => match input.split_first() {
-                Some((b, _)) if ByteSet::is_disjoint(bs, b) => false,
-                Some((_, input)) => next.might_match_lookahead(input, Format::Empty),
-                None => true,
-            },
-            Format::Alt(a, b) => {
-                a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
+impl ByteSwitch {
+    fn empty() -> ByteSwitch {
+        let branches = Vec::new();
+        ByteSwitch { branches }
+    }
+
+    fn single(bs: ByteSet, s: Switch) -> ByteSwitch {
+        let branches = vec![(bs, s)];
+        ByteSwitch { branches }
+    }
+
+    fn insert(&self, mut bs: ByteSet, s: &Switch) -> Option<ByteSwitch> {
+        let mut branches = Vec::new();
+        for (bs0, s0) in &self.branches {
+            let bs_both = bs0.intersection(&bs);
+            let bs_old = bs0.difference(&bs);
+            bs = bs.difference(&bs0);
+            if !bs_both.is_empty() {
+                let v = Switch::union(s0, &s)?;
+                branches.push((bs_both, v));
             }
-            Format::Switch(branches) => match branches.split_first() {
-                None => false,
-                Some((branch, branches)) => Format::Alt(
-                    Box::new(branch.clone()),
-                    Box::new(Format::Switch(branches.to_vec())),
-                )
-                .might_match_lookahead(input, next),
-            },
-            Format::Cat(a, b) => match **b {
-                Format::Empty => a.might_match_lookahead(input, next),
-                _ => a.might_match_lookahead(input, Format::Cat(b.clone(), Box::new(next))),
-            },
-            Format::Tuple(fields) => match fields.split_first() {
-                None => next.might_match_lookahead(input, Format::Empty),
-                Some((a, fields)) => a.might_match_lookahead(
-                    input,
-                    Format::Cat(Box::new(Format::Tuple(fields.to_vec())), Box::new(next)),
-                ),
-            },
-            Format::Record(fields) => match fields.split_first() {
-                None => next.might_match_lookahead(input, Format::Empty),
-                Some(((_, a), fields)) => a.might_match_lookahead(
-                    input,
-                    Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
-                ),
-            },
-            Format::Repeat(a) => Format::Alt(
-                Box::new(Format::Empty),
-                Box::new(Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())))),
-            )
-            .might_match_lookahead(input, next),
-            Format::RepeatCount(_expr, _a) => {
-                true // FIXME
-            }
-            Format::Slice(_expr, _a) => {
-                true // FIXME
-            }
-            Format::WithRelativeOffset(_, _) => {
-                true // FIXME
-            }
-            Format::Map(_f, a) => a.might_match_lookahead(input, next),
-            Format::If(_expr, a, b) => {
-                a.might_match_lookahead(input, next.clone()) || b.might_match_lookahead(input, next)
+            if !bs_old.is_empty() {
+                branches.push((bs_old, s0.clone()));
             }
         }
+        if !bs.is_empty() {
+            branches.push((bs, s.clone()));
+        }
+        Some(ByteSwitch { branches })
+    }
+
+    fn union(a: &ByteSwitch, b: &ByteSwitch) -> Option<ByteSwitch> {
+        let mut c = a.clone();
+        for (bs, v) in &b.branches {
+            c = c.insert(bs.clone(), v)?;
+        }
+        Some(c)
     }
 }
 
-impl Lookahead {
-    pub fn empty() -> Lookahead {
-        Lookahead { pattern: vec![] }
+impl Switch {
+    fn reject() -> Switch {
+        Switch(None, ByteSwitch::empty())
     }
 
-    pub fn single(bs: ByteSet) -> Lookahead {
-        Lookahead { pattern: vec![bs] }
+    fn accept(index: usize) -> Switch {
+        Switch(Some(index), ByteSwitch::empty())
     }
 
-    pub fn alt(a: &Lookahead, b: &Lookahead) -> Lookahead {
-        Lookahead {
-            pattern: Iterator::zip(a.pattern.iter(), b.pattern.iter())
-                .map(|(ba, bb)| ByteSet::union(&ba, bb))
-                .collect(),
-        }
-    }
-
-    pub fn cat(a: &Lookahead, b: &Lookahead) -> Lookahead {
-        let mut pattern = a.pattern.clone();
-        pattern.extend(b.pattern.iter().cloned());
-        Lookahead { pattern }
-    }
-
-    /// Find a lookahead that only the first format matches
-    pub fn new(a: &Format, b: &Format, opt_next: Option<&Format>) -> Option<Lookahead> {
-        const LEN: usize = 2;
-        let next = match opt_next {
-            None => Format::Empty,
-            Some(next) => next.clone(),
-        };
-        let pa = Lookahead::from(a, LEN, next.clone())?;
-        if !b.might_match_lookahead(&pa.pattern, next) {
-            Some(pa)
-        } else {
-            None
-        }
-    }
-    /*
-        pub fn disjoint(a: &Self, b: &Self) -> bool {
-            for i in 0..std::cmp::min(a.pattern.len(), b.pattern.len()) {
-                if ByteSet::disjoint(&a.pattern[i], &b.pattern[i]) {
-                    return true;
-                }
-            }
-            false
-        }
-    */
-    pub fn matches(&self, input: &[u8]) -> bool {
-        self.pattern.len() <= input.len()
-            && Iterator::zip(self.pattern.iter(), input.iter()).all(|(p, b)| p.contains(*b))
-    }
-
-    pub fn from(f: &Format, len: usize, next: Format) -> Option<Lookahead> {
-        match f {
-            Format::Fail => None,
-            Format::Empty => match next {
-                Format::Empty => Some(Lookahead::empty()),
-                next => Lookahead::from(&next, len, Format::Empty),
-            },
-            Format::Byte(bs) => {
-                let pa = Lookahead::single(bs.clone());
-                if len > 1 {
-                    // FIXME do we still need to check for Format::Zero?
-                    let pb = Lookahead::from(&next, len - 1, Format::Empty)?;
-                    Some(Lookahead::cat(&pa, &pb))
-                } else {
-                    Some(pa)
-                }
-            }
-            Format::Alt(a, b) => {
-                let ra = Lookahead::from(a, len, next.clone());
-                let rb = Lookahead::from(b, len, next);
-                match (ra, rb) {
+    fn union(sa: &Switch, sb: &Switch) -> Option<Switch> {
+        match (sa, sb) {
+            (Switch(a, sa), Switch(b, sb)) => {
+                let c = match (a, b) {
                     (None, None) => None,
-                    (Some(pa), None) => Some(pa),
-                    (None, Some(pb)) => Some(pb),
-                    (Some(pa), Some(pb)) => Some(Lookahead::alt(&pa, &pb)),
-                }
+                    (Some(index), None) | (None, Some(index)) => Some(*index),
+                    (Some(a), Some(b)) if a == b => Some(*a),
+                    (Some(_), Some(_)) => return None,
+                };
+                Some(Switch(c, ByteSwitch::union(&sa, &sb)?))
+            }
+        }
+    }
+
+    pub fn from(index: usize, depth: usize, f: &Format, next: Format) -> Switch {
+        match f {
+            Format::Fail => Switch::reject(),
+            Format::Empty => match next {
+                Format::Empty => Switch::accept(index),
+                next => Switch::from(index, depth, &next, Format::Empty),
+            },
+            Format::Byte(bs) => Switch(
+                None,
+                ByteSwitch::single(
+                    bs.clone(),
+                    if depth > 0 {
+                        Switch::from(index, depth - 1, &next, Format::Empty)
+                    } else {
+                        Switch::accept(index)
+                    },
+                ),
+            ),
+            Format::Alt(a, b) => {
+                let sa = Switch::from(index, depth, a, next.clone());
+                let sb = Switch::from(index, depth, b, next);
+                Switch::union(&sa, &sb).unwrap()
             }
             Format::Switch(branches) => match branches.split_first() {
-                None => None,
-                Some((branch, branches)) => Lookahead::from(
+                None => Switch::reject(),
+                Some((branch, branches)) => Switch::from(
+                    index,
+                    depth,
                     &Format::Alt(
                         Box::new(branch.clone()),
                         Box::new(Format::Switch(branches.to_vec())),
                     ),
-                    len,
                     next,
                 ),
             },
             Format::Cat(a, b) => match **b {
-                Format::Empty => Lookahead::from(a, len, next),
-                _ => Lookahead::from(a, len, Format::Cat(Box::new(*b.clone()), Box::new(next))),
+                Format::Empty => Switch::from(index, depth, a, next),
+                _ => Switch::from(
+                    index,
+                    depth,
+                    a,
+                    Format::Cat(Box::new(*b.clone()), Box::new(next)),
+                ),
             },
             Format::Tuple(fields) => match fields.split_first() {
-                None => Lookahead::from(&next, len, Format::Empty),
-                Some((a, fields)) => Lookahead::from(
+                None => Switch::from(index, depth, &next, Format::Empty),
+                Some((a, fields)) => Switch::from(
+                    index,
+                    depth,
                     a,
-                    len,
                     Format::Cat(Box::new(Format::Tuple(fields.to_vec())), Box::new(next)),
                 ),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => Lookahead::from(&next, len, Format::Empty),
-                Some(((_, a), fields)) => Lookahead::from(
+                None => Switch::from(index, depth, &next, Format::Empty),
+                Some(((_, a), fields)) => Switch::from(
+                    index,
+                    depth,
                     a,
-                    len,
                     Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
                 ),
             },
-            Format::Repeat(a) => Lookahead::from(
+            Format::Repeat(a) => Switch::from(
+                index,
+                depth,
                 &Format::Alt(
                     Box::new(Format::Empty),
                     Box::new(Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())))),
                 ),
-                len,
                 next,
             ),
             Format::RepeatCount(_expr, _a) => {
-                Some(Lookahead::empty()) // FIXME ?
+                Switch::accept(index) // FIXME
             }
             Format::Slice(_expr, _a) => {
-                Some(Lookahead::empty()) // FIXME ?
+                Switch::accept(index) // FIXME
             }
-            Format::WithRelativeOffset(_, _) => {
-                Some(Lookahead::empty()) // FIXME ?
+            Format::WithRelativeOffset(_expr, _a) => {
+                Switch::accept(index) // FIXME
             }
-            Format::Map(_f, a) => Lookahead::from(a, len, next),
+            Format::Map(_f, a) => Switch::from(index, depth, a, next),
             Format::If(_expr, a, b) => {
-                Lookahead::from(&Format::Alt(a.clone(), b.clone()), len, next)
+                Switch::from(index, depth, &Format::Alt(a.clone(), b.clone()), next)
             }
         }
+    }
+
+    fn matches(&self, input: &[u8]) -> Option<usize> {
+        match self {
+            Switch(accept, ByteSwitch { branches }) => match input.split_first() {
+                None => *accept,
+                Some((b, input)) => {
+                    for (bs, s) in branches {
+                        if bs.contains(*b) {
+                            return s.matches(input);
+                        }
+                    }
+                    *accept
+                }
+            },
+        }
+    }
+
+    fn accepts(branches: &[(usize, Format)]) -> Option<usize> {
+        match branches.split_first() {
+            None => None,
+            Some(((index, _), branches)) => {
+                if branches.iter().all(|(i, _)| i == index) {
+                    Some(*index)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn build(branches: &[&Format], next: Format) -> Option<Switch> {
+        const MAX_DEPTH: usize = 2;
+        let mut switch = Switch::reject();
+        for i in 0..branches.len() {
+            let res = Switch::from(i, MAX_DEPTH, &branches[i], next.clone());
+            switch = Switch::union(&switch, &res)?;
+        }
+        Some(switch)
     }
 }
 
@@ -443,7 +439,7 @@ impl Cond {
     fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
         match self {
             Cond::Expr(expr) => expr.eval_bool(stack),
-            Cond::Peek(look) => look.matches(input),
+            Cond::Switch(switch) => switch.matches(input) == Some(0),
         }
     }
 }
@@ -457,24 +453,34 @@ impl Decoder {
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 let db = Box::new(Decoder::compile(b, opt_next)?);
-                if let Some(look) = Lookahead::new(a, b, opt_next) {
-                    Ok(Decoder::If(Cond::Peek(look), da, db))
-                } else if let Some(look) = Lookahead::new(b, a, opt_next) {
-                    Ok(Decoder::If(Cond::Peek(look), db, da))
+                let next = match opt_next {
+                    None => Format::Empty,
+                    Some(next) => next.clone(),
+                };
+                if let Some(switch) = Switch::build(&[&a, &b], next.clone()) {
+                    Ok(Decoder::If(Cond::Switch(switch), da, db))
                 } else {
-                    Err("cannot find valid lookahead for alt".to_string())
+                    Err(format!("cannot build switch for {:?}", f))
                 }
             }
-            Format::Switch(branches) => match branches.split_first() {
-                None => Ok(Decoder::Fail),
-                Some((branch, branches)) => Decoder::compile(
-                    &Format::Alt(
-                        Box::new(branch.clone()),
-                        Box::new(Format::Switch(branches.to_vec())),
-                    ),
-                    opt_next,
-                ),
-            },
+            Format::Switch(branches) => {
+                let mut ds = Vec::new();
+                let mut fs = Vec::new();
+                let next = match opt_next {
+                    None => Format::Empty,
+                    Some(next) => next.clone(),
+                };
+                for f in branches {
+                    let d = Decoder::compile(f, opt_next)?;
+                    ds.push(d);
+                    fs.push(f);
+                }
+                if let Some(switch) = Switch::build(&fs, next.clone()) {
+                    Ok(Decoder::Switch(switch, ds))
+                } else {
+                    Err(format!("cannot build switch for {:?}", f))
+                }
+            }
             Format::Cat(a, b) => {
                 let next = opt_next.unwrap_or(&Format::Empty);
                 let da = Box::new(Decoder::compile(
@@ -545,17 +551,20 @@ impl Decoder {
                         Box::new(next.clone()),
                     )),
                 )?);
-                if opt_next.is_some() {
-                    let aplus = Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())));
-                    if let Some(look) = Lookahead::new(&aplus, &Format::Empty, opt_next) {
-                        Ok(Decoder::While(look, da))
-                    } else if let Some(look) = Lookahead::new(&Format::Empty, &aplus, opt_next) {
-                        Ok(Decoder::Until(look, da))
+                if let Some(next) = opt_next {
+                    let fa = &Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())));
+                    let fb = &Format::Empty;
+                    if let Some(switch) = Switch::build(&[fa, fb], next.clone()) {
+                        Ok(Decoder::While(switch, da))
                     } else {
-                        Err("cannot find valid lookahead for repeat".to_string())
+                        Err(format!("cannot build switch for {:?}", f))
                     }
                 } else {
-                    Ok(Decoder::While(Lookahead::single(ByteSet::full()), da))
+                    let switch = Switch(
+                        None,
+                        ByteSwitch::single(ByteSet::full(), Switch(Some(0), ByteSwitch::empty())),
+                    );
+                    Ok(Decoder::While(switch, da))
                 }
             }
             Format::RepeatCount(expr, a) => {
@@ -606,6 +615,10 @@ impl Decoder {
                     b.parse(stack, input)
                 }
             }
+            Decoder::Switch(switch, branches) => {
+                let index = switch.matches(input)?;
+                branches[index].parse(stack, input)
+            }
             Decoder::Cat(a, b) => {
                 let (va, input) = a.parse(stack, input)?;
                 let (vb, input) = b.parse(stack, input)?;
@@ -635,20 +648,10 @@ impl Decoder {
                 }
                 Some((Value::Record(v), input))
             }
-            Decoder::While(look, a) => {
+            Decoder::While(switch, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
-                while look.matches(input) {
-                    let (va, next_input) = a.parse(stack, input)?;
-                    input = next_input;
-                    v.push(va);
-                }
-                Some((Value::Seq(v), input))
-            }
-            Decoder::Until(look, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                while !look.matches(input) {
+                while switch.matches(input) == Some(0) {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
