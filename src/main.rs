@@ -829,6 +829,9 @@ fn jpeg_format() -> Format {
         ("elements", any_bytes()),
     ]);
 
+    // DNL: Define number of lines (See ITU T.81 Section B.2.5)
+    let dnl_data = record([("num-lines", u16be())]);
+
     // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
     let dri_data = record([("restart-interval", u16be())]);
 
@@ -916,7 +919,7 @@ fn jpeg_format() -> Format {
     let eoi = marker(0xD9); // End of of image
     let sos = marker_segment(0xDA, sos_data.clone()); // Start of scan
     let dqt = marker_segment(0xDB, dqt_data.clone()); // Define quantization table
-    let dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
+    let dnl = marker_segment(0xDC, dnl_data.clone()); // Define number of lines
     let dri = marker_segment(0xDD, dri_data.clone()); // Define restart interval
     let _dhp = marker_segment(0xDE, any_bytes()); // Define hierarchical progression
     let _exp = marker_segment(0xDF, any_bytes()); // Expand reference components
