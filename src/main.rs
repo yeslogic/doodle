@@ -156,7 +156,7 @@ impl Expr {
         match self.eval(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
-            Value::U32(n) => n as usize, // FIXME
+            Value::U32(n) => usize::try_from(n).unwrap(),
             Value::Unit | Value::Bool(_) | Value::Pair(_, _) | Value::Seq(_) | Value::Record(_) => {
                 panic!("value is not number")
             }
