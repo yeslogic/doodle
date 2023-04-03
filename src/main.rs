@@ -646,9 +646,9 @@ fn record<Label: ToString>(fields: impl IntoIterator<Item = (Label, Format)>) ->
     )
 }
 
-// fn optional(format: Format) -> Format {
-//     alts([format, Format::Unit])
-// }
+fn optional(format: Format) -> Format {
+    alts([format, Format::Empty])
+}
 
 fn repeat(format: Format) -> Format {
     Format::Repeat(Box::new(format))
@@ -916,7 +916,7 @@ fn jpeg_format() -> Format {
     let eoi = marker(0xD9); // End of of image
     let sos = marker_segment(0xDA, sos_data.clone()); // Start of scan
     let dqt = marker_segment(0xDB, dqt_data.clone()); // Define quantization table
-    let _dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
+    let dnl = marker_segment(0xDC, any_bytes()); // Define number of lines
     let dri = marker_segment(0xDD, dri_data.clone()); // Define restart interval
     let _dhp = marker_segment(0xDE, any_bytes()); // Define hierarchical progression
     let _exp = marker_segment(0xDF, any_bytes()); // Expand reference components
@@ -1019,8 +1019,8 @@ fn jpeg_format() -> Format {
         ("segments", repeat(table_or_misc.clone())),
         ("header", frame_header.clone()),
         ("scan", scan.clone()),
-        // TODO: ("dnl", optional(dnl)), // Error: "cannot find valid lookahead for star"
-        // TODO: ("scans", repeat(scan)), // Error: "cannot find valid lookahead for star"
+        ("dnl", optional(dnl.clone())),
+        ("scans", repeat(scan)),
     ]);
 
     let jpeg = record([
