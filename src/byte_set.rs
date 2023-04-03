@@ -96,6 +96,10 @@ impl ByteSet {
         ByteSet::zip_bits_with(&self, other, |bits0, bits1| bits0 | bits1)
     }
 
+    pub fn difference(&self, other: &ByteSet) -> ByteSet {
+        ByteSet::zip_bits_with(&self, other, |b0, b1| b0 & !b1)
+    }
+
     pub fn intersection(&self, other: &ByteSet) -> ByteSet {
         ByteSet::zip_bits_with(&self, other, |bits0, bits1| bits0 & bits1)
     }
@@ -200,17 +204,25 @@ mod tests {
         }
     }
 
-    #[test]
-    fn is_disjoint() {
-        let not_00 = !ByteSet::from([0x00]);
-        let not_255 = !ByteSet::from([0xFF]);
-        let is_00 = ByteSet::from([0x00]);
-        let is_255 = ByteSet::from([0xFF]);
-        assert!(!ByteSet::is_disjoint(&not_00, &not_00));
-        assert!(!ByteSet::is_disjoint(&not_00, &not_255));
-        assert!(ByteSet::is_disjoint(&not_00, &is_00));
-        assert!(!ByteSet::is_disjoint(&not_00, &is_255));
-        assert!(ByteSet::is_disjoint(&is_00, &is_255));
+    mod is_disjoint {
+        use super::*;
+
+        proptest! {
+            #[test]
+            fn test_complement(bs in any_byte_set()) {
+                assert!(ByteSet::is_disjoint(&bs, &bs.complement()));
+            }
+
+            #[test]
+            fn test_difference_left(bs0 in any_byte_set(), bs1 in any_byte_set()) {
+                assert!(ByteSet::is_disjoint(&ByteSet::difference(&bs0, &bs1), &bs1));
+            }
+
+            #[test]
+            fn test_difference_right(bs0 in any_byte_set(), bs1 in any_byte_set()) {
+                assert!(ByteSet::is_disjoint(&bs0, &ByteSet::difference(&bs1, &bs0)));
+            }
+        }
     }
 
     #[test]
