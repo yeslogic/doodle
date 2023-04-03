@@ -83,6 +83,8 @@ enum Format {
     RepeatCount(Expr, Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
+    /// Matches a format at a byte offset relative to the current stream position
+    WithRelativeOffset(Expr, Box<Format>),
     /// Transform a decoded value with a function
     Map(Func, Box<Format>),
     /// Conditional format
@@ -112,6 +114,7 @@ enum Decoder {
     Until(Lookahead, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
+    WithRelativeOffset(Expr, Box<Decoder>),
     Map(Func, Box<Decoder>),
 }
 
@@ -121,9 +124,10 @@ impl Expr {
             Expr::Const(v) => v.clone(),
             Expr::Var(index) => stack[stack.len() - index - 1].clone(),
             Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(x - y),
-                (Value::U16(x), Value::U16(y)) => Value::U16(x - y),
-                (_, _) => panic!("mismatched operands"),
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
             Expr::Pair(expr0, expr1) => {
                 Value::Pair(Box::new(expr0.eval(stack)), Box::new(expr1.eval(stack)))
@@ -235,6 +239,7 @@ impl Format {
             Format::Slice(_expr, _a) => true,
             Format::Map(_f, a) => a.nullable(),
             Format::If(_expr, a, b) => a.nullable() || b.nullable(),
+            Format::WithRelativeOffset(_, _) => true,
         }
     }
 
@@ -280,6 +285,9 @@ impl Format {
                 true // FIXME
             }
             Format::Slice(_expr, _a) => {
+                true // FIXME
+            }
+            Format::WithRelativeOffset(_, _) => {
                 true // FIXME
             }
             Format::Map(_f, a) => a.might_match_lookahead(input, next),
@@ -403,6 +411,9 @@ impl Lookahead {
             Format::Slice(_expr, _a) => {
                 Some(Lookahead::empty()) // FIXME ?
             }
+            Format::WithRelativeOffset(_, _) => {
+                Some(Lookahead::empty()) // FIXME ?
+            }
             Format::Map(_f, a) => Lookahead::from(a, len, next),
             Format::If(_expr, a, b) => {
                 Lookahead::from(&Format::Alt(a.clone(), b.clone()), len, next)
@@ -517,6 +528,10 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, None)?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
+            Format::WithRelativeOffset(expr, a) => {
+                let da = Box::new(Decoder::compile(a, None)?);
+                Ok(Decoder::WithRelativeOffset(expr.clone(), da))
+            }
             Format::Map(f, a) => {
                 let da = Box::new(Decoder::compile(a, opt_next)?);
                 Ok(Decoder::Map(f.clone(), da))
@@ -616,6 +631,16 @@ impl Decoder {
                 let size = expr.eval_usize(stack);
                 if size <= input.len() {
                     let (slice, input) = input.split_at(size);
+                    let (v, _) = a.parse(stack, slice)?;
+                    Some((v, input))
+                } else {
+                    None
+                }
+            }
+            Decoder::WithRelativeOffset(expr, a) => {
+                let offset = expr.eval_usize(stack);
+                if offset <= input.len() {
+                    let (_, slice) = input.split_at(offset);
                     let (v, _) = a.parse(stack, slice)?;
                     Some((v, input))
                 } else {
@@ -736,6 +761,75 @@ fn png_format() -> Format {
     ])
 }
 
+/// TIFF Image file header
+///
+/// - [TIFF 6.0 Specification, Section 4.5](https://developer.adobe.com/content/dam/udp/en/open/standards/tiff/TIFF6.pdf#page=13)
+/// - [Exif Version 2.32, Section 4.5.2](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=23)
+fn tiff_format() -> Format {
+    // Image file directory field
+    fn ifd_field(is_be: bool) -> Format {
+        record([
+            ("tag", if is_be { u16be() } else { u16le() }),
+            ("type", if is_be { u16be() } else { u16le() }),
+            ("length", if is_be { u32be() } else { u32le() }),
+            ("offset-or-data", if is_be { u32be() } else { u32le() }),
+            // TODO: Offset from start of the TIFF header for values longer than 4 bytes
+        ])
+    }
+
+    // Image file directory
+    fn ifd(is_be: bool) -> Format {
+        record([
+            ("num-fields", if is_be { u16be() } else { u16le() }),
+            ("fields", repeat_count(Expr::Var(0), ifd_field(is_be))),
+            ("next-ifd-offset", if is_be { u32be() } else { u32le() }),
+            // TODO: Offset from start of the TIFF header (i.e. `offset + 2 + num-fields * 12`)
+            // TODO: Recursive call to `ifd(is_be)`
+            ("next-ifd", any_bytes()),
+        ])
+    }
+
+    record([
+        (
+            "is-big-endian",
+            alts([
+                Format::Map(
+                    Func::Expr(Expr::Const(Value::Bool(false))),
+                    Box::new(Format::from_bytes(b"II")),
+                ),
+                Format::Map(
+                    Func::Expr(Expr::Const(Value::Bool(true))),
+                    Box::new(Format::from_bytes(b"MM")),
+                ),
+            ]),
+        ),
+        (
+            "magic",
+            Format::If(Expr::Var(0), Box::new(u16be()), Box::new(u16le())), // 42
+        ),
+        (
+            "offset",
+            Format::If(Expr::Var(1), Box::new(u32be()), Box::new(u32le())),
+        ),
+        (
+            "ifd",
+            Format::WithRelativeOffset(
+                // TODO: Offset from start of the TIFF header
+                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::Const(Value::U32(8)))),
+                Box::new(Format::If(
+                    Expr::Var(2),
+                    Box::new(ifd(true)),
+                    Box::new(ifd(false)),
+                )),
+            ),
+        ),
+    ])
+}
+
+/// JPEG File Interchange Format
+///
+/// - [JPEG File Interchange Format Version 1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
+/// - [ITU T.81 | ISO IEC 10918-1](https://www.w3.org/Graphics/JPEG/itu-t81.pdf)
 fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
@@ -862,8 +956,8 @@ fn jpeg_format() -> Format {
         ("expand-horizontal-vertical", u8()),
     ]);
 
-    // APP0: Application segment 0
-    let app0_data = record([
+    // APP0: Application segment 0 (JFIF)
+    let app0_jfif = record([
         ("identifier", Format::from_bytes(b"JFIF\0")),
         ("version-major", u8()),
         ("version-minor", u8()),
@@ -884,39 +978,36 @@ fn jpeg_format() -> Format {
         ),
     ]);
 
-    let app1_exif = record([
-        ("identifier", Format::from_bytes(b"Exif\0\0")),
-        (
-            "big-endian",
-            alts([
-                Format::Map(
-                    Func::Expr(Expr::Const(Value::Bool(false))),
-                    Box::new(Format::from_bytes(b"II*\0")),
-                ),
-                Format::Map(
-                    Func::Expr(Expr::Const(Value::Bool(true))),
-                    Box::new(Format::from_bytes(b"MM\0*")),
-                ),
-            ]),
-        ),
-        (
-            "offset",
-            Format::If(Expr::Var(0), Box::new(u32be()), Box::new(u32le())),
-        ),
-        ("exif", any_bytes()),
+    let app0_data = alts([
+        app0_jfif,
+        // FIXME there are other APP0 formats
+        // see https://exiftool.org/TagNames/JPEG.html
     ]);
 
+    // APP1: Application segment 1 (EXIF)
+    //
+    // - [Exif Version 2.32, Section 4.5.4](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=24)
+    let app1_exif = record([
+        ("identifier", Format::from_bytes(b"Exif\0")),
+        ("padding", is_byte(0x00)),
+        ("exif", tiff_format()),
+    ]);
+
+    // APP1: Application segment 1 (XMP)
     let app1_xmp = record([
         (
             "identifier",
             Format::from_bytes(b"http://ns.adobe.com/xap/1.0/\0"),
         ),
         ("xmp", any_bytes()),
+    ]);
+
+    let app1_data = alts([
+        app1_exif,
+        app1_xmp,
         // FIXME there are other APP1 formats
         // see https://exiftool.org/TagNames/JPEG.html
     ]);
-
-    let app1_data = alts([app1_exif, app1_xmp]);
 
     let sof0 = marker_segment(0xC0, sof_data.clone()); // Start of frame (baseline jpeg)
     let sof1 = marker_segment(0xC1, sof_data.clone()); // Start of frame (extended sequential, huffman)
