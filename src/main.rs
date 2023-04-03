@@ -761,7 +761,7 @@ fn jpeg_format() -> Format {
         ])
     }
 
-    // SOF: Frame header (See ITU T.81 Section B.2.2)
+    // SOF_n: Frame header (See ITU T.81 Section B.2.2)
     let sof_data = record([
         ("sample-precision", u8()),
         ("num-lines", u16be()),
@@ -834,6 +834,33 @@ fn jpeg_format() -> Format {
 
     // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
     let dri_data = record([("restart-interval", u16be())]);
+
+    // DHP: Define hierarchial progression (See ITU T.81 Section B.3.2)
+    // NOTE: Same as SOF except for quantization-table-id
+    let dhp_data = record([
+        ("sample-precision", u8()),
+        ("num-lines", u16be()),
+        ("num-samples-per-line", u16be()),
+        ("num-image-components", u8()),
+        (
+            "image-components",
+            repeat_count(
+                Expr::Var(0), // num-image-components
+                record([
+                    ("id", u8()),
+                    ("sampling-factor", u8()), // { horizontal <- u4, vertical <- u4 }
+                    ("quantization-table-id", is_byte(0)),
+                ]),
+            ),
+        ),
+    ]);
+
+    // EXP: Expand reference components (See ITU T.81 Section B.3.3)
+    let exp_data = record([
+        // expand-horizontal <- u4 // 0 | 1;
+        // expand-vertical <- u4 // 0 | 1;
+        ("expand-horizontal-vertical", u8()),
+    ]);
 
     // APP0: Application segment 0
     let app0_data = record([
@@ -921,8 +948,8 @@ fn jpeg_format() -> Format {
     let dqt = marker_segment(0xDB, dqt_data.clone()); // Define quantization table
     let dnl = marker_segment(0xDC, dnl_data.clone()); // Define number of lines
     let dri = marker_segment(0xDD, dri_data.clone()); // Define restart interval
-    let _dhp = marker_segment(0xDE, any_bytes()); // Define hierarchical progression
-    let _exp = marker_segment(0xDF, any_bytes()); // Expand reference components
+    let _dhp = marker_segment(0xDE, dhp_data.clone()); // Define hierarchical progression
+    let _exp = marker_segment(0xDF, exp_data.clone()); // Expand reference components
     let app0 = marker_segment(0xE0, app0_data.clone()); // Application segment 0 (JFIF/JFXX/AVI1/...)
     let app1 = marker_segment(0xE1, app1_data.clone()); // Application segment 1 (EXIF/XMP/XAP/...)
     let app2 = marker_segment(0xE2, any_bytes()); // Application segment 2 (FlashPix/ICC/...)
