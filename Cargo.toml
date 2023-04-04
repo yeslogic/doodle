@@ -9,3 +9,4 @@ edition = "2021"
 proptest = "1.1.0"
 
 [dependencies]
+clap = { version ="4.2", features = ["derive"] }

@@ -1,5 +1,7 @@
-use std::env;
 use std::fs;
+use std::path::PathBuf;
+
+use clap::Parser;
 
 use crate::byte_set::ByteSet;
 
@@ -1146,10 +1148,15 @@ fn jpeg_format() -> Format {
     jpeg
 }
 
+#[derive(Parser)]
+struct Args {
+    #[arg(default_value = "test.jpg")]
+    filename: PathBuf,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    let args: Vec<String> = env::args().collect();
-    let filename = if args.len() < 2 { "test.jpg" } else { &args[1] };
-    let input = fs::read(filename)?;
+    let args = Args::parse();
+    let input = fs::read(args.filename)?;
 
     let format = alts([jpeg_format(), png_format()]);
     let decoder = Decoder::compile(&format, None)?;
