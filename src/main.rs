@@ -217,14 +217,6 @@ impl Func {
 }
 
 impl Format {
-    fn from_bytes(bytes: &[u8]) -> Format {
-        let v = bytes
-            .iter()
-            .map(|b| Format::Byte(ByteSet::from([*b])))
-            .collect();
-        Format::Tuple(v)
-    }
-
     fn nullable(&self) -> bool {
         match self {
             Format::Fail => false,
@@ -695,6 +687,10 @@ fn any_byte() -> Format {
     Format::Byte(ByteSet::full())
 }
 
+fn is_bytes(bytes: &[u8]) -> Format {
+    Format::Tuple(bytes.iter().copied().map(is_byte).collect())
+}
+
 fn any_bytes() -> Format {
     repeat(any_byte())
 }
@@ -756,7 +752,7 @@ fn png_format() -> Format {
     ]);
 
     record([
-        ("signature", Format::from_bytes(b"\x89PNG\r\n\x1A\n")),
+        ("signature", is_bytes(b"\x89PNG\r\n\x1A\n")),
         ("chunks", Format::Repeat(Box::new(chunk))),
     ])
 }
@@ -795,11 +791,11 @@ fn tiff_format() -> Format {
             alts([
                 Format::Map(
                     Func::Expr(Expr::Const(Value::Bool(false))),
-                    Box::new(Format::from_bytes(b"II")),
+                    Box::new(is_bytes(b"II")),
                 ),
                 Format::Map(
                     Func::Expr(Expr::Const(Value::Bool(true))),
-                    Box::new(Format::from_bytes(b"MM")),
+                    Box::new(is_bytes(b"MM")),
                 ),
             ]),
         ),
@@ -958,7 +954,7 @@ fn jpeg_format() -> Format {
 
     // APP0: Application segment 0 (JFIF)
     let app0_jfif = record([
-        ("identifier", Format::from_bytes(b"JFIF\0")),
+        ("identifier", is_bytes(b"JFIF\0")),
         ("version-major", u8()),
         ("version-minor", u8()),
         ("density-units", u8()), // 0 | 1 | 2
@@ -988,17 +984,14 @@ fn jpeg_format() -> Format {
     //
     // - [Exif Version 2.32, Section 4.5.4](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=24)
     let app1_exif = record([
-        ("identifier", Format::from_bytes(b"Exif\0")),
+        ("identifier", is_bytes(b"Exif\0")),
         ("padding", is_byte(0x00)),
         ("exif", tiff_format()),
     ]);
 
     // APP1: Application segment 1 (XMP)
     let app1_xmp = record([
-        (
-            "identifier",
-            Format::from_bytes(b"http://ns.adobe.com/xap/1.0/\0"),
-        ),
+        ("identifier", is_bytes(b"http://ns.adobe.com/xap/1.0/\0")),
         ("xmp", any_bytes()),
     ]);
 
