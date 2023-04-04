@@ -9,7 +9,7 @@ use crate::byte_set::ByteSet;
 mod byte_set;
 
 #[derive(Clone, PartialEq, Debug, Serialize)]
-enum Value {
+pub enum Value {
     Unit,
     Bool(bool),
     U8(u8),
@@ -650,6 +650,115 @@ impl Decoder {
     }
 }
 
+mod render_tree {
+    use std::fmt;
+
+    use crate::Value;
+
+    const SEQ_PREVIEW_LEN: usize = 10;
+
+    fn is_atomic_value(value: &Value) -> bool {
+        match value {
+            Value::Unit => true,
+            Value::Bool(_) => true,
+            Value::U8(_) => true,
+            Value::U16(_) => true,
+            Value::U32(_) => true,
+            Value::Pair(_, _) => false,
+            Value::Seq(vals) => vals.is_empty(),
+            Value::Record(fields) => fields.is_empty(),
+        }
+    }
+
+    pub fn print_value(gutter: &mut Vec<bool>, value: &Value) {
+        match value {
+            Value::Unit => print!("()"),
+            Value::Bool(true) => print!("true"),
+            Value::Bool(false) => print!("false"),
+            Value::U8(i) => print!("{i}"),
+            Value::U16(i) => print!("{i}"),
+            Value::U32(i) => print!("{i}"),
+            Value::Pair(val0, val1) => {
+                print_field_value_continue(gutter, 0, val0);
+                print_field_value_last(gutter, 1, val1);
+            }
+            Value::Seq(vals) if vals.is_empty() => print!("[]"),
+            Value::Seq(vals) => {
+                if vals.len() > SEQ_PREVIEW_LEN && vals.iter().all(is_atomic_value) {
+                    let last_index = vals.len() - 1;
+                    for (index, val) in vals[0..SEQ_PREVIEW_LEN].iter().enumerate() {
+                        print_field_value_continue(gutter, index, val);
+                    }
+                    if SEQ_PREVIEW_LEN != last_index {
+                        print_field_skipped(gutter);
+                    }
+                    print_field_value_last(gutter, last_index, &vals[last_index]);
+                } else {
+                    let last_index = vals.len() - 1;
+                    for (index, val) in vals[..last_index].iter().enumerate() {
+                        print_field_value_continue(gutter, index, val);
+                    }
+                    print_field_value_last(gutter, last_index, &vals[last_index]);
+                }
+            }
+            Value::Record(vals) if vals.is_empty() => print!("{{}}"),
+            Value::Record(fields) => {
+                let last_index = fields.len() - 1;
+                for (label, val) in &fields[..last_index] {
+                    print_field_value_continue(gutter, label, val);
+                }
+                let (label, val) = &fields[last_index];
+                print_field_value_last(gutter, label, val);
+            }
+        }
+    }
+
+    fn print_gutter(gutter: &[bool]) {
+        for is_continue in gutter {
+            if *is_continue {
+                print!("│   ");
+            } else {
+                print!("    ");
+            }
+        }
+    }
+
+    fn print_field_value_continue(gutter: &mut Vec<bool>, label: impl fmt::Display, value: &Value) {
+        print_gutter(gutter);
+        print!("├── {label} :=");
+        gutter.push(true);
+        if is_atomic_value(value) {
+            print!(" ");
+            print_value(gutter, value);
+            println!();
+        } else {
+            println!();
+            print_value(gutter, value);
+        }
+        gutter.pop();
+    }
+
+    fn print_field_value_last(gutter: &mut Vec<bool>, label: impl fmt::Display, value: &Value) {
+        print_gutter(gutter);
+        print!("└── {label} :=");
+        gutter.push(false);
+        if is_atomic_value(value) {
+            print!(" ");
+            print_value(gutter, value);
+            println!();
+        } else {
+            println!();
+            print_value(gutter, value);
+        }
+        gutter.pop();
+    }
+
+    fn print_field_skipped(gutter: &[bool]) {
+        print_gutter(gutter);
+        println!("~");
+    }
+}
+
 fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
     let mut formats = formats.into_iter();
     let format = formats.next().unwrap_or(Format::Fail);
@@ -1153,13 +1262,13 @@ fn jpeg_format() -> Format {
 enum OutputFormat {
     Debug,
     Json,
+    Tree,
 }
 
 /// Decode a binary file
 #[derive(Parser)]
 struct Args {
-    /// Format to use when rendering decoded values
-    #[arg(long, default_value = "debug")]
+    #[arg(long, default_value = "tree")]
     output: OutputFormat,
     /// The binary file to decode
     #[arg(default_value = "test.jpg")]
@@ -1179,6 +1288,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match args.output {
         OutputFormat::Debug => println!("{val:?}"),
         OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
+        OutputFormat::Tree => render_tree::print_value(&mut Vec::new(), &val),
     }
 
     Ok(())
