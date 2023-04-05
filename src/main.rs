@@ -1268,6 +1268,7 @@ enum OutputFormat {
 /// Decode a binary file
 #[derive(Parser)]
 struct Args {
+    /// How decoded values are rendered
     #[arg(long, default_value = "tree")]
     output: OutputFormat,
     /// The binary file to decode
