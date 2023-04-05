@@ -1,13 +1,14 @@
 use std::fs;
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
+use serde::Serialize;
 
 use crate::byte_set::ByteSet;
 
 mod byte_set;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize)]
 enum Value {
     Unit,
     Bool(bool),
@@ -1148,8 +1149,19 @@ fn jpeg_format() -> Format {
     jpeg
 }
 
+#[derive(Copy, Clone, ValueEnum)]
+enum OutputFormat {
+    Debug,
+    Json,
+}
+
+/// Decode a binary file
 #[derive(Parser)]
 struct Args {
+    /// Format to use when rendering decoded values
+    #[arg(long, default_value = "debug")]
+    output: OutputFormat,
+    /// The binary file to decode
     #[arg(default_value = "test.jpg")]
     filename: PathBuf,
 }
@@ -1164,7 +1176,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let mut stack = Vec::new();
     let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
 
-    println!("{:?}", val);
+    match args.output {
+        OutputFormat::Debug => println!("{val:?}"),
+        OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
+    }
 
     Ok(())
 }
