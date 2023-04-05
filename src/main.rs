@@ -20,7 +20,7 @@ enum Value {
     Record(Vec<(String, Value)>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Expr {
     Const(Value),
     Var(usize),
@@ -30,7 +30,7 @@ enum Expr {
     Record(Vec<(String, Expr)>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Func {
     Expr(Expr),
     Fst,
@@ -62,7 +62,7 @@ enum Func {
 /// formats no longer describe regular languages.
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Format {
     /// A format that never matches
     Fail,
