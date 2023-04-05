@@ -658,11 +658,13 @@ impl Decoder {
 }
 
 mod render_tree {
-    use std::fmt;
+    use std::{fmt, io};
 
     use crate::Value;
 
-    const SEQ_PREVIEW_LEN: usize = 10;
+    pub fn print_value(value: &Value) {
+        Context::new(io::stdout()).write_value(value).unwrap()
+    }
 
     fn is_atomic_value(value: &Value) -> bool {
         match value {
@@ -676,88 +678,124 @@ mod render_tree {
         }
     }
 
-    pub fn print_value(gutter: &mut Vec<bool>, value: &Value) {
-        match value {
-            Value::Bool(true) => print!("true"),
-            Value::Bool(false) => print!("false"),
-            Value::U8(i) => print!("{i}"),
-            Value::U16(i) => print!("{i}"),
-            Value::U32(i) => print!("{i}"),
-            Value::Tuple(vals) if vals.is_empty() => print!("()"),
-            Value::Seq(vals) if vals.is_empty() => print!("[]"),
-            Value::Record(vals) if vals.is_empty() => print!("{{}}"),
-            Value::Tuple(vals) | Value::Seq(vals) => {
-                if vals.len() > SEQ_PREVIEW_LEN && vals.iter().all(is_atomic_value) {
+    enum Column {
+        Branch,
+        Space,
+    }
+
+    pub struct Context<W: io::Write> {
+        writer: W,
+        gutter: Vec<Column>,
+        preview_len: Option<usize>,
+    }
+
+    impl<W: io::Write> Context<W> {
+        pub fn new(writer: W) -> Context<W> {
+            Context {
+                writer,
+                gutter: Vec::new(),
+                preview_len: Some(10),
+            }
+        }
+
+        pub fn write_value(&mut self, value: &Value) -> io::Result<()> {
+            match value {
+                Value::Bool(true) => write!(&mut self.writer, "true"),
+                Value::Bool(false) => write!(&mut self.writer, "false"),
+                Value::U8(i) => write!(&mut self.writer, "{i}"),
+                Value::U16(i) => write!(&mut self.writer, "{i}"),
+                Value::U32(i) => write!(&mut self.writer, "{i}"),
+                Value::Tuple(vals) if vals.is_empty() => write!(&mut self.writer, "()"),
+                Value::Seq(vals) if vals.is_empty() => write!(&mut self.writer, "[]"),
+                Value::Record(fields) if fields.is_empty() => write!(&mut self.writer, "{{}}"),
+                Value::Tuple(vals) => self.write_elems(vals),
+                Value::Seq(vals) => self.write_elems(vals),
+                Value::Record(fields) => self.write_fields(fields),
+            }
+        }
+
+        fn write_elems(&mut self, vals: &[Value]) -> Result<(), io::Error> {
+            match self.preview_len {
+                Some(max_len) if vals.len() > max_len && vals.iter().all(is_atomic_value) => {
                     let last_index = vals.len() - 1;
-                    for (index, val) in vals[0..SEQ_PREVIEW_LEN].iter().enumerate() {
-                        print_field_value_continue(gutter, index, val);
+                    for (index, val) in vals[0..max_len].iter().enumerate() {
+                        self.write_field_value_continue(index, val)?;
                     }
-                    if SEQ_PREVIEW_LEN != last_index {
-                        print_field_skipped(gutter);
+                    if max_len != last_index {
+                        self.write_field_skipped()?;
                     }
-                    print_field_value_last(gutter, last_index, &vals[last_index]);
-                } else {
+                    self.write_field_value_last(last_index, &vals[last_index])
+                }
+                Some(_) | None => {
                     let last_index = vals.len() - 1;
                     for (index, val) in vals[..last_index].iter().enumerate() {
-                        print_field_value_continue(gutter, index, val);
+                        self.write_field_value_continue(index, val)?;
                     }
-                    print_field_value_last(gutter, last_index, &vals[last_index]);
+                    self.write_field_value_last(last_index, &vals[last_index])
                 }
-            }
-            Value::Record(fields) => {
-                let last_index = fields.len() - 1;
-                for (label, val) in &fields[..last_index] {
-                    print_field_value_continue(gutter, label, val);
-                }
-                let (label, val) = &fields[last_index];
-                print_field_value_last(gutter, label, val);
             }
         }
-    }
 
-    fn print_gutter(gutter: &[bool]) {
-        for is_continue in gutter {
-            if *is_continue {
-                print!("│   ");
+        fn write_fields(&mut self, fields: &[(String, Value)]) -> Result<(), io::Error> {
+            let last_index = fields.len() - 1;
+            for (label, val) in &fields[..last_index] {
+                self.write_field_value_continue(label, val)?;
+            }
+            let (label, val) = &fields[last_index];
+            self.write_field_value_last(label, val)
+        }
+
+        fn write_gutter(&mut self) -> io::Result<()> {
+            for column in &self.gutter {
+                match column {
+                    Column::Branch => write!(&mut self.writer, "│   ")?,
+                    Column::Space => write!(&mut self.writer, "    ")?,
+                }
+            }
+            Ok(())
+        }
+
+        fn write_field_value_continue(
+            &mut self,
+            label: impl fmt::Display,
+            value: &Value,
+        ) -> io::Result<()> {
+            self.write_gutter()?;
+            write!(&mut self.writer, "├── {label} :=")?;
+            self.gutter.push(Column::Branch);
+            self.write_field_value(value)?;
+            self.gutter.pop();
+            Ok(())
+        }
+
+        fn write_field_value_last(
+            &mut self,
+            label: impl fmt::Display,
+            value: &Value,
+        ) -> io::Result<()> {
+            self.write_gutter()?;
+            write!(&mut self.writer, "└── {label} :=")?;
+            self.gutter.push(Column::Space);
+            self.write_field_value(value)?;
+            self.gutter.pop();
+            Ok(())
+        }
+
+        fn write_field_value(&mut self, value: &Value) -> io::Result<()> {
+            if is_atomic_value(value) {
+                write!(&mut self.writer, " ")?;
+                self.write_value(value)?;
+                writeln!(&mut self.writer)
             } else {
-                print!("    ");
+                writeln!(&mut self.writer)?;
+                self.write_value(value)
             }
         }
-    }
 
-    fn print_field_value_continue(gutter: &mut Vec<bool>, label: impl fmt::Display, value: &Value) {
-        print_gutter(gutter);
-        print!("├── {label} :=");
-        gutter.push(true);
-        if is_atomic_value(value) {
-            print!(" ");
-            print_value(gutter, value);
-            println!();
-        } else {
-            println!();
-            print_value(gutter, value);
+        fn write_field_skipped(&mut self) -> io::Result<()> {
+            self.write_gutter()?;
+            writeln!(&mut self.writer, "~")
         }
-        gutter.pop();
-    }
-
-    fn print_field_value_last(gutter: &mut Vec<bool>, label: impl fmt::Display, value: &Value) {
-        print_gutter(gutter);
-        print!("└── {label} :=");
-        gutter.push(false);
-        if is_atomic_value(value) {
-            print!(" ");
-            print_value(gutter, value);
-            println!();
-        } else {
-            println!();
-            print_value(gutter, value);
-        }
-        gutter.pop();
-    }
-
-    fn print_field_skipped(gutter: &[bool]) {
-        print_gutter(gutter);
-        println!("~");
     }
 }
 
@@ -1334,7 +1372,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match args.output {
         OutputFormat::Debug => println!("{val:?}"),
         OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
-        OutputFormat::Tree => render_tree::print_value(&mut Vec::new(), &val),
+        OutputFormat::Tree => render_tree::print_value(&val),
     }
 
     Ok(())
