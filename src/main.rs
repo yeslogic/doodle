@@ -1248,8 +1248,11 @@ fn jpeg_format() -> Format {
 
 #[derive(Copy, Clone, ValueEnum)]
 enum OutputFormat {
+    /// Use the debug formatter
     Debug,
+    /// Serialize to JSON
     Json,
+    /// Display as a human-readable tree
     Tree,
 }
 
