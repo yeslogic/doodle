@@ -290,6 +290,8 @@ impl ByteSwitch {
 #[derive(Debug)]
 enum Next<'a> {
     Nil,
+    Tuple(&'a [Format], &'a Next<'a>),
+    Record(&'a [(String, Format)], &'a Next<'a>),
     Cons(&'a Format, &'a Next<'a>),
 }
 
@@ -317,22 +319,31 @@ impl Switch {
         }
     }
 
+    fn from_next(index: usize, depth: usize, next: &Next) -> Switch {
+        match next {
+            Next::Nil => Switch::accept(index),
+            Next::Tuple(fs, next) => match fs.split_first() {
+                None => Switch::from_next(index, depth, next),
+                Some((f, fs)) => Switch::from(index, depth, &f, &Next::Tuple(fs, next)),
+            },
+            Next::Record(fs, next) => match fs.split_first() {
+                None => Switch::from_next(index, depth, next),
+                Some(((_n, f), fs)) => Switch::from(index, depth, &f, &Next::Record(fs, next)),
+            },
+            Next::Cons(f, next) => Switch::from(index, depth, f, next),
+        }
+    }
+
     pub fn from(index: usize, depth: usize, f: &Format, next: &Next) -> Switch {
         match f {
             Format::Fail => Switch::reject(),
-            Format::Empty => match next {
-                Next::Nil => Switch::accept(index),
-                Next::Cons(f, next) => Switch::from(index, depth, f, next),
-            },
+            Format::Empty => Switch::from_next(index, depth, next),
             Format::Byte(bs) => Switch(
                 None,
                 ByteSwitch::single(
                     bs.clone(),
                     if depth > 0 {
-                        match next {
-                            Next::Nil => Switch::accept(index),
-                            Next::Cons(f, next) => Switch::from(index, depth - 1, f, next),
-                        }
+                        Switch::from_next(index, depth - 1, next)
                     } else {
                         Switch::accept(index)
                     },
@@ -356,28 +367,14 @@ impl Switch {
                 _ => Switch::from(index, depth, a, &Next::Cons(b, next)),
             },
             Format::Tuple(fields) => match fields.split_first() {
-                None => match next {
-                    Next::Nil => Switch::accept(index),
-                    Next::Cons(f, next) => Switch::from(index, depth, f, next),
-                },
-                Some((a, fields)) => Switch::from(
-                    index,
-                    depth,
-                    a,
-                    &Next::Cons(&Format::Tuple(fields.to_vec()), next),
-                ),
+                None => Switch::from_next(index, depth, next),
+                Some((a, fields)) => Switch::from(index, depth, a, &Next::Tuple(&fields, next)),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => match next {
-                    Next::Nil => Switch::accept(index),
-                    Next::Cons(f, next) => Switch::from(index, depth, f, next),
-                },
-                Some(((_, a), fields)) => Switch::from(
-                    index,
-                    depth,
-                    a,
-                    &Next::Cons(&Format::Record(fields.to_vec()), next),
-                ),
+                None => Switch::from_next(index, depth, next),
+                Some(((_, a), fields)) => {
+                    Switch::from(index, depth, a, &Next::Record(&fields, next))
+                }
             },
             Format::Repeat(a) => Switch::from(
                 index,
@@ -490,35 +487,19 @@ impl Decoder {
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
-
                 while let Some(f) = fields.next() {
-                    let df = match fields.len() == 0 {
-                        true => Decoder::compile(f, next)?,
-                        false => Decoder::compile(
-                            f,
-                            &Next::Cons(&Format::Tuple(fields.as_slice().to_vec()), next),
-                        )?,
-                    };
+                    let df = Decoder::compile(f, &Next::Tuple(fields.as_slice(), next))?;
                     dfields.push(df);
                 }
-
                 Ok(Decoder::Tuple(dfields))
             }
             Format::Record(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
-
                 while let Some((name, f)) = fields.next() {
-                    let df = match fields.len() == 0 {
-                        true => Decoder::compile(f, next)?,
-                        false => Decoder::compile(
-                            f,
-                            &Next::Cons(&Format::Record(fields.as_slice().to_vec()), next),
-                        )?,
-                    };
+                    let df = Decoder::compile(f, &Next::Record(fields.as_slice(), next))?;
                     dfields.push((name.clone(), df));
                 }
-
                 Ok(Decoder::Record(dfields))
             }
             Format::Repeat(a) => {
@@ -527,7 +508,13 @@ impl Decoder {
                 }
                 let astar = Format::Repeat(a.clone());
                 let da = Box::new(Decoder::compile(a, &Next::Cons(&astar, next))?);
-                if let Next::Cons(_, _) = next {
+                if let Next::Nil = next {
+                    let switch = Switch(
+                        None,
+                        ByteSwitch::single(ByteSet::full(), Switch(Some(0), ByteSwitch::empty())),
+                    );
+                    Ok(Decoder::While(switch, da))
+                } else {
                     let fa = &Format::Cat(a.clone(), Box::new(astar));
                     let fb = &Format::Empty;
                     if let Some(switch) = Switch::build(&[fa, fb], next) {
@@ -535,12 +522,6 @@ impl Decoder {
                     } else {
                         Err(format!("cannot build switch for {:?}", f))
                     }
-                } else {
-                    let switch = Switch(
-                        None,
-                        ByteSwitch::single(ByteSet::full(), Switch(Some(0), ByteSwitch::empty())),
-                    );
-                    Ok(Decoder::While(switch, da))
                 }
             }
             Format::RepeatCount(expr, a) => {
