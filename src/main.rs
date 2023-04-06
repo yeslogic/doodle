@@ -444,7 +444,11 @@ impl Decoder {
                 }
             }
             Format::Cat(a, b) => {
-                let da = Box::new(Decoder::compile(a, Some(&b))?);
+                let next = opt_next.unwrap_or(&Format::Empty);
+                let da = Box::new(Decoder::compile(
+                    a,
+                    Some(&Format::Cat(Box::new(*b.clone()), Box::new(next.clone()))),
+                )?);
                 let db = Box::new(Decoder::compile(b, opt_next)?);
                 Ok(Decoder::Cat(da, db))
             }
@@ -500,7 +504,15 @@ impl Decoder {
                 if a.nullable() {
                     return Err("cannot repeat nullable format".to_string());
                 }
-                let da = Box::new(Decoder::compile(a, None)?);
+                let astar = Format::Repeat(a.clone());
+                let next = opt_next.unwrap_or(&Format::Empty);
+                let da = Box::new(Decoder::compile(
+                    a,
+                    Some(&Format::Cat(
+                        Box::new(astar.clone()),
+                        Box::new(next.clone()),
+                    )),
+                )?);
                 if opt_next.is_some() {
                     let aplus = Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())));
                     if let Some(look) = Lookahead::new(&aplus, &Format::Empty, opt_next) {
@@ -983,21 +995,21 @@ fn jpeg_format() -> Format {
     ]);
 
     // DHT: Define Huffman table (See ITU T.81 Section B.2.4.2)
-    let dht_data = repeat(record([
+    let dht_data = record([
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
         ("class-table-id", u8()),
         ("num-codes", repeat_count(Expr::Const(Value::U8(16)), u8())),
         ("values", any_bytes()), // List.map num-codes (\n => repeat-count n u8);
-    ]));
+    ]);
 
     // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
-    let dac_data = repeat(record([
+    let dac_data = record([
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
         ("class-table-id", u8()),
         ("value", u8()),
-    ]));
+    ]);
 
     // SOS: Scan header (See ITU T.81 Section B.2.3)
     let sos_data = record([
