@@ -340,18 +340,14 @@ impl Switch {
                 let sb = Switch::from(index, depth, b, next);
                 Switch::union(&sa, &sb).unwrap()
             }
-            Format::Switch(branches) => match branches.split_first() {
-                None => Switch::reject(),
-                Some((branch, branches)) => Switch::from(
-                    index,
-                    depth,
-                    &Format::Alt(
-                        Box::new(branch.clone()),
-                        Box::new(Format::Switch(branches.to_vec())),
-                    ),
-                    next,
-                ),
-            },
+            Format::Switch(branches) => {
+                let mut switch = Switch::reject();
+                for f in branches {
+                    let s = Switch::from(index, depth, f, next);
+                    switch = Switch::union(&switch, &s).unwrap();
+                }
+                switch
+            }
             Format::Cat(a, b) => match **b {
                 Format::Empty => Switch::from(index, depth, a, next),
                 _ => Switch::from(index, depth, a, &Next::Cons(b, next)),
