@@ -285,6 +285,12 @@ impl ByteSwitch {
     }
 }
 
+#[derive(Debug)]
+enum Next<'a> {
+    Nil,
+    Cons(&'a Format, &'a Next<'a>),
+}
+
 impl Switch {
     fn reject() -> Switch {
         Switch(None, ByteSwitch::empty())
@@ -308,26 +314,29 @@ impl Switch {
         }
     }
 
-    pub fn from(index: usize, depth: usize, f: &Format, next: Format) -> Switch {
+    pub fn from(index: usize, depth: usize, f: &Format, next: &Next) -> Switch {
         match f {
             Format::Fail => Switch::reject(),
             Format::Empty => match next {
-                Format::Empty => Switch::accept(index),
-                next => Switch::from(index, depth, &next, Format::Empty),
+                Next::Nil => Switch::accept(index),
+                Next::Cons(f, next) => Switch::from(index, depth, f, next),
             },
             Format::Byte(bs) => Switch(
                 None,
                 ByteSwitch::single(
                     bs.clone(),
                     if depth > 0 {
-                        Switch::from(index, depth - 1, &next, Format::Empty)
+                        match next {
+                            Next::Nil => Switch::accept(index),
+                            Next::Cons(f, next) => Switch::from(index, depth - 1, f, next),
+                        }
                     } else {
                         Switch::accept(index)
                     },
                 ),
             ),
             Format::Alt(a, b) => {
-                let sa = Switch::from(index, depth, a, next.clone());
+                let sa = Switch::from(index, depth, a, next);
                 let sb = Switch::from(index, depth, b, next);
                 Switch::union(&sa, &sb).unwrap()
             }
@@ -345,29 +354,30 @@ impl Switch {
             },
             Format::Cat(a, b) => match **b {
                 Format::Empty => Switch::from(index, depth, a, next),
-                _ => Switch::from(
-                    index,
-                    depth,
-                    a,
-                    Format::Cat(Box::new(*b.clone()), Box::new(next)),
-                ),
+                _ => Switch::from(index, depth, a, &Next::Cons(b, next)),
             },
             Format::Tuple(fields) => match fields.split_first() {
-                None => Switch::from(index, depth, &next, Format::Empty),
+                None => match next {
+                    Next::Nil => Switch::accept(index),
+                    Next::Cons(f, next) => Switch::from(index, depth, f, next),
+                },
                 Some((a, fields)) => Switch::from(
                     index,
                     depth,
                     a,
-                    Format::Cat(Box::new(Format::Tuple(fields.to_vec())), Box::new(next)),
+                    &Next::Cons(&Format::Tuple(fields.to_vec()), next),
                 ),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => Switch::from(index, depth, &next, Format::Empty),
+                None => match next {
+                    Next::Nil => Switch::accept(index),
+                    Next::Cons(f, next) => Switch::from(index, depth, f, next),
+                },
                 Some(((_, a), fields)) => Switch::from(
                     index,
                     depth,
                     a,
-                    Format::Cat(Box::new(Format::Record(fields.to_vec())), Box::new(next)),
+                    &Next::Cons(&Format::Record(fields.to_vec()), next),
                 ),
             },
             Format::Repeat(a) => Switch::from(
@@ -424,11 +434,11 @@ impl Switch {
         }
     }
 
-    fn build(branches: &[&Format], next: Format) -> Option<Switch> {
+    fn build(branches: &[&Format], next: &Next) -> Option<Switch> {
         const MAX_DEPTH: usize = 2;
         let mut switch = Switch::reject();
         for i in 0..branches.len() {
-            let res = Switch::from(i, MAX_DEPTH, &branches[i], next.clone());
+            let res = Switch::from(i, MAX_DEPTH, &branches[i], next);
             switch = Switch::union(&switch, &res)?;
         }
         Some(switch)
@@ -445,19 +455,15 @@ impl Cond {
 }
 
 impl Decoder {
-    pub fn compile(f: &Format, opt_next: Option<&Format>) -> Result<Decoder, String> {
+    pub fn compile(f: &Format, next: &Next) -> Result<Decoder, String> {
         match f {
             Format::Fail => Ok(Decoder::Fail),
             Format::Empty => Ok(Decoder::Empty),
             Format::Byte(bs) => Ok(Decoder::Byte(bs.clone())),
             Format::Alt(a, b) => {
-                let da = Box::new(Decoder::compile(a, opt_next)?);
-                let db = Box::new(Decoder::compile(b, opt_next)?);
-                let next = match opt_next {
-                    None => Format::Empty,
-                    Some(next) => next.clone(),
-                };
-                if let Some(switch) = Switch::build(&[&a, &b], next.clone()) {
+                let da = Box::new(Decoder::compile(a, next)?);
+                let db = Box::new(Decoder::compile(b, next)?);
+                if let Some(switch) = Switch::build(&[&a, &b], next) {
                     Ok(Decoder::If(Cond::Switch(switch), da, db))
                 } else {
                     Err(format!("cannot build switch for {:?}", f))
@@ -466,28 +472,20 @@ impl Decoder {
             Format::Switch(branches) => {
                 let mut ds = Vec::new();
                 let mut fs = Vec::new();
-                let next = match opt_next {
-                    None => Format::Empty,
-                    Some(next) => next.clone(),
-                };
                 for f in branches {
-                    let d = Decoder::compile(f, opt_next)?;
+                    let d = Decoder::compile(f, next)?;
                     ds.push(d);
                     fs.push(f);
                 }
-                if let Some(switch) = Switch::build(&fs, next.clone()) {
+                if let Some(switch) = Switch::build(&fs, next) {
                     Ok(Decoder::Switch(switch, ds))
                 } else {
                     Err(format!("cannot build switch for {:?}", f))
                 }
             }
             Format::Cat(a, b) => {
-                let next = opt_next.unwrap_or(&Format::Empty);
-                let da = Box::new(Decoder::compile(
-                    a,
-                    Some(&Format::Cat(Box::new(*b.clone()), Box::new(next.clone()))),
-                )?);
-                let db = Box::new(Decoder::compile(b, opt_next)?);
+                let da = Box::new(Decoder::compile(a, &Next::Cons(b, next))?);
+                let db = Box::new(Decoder::compile(b, next)?);
                 Ok(Decoder::Cat(da, db))
             }
             Format::Tuple(fields) => {
@@ -495,18 +493,11 @@ impl Decoder {
                 let mut fields = fields.iter();
 
                 while let Some(f) = fields.next() {
-                    let df = match (fields.len() == 0, opt_next) {
-                        (true, None) => Decoder::compile(f, None)?,
-                        (true, Some(next)) => Decoder::compile(f, Some(next))?,
-                        (false, None) => {
-                            Decoder::compile(f, Some(&Format::Tuple(fields.as_slice().to_vec())))?
-                        }
-                        (false, Some(next)) => Decoder::compile(
+                    let df = match fields.len() == 0 {
+                        true => Decoder::compile(f, next)?,
+                        false => Decoder::compile(
                             f,
-                            Some(&Format::Cat(
-                                Box::new(Format::Tuple(fields.as_slice().to_vec())),
-                                Box::new(next.clone()),
-                            )),
+                            &Next::Cons(&Format::Tuple(fields.as_slice().to_vec()), next),
                         )?,
                     };
                     dfields.push(df);
@@ -519,18 +510,11 @@ impl Decoder {
                 let mut fields = fields.iter();
 
                 while let Some((name, f)) = fields.next() {
-                    let df = match (fields.len() == 0, opt_next) {
-                        (true, None) => Decoder::compile(f, None)?,
-                        (true, Some(next)) => Decoder::compile(f, Some(next))?,
-                        (false, None) => {
-                            Decoder::compile(f, Some(&Format::Record(fields.as_slice().to_vec())))?
-                        }
-                        (false, Some(next)) => Decoder::compile(
+                    let df = match fields.len() == 0 {
+                        true => Decoder::compile(f, next)?,
+                        false => Decoder::compile(
                             f,
-                            Some(&Format::Cat(
-                                Box::new(Format::Record(fields.as_slice().to_vec())),
-                                Box::new(next.clone()),
-                            )),
+                            &Next::Cons(&Format::Record(fields.as_slice().to_vec()), next),
                         )?,
                     };
                     dfields.push((name.clone(), df));
@@ -543,18 +527,11 @@ impl Decoder {
                     return Err("cannot repeat nullable format".to_string());
                 }
                 let astar = Format::Repeat(a.clone());
-                let next = opt_next.unwrap_or(&Format::Empty);
-                let da = Box::new(Decoder::compile(
-                    a,
-                    Some(&Format::Cat(
-                        Box::new(astar.clone()),
-                        Box::new(next.clone()),
-                    )),
-                )?);
-                if let Some(next) = opt_next {
-                    let fa = &Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())));
+                let da = Box::new(Decoder::compile(a, &Next::Cons(&astar, next))?);
+                if let Next::Cons(_, _) = next {
+                    let fa = &Format::Cat(a.clone(), Box::new(astar));
                     let fb = &Format::Empty;
-                    if let Some(switch) = Switch::build(&[fa, fb], next.clone()) {
+                    if let Some(switch) = Switch::build(&[fa, fb], next) {
                         Ok(Decoder::While(switch, da))
                     } else {
                         Err(format!("cannot build switch for {:?}", f))
@@ -569,24 +546,24 @@ impl Decoder {
             }
             Format::RepeatCount(expr, a) => {
                 // FIXME probably not right
-                let da = Box::new(Decoder::compile(a, opt_next)?);
+                let da = Box::new(Decoder::compile(a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::Slice(expr, a) => {
-                let da = Box::new(Decoder::compile(a, None)?);
+                let da = Box::new(Decoder::compile(a, &Next::Nil)?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
             Format::WithRelativeOffset(expr, a) => {
-                let da = Box::new(Decoder::compile(a, None)?);
+                let da = Box::new(Decoder::compile(a, &Next::Nil)?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
             Format::Map(f, a) => {
-                let da = Box::new(Decoder::compile(a, opt_next)?);
+                let da = Box::new(Decoder::compile(a, next)?);
                 Ok(Decoder::Map(f.clone(), da))
             }
             Format::If(expr, a, b) => {
-                let da = Box::new(Decoder::compile(a, opt_next)?);
-                let db = Box::new(Decoder::compile(b, opt_next)?);
+                let da = Box::new(Decoder::compile(a, next)?);
+                let db = Box::new(Decoder::compile(b, next)?);
                 Ok(Decoder::If(Cond::Expr(expr.clone()), da, db))
             }
         }
@@ -1324,7 +1301,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let input = fs::read(args.filename)?;
 
     let format = alts([jpeg_format(), png_format()]);
-    let decoder = Decoder::compile(&format, None)?;
+    let decoder = Decoder::compile(&format, &Next::Nil)?;
 
     let mut stack = Vec::new();
     let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
@@ -1357,7 +1334,7 @@ mod tests {
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1365,7 +1342,7 @@ mod tests {
     #[test]
     fn compile_empty() {
         let f = Format::Empty;
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(&d, &[], &[], Value::Unit);
         accepts(&d, &[0x00], &[0x00], Value::Unit);
     }
@@ -1373,7 +1350,7 @@ mod tests {
     #[test]
     fn compile_byte_is() {
         let f = is_byte(0x00);
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
         rejects(&d, &[0xFF]);
@@ -1383,7 +1360,7 @@ mod tests {
     #[test]
     fn compile_byte_not() {
         let f = not_byte(0x00);
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
@@ -1393,7 +1370,7 @@ mod tests {
     #[test]
     fn compile_alt_byte() {
         let f = alts([is_byte(0x00), is_byte(0xFF)]);
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         rejects(&d, &[0x11]);
@@ -1403,19 +1380,19 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([is_byte(0x00), is_byte(0x00)]);
-        assert!(Decoder::compile(&f, None).is_err());
+        assert!(Decoder::compile(&f, &Next::Nil).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
         let f = alts([Format::Empty, Format::Empty]);
-        assert!(Decoder::compile(&f, None).is_err());
+        assert!(Decoder::compile(&f, &Next::Nil).is_err());
     }
 
     #[test]
     fn compile_alt_opt() {
         let f = alts([Format::Empty, is_byte(0x00)]);
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[], &[], Value::Unit);
         accepts(&d, &[0xFF], &[0xFF], Value::Unit);
@@ -1427,7 +1404,7 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(is_byte(0xFF)),
         );
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1450,7 +1427,7 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(alts([Format::Empty, is_byte(0xFF)])),
         );
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1489,13 +1466,13 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(alts([Format::Empty, is_byte(0x00)])),
         );
-        assert!(Decoder::compile(&f, None).is_err());
+        assert!(Decoder::compile(&f, &Next::Nil).is_err());
     }
 
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
         accepts(
@@ -1510,7 +1487,7 @@ mod tests {
     #[test]
     fn compile_repeat_repeat() {
         let f = repeat(repeat(is_byte(0x00)));
-        assert!(Decoder::compile(&f, None).is_err());
+        assert!(Decoder::compile(&f, &Next::Nil).is_err());
     }
 
     #[test]
@@ -1519,7 +1496,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(repeat(is_byte(0xFF))),
         );
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(
             &d,
             &[],
@@ -1564,7 +1541,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(repeat(is_byte(0x00))),
         );
-        assert!(Decoder::compile(&f, None).is_err());
+        assert!(Decoder::compile(&f, &Next::Nil).is_err());
     }
 
     #[test]
@@ -1574,7 +1551,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x7F))),
         ]);
-        assert!(Decoder::compile(&f, None).is_ok());
+        assert!(Decoder::compile(&f, &Next::Nil).is_ok());
     }
 
     #[test]
@@ -1584,7 +1561,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x00))),
         ]);
-        assert!(Decoder::compile(&f, None).is_err());
+        assert!(Decoder::compile(&f, &Next::Nil).is_err());
     }
 
     #[test]
@@ -1605,7 +1582,7 @@ mod tests {
                 ]),
             ),
         ]);
-        let d = Decoder::compile(&f, None).unwrap();
+        let d = Decoder::compile(&f, &Next::Nil).unwrap();
         accepts(
             &d,
             &[],
