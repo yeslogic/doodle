@@ -368,10 +368,7 @@ impl Switch {
                 }
                 switch
             }
-            Format::Cat(a, b) => match **b {
-                Format::Empty => Switch::from(index, depth, a, next),
-                _ => Switch::from(index, depth, a, &Next::Cat(b, next)),
-            },
+            Format::Cat(a, b) => Switch::from(index, depth, a, &Next::Cat(b, next)),
             Format::Tuple(fields) => match fields.split_first() {
                 None => Switch::from_next(index, depth, next),
                 Some((a, fields)) => Switch::from(index, depth, a, &Next::Tuple(&fields, next)),
