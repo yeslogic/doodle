@@ -289,10 +289,10 @@ impl ByteSwitch {
 
 #[derive(Debug)]
 enum Next<'a> {
-    Nil,
+    Empty,
+    Cat(&'a Format, &'a Next<'a>),
     Tuple(&'a [Format], &'a Next<'a>),
     Record(&'a [(String, Format)], &'a Next<'a>),
-    Cons(&'a Format, &'a Next<'a>),
 }
 
 impl Switch {
@@ -321,7 +321,8 @@ impl Switch {
 
     fn from_next(index: usize, depth: usize, next: &Next) -> Switch {
         match next {
-            Next::Nil => Switch::accept(index),
+            Next::Empty => Switch::accept(index),
+            Next::Cat(f, next) => Switch::from(index, depth, f, next),
             Next::Tuple(fs, next) => match fs.split_first() {
                 None => Switch::from_next(index, depth, next),
                 Some((f, fs)) => Switch::from(index, depth, &f, &Next::Tuple(fs, next)),
@@ -330,7 +331,6 @@ impl Switch {
                 None => Switch::from_next(index, depth, next),
                 Some(((_n, f), fs)) => Switch::from(index, depth, &f, &Next::Record(fs, next)),
             },
-            Next::Cons(f, next) => Switch::from(index, depth, f, next),
         }
     }
 
@@ -364,7 +364,7 @@ impl Switch {
             }
             Format::Cat(a, b) => match **b {
                 Format::Empty => Switch::from(index, depth, a, next),
-                _ => Switch::from(index, depth, a, &Next::Cons(b, next)),
+                _ => Switch::from(index, depth, a, &Next::Cat(b, next)),
             },
             Format::Tuple(fields) => match fields.split_first() {
                 None => Switch::from_next(index, depth, next),
@@ -480,7 +480,7 @@ impl Decoder {
                 }
             }
             Format::Cat(a, b) => {
-                let da = Box::new(Decoder::compile(a, &Next::Cons(b, next))?);
+                let da = Box::new(Decoder::compile(a, &Next::Cat(b, next))?);
                 let db = Box::new(Decoder::compile(b, next)?);
                 Ok(Decoder::Cat(da, db))
             }
@@ -507,8 +507,8 @@ impl Decoder {
                     return Err("cannot repeat nullable format".to_string());
                 }
                 let astar = Format::Repeat(a.clone());
-                let da = Box::new(Decoder::compile(a, &Next::Cons(&astar, next))?);
-                if let Next::Nil = next {
+                let da = Box::new(Decoder::compile(a, &Next::Cat(&astar, next))?);
+                if let Next::Empty = next {
                     let switch = Switch(
                         None,
                         ByteSwitch::single(ByteSet::full(), Switch(Some(0), ByteSwitch::empty())),
@@ -530,11 +530,11 @@ impl Decoder {
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::Slice(expr, a) => {
-                let da = Box::new(Decoder::compile(a, &Next::Nil)?);
+                let da = Box::new(Decoder::compile(a, &Next::Empty)?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
             Format::WithRelativeOffset(expr, a) => {
-                let da = Box::new(Decoder::compile(a, &Next::Nil)?);
+                let da = Box::new(Decoder::compile(a, &Next::Empty)?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
             Format::Map(f, a) => {
@@ -1281,7 +1281,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let input = fs::read(args.filename)?;
 
     let format = alts([jpeg_format(), png_format()]);
-    let decoder = Decoder::compile(&format, &Next::Nil)?;
+    let decoder = Decoder::compile(&format, &Next::Empty)?;
 
     let mut stack = Vec::new();
     let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
@@ -1314,7 +1314,7 @@ mod tests {
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1322,7 +1322,7 @@ mod tests {
     #[test]
     fn compile_empty() {
         let f = Format::Empty;
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[], &[], Value::Unit);
         accepts(&d, &[0x00], &[0x00], Value::Unit);
     }
@@ -1330,7 +1330,7 @@ mod tests {
     #[test]
     fn compile_byte_is() {
         let f = is_byte(0x00);
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
         rejects(&d, &[0xFF]);
@@ -1340,7 +1340,7 @@ mod tests {
     #[test]
     fn compile_byte_not() {
         let f = not_byte(0x00);
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
@@ -1350,7 +1350,7 @@ mod tests {
     #[test]
     fn compile_alt_byte() {
         let f = alts([is_byte(0x00), is_byte(0xFF)]);
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         rejects(&d, &[0x11]);
@@ -1360,19 +1360,19 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([is_byte(0x00), is_byte(0x00)]);
-        assert!(Decoder::compile(&f, &Next::Nil).is_err());
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
         let f = alts([Format::Empty, Format::Empty]);
-        assert!(Decoder::compile(&f, &Next::Nil).is_err());
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
     #[test]
     fn compile_alt_opt() {
         let f = alts([Format::Empty, is_byte(0x00)]);
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[], &[], Value::Unit);
         accepts(&d, &[0xFF], &[0xFF], Value::Unit);
@@ -1384,7 +1384,7 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(is_byte(0xFF)),
         );
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1407,7 +1407,7 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(alts([Format::Empty, is_byte(0xFF)])),
         );
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1446,13 +1446,13 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(alts([Format::Empty, is_byte(0x00)])),
         );
-        assert!(Decoder::compile(&f, &Next::Nil).is_err());
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
         accepts(
@@ -1467,7 +1467,7 @@ mod tests {
     #[test]
     fn compile_repeat_repeat() {
         let f = repeat(repeat(is_byte(0x00)));
-        assert!(Decoder::compile(&f, &Next::Nil).is_err());
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
     #[test]
@@ -1476,7 +1476,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(repeat(is_byte(0xFF))),
         );
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(
             &d,
             &[],
@@ -1521,7 +1521,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(repeat(is_byte(0x00))),
         );
-        assert!(Decoder::compile(&f, &Next::Nil).is_err());
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
     #[test]
@@ -1531,7 +1531,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x7F))),
         ]);
-        assert!(Decoder::compile(&f, &Next::Nil).is_ok());
+        assert!(Decoder::compile(&f, &Next::Empty).is_ok());
     }
 
     #[test]
@@ -1541,7 +1541,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x00))),
         ]);
-        assert!(Decoder::compile(&f, &Next::Nil).is_err());
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
     #[test]
@@ -1562,7 +1562,7 @@ mod tests {
                 ]),
             ),
         ]);
-        let d = Decoder::compile(&f, &Next::Nil).unwrap();
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(
             &d,
             &[],
