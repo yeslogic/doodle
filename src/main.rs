@@ -256,7 +256,7 @@ impl ByteSwitch {
         ByteSwitch { branches }
     }
 
-    fn insert(self, mut bs: ByteSet, s: &Switch) -> Option<ByteSwitch> {
+    fn insert(self, mut bs: ByteSet, s: Switch) -> Option<ByteSwitch> {
         let mut branches = Vec::new();
         for (bs0, s0) in self.branches {
             let bs_both = bs0.intersection(&bs);
@@ -265,7 +265,7 @@ impl ByteSwitch {
                 if !bs_old.is_empty() {
                     branches.push((bs_old, s0.clone()));
                 }
-                let v = Switch::union(s0, &s)?;
+                let v = Switch::union(s0, s.clone())?;
                 branches.push((bs_both, v));
                 bs = bs.difference(&bs0);
             } else {
@@ -273,14 +273,14 @@ impl ByteSwitch {
             }
         }
         if !bs.is_empty() {
-            branches.push((bs, s.clone()));
+            branches.push((bs, s));
         }
         Some(ByteSwitch { branches })
     }
 
-    fn union(a: ByteSwitch, b: &ByteSwitch) -> Option<ByteSwitch> {
+    fn union(a: ByteSwitch, b: ByteSwitch) -> Option<ByteSwitch> {
         let mut c = a;
-        for (bs, v) in &b.branches {
+        for (bs, v) in b.branches {
             c = c.insert(bs.clone(), v)?;
         }
         Some(c)
@@ -305,17 +305,17 @@ impl Switch {
         Switch(Some(index), ByteSwitch::empty())
     }
 
-    fn union(sa: Switch, sb: &Switch) -> Option<Switch> {
+    fn union(sa: Switch, sb: Switch) -> Option<Switch> {
         match (sa, sb) {
             (Switch(a, sa), Switch(b, sb)) => {
                 let c = match (a, b) {
                     (None, None) => None,
                     (Some(index), None) => Some(index),
-                    (None, Some(index)) => Some(*index),
-                    (Some(a), Some(b)) if a == *b => Some(a),
+                    (None, Some(index)) => Some(index),
+                    (Some(a), Some(b)) if a == b => Some(a),
                     (Some(_), Some(_)) => return None,
                 };
-                Some(Switch(c, ByteSwitch::union(sa, &sb)?))
+                Some(Switch(c, ByteSwitch::union(sa, sb)?))
             }
         }
     }
@@ -335,7 +335,7 @@ impl Switch {
             Next::Repeat(a, next) => {
                 let sa = Switch::from_next(index, depth, next);
                 let sb = Switch::from(index, depth, a, &Next::Repeat(a, next));
-                Switch::union(sa, &sb).unwrap()
+                Switch::union(sa, sb).unwrap()
             }
         }
     }
@@ -358,13 +358,13 @@ impl Switch {
             Format::Alt(a, b) => {
                 let sa = Switch::from(index, depth, a, next);
                 let sb = Switch::from(index, depth, b, next);
-                Switch::union(sa, &sb).unwrap()
+                Switch::union(sa, sb).unwrap()
             }
             Format::Switch(branches) => {
                 let mut switch = Switch::reject();
                 for f in branches {
                     let s = Switch::from(index, depth, f, next);
-                    switch = Switch::union(switch, &s).unwrap();
+                    switch = Switch::union(switch, s).unwrap();
                 }
                 switch
             }
@@ -382,7 +382,7 @@ impl Switch {
             Format::Repeat(a) => {
                 let sa = Switch::from_next(index, depth, next);
                 let sb = Switch::from(index, depth, a, &Next::Repeat(a, next));
-                Switch::union(sa, &sb).unwrap()
+                Switch::union(sa, sb).unwrap()
             }
             Format::RepeatCount(_expr, _a) => {
                 Switch::accept(index) // FIXME
@@ -434,7 +434,7 @@ impl Switch {
         let mut switch = Switch::reject();
         for i in 0..branches.len() {
             let res = Switch::from(i, MAX_DEPTH, &branches[i], next);
-            switch = Switch::union(switch, &res)?;
+            switch = Switch::union(switch, res)?;
         }
         Some(switch)
     }
