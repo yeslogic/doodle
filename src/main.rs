@@ -256,34 +256,30 @@ impl ByteSwitch {
         ByteSwitch { branches }
     }
 
-    fn insert(self, mut bs: ByteSet, s: Switch) -> Option<ByteSwitch> {
-        let mut branches = Vec::new();
-        for (bs0, s0) in self.branches {
-            let bs_both = bs0.intersection(&bs);
-            if !bs_both.is_empty() {
-                let bs_old = bs0.difference(&bs);
-                if !bs_old.is_empty() {
-                    branches.push((bs_old, s0.clone()));
+    fn union(a: ByteSwitch, b: ByteSwitch) -> Option<ByteSwitch> {
+        let mut branches = a.branches;
+        for (mut bs, s) in b.branches {
+            let mut tmp_branches = Vec::new();
+            for (bs0, s0) in branches {
+                let bs_both = bs0.intersection(&bs);
+                if !bs_both.is_empty() {
+                    let bs_old = bs0.difference(&bs);
+                    if !bs_old.is_empty() {
+                        tmp_branches.push((bs_old, s0.clone()));
+                    }
+                    let v = Switch::union(s0, s.clone())?;
+                    tmp_branches.push((bs_both, v));
+                    bs = bs.difference(&bs0);
+                } else {
+                    tmp_branches.push((bs0, s0));
                 }
-                let v = Switch::union(s0, s.clone())?;
-                branches.push((bs_both, v));
-                bs = bs.difference(&bs0);
-            } else {
-                branches.push((bs0, s0));
             }
-        }
-        if !bs.is_empty() {
-            branches.push((bs, s));
+            if !bs.is_empty() {
+                tmp_branches.push((bs, s));
+            }
+            branches = tmp_branches;
         }
         Some(ByteSwitch { branches })
-    }
-
-    fn union(a: ByteSwitch, b: ByteSwitch) -> Option<ByteSwitch> {
-        let mut c = a;
-        for (bs, v) in b.branches {
-            c = c.insert(bs.clone(), v)?;
-        }
-        Some(c)
     }
 }
 
