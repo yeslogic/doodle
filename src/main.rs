@@ -293,6 +293,7 @@ enum Next<'a> {
     Cat(&'a Format, &'a Next<'a>),
     Tuple(&'a [Format], &'a Next<'a>),
     Record(&'a [(String, Format)], &'a Next<'a>),
+    Repeat(&'a Format, &'a Next<'a>),
 }
 
 impl Switch {
@@ -331,6 +332,11 @@ impl Switch {
                 None => Switch::from_next(index, depth, next),
                 Some(((_n, f), fs)) => Switch::from(index, depth, &f, &Next::Record(fs, next)),
             },
+            Next::Repeat(a, next) => {
+                let sa = Switch::from_next(index, depth, next);
+                let sb = Switch::from(index, depth, a, &Next::Repeat(a, next));
+                Switch::union(sa, &sb).unwrap()
+            }
         }
     }
 
@@ -376,15 +382,11 @@ impl Switch {
                     Switch::from(index, depth, a, &Next::Record(&fields, next))
                 }
             },
-            Format::Repeat(a) => Switch::from(
-                index,
-                depth,
-                &Format::Alt(
-                    Box::new(Format::Empty),
-                    Box::new(Format::Cat(a.clone(), Box::new(Format::Repeat(a.clone())))),
-                ),
-                next,
-            ),
+            Format::Repeat(a) => {
+                let sa = Switch::from_next(index, depth, next);
+                let sb = Switch::from(index, depth, a, &Next::Repeat(a, next));
+                Switch::union(sa, &sb).unwrap()
+            }
             Format::RepeatCount(_expr, _a) => {
                 Switch::accept(index) // FIXME
             }
@@ -506,8 +508,8 @@ impl Decoder {
                 if a.nullable() {
                     return Err("cannot repeat nullable format".to_string());
                 }
-                let astar = Format::Repeat(a.clone());
-                let da = Box::new(Decoder::compile(a, &Next::Cat(&astar, next))?);
+                let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
+                // FIXME this isn't quite right
                 if let Next::Empty = next {
                     let switch = Switch(
                         None,
@@ -515,6 +517,7 @@ impl Decoder {
                     );
                     Ok(Decoder::While(switch, da))
                 } else {
+                    let astar = Format::Repeat(a.clone());
                     let fa = &Format::Cat(a.clone(), Box::new(astar));
                     let fb = &Format::Empty;
                     if let Some(switch) = Switch::build(&[fa, fb], next) {
