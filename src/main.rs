@@ -97,12 +97,10 @@ enum Format {
 }
 
 #[derive(Clone, Debug)]
-struct ByteSwitch {
+struct Switch {
+    accept: Option<usize>,
     branches: Vec<(ByteSet, Switch)>,
 }
-
-#[derive(Clone, Debug)]
-struct Switch(Option<usize>, ByteSwitch);
 
 enum Cond {
     Expr(Expr),
@@ -245,44 +243,6 @@ impl Format {
     }
 }
 
-impl ByteSwitch {
-    fn empty() -> ByteSwitch {
-        let branches = Vec::new();
-        ByteSwitch { branches }
-    }
-
-    fn single(bs: ByteSet, s: Switch) -> ByteSwitch {
-        let branches = vec![(bs, s)];
-        ByteSwitch { branches }
-    }
-
-    fn union(a: ByteSwitch, b: ByteSwitch) -> Option<ByteSwitch> {
-        let mut branches = a.branches;
-        for (mut bs, s) in b.branches {
-            let mut tmp_branches = Vec::new();
-            for (bs0, s0) in branches {
-                let bs_both = bs0.intersection(&bs);
-                if !bs_both.is_empty() {
-                    let bs_old = bs0.difference(&bs);
-                    if !bs_old.is_empty() {
-                        tmp_branches.push((bs_old, s0.clone()));
-                    }
-                    let v = Switch::union(s0, s.clone())?;
-                    tmp_branches.push((bs_both, v));
-                    bs = bs.difference(&bs0);
-                } else {
-                    tmp_branches.push((bs0, s0));
-                }
-            }
-            if !bs.is_empty() {
-                tmp_branches.push((bs, s));
-            }
-            branches = tmp_branches;
-        }
-        Some(ByteSwitch { branches })
-    }
-}
-
 #[derive(Debug)]
 enum Next<'a> {
     Empty,
@@ -294,133 +254,131 @@ enum Next<'a> {
 
 impl Switch {
     fn reject() -> Switch {
-        Switch(None, ByteSwitch::empty())
-    }
-
-    fn accept(index: usize) -> Switch {
-        Switch(Some(index), ByteSwitch::empty())
-    }
-
-    fn union(sa: Switch, sb: Switch) -> Option<Switch> {
-        match (sa, sb) {
-            (Switch(a, sa), Switch(b, sb)) => {
-                let c = match (a, b) {
-                    (None, None) => None,
-                    (Some(index), None) => Some(index),
-                    (None, Some(index)) => Some(index),
-                    (Some(a), Some(b)) if a == b => Some(a),
-                    (Some(_), Some(_)) => return None,
-                };
-                Some(Switch(c, ByteSwitch::union(sa, sb)?))
-            }
+        Switch {
+            accept: None,
+            branches: vec![],
         }
     }
 
-    fn from_next(index: usize, depth: usize, next: &Next) -> Switch {
+    fn accept(&mut self, index: usize) -> Result<(), ()> {
+        match self.accept {
+            None => {
+                self.accept = Some(index);
+                Ok(())
+            }
+            Some(i) if i == index => Ok(()),
+            Some(_) => Err(()),
+        }
+    }
+
+    fn add_next(&mut self, index: usize, depth: usize, next: &Next) -> Result<(), ()> {
         match next {
-            Next::Empty => Switch::accept(index),
-            Next::Cat(f, next) => Switch::from(index, depth, f, next),
+            Next::Empty => self.accept(index),
+            Next::Cat(f, next) => self.add(index, depth, f, next),
             Next::Tuple(fs, next) => match fs.split_first() {
-                None => Switch::from_next(index, depth, next),
-                Some((f, fs)) => Switch::from(index, depth, &f, &Next::Tuple(fs, next)),
+                None => self.add_next(index, depth, next),
+                Some((f, fs)) => self.add(index, depth, &f, &Next::Tuple(fs, next)),
             },
             Next::Record(fs, next) => match fs.split_first() {
-                None => Switch::from_next(index, depth, next),
-                Some(((_n, f), fs)) => Switch::from(index, depth, &f, &Next::Record(fs, next)),
+                None => self.add_next(index, depth, next),
+                Some(((_n, f), fs)) => self.add(index, depth, &f, &Next::Record(fs, next)),
             },
             Next::Repeat(a, next) => {
-                let sa = Switch::from_next(index, depth, next);
-                let sb = Switch::from(index, depth, a, &Next::Repeat(a, next));
-                Switch::union(sa, sb).unwrap()
+                self.add_next(index, depth, next)?;
+                self.add(index, depth, a, &Next::Repeat(a, next))?;
+                Ok(())
             }
         }
     }
 
-    pub fn from(index: usize, depth: usize, f: &Format, next: &Next) -> Switch {
+    pub fn add(&mut self, index: usize, depth: usize, f: &Format, next: &Next) -> Result<(), ()> {
         match f {
-            Format::Fail => Switch::reject(),
-            Format::Empty => Switch::from_next(index, depth, next),
-            Format::Byte(bs) => Switch(
-                None,
-                ByteSwitch::single(
-                    bs.clone(),
+            Format::Fail => Ok(()),
+            Format::Empty => self.add_next(index, depth, next),
+            Format::Byte(bs) => {
+                let mut bs = bs.clone();
+                let mut new_branches = Vec::new();
+                for (bs0, switch) in self.branches.iter_mut() {
+                    let common = bs0.intersection(&bs);
+                    if !common.is_empty() {
+                        let orig = bs0.difference(&bs);
+                        if !orig.is_empty() {
+                            new_branches.push((orig, switch.clone()));
+                        }
+                        *bs0 = common;
+                        if depth > 0 {
+                            switch.add_next(index, depth - 1, next)?;
+                        } else {
+                            switch.accept(index)?;
+                        }
+                        bs = bs.difference(bs0);
+                    }
+                }
+                if !bs.is_empty() {
+                    let mut switch = Switch::reject();
                     if depth > 0 {
-                        Switch::from_next(index, depth - 1, next)
+                        switch.add_next(index, depth - 1, next)?;
                     } else {
-                        Switch::accept(index)
-                    },
-                ),
-            ),
+                        switch.accept(index)?;
+                    }
+                    self.branches.push((bs, switch));
+                }
+                self.branches.append(&mut new_branches);
+                Ok(())
+            }
             Format::Alt(a, b) => {
-                let sa = Switch::from(index, depth, a, next);
-                let sb = Switch::from(index, depth, b, next);
-                Switch::union(sa, sb).unwrap()
+                self.add(index, depth, a, next)?;
+                self.add(index, depth, b, next)?;
+                Ok(())
             }
             Format::Switch(branches) => {
-                let mut switch = Switch::reject();
                 for f in branches {
-                    let s = Switch::from(index, depth, f, next);
-                    switch = Switch::union(switch, s).unwrap();
+                    self.add(index, depth, f, next)?;
                 }
-                switch
+                Ok(())
             }
-            Format::Cat(a, b) => Switch::from(index, depth, a, &Next::Cat(b, next)),
+            Format::Cat(a, b) => self.add(index, depth, a, &Next::Cat(b, next)),
             Format::Tuple(fields) => match fields.split_first() {
-                None => Switch::from_next(index, depth, next),
-                Some((a, fields)) => Switch::from(index, depth, a, &Next::Tuple(&fields, next)),
+                None => self.add_next(index, depth, next),
+                Some((a, fields)) => self.add(index, depth, a, &Next::Tuple(&fields, next)),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => Switch::from_next(index, depth, next),
-                Some(((_, a), fields)) => {
-                    Switch::from(index, depth, a, &Next::Record(&fields, next))
-                }
+                None => self.add_next(index, depth, next),
+                Some(((_, a), fields)) => self.add(index, depth, a, &Next::Record(&fields, next)),
             },
             Format::Repeat(a) => {
-                let sa = Switch::from_next(index, depth, next);
-                let sb = Switch::from(index, depth, a, &Next::Repeat(a, next));
-                Switch::union(sa, sb).unwrap()
+                self.add_next(index, depth, next)?;
+                self.add(index, depth, a, &Next::Repeat(a, next))?;
+                Ok(())
             }
             Format::RepeatCount(_expr, _a) => {
-                Switch::accept(index) // FIXME
+                self.accept(index) // FIXME
             }
             Format::Slice(_expr, _a) => {
-                Switch::accept(index) // FIXME
+                self.accept(index) // FIXME
             }
             Format::WithRelativeOffset(_expr, _a) => {
-                Switch::accept(index) // FIXME
+                self.accept(index) // FIXME
             }
-            Format::Map(_f, a) => Switch::from(index, depth, a, next),
+            Format::Map(_f, a) => self.add(index, depth, a, next),
             Format::If(_expr, a, b) => {
-                Switch::from(index, depth, &Format::Alt(a.clone(), b.clone()), next)
+                self.add(index, depth, a, next)?;
+                self.add(index, depth, b, next)?;
+                Ok(())
             }
         }
     }
 
     fn matches(&self, input: &[u8]) -> Option<usize> {
-        match self {
-            Switch(accept, ByteSwitch { branches }) => match input.split_first() {
-                None => *accept,
-                Some((b, input)) => {
-                    for (bs, s) in branches {
-                        if bs.contains(*b) {
-                            return s.matches(input);
-                        }
+        match input.split_first() {
+            None => self.accept,
+            Some((b, input)) => {
+                for (bs, s) in &self.branches {
+                    if bs.contains(*b) {
+                        return s.matches(input);
                     }
-                    *accept
                 }
-            },
-        }
-    }
-
-    fn accepts(branches: &[(usize, Format)]) -> Option<usize> {
-        match branches.split_first() {
-            None => None,
-            Some(((index, _), branches)) => {
-                if branches.iter().all(|(i, _)| i == index) {
-                    Some(*index)
-                } else {
-                    None
-                }
+                self.accept
             }
         }
     }
@@ -429,8 +387,7 @@ impl Switch {
         const MAX_DEPTH: usize = 2;
         let mut switch = Switch::reject();
         for i in 0..branches.len() {
-            let res = Switch::from(i, MAX_DEPTH, &branches[i], next);
-            switch = Switch::union(switch, res)?;
+            switch.add(i, MAX_DEPTH, &branches[i], next).ok()?;
         }
         Some(switch)
     }
@@ -504,10 +461,16 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
                 // FIXME this isn't quite right
                 if let Next::Empty = next {
-                    let switch = Switch(
-                        None,
-                        ByteSwitch::single(ByteSet::full(), Switch(Some(0), ByteSwitch::empty())),
-                    );
+                    let switch = Switch {
+                        accept: None,
+                        branches: vec![(
+                            ByteSet::full(),
+                            Switch {
+                                accept: Some(0),
+                                branches: vec![],
+                            },
+                        )],
+                    };
                     Ok(Decoder::While(switch, da))
                 } else {
                     let astar = Format::Repeat(a.clone());
