@@ -383,13 +383,22 @@ impl Switch {
         }
     }
 
-    fn build(branches: &[&Format], next: &Next) -> Option<Switch> {
-        const MAX_DEPTH: usize = 2;
+    fn build0(depth: usize, branches: &[&Format], next: &Next) -> Option<Switch> {
         let mut switch = Switch::reject();
         for i in 0..branches.len() {
-            switch.add(i, MAX_DEPTH, &branches[i], next).ok()?;
+            switch.add(i, depth, &branches[i], next).ok()?;
         }
         Some(switch)
+    }
+
+    fn build(branches: &[&Format], next: &Next) -> Option<Switch> {
+        const MAX_DEPTH: usize = 16;
+        for depth in 0..MAX_DEPTH {
+            if let Some(switch) = Switch::build0(depth, branches, next) {
+                return Some(switch);
+            }
+        }
+        None
     }
 }
 
