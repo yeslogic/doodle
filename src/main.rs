@@ -277,11 +277,11 @@ impl Switch {
             Next::Cat(f, next) => self.add(index, depth, f, next),
             Next::Tuple(fs, next) => match fs.split_first() {
                 None => self.add_next(index, depth, next),
-                Some((f, fs)) => self.add(index, depth, &f, &Next::Tuple(fs, next)),
+                Some((f, fs)) => self.add(index, depth, f, &Next::Tuple(fs, next)),
             },
             Next::Record(fs, next) => match fs.split_first() {
                 None => self.add_next(index, depth, next),
-                Some(((_n, f), fs)) => self.add(index, depth, &f, &Next::Record(fs, next)),
+                Some(((_n, f), fs)) => self.add(index, depth, f, &Next::Record(fs, next)),
             },
             Next::Repeat(a, next) => {
                 self.add_next(index, depth, next)?;
@@ -296,7 +296,7 @@ impl Switch {
             Format::Fail => Ok(()),
             Format::Empty => self.add_next(index, depth, next),
             Format::Byte(bs) => {
-                let mut bs = bs.clone();
+                let mut bs = *bs;
                 let mut new_branches = Vec::new();
                 for (bs0, switch) in self.branches.iter_mut() {
                     let common = bs0.intersection(&bs);
@@ -340,11 +340,11 @@ impl Switch {
             Format::Cat(a, b) => self.add(index, depth, a, &Next::Cat(b, next)),
             Format::Tuple(fields) => match fields.split_first() {
                 None => self.add_next(index, depth, next),
-                Some((a, fields)) => self.add(index, depth, a, &Next::Tuple(&fields, next)),
+                Some((a, fields)) => self.add(index, depth, a, &Next::Tuple(fields, next)),
             },
             Format::Record(fields) => match fields.split_first() {
                 None => self.add_next(index, depth, next),
-                Some(((_, a), fields)) => self.add(index, depth, a, &Next::Record(&fields, next)),
+                Some(((_, a), fields)) => self.add(index, depth, a, &Next::Record(fields, next)),
             },
             Format::Repeat(a) => {
                 self.add_next(index, depth, next)?;
@@ -385,8 +385,8 @@ impl Switch {
 
     fn build0(depth: usize, branches: &[&Format], next: &Next) -> Option<Switch> {
         let mut switch = Switch::reject();
-        for i in 0..branches.len() {
-            switch.add(i, depth, &branches[i], next).ok()?;
+        for (i, branch) in branches.iter().enumerate() {
+            switch.add(i, depth, branch, next).ok()?;
         }
         Some(switch)
     }
@@ -416,11 +416,11 @@ impl Decoder {
         match f {
             Format::Fail => Ok(Decoder::Fail),
             Format::Empty => Ok(Decoder::Empty),
-            Format::Byte(bs) => Ok(Decoder::Byte(bs.clone())),
+            Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, next)?);
                 let db = Box::new(Decoder::compile(b, next)?);
-                if let Some(switch) = Switch::build(&[&a, &b], next) {
+                if let Some(switch) = Switch::build(&[a, b], next) {
                     Ok(Decoder::If(Cond::Switch(switch), da, db))
                 } else {
                     Err(format!("cannot build switch for {:?}", f))
