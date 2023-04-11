@@ -1417,6 +1417,33 @@ mod tests {
         assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
+    // This test takes over a minute to run
+    //#[test]
+    fn compile_alt_opt_ambiguous_slow() {
+        let alt = alts([
+            is_byte(0x00),
+            is_byte(0x01),
+            is_byte(0x02),
+            is_byte(0x03),
+            is_byte(0x04),
+            is_byte(0x05),
+            is_byte(0x06),
+            is_byte(0x07),
+        ]);
+        let rec = record([
+            ("0", alt.clone()),
+            ("1", alt.clone()),
+            ("2", alt.clone()),
+            ("3", alt.clone()),
+            ("4", alt.clone()),
+            ("5", alt.clone()),
+            ("6", alt.clone()),
+            ("7", alt.clone()),
+        ]);
+        let f = alts([rec.clone(), rec.clone()]);
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+    }
+
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
