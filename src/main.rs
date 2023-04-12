@@ -1519,16 +1519,16 @@ mod tests {
             &d,
             &[0x00, 0xFF, 0x00],
             &[0x00],
-            Value::Pair(
-                Box::new(Value::Seq(vec![Value::U8(0x00)])),
-                Box::new(Value::Seq(vec![Value::U8(0xFF)])),
-            ),
+            Value::Tuple(vec![
+                Value::Seq(vec![Value::U8(0x00)]),
+                Value::Seq(vec![Value::U8(0xFF)]),
+            ]),
         );
         accepts(
             &d,
             &[0x7F],
             &[0x7F],
-            Value::Pair(Box::new(Value::Seq(vec![])), Box::new(Value::Seq(vec![]))),
+            Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![])]),
         );
     }
 
