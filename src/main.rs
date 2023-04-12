@@ -1409,8 +1409,8 @@ mod tests {
         assert!(Decoder::compile(&f, &Next::Empty).is_err());
     }
 
-    // This test takes over a minute to run
-    //#[test]
+    #[test]
+    #[ignore = "this test takes over a minute to run"]
     fn compile_alt_opt_ambiguous_slow() {
         let alt = alts([
             is_byte(0x00),
