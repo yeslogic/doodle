@@ -84,6 +84,8 @@ enum Format {
     Record(Vec<(String, Format)>),
     /// Repeat a format zero-or-more times
     Repeat(Box<Format>),
+    /// Repeat a format one-or-more times
+    Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
     RepeatCount(Expr, Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
@@ -118,6 +120,7 @@ enum Decoder {
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
     While(Switch, Box<Decoder>),
+    Until(Switch, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -234,6 +237,7 @@ impl Format {
             Format::Tuple(fields) => fields.iter().all(|f| f.nullable()),
             Format::Record(fields) => fields.iter().all(|(_, f)| f.nullable()),
             Format::Repeat(_a) => true,
+            Format::Repeat1(_a) => false,
             Format::RepeatCount(_expr, _a) => true,
             Format::Slice(_expr, _a) => true,
             Format::Map(_f, a) => a.nullable(),
@@ -348,6 +352,10 @@ impl Switch {
             },
             Format::Repeat(a) => {
                 self.add_next(index, depth, next)?;
+                self.add(index, depth, a, &Next::Repeat(a, next))?;
+                Ok(())
+            }
+            Format::Repeat1(a) => {
                 self.add(index, depth, a, &Next::Repeat(a, next))?;
                 Ok(())
             }
@@ -477,6 +485,20 @@ impl Decoder {
                     Err(format!("cannot build switch for {:?}", f))
                 }
             }
+            Format::Repeat1(a) => {
+                if a.nullable() {
+                    return Err("cannot repeat nullable format".to_string());
+                }
+                let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
+                let astar = Format::Repeat(a.clone());
+                let fa = &Format::Empty;
+                let fb = &Format::Cat(a.clone(), Box::new(astar));
+                if let Some(switch) = Switch::build(&[fa, fb], next) {
+                    Ok(Decoder::Until(switch, da))
+                } else {
+                    Err(format!("cannot build switch for {:?}", f))
+                }
+            }
             Format::RepeatCount(expr, a) => {
                 // FIXME probably not right
                 let da = Box::new(Decoder::compile(a, next)?);
@@ -565,6 +587,19 @@ impl Decoder {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
+                }
+                Some((Value::Seq(v), input))
+            }
+            Decoder::Until(switch, a) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                loop {
+                    let (va, next_input) = a.parse(stack, input)?;
+                    input = next_input;
+                    v.push(va);
+                    if switch.matches(input) == Some(0) {
+                        break;
+                    }
                 }
                 Some((Value::Seq(v), input))
             }
@@ -734,6 +769,10 @@ fn optional(format: Format) -> Format {
 
 fn repeat(format: Format) -> Format {
     Format::Repeat(Box::new(format))
+}
+
+fn repeat1(format: Format) -> Format {
+    Format::Repeat1(Box::new(format))
 }
 
 fn repeat_count(len: Expr, format: Format) -> Format {
@@ -1617,6 +1656,27 @@ mod tests {
                 ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
                 ("second-and-third".to_string(), Value::Unit),
             ]),
+        );
+    }
+
+    #[test]
+    fn compile_repeat1() {
+        let f = repeat1(is_byte(0x00));
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        rejects(&d, &[]);
+        rejects(&d, &[0xFF]);
+        accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[0xFF],
+            Value::Seq(vec![Value::U8(0x00)]),
+        );
+        accepts(
+            &d,
+            &[0x00, 0x00],
+            &[],
+            Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)]),
         );
     }
 }
