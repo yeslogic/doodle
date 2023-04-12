@@ -468,28 +468,13 @@ impl Decoder {
                     return Err("cannot repeat nullable format".to_string());
                 }
                 let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
-                // FIXME this isn't quite right
-                if let Next::Empty = next {
-                    let switch = Switch {
-                        accept: None,
-                        branches: vec![(
-                            ByteSet::full(),
-                            Switch {
-                                accept: Some(0),
-                                branches: vec![],
-                            },
-                        )],
-                    };
+                let astar = Format::Repeat(a.clone());
+                let fa = &Format::Cat(a.clone(), Box::new(astar));
+                let fb = &Format::Empty;
+                if let Some(switch) = Switch::build(&[fa, fb], next) {
                     Ok(Decoder::While(switch, da))
                 } else {
-                    let astar = Format::Repeat(a.clone());
-                    let fa = &Format::Cat(a.clone(), Box::new(astar));
-                    let fb = &Format::Empty;
-                    if let Some(switch) = Switch::build(&[fa, fb], next) {
-                        Ok(Decoder::While(switch, da))
-                    } else {
-                        Err(format!("cannot build switch for {:?}", f))
-                    }
+                    Err(format!("cannot build switch for {:?}", f))
                 }
             }
             Format::RepeatCount(expr, a) => {
@@ -1449,6 +1434,7 @@ mod tests {
         let f = repeat(is_byte(0x00));
         let d = Decoder::compile(&f, &Next::Empty).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
+        accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
         accepts(
             &d,
@@ -1456,7 +1442,6 @@ mod tests {
             &[],
             Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)]),
         );
-        rejects(&d, &[0x00, 0xFF]);
     }
 
     #[test]
@@ -1505,9 +1490,21 @@ mod tests {
                 Box::new(Value::Seq(vec![Value::U8(0xFF)])),
             ),
         );
-        rejects(&d, &[0x7F]);
-        rejects(&d, &[0xFF, 0x00]);
-        rejects(&d, &[0x00, 0xFF, 0x00]);
+        accepts(
+            &d,
+            &[0x00, 0xFF, 0x00],
+            &[0x00],
+            Value::Pair(
+                Box::new(Value::Seq(vec![Value::U8(0x00)])),
+                Box::new(Value::Seq(vec![Value::U8(0xFF)])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0x7F],
+            &[0x7F],
+            Value::Pair(Box::new(Value::Seq(vec![])), Box::new(Value::Seq(vec![]))),
+        );
     }
 
     #[test]
