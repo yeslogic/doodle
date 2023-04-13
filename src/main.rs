@@ -59,13 +59,16 @@ enum Func {
 /// ```text
 /// ⟦ Fail ⟧                    = ∅                     empty set
 /// ⟦ Empty ⟧                   = ε                     empty byte string
-/// ⟦ Byte(Any) ⟧               = .                     any byte
-/// ⟦ Byte(Is(b)) ⟧             = b                     literal byte
-/// ⟦ Alt(f0, f1) ⟧             = ⟦ f0 ⟧ | ⟦ f0 ⟧       alternation
-/// ⟦ Cat(f0, f1) ⟧             = ⟦ f0 ⟧ ⟦ f0 ⟧         concatenation
+/// ⟦ Byte(!{}) ⟧               = .                     any byte
+/// ⟦ Byte({b}) ⟧               = b                     literal byte
+/// ⟦ Alt(f₀, f₁) ⟧             = ⟦ f₀ ⟧ | ⟦ f₁ ⟧       alternation
+/// ⟦ Switch([]) ⟧              = ∅                     empty set
+/// ⟦ Switch([f₀, ..., fₙ]) ⟧   = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧ alternation
+/// ⟦ Cat(f₀, f₁) ⟧             = ⟦ f₀ ⟧ ⟦ f₁ ⟧         concatenation
 /// ⟦ Tuple([]) ⟧               = ε                     empty byte string
-/// ⟦ Tuple([f0, ..., fn]) ⟧    = ⟦ f0 ⟧ ... ⟦ fn ⟧     concatenation
-/// ⟦ Repeat(f) ⟧               = ⟦ f0 ⟧*               Kleene star
+/// ⟦ Tuple([f₀, ..., fₙ]) ⟧    = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧     concatenation
+/// ⟦ Repeat(f) ⟧               = ⟦ f ⟧*                Kleene star
+/// ⟦ Repeat1(f) ⟧              = ⟦ f ⟧+                Kleene plus
 /// ```
 ///
 /// Note that the data dependency present in record formats means that these
@@ -1432,6 +1435,14 @@ mod tests {
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
         rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt() {
+        let f = alts([]);
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        rejects(&d, &[]);
+        rejects(&d, &[0x00]);
     }
 
     #[test]
