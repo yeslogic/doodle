@@ -202,23 +202,23 @@ impl Func {
             Func::U16Be => match arg {
                 Value::Tuple(vs) => match vs.as_slice() {
                     [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    _ => panic!("expected (U8, U8)"),
+                    _ => panic!("U16Be: expected (U8, U8)"),
                 },
                 _ => panic!("U16Be: expected (_, _)"),
             },
             Func::U16Le => match arg {
                 Value::Tuple(vs) => match vs.as_slice() {
                     [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    _ => panic!("expected (U8, U8)"),
+                    _ => panic!("U16Le: expected (U8, U8)"),
                 },
-                _ => panic!("U16Be: expected (_, _)"),
+                _ => panic!("U16Le: expected (_, _)"),
             },
             Func::U32Be => match arg {
                 Value::Tuple(vs) => match vs.as_slice() {
                     [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                         Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
                     }
-                    _ => panic!("expected (U8, U8, U8, U8)"),
+                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
                 },
                 _ => panic!("U32Be: expected (_, _, _, _)"),
             },
@@ -227,9 +227,9 @@ impl Func {
                     [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                         Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
                     }
-                    _ => panic!("expected (U8, U8, U8, U8)"),
+                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
                 },
-                _ => panic!("U32Be: expected (_, _, _, _)"),
+                _ => panic!("U32Le: expected (_, _, _, _)"),
             },
             Func::Stream => match arg {
                 Value::Seq(vs) => {
