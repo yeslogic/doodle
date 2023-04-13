@@ -233,6 +233,7 @@ impl Func {
 }
 
 impl Format {
+    /// Returns `true` if the format matches the empty byte string
     fn nullable(&self) -> bool {
         match self {
             Format::Fail => false,
