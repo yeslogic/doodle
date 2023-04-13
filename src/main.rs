@@ -19,12 +19,19 @@ enum Pattern {
     U16(u16),
     U32(u32),
     Tuple(Vec<Pattern>),
+    Variant(String, Box<Pattern>),
     Seq(Vec<Pattern>),
 }
 
 impl Pattern {
+    const UNIT: Pattern = Pattern::Tuple(Vec::new());
+
     fn from_bytes(bs: &[u8]) -> Pattern {
         Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
+    }
+
+    fn variant(label: impl Into<String>, value: impl Into<Box<Pattern>>) -> Pattern {
+        Pattern::Variant(label.into(), value.into())
     }
 }
 
@@ -36,11 +43,25 @@ pub enum Value {
     U32(u32),
     Tuple(Vec<Value>),
     Record(Vec<(String, Value)>),
+    Variant(String, Box<Value>),
     Seq(Vec<Value>),
 }
 
 impl Value {
     const UNIT: Value = Value::Tuple(Vec::new());
+
+    fn record<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Value)>) -> Value {
+        Value::Record(
+            fields
+                .into_iter()
+                .map(|(label, value)| (label.into(), value))
+                .collect(),
+        )
+    }
+
+    fn variant(label: impl Into<String>, value: impl Into<Box<Value>>) -> Value {
+        Value::Variant(label.into(), value.into())
+    }
 
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the stack
@@ -67,6 +88,9 @@ impl Value {
                 }
                 true
             }
+            (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
+                v.matches(stack, p)
+            }
             _ => false,
         }
     }
@@ -83,6 +107,7 @@ enum Expr {
     IsEven(Box<Expr>),
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
+    Variant(String, Box<Expr>),
     Seq(Vec<Expr>),
 }
 
@@ -95,6 +120,7 @@ enum Func {
     Expr(Expr),
     TupleProj(usize),
     RecordProj(String),
+    Match(Vec<(Pattern, Expr)>),
     U16Be,
     U16Le,
     U32Be,
@@ -123,19 +149,19 @@ enum Func {
 ///
 /// ```text
 /// ⟦ _ ⟧ : Format ⇀ Regexp
-/// ⟦ Fail ⟧                    = ∅
-/// ⟦ Byte({}) ⟧                = ∅
-/// ⟦ Byte(!{}) ⟧               = .
-/// ⟦ Byte({b}) ⟧               = b
-/// ⟦ Byte({b₀, ... bₙ}) ⟧      = b₀ | ... | bₙ
-/// ⟦ Union([]) ⟧               = ∅
-/// ⟦ Union([f₀, ..., fₙ]) ⟧    = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
-/// ⟦ Tuple([]) ⟧               = ε
-/// ⟦ Tuple([f₀, ..., fₙ]) ⟧    = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧
-/// ⟦ Repeat(f) ⟧               = ⟦ f ⟧*
-/// ⟦ Repeat1(f) ⟧              = ⟦ f ⟧ ⟦ f ⟧*
-/// ⟦ RepeatCount(n, f) ⟧       = ⟦ f ⟧ ... ⟦ f ⟧
-///                               ╰── n times ──╯
+/// ⟦ Fail ⟧                                = ∅
+/// ⟦ Byte({}) ⟧                            = ∅
+/// ⟦ Byte(!{}) ⟧                           = .
+/// ⟦ Byte({b}) ⟧                           = b
+/// ⟦ Byte({b₀, ... bₙ}) ⟧                  = b₀ | ... | bₙ
+/// ⟦ Union([]) ⟧                           = ∅
+/// ⟦ Union([(l₀, f₀), ..., (lₙ, fₙ)]) ⟧    = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
+/// ⟦ Tuple([]) ⟧                           = ε
+/// ⟦ Tuple([f₀, ..., fₙ]) ⟧                = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧
+/// ⟦ Repeat(f) ⟧                           = ⟦ f ⟧*
+/// ⟦ Repeat1(f) ⟧                          = ⟦ f ⟧ ⟦ f ⟧*
+/// ⟦ RepeatCount(n, f) ⟧                   = ⟦ f ⟧ ... ⟦ f ⟧
+///                                           ╰── n times ──╯
 /// ```
 ///
 /// Note that the data dependency present in record formats means that these
@@ -151,7 +177,7 @@ enum Format {
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Matches the union of the byte strings matched by all the formats
-    Union(Vec<Format>),
+    Union(Vec<(String, Format)>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
@@ -208,7 +234,7 @@ enum Decoder {
     Fail,
     EndOfInput,
     Byte(ByteSet),
-    Branch(MatchTree, Vec<Decoder>),
+    Branch(MatchTree, Vec<(String, Decoder)>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
     While(MatchTree, Box<Decoder>),
@@ -241,12 +267,10 @@ impl Expr {
                 _ => panic!("IsEven expected number"),
             },
             Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
-            Expr::Record(fields) => Value::Record(
-                fields
-                    .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval(stack)))
-                    .collect(),
-            ),
+            Expr::Record(fields) => {
+                Value::record(fields.iter().map(|(label, expr)| (label, expr.eval(stack))))
+            }
+            Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
             Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
         }
     }
@@ -256,9 +280,7 @@ impl Expr {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
-            Value::Bool(_) | Value::Tuple(_) | Value::Record(_) | Value::Seq(_) => {
-                panic!("value is not number")
-            }
+            _ => panic!("value is not number"),
         }
     }
 }
@@ -278,6 +300,16 @@ impl Func {
                 },
                 _ => panic!("RecordProj: expected record"),
             },
+            Func::Match(branches) => {
+                let initial_len = stack.len();
+                let (_, expr) = branches
+                    .iter()
+                    .find(|(pattern, _)| arg.matches(stack, pattern))
+                    .expect("exhaustive patterns");
+                let value = expr.eval(stack);
+                stack.truncate(initial_len);
+                value
+            }
             Func::U16Be => match arg {
                 Value::Tuple(vs) => match vs.as_slice() {
                     [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
@@ -328,7 +360,7 @@ impl Format {
             Format::Fail => false,
             Format::EndOfInput => true,
             Format::Byte(_) => false,
-            Format::Union(branches) => branches.iter().any(|f| f.is_nullable()),
+            Format::Union(branches) => branches.iter().any(|(_, f)| f.is_nullable()),
             Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable()),
             Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable()),
             Format::Repeat(_a) => true,
@@ -422,7 +454,7 @@ impl<'a> MatchTreeLevel<'a> {
                 Ok(())
             }
             Format::Union(branches) => {
-                for f in branches {
+                for (_, f) in branches {
                     self.add(index, f, next.clone())?;
                 }
                 Ok(())
@@ -531,11 +563,13 @@ impl Decoder {
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Union(branches) => {
-                let ds = branches
-                    .iter()
-                    .map(|f| Decoder::compile(f, next.clone()))
-                    .collect::<Result<Vec<_>, _>>()?;
-                if let Some(tree) = MatchTree::build(branches, next) {
+                let mut fs = Vec::with_capacity(branches.len());
+                let mut ds = Vec::with_capacity(branches.len());
+                for (label, f) in branches {
+                    ds.push((label.clone(), Decoder::compile(f, next.clone())?));
+                    fs.push(f.clone());
+                }
+                if let Some(tree) = MatchTree::build(&fs, next) {
                     Ok(Decoder::Branch(tree, ds))
                 } else {
                     Err(format!("cannot build match tree for {:?}", f))
@@ -639,7 +673,9 @@ impl Decoder {
             }
             Decoder::Branch(tree, branches) => {
                 let index = tree.matches(input)?;
-                branches[index].parse(stack, input)
+                let (label, d) = &branches[index];
+                let (v, input) = d.parse(stack, input)?;
+                Some((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
@@ -728,7 +764,7 @@ impl Decoder {
                 let initial_len = stack.len();
                 let (_, decoder) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(stack, &pattern))
+                    .find(|(pattern, _)| head.matches(stack, pattern))
                     .expect("exhaustive patterns");
                 let value = decoder.parse(stack, input);
                 stack.truncate(initial_len);
@@ -753,9 +789,10 @@ mod render_tree {
             Value::U8(_) => true,
             Value::U16(_) => true,
             Value::U32(_) => true,
-            Value::Tuple(vals) => vals.is_empty(),
+            Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
-            Value::Seq(vals) => vals.is_empty(),
+            Value::Seq(values) => values.is_empty(),
+            Value::Variant(_, value) => is_atomic_value(value),
         }
     }
 
@@ -792,6 +829,15 @@ mod render_tree {
                 Value::Tuple(vals) => self.write_elems(vals),
                 Value::Seq(vals) => self.write_elems(vals),
                 Value::Record(fields) => self.write_fields(fields),
+                Value::Variant(label, value) => {
+                    if is_atomic_value(value) {
+                        write!(&mut self.writer, "{{ {label} := ")?;
+                        self.write_value(value)?;
+                        write!(&mut self.writer, " }}")
+                    } else {
+                        self.write_field_value_last(label, value)
+                    }
+                }
             }
         }
 
@@ -880,20 +926,24 @@ mod render_tree {
     }
 }
 
-fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
-    Format::Union(formats.into_iter().collect())
+fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+    Format::Union(
+        (fields.into_iter())
+            .map(|(label, format)| (label.into(), format))
+            .collect(),
+    )
 }
 
-fn record<Label: ToString>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+fn record<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
     Format::Record(
         (fields.into_iter())
-            .map(|(label, format)| (label.to_string(), format))
+            .map(|(label, format)| (label.into(), format))
             .collect(),
     )
 }
 
 fn optional(format: Format) -> Format {
-    alts([format, Format::EMPTY])
+    alts([("some", format), ("none", Format::EMPTY)])
 }
 
 fn repeat(format: Format) -> Format {
@@ -1047,11 +1097,11 @@ fn png_format() -> Format {
     let iend_data = Format::EMPTY; // FIXME ensure IEND length = 0
 
     let other_tag = alts([
-        is_bytes(b"PLTE"),
-        is_bytes(b"bKGD"),
-        is_bytes(b"pHYs"),
-        is_bytes(b"tIME"),
-        is_bytes(b"tRNS"),
+        ("PLTE", is_bytes(b"PLTE")),
+        ("bKGD", is_bytes(b"bKGD")),
+        ("pHYs", is_bytes(b"pHYs")),
+        ("tIME", is_bytes(b"tIME")),
+        ("tRNS", is_bytes(b"tRNS")),
         // FIXME other tags excluding IHDR/IDAT/IEND
     ]);
 
@@ -1104,23 +1154,50 @@ fn tiff_format() -> Format {
 
     record([
         (
-            "is-big-endian",
+            "byte-order",
             alts([
-                Format::Map(Func::Expr(Expr::Bool(false)), Box::new(is_bytes(b"II"))),
-                Format::Map(Func::Expr(Expr::Bool(true)), Box::new(is_bytes(b"MM"))),
+                (
+                    "le",
+                    Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"II"))),
+                ),
+                (
+                    "be",
+                    Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"MM"))),
+                ),
             ]),
         ),
         (
             "magic",
-            if_then_else(Expr::Var(0), u16be(), u16le()), // 42
+            Format::Match(
+                Expr::Var(0), // byte-order
+                vec![
+                    (Pattern::variant("le", Pattern::UNIT), u16le()), // 42
+                    (Pattern::variant("be", Pattern::UNIT), u16be()), // 42
+                ],
+            ),
         ),
-        ("offset", if_then_else(Expr::Var(1), u32be(), u32le())),
+        (
+            "offset",
+            Format::Match(
+                Expr::Var(1), // byte-order
+                vec![
+                    (Pattern::variant("le", Pattern::UNIT), u32le()),
+                    (Pattern::variant("be", Pattern::UNIT), u32be()),
+                ],
+            ),
+        ),
         (
             "ifd",
             Format::WithRelativeOffset(
                 // TODO: Offset from start of the TIFF header
                 Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
-                Box::new(if_then_else(Expr::Var(2), ifd(true), ifd(false))),
+                Box::new(Format::Match(
+                    Expr::Var(2), // byte-order
+                    vec![
+                        (Pattern::variant("le", Pattern::UNIT), ifd(false)),
+                        (Pattern::variant("be", Pattern::UNIT), ifd(true)),
+                    ],
+                )),
             ),
         ),
     ])
@@ -1282,7 +1359,7 @@ fn jpeg_format() -> Format {
         (
             "data",
             Format::Match(
-                Expr::Var(0),
+                Expr::Var(0), // identifier
                 vec![
                     (Pattern::from_bytes(b"JFIF"), app0_jfif),
                     // FIXME: there are other APP0 formats
@@ -1306,7 +1383,7 @@ fn jpeg_format() -> Format {
         (
             "data",
             Format::Match(
-                Expr::Var(0),
+                Expr::Var(0), // identifier
                 vec![
                     (Pattern::from_bytes(b"Exif"), app1_exif),
                     (
@@ -1372,70 +1449,86 @@ fn jpeg_format() -> Format {
     let com = marker_segment(0xFE, any_bytes()); // Extension data (comment)
 
     let table_or_misc = alts([
-        dqt.clone(), // Define quantization table
-        dht.clone(), // Define Huffman Table
-        dac.clone(), // Define arithmetic coding conditioning
-        dri.clone(), // Define restart interval
-        app0.clone(),
-        app1.clone(),
-        app2.clone(),
-        app3.clone(),
-        app4.clone(),
-        app5.clone(),
-        app6.clone(),
-        app7.clone(),
-        app8.clone(),
-        app9.clone(),
-        app10.clone(),
-        app11.clone(),
-        app12.clone(),
-        app13.clone(),
-        app14.clone(),
-        app15.clone(),
-        com.clone(), // Comment
+        ("dqt", dqt.clone()), // Define quantization table
+        ("dht", dht.clone()), // Define Huffman Table
+        ("dac", dac.clone()), // Define arithmetic coding conditioning
+        ("dri", dri.clone()), // Define restart interval
+        ("app0", app0.clone()),
+        ("app1", app1.clone()),
+        ("app2", app2.clone()),
+        ("app3", app3.clone()),
+        ("app4", app4.clone()),
+        ("app5", app5.clone()),
+        ("app6", app6.clone()),
+        ("app7", app7.clone()),
+        ("app8", app8.clone()),
+        ("app9", app9.clone()),
+        ("app10", app10.clone()),
+        ("app11", app11.clone()),
+        ("app12", app12.clone()),
+        ("app13", app13.clone()),
+        ("app14", app14.clone()),
+        ("app15", app15.clone()),
+        ("com", com.clone()), // Comment
     ]);
 
     let frame_header = alts([
-        sof0.clone(),
-        sof1.clone(),
-        sof2.clone(),
-        sof3.clone(),
-        sof5.clone(),
-        sof6.clone(),
-        sof7.clone(),
-        sof9.clone(),
-        sof10.clone(),
-        sof11.clone(),
-        sof13.clone(),
-        sof14.clone(),
-        sof15.clone(),
+        ("sof0", sof0.clone()),
+        ("sof1", sof1.clone()),
+        ("sof2", sof2.clone()),
+        ("sof3", sof3.clone()),
+        ("sof5", sof5.clone()),
+        ("sof6", sof6.clone()),
+        ("sof7", sof7.clone()),
+        ("sof9", sof9.clone()),
+        ("sof10", sof10.clone()),
+        ("sof11", sof11.clone()),
+        ("sof13", sof13.clone()),
+        ("sof14", sof14.clone()),
+        ("sof15", sof15.clone()),
     ]);
 
     // MCU: Minimum coded unit
-    let mcu = alts([
-        not_byte(0xFF),
-        Format::Map(
-            Func::Expr(Expr::U8(0xFF)),
-            Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(0x00)])),
-        ),
-    ]);
+    let mcu = Format::Map(
+        Func::Match(vec![
+            (Pattern::variant("byte", Pattern::Binding), Expr::Var(0)),
+            (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
+        ]),
+        Box::new(alts([
+            ("byte", not_byte(0xFF)),
+            ("zero", Format::Tuple(vec![is_byte(0xFF), is_byte(0x00)])),
+        ])),
+    );
 
     // A series of entropy coded segments separated by restart markers
     let scan_data = Format::Map(
         Func::Stream,
-        Box::new(repeat(alts([
-            // FIXME: Extract into separate ECS repetition
-            mcu, // TODO: repeat(mcu),
-            // FIXME: Restart markers should cycle in order from rst0-rst7
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst0)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst1)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst2)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst3)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst4)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst5)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst6)),
-            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst7)),
-        ]))),
+        Box::new(repeat(Format::Map(
+            Func::Match(vec![
+                (Pattern::variant("mcu", Pattern::Binding), Expr::Var(0)),
+                (Pattern::variant("rst0", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst1", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst2", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst3", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst4", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst5", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst6", Pattern::Wildcard), Expr::UNIT),
+                (Pattern::variant("rst7", Pattern::Wildcard), Expr::UNIT),
+            ]),
+            Box::new(alts([
+                // FIXME: Extract into separate ECS repetition
+                ("mcu", mcu), // TODO: repeat(mcu),
+                // FIXME: Restart markers should cycle in order from rst0-rst7
+                ("rst0", rst0),
+                ("rst1", rst1),
+                ("rst2", rst2),
+                ("rst3", rst3),
+                ("rst4", rst4),
+                ("rst5", rst5),
+                ("rst6", rst6),
+                ("rst7", rst7),
+            ])),
+        ))),
     );
 
     let scan = record([
@@ -1445,7 +1538,10 @@ fn jpeg_format() -> Format {
     ]);
 
     let frame = record([
-        ("app0", alts([app0.clone(), app1.clone()])),
+        (
+            "initial-segment",
+            alts([("app0", app0.clone()), ("app1", app1.clone())]),
+        ),
         ("segments", repeat(table_or_misc.clone())),
         ("header", frame_header.clone()),
         ("scan", scan.clone()),
@@ -1490,7 +1586,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let format = Format::Map(
         Func::RecordProj("data".to_string()),
         Box::new(record([
-            ("data", alts([jpeg_format(), png_format(), riff_format()])),
+            (
+                "data",
+                alts([
+                    ("jpeg", jpeg_format()),
+                    ("png", png_format()),
+                    ("riff", riff_format()),
+                ]),
+            ),
             ("end", Format::EndOfInput),
         ])),
     );
@@ -1562,7 +1665,7 @@ mod tests {
 
     #[test]
     fn compile_alt() {
-        let f = alts([]);
+        let f = alts::<&str>([]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
@@ -1570,80 +1673,85 @@ mod tests {
 
     #[test]
     fn compile_alt_byte() {
-        let f = alts([is_byte(0x00), is_byte(0xFF)]);
+        let f = alts([("a", is_byte(0x00)), ("b", is_byte(0xFF))]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
-        accepts(&d, &[0x00], &[], Value::U8(0x00));
-        accepts(&d, &[0xFF], &[], Value::U8(0xFF));
+        accepts(&d, &[0x00], &[], Value::variant("a", Value::U8(0x00)));
+        accepts(&d, &[0xFF], &[], Value::variant("b", Value::U8(0xFF)));
         rejects(&d, &[0x11]);
         rejects(&d, &[]);
     }
 
     #[test]
     fn compile_alt_ambiguous() {
-        let f = alts([is_byte(0x00), is_byte(0x00)]);
+        let f = alts([("a", is_byte(0x00)), ("b", is_byte(0x00))]);
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_fail() {
-        let f = alts([Format::Fail, Format::Fail]);
+        let f = alts([("a", Format::Fail), ("b", Format::Fail)]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         rejects(&d, &[]);
     }
 
     #[test]
     fn compile_alt_end_of_input() {
-        let f = alts([Format::EndOfInput, Format::EndOfInput]);
+        let f = alts([("a", Format::EndOfInput), ("b", Format::EndOfInput)]);
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
-        let f = alts([Format::EMPTY, Format::EMPTY]);
+        let f = alts([("a", Format::EMPTY), ("b", Format::EMPTY)]);
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_fail_end_of_input() {
-        let f = alts([Format::Fail, Format::EndOfInput]);
+        let f = alts([("a", Format::Fail), ("b", Format::EndOfInput)]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
-        accepts(&d, &[], &[], Value::UNIT);
+        accepts(&d, &[], &[], Value::variant("b", Value::UNIT));
     }
 
     #[test]
     fn compile_alt_end_of_input_or_byte() {
-        let f = alts([Format::EndOfInput, is_byte(0x00)]);
+        let f = alts([("a", Format::EndOfInput), ("b", is_byte(0x00))]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
-        accepts(&d, &[], &[], Value::UNIT);
-        accepts(&d, &[0x00], &[], Value::U8(0x00));
-        accepts(&d, &[0x00, 0x00], &[0x00], Value::U8(0x00));
+        accepts(&d, &[], &[], Value::variant("a", Value::UNIT));
+        accepts(&d, &[0x00], &[], Value::variant("b", Value::U8(0x00)));
+        accepts(
+            &d,
+            &[0x00, 0x00],
+            &[0x00],
+            Value::variant("b", Value::U8(0x00)),
+        );
         rejects(&d, &[0x11]);
     }
 
     #[test]
     fn compile_alt_opt() {
-        let f = alts([Format::EMPTY, is_byte(0x00)]);
+        let f = alts([("a", Format::EMPTY), ("b", is_byte(0x00))]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
-        accepts(&d, &[0x00], &[], Value::U8(0x00));
-        accepts(&d, &[], &[], Value::UNIT);
-        accepts(&d, &[0xFF], &[0xFF], Value::UNIT);
+        accepts(&d, &[0x00], &[], Value::variant("b", Value::U8(0x00)));
+        accepts(&d, &[], &[], Value::variant("a", Value::UNIT));
+        accepts(&d, &[0xFF], &[0xFF], Value::variant("a", Value::UNIT));
     }
 
     #[test]
     fn compile_alt_opt_next() {
-        let f = Format::Tuple(vec![alts([Format::EMPTY, is_byte(0x00)]), is_byte(0xFF)]);
+        let f = Format::Tuple(vec![optional(is_byte(0x00)), is_byte(0xFF)]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Tuple(vec![Value::U8(0), Value::U8(0xFF)]),
+            Value::Tuple(vec![Value::variant("some", Value::U8(0)), Value::U8(0xFF)]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Tuple(vec![Value::UNIT, Value::U8(0xFF)]),
+            Value::Tuple(vec![Value::variant("none", Value::UNIT), Value::U8(0xFF)]),
         );
         rejects(&d, &[0x00]);
         rejects(&d, &[]);
@@ -1651,59 +1759,81 @@ mod tests {
 
     #[test]
     fn compile_alt_opt_opt() {
-        let f = Format::Tuple(vec![
-            alts([Format::EMPTY, is_byte(0x00)]),
-            alts([Format::EMPTY, is_byte(0xFF)]),
-        ]);
+        let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0xFF))]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Tuple(vec![Value::U8(0), Value::U8(0xFF)]),
+            Value::Tuple(vec![
+                Value::variant("some", Value::U8(0)),
+                Value::variant("some", Value::U8(0xFF)),
+            ]),
         );
         accepts(
             &d,
             &[0x00],
             &[],
-            Value::Tuple(vec![Value::U8(0), Value::UNIT]),
+            Value::Tuple(vec![
+                Value::variant("some", Value::U8(0)),
+                Value::variant("none", Value::UNIT),
+            ]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Tuple(vec![Value::UNIT, Value::U8(0xFF)]),
+            Value::Tuple(vec![
+                Value::variant("none", Value::UNIT),
+                Value::variant("some", Value::U8(0xFF)),
+            ]),
         );
-        accepts(&d, &[], &[], Value::Tuple(vec![Value::UNIT, Value::UNIT]));
-        accepts(&d, &[], &[], Value::Tuple(vec![Value::UNIT, Value::UNIT]));
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Tuple(vec![
+                Value::variant("none", Value::UNIT),
+                Value::variant("none", Value::UNIT),
+            ]),
+        );
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Tuple(vec![
+                Value::variant("none", Value::UNIT),
+                Value::variant("none", Value::UNIT),
+            ]),
+        );
         accepts(
             &d,
             &[0x7F],
             &[0x7F],
-            Value::Tuple(vec![Value::UNIT, Value::UNIT]),
+            Value::Tuple(vec![
+                Value::variant("none", Value::UNIT),
+                Value::variant("none", Value::UNIT),
+            ]),
         );
     }
 
     #[test]
     fn compile_alt_opt_ambiguous() {
-        let f = Format::Tuple(vec![
-            alts([Format::EMPTY, is_byte(0x00)]),
-            alts([Format::EMPTY, is_byte(0x00)]),
-        ]);
+        let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0x00))]);
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_opt_ambiguous_slow() {
         let alt = alts([
-            is_byte(0x00),
-            is_byte(0x01),
-            is_byte(0x02),
-            is_byte(0x03),
-            is_byte(0x04),
-            is_byte(0x05),
-            is_byte(0x06),
-            is_byte(0x07),
+            ("0x00", is_byte(0x00)),
+            ("0x01", is_byte(0x01)),
+            ("0x02", is_byte(0x02)),
+            ("0x03", is_byte(0x03)),
+            ("0x04", is_byte(0x04)),
+            ("0x05", is_byte(0x05)),
+            ("0x06", is_byte(0x06)),
+            ("0x07", is_byte(0x07)),
         ]);
         let rec = record([
             ("0", alt.clone()),
@@ -1715,13 +1845,17 @@ mod tests {
             ("6", alt.clone()),
             ("7", alt.clone()),
         ]);
-        let f = alts([rec.clone(), rec.clone()]);
+        let f = alts([("a", rec.clone()), ("b", rec.clone())]);
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_repeat_alt_repeat1_slow() {
-        let f = repeat(alts([repeat1(is_byte(0x00)), is_byte(0x01), is_byte(0x02)]));
+        let f = repeat(alts([
+            ("a", repeat1(is_byte(0x00))),
+            ("b", is_byte(0x01)),
+            ("c", is_byte(0x02)),
+        ]));
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
@@ -1862,16 +1996,13 @@ mod tests {
             ("first", repeat(is_byte(0x00))),
             (
                 "second-and-third",
-                alts([
-                    Format::EMPTY,
-                    record([
-                        (
-                            "second",
-                            Format::Tuple(vec![is_byte(0xFF), repeat(is_byte(0xFF))]),
-                        ),
-                        ("third", repeat(is_byte(0x00))),
-                    ]),
-                ]),
+                optional(record([
+                    (
+                        "second",
+                        Format::Tuple(vec![is_byte(0xFF), repeat(is_byte(0xFF))]),
+                    ),
+                    ("third", repeat(is_byte(0x00))),
+                ])),
             ),
         ]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
@@ -1879,35 +2010,38 @@ mod tests {
             &d,
             &[],
             &[],
-            Value::Record(vec![
-                ("first".to_string(), Value::Seq(vec![])),
-                ("second-and-third".to_string(), Value::UNIT),
+            Value::record([
+                ("first", Value::Seq(vec![])),
+                ("second-and-third", Value::variant("none", Value::UNIT)),
             ]),
         );
         accepts(
             &d,
             &[0x00],
             &[],
-            Value::Record(vec![
-                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
-                ("second-and-third".to_string(), Value::UNIT),
+            Value::record([
+                ("first", Value::Seq(vec![Value::U8(0x00)])),
+                ("second-and-third", Value::variant("none", Value::UNIT)),
             ]),
         );
         accepts(
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Record(vec![
-                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+            Value::record([
+                ("first", Value::Seq(vec![Value::U8(0x00)])),
                 (
-                    "second-and-third".to_string(),
-                    Value::Record(vec![
-                        (
-                            "second".to_string(),
-                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
-                        ),
-                        ("third".to_string(), Value::Seq(vec![])),
-                    ]),
+                    "second-and-third",
+                    Value::variant(
+                        "some",
+                        Value::record([
+                            (
+                                "second",
+                                Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
+                            ),
+                            ("third", Value::Seq(vec![])),
+                        ]),
+                    ),
                 ),
             ]),
         );
@@ -1915,17 +2049,20 @@ mod tests {
             &d,
             &[0x00, 0xFF, 0x00],
             &[],
-            Value::Record(vec![
-                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
+            Value::record(vec![
+                ("first", Value::Seq(vec![Value::U8(0x00)])),
                 (
-                    "second-and-third".to_string(),
-                    Value::Record(vec![
-                        (
-                            "second".to_string(),
-                            Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
-                        ),
-                        ("third".to_string(), Value::Seq(vec![Value::U8(0x00)])),
-                    ]),
+                    "second-and-third",
+                    Value::variant(
+                        "some",
+                        Value::record(vec![
+                            (
+                                "second",
+                                Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
+                            ),
+                            ("third", Value::Seq(vec![Value::U8(0x00)])),
+                        ]),
+                    ),
                 ),
             ]),
         );
@@ -1933,9 +2070,9 @@ mod tests {
             &d,
             &[0x00, 0x7F],
             &[0x7F],
-            Value::Record(vec![
-                ("first".to_string(), Value::Seq(vec![Value::U8(0x00)])),
-                ("second-and-third".to_string(), Value::UNIT),
+            Value::record(vec![
+                ("first", Value::Seq(vec![Value::U8(0x00)])),
+                ("second-and-third", Value::variant("none", Value::UNIT)),
             ]),
         );
     }
