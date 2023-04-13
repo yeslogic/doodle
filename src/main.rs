@@ -54,21 +54,41 @@ enum Func {
 
 /// Binary format descriptions
 ///
-/// A subset of binary formats can be modelled as [regular expressions]:
+/// # Binary formats as regular expressions
+///
+/// Given a language of [regular expressions]:
 ///
 /// ```text
-/// ⟦ Fail ⟧                    = ∅                     empty set
-/// ⟦ Empty ⟧                   = ε                     empty byte string
-/// ⟦ Byte(!{}) ⟧               = .                     any byte
-/// ⟦ Byte({b}) ⟧               = b                     literal byte
-/// ⟦ Alt(f₀, f₁) ⟧             = ⟦ f₀ ⟧ | ⟦ f₁ ⟧       alternation
-/// ⟦ Switch([]) ⟧              = ∅                     empty set
-/// ⟦ Switch([f₀, ..., fₙ]) ⟧   = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧ alternation
-/// ⟦ Cat(f₀, f₁) ⟧             = ⟦ f₀ ⟧ ⟦ f₁ ⟧         concatenation
-/// ⟦ Tuple([]) ⟧               = ε                     empty byte string
-/// ⟦ Tuple([f₀, ..., fₙ]) ⟧    = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧     concatenation
-/// ⟦ Repeat(f) ⟧               = ⟦ f ⟧*                Kleene star
-/// ⟦ Repeat1(f) ⟧              = ⟦ f ⟧+                Kleene plus
+/// r ∈ Regexp ::=
+///   | ∅           empty set
+///   | ε           empty byte string
+///   | .           any byte
+///   | b           literal byte
+///   | r|r         alternation
+///   | r r         concatenation
+///   | r*          Kleene star
+/// ```
+///
+/// We can use these to model a subset of our binary format descriptions:
+///
+/// ```text
+/// ⟦ _ ⟧ : Format ⇀ Regexp
+/// ⟦ Fail ⟧                    = ∅
+/// ⟦ Empty ⟧                   = ε
+/// ⟦ Byte({}) ⟧                = ∅
+/// ⟦ Byte(!{}) ⟧               = .
+/// ⟦ Byte({b}) ⟧               = b
+/// ⟦ Byte({b₀, ... bₙ}) ⟧      = b₀ | ... | bₙ
+/// ⟦ Alt(f₀, f₁) ⟧             = ⟦ f₀ ⟧ | ⟦ f₁ ⟧
+/// ⟦ Switch([]) ⟧              = ∅
+/// ⟦ Switch([f₀, ..., fₙ]) ⟧   = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
+/// ⟦ Cat(f₀, f₁) ⟧             = ⟦ f₀ ⟧ ⟦ f₁ ⟧
+/// ⟦ Tuple([]) ⟧               = ε
+/// ⟦ Tuple([f₀, ..., fₙ]) ⟧    = ⟦ f₀ ⟧ ... ⟦ fₙ ⟧
+/// ⟦ Repeat(f) ⟧               = ⟦ f ⟧*
+/// ⟦ Repeat1(f) ⟧              = ⟦ f ⟧ ⟦ f ⟧*
+/// ⟦ RepeatCount(n, f) ⟧       = ⟦ f ⟧ ... ⟦ f ⟧
+///                               ╰── n times ──╯
 /// ```
 ///
 /// Note that the data dependency present in record formats means that these
