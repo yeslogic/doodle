@@ -234,23 +234,23 @@ impl Func {
 
 impl Format {
     /// Returns `true` if the format matches the empty byte string
-    fn nullable(&self) -> bool {
+    fn is_nullable(&self) -> bool {
         match self {
             Format::Fail => false,
             Format::Empty => true,
             Format::EndOfInput => true,
             Format::Byte(_) => false,
-            Format::Alt(a, b) => a.nullable() || b.nullable(),
-            Format::Switch(branches) => branches.iter().any(|f| f.nullable()),
-            Format::Cat(a, b) => a.nullable() && b.nullable(),
-            Format::Tuple(fields) => fields.iter().all(|f| f.nullable()),
-            Format::Record(fields) => fields.iter().all(|(_, f)| f.nullable()),
+            Format::Alt(a, b) => a.is_nullable() || b.is_nullable(),
+            Format::Switch(branches) => branches.iter().any(|f| f.is_nullable()),
+            Format::Cat(a, b) => a.is_nullable() && b.is_nullable(),
+            Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable()),
+            Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable()),
             Format::Repeat(_a) => true,
             Format::Repeat1(_a) => false,
             Format::RepeatCount(_expr, _a) => true,
             Format::Slice(_expr, _a) => true,
-            Format::Map(_f, a) => a.nullable(),
-            Format::If(_expr, a, b) => a.nullable() || b.nullable(),
+            Format::Map(_f, a) => a.is_nullable(),
+            Format::If(_expr, a, b) => a.is_nullable() || b.is_nullable(),
             Format::WithRelativeOffset(_, _) => true,
         }
     }
@@ -483,7 +483,7 @@ impl Decoder {
                 Ok(Decoder::Record(dfields))
             }
             Format::Repeat(a) => {
-                if a.nullable() {
+                if a.is_nullable() {
                     return Err("cannot repeat nullable format".to_string());
                 }
                 let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
@@ -497,7 +497,7 @@ impl Decoder {
                 }
             }
             Format::Repeat1(a) => {
-                if a.nullable() {
+                if a.is_nullable() {
                     return Err("cannot repeat nullable format".to_string());
                 }
                 let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
