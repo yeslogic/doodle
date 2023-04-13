@@ -1631,6 +1631,31 @@ mod tests {
     }
 
     #[test]
+    fn compile_cat_repeat_end_of_input() {
+        let f = Format::Cat(
+            Box::new(repeat(is_byte(0x00))),
+            Box::new(Format::EndOfInput),
+        );
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Tuple(vec![Value::Seq(vec![]), Value::UNIT]),
+        );
+        accepts(
+            &d,
+            &[0x00, 0x00, 0x00],
+            &[],
+            Value::Tuple(vec![
+                Value::Seq(vec![Value::U8(0x00), Value::U8(0x00), Value::U8(0x00)]),
+                Value::UNIT,
+            ]),
+        );
+        rejects(&d, &[0x00, 0x10]);
+    }
+
+    #[test]
     fn compile_cat_repeat_ambiguous() {
         let f = Format::Cat(
             Box::new(repeat(is_byte(0x00))),
