@@ -25,12 +25,19 @@ impl Value {
 
 #[derive(Clone, Debug)]
 enum Expr {
-    Const(Value),
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
     Var(usize),
     Sub(Box<Expr>, Box<Expr>),
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
     Seq(Vec<Expr>),
+}
+
+impl Expr {
+    const UNIT: Expr = Expr::Tuple(Vec::new());
 }
 
 #[derive(Clone, Debug)]
@@ -136,7 +143,10 @@ enum Decoder {
 impl Expr {
     fn eval(&self, stack: &[Value]) -> Value {
         match self {
-            Expr::Const(v) => v.clone(),
+            Expr::Bool(b) => Value::Bool(*b),
+            Expr::U8(i) => Value::U8(*i),
+            Expr::U16(i) => Value::U16(*i),
+            Expr::U32(i) => Value::U32(*i),
             Expr::Var(index) => stack[stack.len() - index - 1].clone(),
             Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
@@ -978,14 +988,8 @@ fn tiff_format() -> Format {
         (
             "is-big-endian",
             alts([
-                Format::Map(
-                    Func::Expr(Expr::Const(Value::Bool(false))),
-                    Box::new(is_bytes(b"II")),
-                ),
-                Format::Map(
-                    Func::Expr(Expr::Const(Value::Bool(true))),
-                    Box::new(is_bytes(b"MM")),
-                ),
+                Format::Map(Func::Expr(Expr::Bool(false)), Box::new(is_bytes(b"II"))),
+                Format::Map(Func::Expr(Expr::Bool(true)), Box::new(is_bytes(b"MM"))),
             ]),
         ),
         (
@@ -1000,7 +1004,7 @@ fn tiff_format() -> Format {
             "ifd",
             Format::WithRelativeOffset(
                 // TODO: Offset from start of the TIFF header
-                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::Const(Value::U32(8)))),
+                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
                 Box::new(Format::If(
                     Expr::Var(2),
                     Box::new(ifd(true)),
@@ -1032,7 +1036,7 @@ fn jpeg_format() -> Format {
                 Format::Slice(
                     Expr::Sub(
                         Box::new(Expr::Var(0)), // length
-                        Box::new(Expr::Const(Value::U16(2))),
+                        Box::new(Expr::U16(2)),
                     ),
                     Box::new(data),
                 ),
@@ -1064,7 +1068,7 @@ fn jpeg_format() -> Format {
         // class <- u4 //= 0 | 1;
         // table-id <- u4 //= 1 |..| 4;
         ("class-table-id", u8()),
-        ("num-codes", repeat_count(Expr::Const(Value::U8(16)), u8())),
+        ("num-codes", repeat_count(Expr::U8(16), u8())),
         ("values", any_bytes()), // List.map num-codes (\n => repeat-count n u8);
     ]);
 
@@ -1285,7 +1289,7 @@ fn jpeg_format() -> Format {
     let mcu = alts([
         not_byte(0xFF),
         Format::Map(
-            Func::Expr(Expr::Const(Value::U8(0xFF))),
+            Func::Expr(Expr::U8(0xFF)),
             Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(0x00)])),
         ),
     ]);
@@ -1297,14 +1301,14 @@ fn jpeg_format() -> Format {
             // FIXME: Extract into separate ECS repetition
             mcu, // TODO: repeat(mcu),
             // FIXME: Restart markers should cycle in order from rst0-rst7
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst0)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst1)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst2)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst3)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst4)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst5)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst6)),
-            Format::Map(Func::Expr(Expr::Const(Value::UNIT)), Box::new(rst7)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst0)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst1)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst2)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst3)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst4)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst5)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst6)),
+            Format::Map(Func::Expr(Expr::UNIT), Box::new(rst7)),
         ]))),
     );
 
