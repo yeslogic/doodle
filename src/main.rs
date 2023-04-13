@@ -71,6 +71,8 @@ enum Format {
     Fail,
     /// A format that matches the empty byte string
     Empty,
+    /// Matches if the end of the input has been reached
+    EndOfInput,
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Matches the union of the byte strings matched by the two formats
@@ -116,6 +118,7 @@ enum Cond {
 enum Decoder {
     Fail,
     Empty,
+    EndOfInput,
     Byte(ByteSet),
     If(Cond, Box<Decoder>, Box<Decoder>),
     Switch(Switch, Vec<Decoder>),
@@ -234,6 +237,7 @@ impl Format {
         match self {
             Format::Fail => false,
             Format::Empty => true,
+            Format::EndOfInput => true,
             Format::Byte(_) => false,
             Format::Alt(a, b) => a.nullable() || b.nullable(),
             Format::Switch(branches) => branches.iter().any(|f| f.nullable()),
@@ -303,6 +307,7 @@ impl Switch {
         match f {
             Format::Fail => Ok(()),
             Format::Empty => self.add_next(index, depth, next),
+            Format::EndOfInput => self.accept(index),
             Format::Byte(bs) => {
                 let mut bs = *bs;
                 let mut new_branches = Vec::new();
@@ -428,6 +433,7 @@ impl Decoder {
         match f {
             Format::Fail => Ok(Decoder::Fail),
             Format::Empty => Ok(Decoder::Empty),
+            Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, next)?);
@@ -536,6 +542,10 @@ impl Decoder {
         match self {
             Decoder::Fail => None,
             Decoder::Empty => Some((Value::UNIT, input)),
+            Decoder::EndOfInput => match input {
+                [] => Some((Value::UNIT, &[])),
+                _ => None,
+            },
             Decoder::Byte(bs) => {
                 let (&b, input) = input.split_first()?;
                 if bs.contains(b) {
@@ -1305,7 +1315,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let args = Args::parse();
     let input = fs::read(args.filename)?;
 
-    let format = alts([jpeg_format(), png_format()]);
+    let format = Format::Map(
+        Func::RecordProj("data".to_string()),
+        Box::new(record([
+            ("data", alts([jpeg_format(), png_format()])),
+            ("end", Format::EndOfInput),
+        ])),
+    );
     let decoder = Decoder::compile(&format, &Next::Empty)?;
 
     let mut stack = Vec::new();
@@ -1389,9 +1405,39 @@ mod tests {
     }
 
     #[test]
+    fn compile_alt_fail() {
+        let f = alts([Format::Fail, Format::Fail]);
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt_end_of_input() {
+        let f = alts([Format::EndOfInput, Format::EndOfInput]);
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+    }
+
+    #[test]
     fn compile_alt_empty() {
         let f = alts([Format::Empty, Format::Empty]);
         assert!(Decoder::compile(&f, &Next::Empty).is_err());
+    }
+
+    #[test]
+    fn compile_alt_fail_end_of_input() {
+        let f = alts([Format::Fail, Format::EndOfInput]);
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        accepts(&d, &[], &[], Value::UNIT);
+    }
+
+    #[test]
+    fn compile_alt_end_of_input_or_byte() {
+        let f = alts([Format::EndOfInput, is_byte(0x00)]);
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        accepts(&d, &[], &[], Value::UNIT);
+        accepts(&d, &[0x00], &[], Value::U8(0x00));
+        accepts(&d, &[0x00, 0x00], &[0x00], Value::U8(0x00));
+        rejects(&d, &[0x11]);
     }
 
     #[test]
@@ -1567,6 +1613,20 @@ mod tests {
             &[0x7F],
             Value::Tuple(vec![Value::Seq(vec![]), Value::Seq(vec![])]),
         );
+    }
+
+    #[test]
+    fn compile_cat_end_of_input() {
+        let f = Format::Cat(Box::new(is_byte(0x00)), Box::new(Format::EndOfInput));
+        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Tuple(vec![Value::U8(0x00), Value::UNIT]),
+        );
+        rejects(&d, &[]);
+        rejects(&d, &[0x00, 0x00]);
     }
 
     #[test]
