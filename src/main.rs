@@ -1586,6 +1586,13 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "this test takes over a minute to run"]
+    fn compile_repeat_alt_repeat1_slow() {
+        let f = repeat(alts([repeat1(is_byte(0x00)), is_byte(0x01), is_byte(0x02)]));
+        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+    }
+
+    #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
         let d = Decoder::compile(&f, &Next::Empty).unwrap();
