@@ -28,6 +28,7 @@ enum Expr {
     Const(Value),
     Var(usize),
     Sub(Box<Expr>, Box<Expr>),
+    IsEven(Box<Expr>),
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
     Seq(Vec<Expr>),
@@ -143,6 +144,12 @@ impl Expr {
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            Expr::IsEven(x) => match x.eval(stack) {
+                Value::U8(x) => Value::Bool(x % 2 == 0),
+                Value::U16(x) => Value::Bool(x % 2 == 0),
+                Value::U32(x) => Value::Bool(x % 2 == 0),
+                _ => panic!("IsEven expected number"),
             },
             Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
             Expr::Record(fields) => Value::Record(
