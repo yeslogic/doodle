@@ -109,7 +109,7 @@ enum Format {
     /// Matches the union of the byte strings matched by the two formats
     Alt(Box<Format>, Box<Format>),
     /// Matches the union of the byte strings matched by all the formats
-    Switch(Vec<Format>),
+    Union(Vec<Format>),
     /// Matches the set of byte strings matched by the first format, followed by
     /// the second format
     Cat(Box<Format>, Box<Format>),
@@ -281,7 +281,7 @@ impl Format {
             Format::EndOfInput => true,
             Format::Byte(_) => false,
             Format::Alt(a, b) => a.is_nullable() || b.is_nullable(),
-            Format::Switch(branches) => branches.iter().any(|f| f.is_nullable()),
+            Format::Union(branches) => branches.iter().any(|f| f.is_nullable()),
             Format::Cat(a, b) => a.is_nullable() && b.is_nullable(),
             Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable()),
             Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable()),
@@ -385,7 +385,7 @@ impl Switch {
                 self.add(index, depth, b, next)?;
                 Ok(())
             }
-            Format::Switch(branches) => {
+            Format::Union(branches) => {
                 for f in branches {
                     self.add(index, depth, f, next)?;
                 }
@@ -485,7 +485,7 @@ impl Decoder {
                     Err(format!("cannot build switch for {:?}", f))
                 }
             }
-            Format::Switch(branches) => {
+            Format::Union(branches) => {
                 let mut ds = Vec::new();
                 let mut fs = Vec::new();
                 for f in branches {
@@ -840,7 +840,7 @@ mod render_tree {
 }
 
 fn alts(formats: impl IntoIterator<Item = Format>) -> Format {
-    Format::Switch(formats.into_iter().collect())
+    Format::Union(formats.into_iter().collect())
 }
 
 fn record<Label: ToString>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
