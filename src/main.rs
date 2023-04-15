@@ -929,6 +929,33 @@ fn u32le() -> Format {
     )
 }
 
+fn riff_format() -> Format {
+    fn chunk(tag: Format, data: Format) -> Format {
+        record([
+            ("tag", tag),
+            ("length", u32le()),
+            ("data", Format::Slice(Expr::Var(0), Box::new(data))),
+            (
+                "pad",
+                Format::If(
+                    Expr::IsEven(Box::new(Expr::Var(1))),
+                    Box::new(Format::Empty),
+                    Box::new(is_byte(0x00)),
+                ),
+            ),
+        ])
+    }
+
+    let any_tag = Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]); // FIXME ASCII
+
+    let subchunks = record([
+        ("tag", any_tag.clone()),
+        ("chunks", repeat(chunk(any_tag, any_bytes()))),
+    ]);
+
+    chunk(is_bytes(b"RIFF"), subchunks.clone())
+}
+
 fn png_format() -> Format {
     fn chunk(tag: Format, data: Format) -> Format {
         record([
@@ -1394,7 +1421,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let format = Format::Map(
         Func::RecordProj("data".to_string()),
         Box::new(record([
-            ("data", alts([jpeg_format(), png_format()])),
+            ("data", alts([jpeg_format(), png_format(), riff_format()])),
             ("end", Format::EndOfInput),
         ])),
     );
