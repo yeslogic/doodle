@@ -35,6 +35,7 @@ enum Expr {
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
     Seq(Vec<Expr>),
+    Switch(Box<Expr>, Vec<Value>, Option<usize>),
 }
 
 impl Expr {
@@ -194,6 +195,19 @@ impl Expr {
                     .collect(),
             ),
             Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::Switch(expr, branches, opt_otherwise) => {
+                let v = expr.eval(stack);
+                for (i, v0) in branches.iter().enumerate() {
+                    if v == *v0 {
+                        return Value::U32(i.try_into().unwrap());
+                    }
+                }
+                if let Some(i) = opt_otherwise {
+                    Value::U32((*i).try_into().unwrap())
+                } else {
+                    Value::Bool(false)
+                }
+            }
         }
     }
 
