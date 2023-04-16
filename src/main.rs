@@ -21,6 +21,10 @@ pub enum Value {
 
 impl Value {
     const UNIT: Value = Value::Tuple(Vec::new());
+
+    fn from_bytes(bs: &[u8]) -> Value {
+        Value::Seq(bs.iter().copied().map(|b| Value::U8(b)).collect())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1275,23 +1279,37 @@ fn jpeg_format() -> Format {
     // APP1: Application segment 1 (EXIF)
     //
     // - [Exif Version 2.32, Section 4.5.4](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=24)
-    let app1_exif = record([
-        ("identifier", is_bytes(b"Exif\0")),
-        ("padding", is_byte(0x00)),
-        ("exif", tiff_format()),
-    ]);
+    let app1_exif = record([("padding", is_byte(0x00)), ("exif", tiff_format())]);
 
     // APP1: Application segment 1 (XMP)
-    let app1_xmp = record([
-        ("identifier", is_bytes(b"http://ns.adobe.com/xap/1.0/\0")),
-        ("xmp", any_bytes()),
-    ]);
+    let app1_xmp = record([("xmp", any_bytes())]);
 
-    let app1_data = alts([
-        app1_exif,
-        app1_xmp,
-        // FIXME there are other APP1 formats
-        // see https://exiftool.org/TagNames/JPEG.html
+    // FIXME there are other APP1 formats
+    // see https://exiftool.org/TagNames/JPEG.html
+    let app1_other = any_bytes();
+
+    let asciiz_string = Format::Map(
+        Func::RecordProj("string".to_string()),
+        Box::new(record([
+            ("string", repeat(not_byte(0x00))),
+            ("null", is_byte(0x00)),
+        ])),
+    );
+
+    let app1_ids = vec![
+        Value::from_bytes(b"Exif"),
+        Value::from_bytes(b"http://ns.adobe.com/xap/1.0/"),
+    ];
+
+    let app1_data = record([
+        ("identifier", asciiz_string),
+        (
+            "data",
+            Format::Switch(
+                Expr::Switch(Box::new(Expr::Var(0)), app1_ids, Some(2)),
+                vec![app1_exif, app1_xmp, app1_other],
+            ),
+        ),
     ]);
 
     let sof0 = marker_segment(0xC0, sof_data.clone()); // Start of frame (baseline jpeg)
