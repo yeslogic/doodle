@@ -135,14 +135,14 @@ enum Format {
 }
 
 #[derive(Clone, Debug)]
-struct Switch {
+struct MatchTree {
     accept: Option<usize>,
-    branches: Vec<(ByteSet, Switch)>,
+    branches: Vec<(ByteSet, MatchTree)>,
 }
 
 enum Cond {
     Expr(Expr),
-    Switch(Switch),
+    Switch(MatchTree),
 }
 
 /// Decoders with a fixed amount of lookahead
@@ -152,12 +152,12 @@ enum Decoder {
     EndOfInput,
     Byte(ByteSet),
     If(Cond, Box<Decoder>, Box<Decoder>),
-    Switch(Switch, Vec<Decoder>),
+    Switch(MatchTree, Vec<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
-    While(Switch, Box<Decoder>),
-    Until(Switch, Box<Decoder>),
+    While(MatchTree, Box<Decoder>),
+    Until(MatchTree, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -305,9 +305,9 @@ enum Next<'a> {
     Repeat(&'a Format, &'a Next<'a>),
 }
 
-impl Switch {
-    fn reject() -> Switch {
-        Switch {
+impl MatchTree {
+    fn reject() -> MatchTree {
+        MatchTree {
             accept: None,
             branches: vec![],
         }
@@ -352,30 +352,30 @@ impl Switch {
             Format::Byte(bs) => {
                 let mut bs = *bs;
                 let mut new_branches = Vec::new();
-                for (bs0, switch) in self.branches.iter_mut() {
+                for (bs0, tree) in self.branches.iter_mut() {
                     let common = bs0.intersection(&bs);
                     if !common.is_empty() {
                         let orig = bs0.difference(&bs);
                         if !orig.is_empty() {
-                            new_branches.push((orig, switch.clone()));
+                            new_branches.push((orig, tree.clone()));
                         }
                         *bs0 = common;
                         if depth > 0 {
-                            switch.add_next(index, depth - 1, next)?;
+                            tree.add_next(index, depth - 1, next)?;
                         } else {
-                            switch.accept(index)?;
+                            tree.accept(index)?;
                         }
                         bs = bs.difference(bs0);
                     }
                 }
                 if !bs.is_empty() {
-                    let mut switch = Switch::reject();
+                    let mut tree = MatchTree::reject();
                     if depth > 0 {
-                        switch.add_next(index, depth - 1, next)?;
+                        tree.add_next(index, depth - 1, next)?;
                     } else {
-                        switch.accept(index)?;
+                        tree.accept(index)?;
                     }
-                    self.branches.push((bs, switch));
+                    self.branches.push((bs, tree));
                 }
                 self.branches.append(&mut new_branches);
                 Ok(())
@@ -441,19 +441,19 @@ impl Switch {
         }
     }
 
-    fn build0(depth: usize, branches: &[&Format], next: &Next) -> Option<Switch> {
-        let mut switch = Switch::reject();
+    fn build0(depth: usize, branches: &[&Format], next: &Next) -> Option<MatchTree> {
+        let mut tree = MatchTree::reject();
         for (i, branch) in branches.iter().enumerate() {
-            switch.add(i, depth, branch, next).ok()?;
+            tree.add(i, depth, branch, next).ok()?;
         }
-        Some(switch)
+        Some(tree)
     }
 
-    fn build(branches: &[&Format], next: &Next) -> Option<Switch> {
+    fn build(branches: &[&Format], next: &Next) -> Option<MatchTree> {
         const MAX_DEPTH: usize = 16;
         for depth in 0..MAX_DEPTH {
-            if let Some(switch) = Switch::build0(depth, branches, next) {
-                return Some(switch);
+            if let Some(tree) = MatchTree::build0(depth, branches, next) {
+                return Some(tree);
             }
         }
         None
@@ -464,7 +464,7 @@ impl Cond {
     fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
         match self {
             Cond::Expr(expr) => expr.eval_bool(stack),
-            Cond::Switch(switch) => switch.matches(input) == Some(0),
+            Cond::Switch(tree) => tree.matches(input) == Some(0),
         }
     }
 }
@@ -479,10 +479,10 @@ impl Decoder {
             Format::Alt(a, b) => {
                 let da = Box::new(Decoder::compile(a, next)?);
                 let db = Box::new(Decoder::compile(b, next)?);
-                if let Some(switch) = Switch::build(&[a, b], next) {
-                    Ok(Decoder::If(Cond::Switch(switch), da, db))
+                if let Some(tree) = MatchTree::build(&[a, b], next) {
+                    Ok(Decoder::If(Cond::Switch(tree), da, db))
                 } else {
-                    Err(format!("cannot build switch for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", f))
                 }
             }
             Format::Union(branches) => {
@@ -493,10 +493,10 @@ impl Decoder {
                     ds.push(d);
                     fs.push(f);
                 }
-                if let Some(switch) = Switch::build(&fs, next) {
-                    Ok(Decoder::Switch(switch, ds))
+                if let Some(tree) = MatchTree::build(&fs, next) {
+                    Ok(Decoder::Switch(tree, ds))
                 } else {
-                    Err(format!("cannot build switch for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", f))
                 }
             }
             Format::Cat(a, b) => {
@@ -530,10 +530,10 @@ impl Decoder {
                 let astar = Format::Repeat(a.clone());
                 let fa = &Format::Cat(a.clone(), Box::new(astar));
                 let fb = &Format::Empty;
-                if let Some(switch) = Switch::build(&[fa, fb], next) {
-                    Ok(Decoder::While(switch, da))
+                if let Some(tree) = MatchTree::build(&[fa, fb], next) {
+                    Ok(Decoder::While(tree, da))
                 } else {
-                    Err(format!("cannot build switch for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", f))
                 }
             }
             Format::Repeat1(a) => {
@@ -544,10 +544,10 @@ impl Decoder {
                 let astar = Format::Repeat(a.clone());
                 let fa = &Format::Empty;
                 let fb = &Format::Cat(a.clone(), Box::new(astar));
-                if let Some(switch) = Switch::build(&[fa, fb], next) {
-                    Ok(Decoder::Until(switch, da))
+                if let Some(tree) = MatchTree::build(&[fa, fb], next) {
+                    Ok(Decoder::Until(tree, da))
                 } else {
-                    Err(format!("cannot build switch for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", f))
                 }
             }
             Format::RepeatCount(expr, a) => {
@@ -602,8 +602,8 @@ impl Decoder {
                     b.parse(stack, input)
                 }
             }
-            Decoder::Switch(switch, branches) => {
-                let index = switch.matches(input)?;
+            Decoder::Switch(tree, branches) => {
+                let index = tree.matches(input)?;
                 branches[index].parse(stack, input)
             }
             Decoder::Cat(a, b) => {
@@ -635,24 +635,24 @@ impl Decoder {
                 }
                 Some((Value::Record(v), input))
             }
-            Decoder::While(switch, a) => {
+            Decoder::While(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
-                while switch.matches(input) == Some(0) {
+                while tree.matches(input) == Some(0) {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
                 }
                 Some((Value::Seq(v), input))
             }
-            Decoder::Until(switch, a) => {
+            Decoder::Until(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
-                    if switch.matches(input) == Some(0) {
+                    if tree.matches(input) == Some(0) {
                         break;
                     }
                 }
