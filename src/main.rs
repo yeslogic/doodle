@@ -132,6 +132,8 @@ enum Format {
     Map(Func, Box<Format>),
     /// Conditional format
     If(Expr, Box<Format>, Box<Format>),
+    /// Switch format
+    Switch(Expr, Vec<Format>),
 }
 
 #[derive(Clone, Debug)]
@@ -152,7 +154,7 @@ enum Decoder {
     EndOfInput,
     Byte(ByteSet),
     If(Cond, Box<Decoder>, Box<Decoder>),
-    Switch(MatchTree, Vec<Decoder>),
+    Switch(Cond, Vec<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
@@ -291,6 +293,7 @@ impl Format {
             Format::Slice(_expr, _a) => true,
             Format::Map(_f, a) => a.is_nullable(),
             Format::If(_expr, a, b) => a.is_nullable() || b.is_nullable(),
+            Format::Switch(_expr, branches) => branches.iter().any(|f| f.is_nullable()),
             Format::WithRelativeOffset(_, _) => true,
         }
     }
@@ -424,6 +427,12 @@ impl MatchTree {
                 self.add(index, depth, b, next)?;
                 Ok(())
             }
+            Format::Switch(_expr, branches) => {
+                for f in branches {
+                    self.add(index, depth, f, next)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -461,10 +470,17 @@ impl MatchTree {
 }
 
 impl Cond {
-    fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
+    fn eval_bool(&self, stack: &[Value], input: &[u8]) -> bool {
         match self {
             Cond::Expr(expr) => expr.eval_bool(stack),
             Cond::MatchTree(tree) => tree.matches(input) == Some(0),
+        }
+    }
+
+    fn eval_opt_usize(&self, stack: &[Value], input: &[u8]) -> Option<usize> {
+        match self {
+            Cond::Expr(expr) => Some(expr.eval_usize(stack)),
+            Cond::MatchTree(tree) => tree.matches(input),
         }
     }
 }
@@ -494,7 +510,7 @@ impl Decoder {
                     fs.push(f);
                 }
                 if let Some(tree) = MatchTree::build(&fs, next) {
-                    Ok(Decoder::Switch(tree, ds))
+                    Ok(Decoder::Switch(Cond::MatchTree(tree), ds))
                 } else {
                     Err(format!("cannot build match tree for {:?}", f))
                 }
@@ -572,6 +588,14 @@ impl Decoder {
                 let db = Box::new(Decoder::compile(b, next)?);
                 Ok(Decoder::If(Cond::Expr(expr.clone()), da, db))
             }
+            Format::Switch(expr, branches) => {
+                let mut ds = Vec::new();
+                for f in branches {
+                    let d = Decoder::compile(f, next)?;
+                    ds.push(d);
+                }
+                Ok(Decoder::Switch(Cond::Expr(expr.clone()), ds))
+            }
         }
     }
 
@@ -596,15 +620,19 @@ impl Decoder {
                 }
             }
             Decoder::If(cond, a, b) => {
-                if cond.eval(stack, input) {
+                if cond.eval_bool(stack, input) {
                     a.parse(stack, input)
                 } else {
                     b.parse(stack, input)
                 }
             }
-            Decoder::Switch(tree, branches) => {
-                let index = tree.matches(input)?;
-                branches[index].parse(stack, input)
+            Decoder::Switch(cond, branches) => {
+                let i = cond.eval_opt_usize(stack, input)?;
+                if i < branches.len() {
+                    branches[i].parse(stack, input)
+                } else {
+                    None
+                }
             }
             Decoder::Cat(a, b) => {
                 let (va, input) = a.parse(stack, input)?;
