@@ -14,6 +14,7 @@ pub enum Value {
     U8(u8),
     U16(u16),
     U32(u32),
+    F32(f32),
     Tuple(Vec<Value>),
     Record(Vec<(String, Value)>),
     Seq(Vec<Value>),
@@ -21,6 +22,13 @@ pub enum Value {
 
 impl Value {
     const UNIT: Value = Value::Tuple(Vec::new());
+
+    fn as_tuple(&self) -> Option<&[Value]> {
+        match self {
+            Value::Tuple(values) => Some(values),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -29,6 +37,7 @@ enum Expr {
     U8(u8),
     U16(u16),
     U32(u32),
+    F32(f32),
     Var(usize),
     Sub(Box<Expr>, Box<Expr>),
     IsEven(Box<Expr>),
@@ -50,6 +59,8 @@ enum Func {
     U16Le,
     U32Be,
     U32Le,
+    F32Be,
+    F32Le,
     Stream,
 }
 
@@ -168,9 +179,10 @@ impl Expr {
     fn eval(&self, stack: &[Value]) -> Value {
         match self {
             Expr::Bool(b) => Value::Bool(*b),
-            Expr::U8(i) => Value::U8(*i),
-            Expr::U16(i) => Value::U16(*i),
-            Expr::U32(i) => Value::U32(*i),
+            Expr::U8(n) => Value::U8(*n),
+            Expr::U16(n) => Value::U16(*n),
+            Expr::U32(n) => Value::U32(*n),
+            Expr::F32(n) => Value::F32(*n),
             Expr::Var(index) => stack[stack.len() - index - 1].clone(),
             Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
@@ -207,9 +219,7 @@ impl Expr {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
-            Value::Bool(_) | Value::Tuple(_) | Value::Record(_) | Value::Seq(_) => {
-                panic!("value is not number")
-            }
+            _ => panic!("value is not an unsigned integer"),
         }
     }
 }
@@ -229,37 +239,37 @@ impl Func {
                 },
                 _ => panic!("RecordProj: expected record"),
             },
-            Func::U16Be => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    _ => panic!("U16Be: expected (U8, U8)"),
-                },
-                _ => panic!("U16Be: expected (_, _)"),
+            Func::U16Be => match arg.as_tuple() {
+                Some([Value::U8(hi), Value::U8(lo)]) => Value::U16(u16::from_be_bytes([*hi, *lo])),
+                _ => panic!("U16Be: expected (U8, U8)"),
             },
-            Func::U16Le => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    _ => panic!("U16Le: expected (U8, U8)"),
-                },
-                _ => panic!("U16Le: expected (_, _)"),
+            Func::U16Le => match arg.as_tuple() {
+                Some([Value::U8(lo), Value::U8(hi)]) => Value::U16(u16::from_le_bytes([*lo, *hi])),
+                _ => panic!("U16Le: expected (U8, U8)"),
             },
-            Func::U32Be => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
-                    }
-                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
-                },
-                _ => panic!("U32Be: expected (_, _, _, _)"),
+            Func::U32Be => match arg.as_tuple() {
+                Some([Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)]) => {
+                    Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
+                }
+                _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
             },
-            Func::U32Le => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
-                    }
-                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
-                },
-                _ => panic!("U32Le: expected (_, _, _, _)"),
+            Func::U32Le => match arg.as_tuple() {
+                Some([Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)]) => {
+                    Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
+                }
+                _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
+            },
+            Func::F32Be => match arg.as_tuple() {
+                Some([Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)]) => {
+                    Value::F32(f32::from_be_bytes([*a, *b, *c, *d]))
+                }
+                _ => panic!("F32Be: expected (U8, U8, U8, U8)"),
+            },
+            Func::F32Le => match arg.as_tuple() {
+                Some([Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)]) => {
+                    Value::F32(f32::from_le_bytes([*a, *b, *c, *d]))
+                }
+                _ => panic!("F32Le: expected (U8, U8, U8, U8)"),
             },
             Func::Stream => match arg {
                 Value::Seq(vs) => {
@@ -708,10 +718,7 @@ mod render_tree {
 
     fn is_atomic_value(value: &Value) -> bool {
         match value {
-            Value::Bool(_) => true,
-            Value::U8(_) => true,
-            Value::U16(_) => true,
-            Value::U32(_) => true,
+            Value::Bool(_) | Value::U8(_) | Value::U16(_) | Value::U32(_) | Value::F32(_) => true,
             Value::Tuple(vals) => vals.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(vals) => vals.is_empty(),
@@ -742,9 +749,10 @@ mod render_tree {
             match value {
                 Value::Bool(true) => write!(&mut self.writer, "true"),
                 Value::Bool(false) => write!(&mut self.writer, "false"),
-                Value::U8(i) => write!(&mut self.writer, "{i}"),
-                Value::U16(i) => write!(&mut self.writer, "{i}"),
-                Value::U32(i) => write!(&mut self.writer, "{i}"),
+                Value::U8(n) => write!(&mut self.writer, "{n}"),
+                Value::U16(n) => write!(&mut self.writer, "{n}"),
+                Value::U32(n) => write!(&mut self.writer, "{n}"),
+                Value::F32(n) => write!(&mut self.writer, "{n}"),
                 Value::Tuple(vals) if vals.is_empty() => write!(&mut self.writer, "()"),
                 Value::Seq(vals) if vals.is_empty() => write!(&mut self.writer, "[]"),
                 Value::Record(fields) if fields.is_empty() => write!(&mut self.writer, "{{}}"),
@@ -920,6 +928,30 @@ fn u32be() -> Format {
 fn u32le() -> Format {
     Format::Map(
         Func::U32Le,
+        Box::new(Format::Tuple(vec![
+            any_byte(),
+            any_byte(),
+            any_byte(),
+            any_byte(),
+        ])),
+    )
+}
+
+fn f32be() -> Format {
+    Format::Map(
+        Func::F32Be,
+        Box::new(Format::Tuple(vec![
+            any_byte(),
+            any_byte(),
+            any_byte(),
+            any_byte(),
+        ])),
+    )
+}
+
+fn f32le() -> Format {
+    Format::Map(
+        Func::F32Le,
         Box::new(Format::Tuple(vec![
             any_byte(),
             any_byte(),
@@ -1393,8 +1425,41 @@ fn jpeg_format() -> Format {
     jpeg
 }
 
+/// Binary STL File
+///
+/// - [Wikipedia](https://en.wikipedia.org/wiki/STL_(file_format)#Binary_STL)
+fn stl_format() -> Format {
+    // TODO: STL variants:
+    // - VisCAM
+    // - SolidView
+    // - Materialise Magics
+
+    let vec3d = record([("x", f32le()), ("y", f32le()), ("z", f32le())]);
+
+    let triangle = record([
+        ("normal", vec3d.clone()),
+        ("vertices", repeat_count(Expr::U8(3), vec3d.clone())),
+        ("attribute-byte-count", u16le()),
+    ]);
+
+    record([
+        ("header", repeat_count(Expr::U8(80), u8())),
+        ("triangle-count", u32le()),
+        ("triangles", repeat_count(Expr::Var(0), triangle)),
+    ])
+}
+
 #[derive(Copy, Clone, ValueEnum)]
-enum OutputFormat {
+enum FormatArg {
+    Auto,
+    Jpeg,
+    Png,
+    Riff,
+    Stl,
+}
+
+#[derive(Copy, Clone, ValueEnum)]
+enum OutputArg {
     /// Use the debug formatter
     Debug,
     /// Serialize to JSON
@@ -1406,9 +1471,12 @@ enum OutputFormat {
 /// Decode a binary file
 #[derive(Parser)]
 struct Args {
+    /// The format to use when decoding the file
+    #[arg(long, default_value = "auto")]
+    format: FormatArg,
     /// How decoded values are rendered
     #[arg(long, default_value = "tree")]
-    output: OutputFormat,
+    output: OutputArg,
     /// The binary file to decode
     #[arg(default_value = "test.jpg")]
     filename: PathBuf,
@@ -1421,19 +1489,28 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let format = Format::Map(
         Func::RecordProj("data".to_string()),
         Box::new(record([
-            ("data", alts([jpeg_format(), png_format(), riff_format()])),
+            (
+                "data",
+                match args.format {
+                    FormatArg::Auto => alts([jpeg_format(), png_format(), riff_format()]),
+                    FormatArg::Jpeg => jpeg_format(),
+                    FormatArg::Png => png_format(),
+                    FormatArg::Riff => riff_format(),
+                    FormatArg::Stl => stl_format(),
+                },
+            ),
             ("end", Format::EndOfInput),
         ])),
     );
     let decoder = Decoder::compile(&format, &Next::Empty)?;
-
-    let mut stack = Vec::new();
-    let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
+    let (val, _) = decoder
+        .parse(&mut Vec::new(), &input)
+        .ok_or("parse failure")?;
 
     match args.output {
-        OutputFormat::Debug => println!("{val:?}"),
-        OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
-        OutputFormat::Tree => render_tree::print_value(&val),
+        OutputArg::Debug => println!("{val:?}"),
+        OutputArg::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
+        OutputArg::Tree => render_tree::print_value(&val),
     }
 
     Ok(())

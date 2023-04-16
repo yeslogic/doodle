@@ -53,3 +53,17 @@ mod riff {
         expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
     }
 }
+
+mod stl {
+    use super::*;
+
+    #[test]
+    fn test_decode_cube_stl() {
+        let output = doodle()
+            .args(["cube.stl", "--format=stl"])
+            .output()
+            .unwrap();
+        let expected = expect_test::expect_file!("expected/decode/cube.stl.stdout");
+        expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
+    }
+}
