@@ -142,7 +142,7 @@ struct MatchTree {
 
 enum Cond {
     Expr(Expr),
-    Switch(MatchTree),
+    MatchTree(MatchTree),
 }
 
 /// Decoders with a fixed amount of lookahead
@@ -464,7 +464,7 @@ impl Cond {
     fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
         match self {
             Cond::Expr(expr) => expr.eval_bool(stack),
-            Cond::Switch(tree) => tree.matches(input) == Some(0),
+            Cond::MatchTree(tree) => tree.matches(input) == Some(0),
         }
     }
 }
@@ -480,7 +480,7 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, next)?);
                 let db = Box::new(Decoder::compile(b, next)?);
                 if let Some(tree) = MatchTree::build(&[a, b], next) {
-                    Ok(Decoder::If(Cond::Switch(tree), da, db))
+                    Ok(Decoder::If(Cond::MatchTree(tree), da, db))
                 } else {
                     Err(format!("cannot build match tree for {:?}", f))
                 }
