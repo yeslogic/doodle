@@ -1,7 +1,7 @@
 use std::{fmt, ops};
 
 /// Compact, allocation-free set of `u8`s.
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ByteSet {
     /// Each bit of the array represents a number in the range `0..=255`
     bits: [u64; 4],

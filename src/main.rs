@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use clap::{Parser, ValueEnum};
 use serde::Serialize;
@@ -8,7 +10,7 @@ use crate::byte_set::ByteSet;
 
 mod byte_set;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Pattern {
     Binding,
     Wildcard,
@@ -26,7 +28,7 @@ impl Pattern {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum Value {
     Bool(bool),
     U8(u8),
@@ -70,7 +72,7 @@ impl Value {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Expr {
     Bool(bool),
     U8(u8),
@@ -88,7 +90,7 @@ impl Expr {
     const UNIT: Expr = Expr::Tuple(Vec::new());
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Func {
     Expr(Expr),
     TupleProj(usize),
@@ -143,7 +145,7 @@ enum Func {
 /// formats no longer describe regular languages.
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Format {
     /// A format that never matches
     Fail,
@@ -179,6 +181,26 @@ enum Format {
     Map(Func, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+enum Next<'a> {
+    Empty,
+    Cat(&'a Format, Rc<Next<'a>>),
+    Tuple(&'a [Format], Rc<Next<'a>>),
+    Record(&'a [(String, Format)], Rc<Next<'a>>),
+    Repeat(&'a Format, Rc<Next<'a>>),
+}
+
+#[derive(Clone, Debug)]
+struct Nexts<'a> {
+    set: HashSet<(usize, Rc<Next<'a>>)>,
+}
+
+#[derive(Clone, Debug)]
+struct MatchTreeLevel<'a> {
+    accept: Option<usize>,
+    branches: Vec<(ByteSet, Nexts<'a>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -331,18 +353,22 @@ impl Format {
     }
 }
 
-#[derive(Debug)]
-enum Next<'a> {
-    Empty,
-    Cat(&'a Format, &'a Next<'a>),
-    Tuple(&'a [Format], &'a Next<'a>),
-    Record(&'a [(String, Format)], &'a Next<'a>),
-    Repeat(&'a Format, &'a Next<'a>),
+impl<'a> Nexts<'a> {
+    fn new() -> Self {
+        Nexts {
+            set: HashSet::new(),
+        }
+    }
+
+    fn add(&mut self, index: usize, next: Rc<Next<'a>>) -> Result<(), ()> {
+        self.set.insert((index, next));
+        Ok(())
+    }
 }
 
-impl MatchTree {
-    fn reject() -> MatchTree {
-        MatchTree {
+impl<'a> MatchTreeLevel<'a> {
+    fn reject() -> MatchTreeLevel<'a> {
+        MatchTreeLevel {
             accept: None,
             branches: vec![],
         }
@@ -359,89 +385,83 @@ impl MatchTree {
         }
     }
 
-    fn add_next(&mut self, index: usize, depth: usize, next: &Next) -> Result<(), ()> {
-        match next {
+    fn add_next(&mut self, index: usize, next: Rc<Next<'a>>) -> Result<(), ()> {
+        match next.as_ref() {
             Next::Empty => self.accept(index),
-            Next::Cat(f, next) => self.add(index, depth, f, next),
+            Next::Cat(f, next) => self.add(index, f, next.clone()),
             Next::Tuple(fs, next) => match fs.split_first() {
-                None => self.add_next(index, depth, next),
-                Some((f, fs)) => self.add(index, depth, f, &Next::Tuple(fs, next)),
+                None => self.add_next(index, next.clone()),
+                Some((f, fs)) => self.add(index, f, Rc::new(Next::Tuple(fs, next.clone()))),
             },
             Next::Record(fs, next) => match fs.split_first() {
-                None => self.add_next(index, depth, next),
-                Some(((_n, f), fs)) => self.add(index, depth, f, &Next::Record(fs, next)),
+                None => self.add_next(index, next.clone()),
+                Some(((_n, f), fs)) => self.add(index, f, Rc::new(Next::Record(fs, next.clone()))),
             },
-            Next::Repeat(a, next) => {
-                self.add_next(index, depth, next)?;
-                self.add(index, depth, a, &Next::Repeat(a, next))?;
+            Next::Repeat(a, next0) => {
+                self.add_next(index, next0.clone())?;
+                self.add(index, a, next)?;
                 Ok(())
             }
         }
     }
 
-    pub fn add(&mut self, index: usize, depth: usize, f: &Format, next: &Next) -> Result<(), ()> {
+    pub fn add(&mut self, index: usize, f: &'a Format, next: Rc<Next<'a>>) -> Result<(), ()> {
         match f {
             Format::Fail => Ok(()),
-            Format::Empty => self.add_next(index, depth, next),
+            Format::Empty => self.add_next(index, next),
             Format::EndOfInput => self.accept(index),
             Format::Byte(bs) => {
                 let mut bs = *bs;
                 let mut new_branches = Vec::new();
-                for (bs0, tree) in self.branches.iter_mut() {
+                for (bs0, nexts) in self.branches.iter_mut() {
                     let common = bs0.intersection(&bs);
                     if !common.is_empty() {
                         let orig = bs0.difference(&bs);
                         if !orig.is_empty() {
-                            new_branches.push((orig, tree.clone()));
+                            new_branches.push((orig, nexts.clone()));
                         }
                         *bs0 = common;
-                        if depth > 0 {
-                            tree.add_next(index, depth - 1, next)?;
-                        } else {
-                            tree.accept(index)?;
-                        }
+                        nexts.add(index, next.clone())?;
                         bs = bs.difference(bs0);
                     }
                 }
                 if !bs.is_empty() {
-                    let mut tree = MatchTree::reject();
-                    if depth > 0 {
-                        tree.add_next(index, depth - 1, next)?;
-                    } else {
-                        tree.accept(index)?;
-                    }
-                    self.branches.push((bs, tree));
+                    let mut nexts = Nexts::new();
+                    nexts.add(index, next.clone())?;
+                    self.branches.push((bs, nexts));
                 }
                 self.branches.append(&mut new_branches);
                 Ok(())
             }
             Format::Alt(a, b) => {
-                self.add(index, depth, a, next)?;
-                self.add(index, depth, b, next)?;
+                self.add(index, a, next.clone())?;
+                self.add(index, b, next.clone())?;
                 Ok(())
             }
             Format::Union(branches) => {
                 for f in branches {
-                    self.add(index, depth, f, next)?;
+                    self.add(index, f, next.clone())?;
                 }
                 Ok(())
             }
-            Format::Cat(a, b) => self.add(index, depth, a, &Next::Cat(b, next)),
+            Format::Cat(a, b) => self.add(index, a, Rc::new(Next::Cat(b, next.clone()))),
             Format::Tuple(fields) => match fields.split_first() {
-                None => self.add_next(index, depth, next),
-                Some((a, fields)) => self.add(index, depth, a, &Next::Tuple(fields, next)),
+                None => self.add_next(index, next.clone()),
+                Some((a, fields)) => self.add(index, a, Rc::new(Next::Tuple(fields, next.clone()))),
             },
             Format::Record(fields) => match fields.split_first() {
-                None => self.add_next(index, depth, next),
-                Some(((_, a), fields)) => self.add(index, depth, a, &Next::Record(fields, next)),
+                None => self.add_next(index, next.clone()),
+                Some(((_, a), fields)) => {
+                    self.add(index, a, Rc::new(Next::Record(fields, next.clone())))
+                }
             },
             Format::Repeat(a) => {
-                self.add_next(index, depth, next)?;
-                self.add(index, depth, a, &Next::Repeat(a, next))?;
+                self.add_next(index, next.clone())?;
+                self.add(index, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 Ok(())
             }
             Format::Repeat1(a) => {
-                self.add(index, depth, a, &Next::Repeat(a, next))?;
+                self.add(index, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 Ok(())
             }
             Format::RepeatCount(_expr, _a) => {
@@ -453,16 +473,51 @@ impl MatchTree {
             Format::WithRelativeOffset(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Map(_f, a) => self.add(index, depth, a, next),
+            Format::Map(_f, a) => self.add(index, a, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
-                    self.add(index, depth, f, next)?;
+                    self.add(index, f, next.clone())?;
                 }
                 Ok(())
             }
         }
     }
 
+    fn accepts(nexts: &Nexts<'a>) -> Option<MatchTree> {
+        let mut tree = MatchTreeLevel::reject();
+        for (i, _next) in nexts.set.iter() {
+            tree.accept(*i).ok()?;
+        }
+        Some(MatchTree {
+            accept: tree.accept,
+            branches: vec![],
+        })
+    }
+
+    fn grow(mut nexts: Nexts<'a>, depth: usize) -> Option<MatchTree> {
+        if let Some(tree) = MatchTreeLevel::accepts(&nexts) {
+            Some(tree)
+        } else if depth > 0 {
+            let mut tree = MatchTreeLevel::reject();
+            for (i, next) in nexts.set.drain() {
+                tree.add_next(i, next).ok()?;
+            }
+            let mut branches = Vec::new();
+            for (bs, nexts) in tree.branches {
+                let t = MatchTreeLevel::grow(nexts, depth - 1)?;
+                branches.push((bs, t));
+            }
+            Some(MatchTree {
+                accept: tree.accept,
+                branches,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl MatchTree {
     fn matches(&self, input: &[u8]) -> Option<usize> {
         match input.split_first() {
             None => self.accept,
@@ -477,35 +532,26 @@ impl MatchTree {
         }
     }
 
-    fn build0(depth: usize, branches: &[&Format], next: &Next) -> Option<MatchTree> {
-        let mut tree = MatchTree::reject();
-        for (i, branch) in branches.iter().enumerate() {
-            tree.add(i, depth, branch, next).ok()?;
+    fn build<'a>(branches: &[&'a Format], next: Rc<Next<'a>>) -> Option<MatchTree> {
+        let mut nexts = Nexts::new();
+        for (i, f) in branches.iter().enumerate() {
+            nexts.add(i, Rc::new(Next::Cat(f, next.clone()))).ok()?;
         }
-        Some(tree)
-    }
-
-    fn build(branches: &[&Format], next: &Next) -> Option<MatchTree> {
-        const MAX_DEPTH: usize = 16;
-        for depth in 0..MAX_DEPTH {
-            if let Some(tree) = MatchTree::build0(depth, branches, next) {
-                return Some(tree);
-            }
-        }
-        None
+        const MAX_DEPTH: usize = 32;
+        MatchTreeLevel::grow(nexts, MAX_DEPTH)
     }
 }
 
 impl Decoder {
-    pub fn compile(f: &Format, next: &Next) -> Result<Decoder, String> {
+    pub fn compile<'a>(f: &Format, next: Rc<Next<'a>>) -> Result<Decoder, String> {
         match f {
             Format::Fail => Ok(Decoder::Fail),
             Format::Empty => Ok(Decoder::Empty),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Alt(a, b) => {
-                let da = Decoder::compile(a, next)?;
-                let db = Decoder::compile(b, next)?;
+                let da = Decoder::compile(a, next.clone())?;
+                let db = Decoder::compile(b, next.clone())?;
                 if let Some(tree) = MatchTree::build(&[a, b], next) {
                     Ok(Decoder::Branch(tree, vec![da, db]))
                 } else {
@@ -516,7 +562,7 @@ impl Decoder {
                 let mut ds = Vec::new();
                 let mut fs = Vec::new();
                 for f in branches {
-                    let d = Decoder::compile(f, next)?;
+                    let d = Decoder::compile(f, next.clone())?;
                     ds.push(d);
                     fs.push(f);
                 }
@@ -527,7 +573,7 @@ impl Decoder {
                 }
             }
             Format::Cat(a, b) => {
-                let da = Box::new(Decoder::compile(a, &Next::Cat(b, next))?);
+                let da = Box::new(Decoder::compile(a, Rc::new(Next::Cat(b, next.clone())))?);
                 let db = Box::new(Decoder::compile(b, next)?);
                 Ok(Decoder::Cat(da, db))
             }
@@ -535,7 +581,8 @@ impl Decoder {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let df = Decoder::compile(f, &Next::Tuple(fields.as_slice(), next))?;
+                    let df =
+                        Decoder::compile(f, Rc::new(Next::Tuple(fields.as_slice(), next.clone())))?;
                     dfields.push(df);
                 }
                 Ok(Decoder::Tuple(dfields))
@@ -544,7 +591,10 @@ impl Decoder {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some((name, f)) = fields.next() {
-                    let df = Decoder::compile(f, &Next::Record(fields.as_slice(), next))?;
+                    let df = Decoder::compile(
+                        f,
+                        Rc::new(Next::Record(fields.as_slice(), next.clone())),
+                    )?;
                     dfields.push((name.clone(), df));
                 }
                 Ok(Decoder::Record(dfields))
@@ -553,7 +603,7 @@ impl Decoder {
                 if a.is_nullable() {
                     return Err("cannot repeat nullable format".to_string());
                 }
-                let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
+                let da = Box::new(Decoder::compile(a, Rc::new(Next::Repeat(a, next.clone())))?);
                 let astar = Format::Repeat(a.clone());
                 let fa = &Format::Cat(a.clone(), Box::new(astar));
                 let fb = &Format::Empty;
@@ -567,7 +617,7 @@ impl Decoder {
                 if a.is_nullable() {
                     return Err("cannot repeat nullable format".to_string());
                 }
-                let da = Box::new(Decoder::compile(a, &Next::Repeat(a, next))?);
+                let da = Box::new(Decoder::compile(a, Rc::new(Next::Repeat(a, next.clone())))?);
                 let astar = Format::Repeat(a.clone());
                 let fa = &Format::Empty;
                 let fb = &Format::Cat(a.clone(), Box::new(astar));
@@ -583,11 +633,11 @@ impl Decoder {
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::Slice(expr, a) => {
-                let da = Box::new(Decoder::compile(a, &Next::Empty)?);
+                let da = Box::new(Decoder::compile(a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
             Format::WithRelativeOffset(expr, a) => {
-                let da = Box::new(Decoder::compile(a, &Next::Empty)?);
+                let da = Box::new(Decoder::compile(a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
             Format::Map(f, a) => {
@@ -597,7 +647,7 @@ impl Decoder {
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
-                    .map(|(pattern, f)| Ok((pattern.clone(), Decoder::compile(f, next)?)))
+                    .map(|(pattern, f)| Ok((pattern.clone(), Decoder::compile(f, next.clone())?)))
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
             }
@@ -1486,7 +1536,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             ("end", Format::EndOfInput),
         ])),
     );
-    let decoder = Decoder::compile(&format, &Next::Empty)?;
+    let decoder = Decoder::compile(&format, Rc::new(Next::Empty))?;
 
     let mut stack = Vec::new();
     let (val, _) = decoder.parse(&mut stack, &input).ok_or("parse failure")?;
@@ -1519,7 +1569,7 @@ mod tests {
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1527,7 +1577,7 @@ mod tests {
     #[test]
     fn compile_empty() {
         let f = Format::Empty;
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0x00], &[0x00], Value::UNIT);
     }
@@ -1535,7 +1585,7 @@ mod tests {
     #[test]
     fn compile_byte_is() {
         let f = is_byte(0x00);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
         rejects(&d, &[0xFF]);
@@ -1545,7 +1595,7 @@ mod tests {
     #[test]
     fn compile_byte_not() {
         let f = not_byte(0x00);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
@@ -1555,7 +1605,7 @@ mod tests {
     #[test]
     fn compile_alt() {
         let f = alts([]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1563,7 +1613,7 @@ mod tests {
     #[test]
     fn compile_alt_byte() {
         let f = alts([is_byte(0x00), is_byte(0xFF)]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         rejects(&d, &[0x11]);
@@ -1573,39 +1623,39 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([is_byte(0x00), is_byte(0x00)]);
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_fail() {
         let f = alts([Format::Fail, Format::Fail]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         rejects(&d, &[]);
     }
 
     #[test]
     fn compile_alt_end_of_input() {
         let f = alts([Format::EndOfInput, Format::EndOfInput]);
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
         let f = alts([Format::Empty, Format::Empty]);
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_alt_fail_end_of_input() {
         let f = alts([Format::Fail, Format::EndOfInput]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
     }
 
     #[test]
     fn compile_alt_end_of_input_or_byte() {
         let f = alts([Format::EndOfInput, is_byte(0x00)]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[0x00, 0x00], &[0x00], Value::U8(0x00));
@@ -1615,7 +1665,7 @@ mod tests {
     #[test]
     fn compile_alt_opt() {
         let f = alts([Format::Empty, is_byte(0x00)]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0xFF], &[0xFF], Value::UNIT);
@@ -1627,7 +1677,7 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(is_byte(0xFF)),
         );
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1650,7 +1700,7 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(alts([Format::Empty, is_byte(0xFF)])),
         );
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1685,11 +1735,10 @@ mod tests {
             Box::new(alts([Format::Empty, is_byte(0x00)])),
             Box::new(alts([Format::Empty, is_byte(0x00)])),
         );
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
-    #[ignore = "this test takes over a minute to run"]
     fn compile_alt_opt_ambiguous_slow() {
         let alt = alts([
             is_byte(0x00),
@@ -1712,20 +1761,19 @@ mod tests {
             ("7", alt.clone()),
         ]);
         let f = alts([rec.clone(), rec.clone()]);
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
-    #[ignore = "this test takes over a minute to run"]
     fn compile_repeat_alt_repeat1_slow() {
         let f = repeat(alts([repeat1(is_byte(0x00)), is_byte(0x01), is_byte(0x02)]));
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1740,7 +1788,7 @@ mod tests {
     #[test]
     fn compile_repeat_repeat() {
         let f = repeat(repeat(is_byte(0x00)));
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
@@ -1749,7 +1797,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(repeat(is_byte(0xFF))),
         );
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[],
@@ -1797,7 +1845,7 @@ mod tests {
     #[test]
     fn compile_cat_end_of_input() {
         let f = Format::Cat(Box::new(is_byte(0x00)), Box::new(Format::EndOfInput));
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1814,7 +1862,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(Format::EndOfInput),
         );
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[],
@@ -1839,7 +1887,7 @@ mod tests {
             Box::new(repeat(is_byte(0x00))),
             Box::new(repeat(is_byte(0x00))),
         );
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
@@ -1849,7 +1897,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x7F))),
         ]);
-        assert!(Decoder::compile(&f, &Next::Empty).is_ok());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_ok());
     }
 
     #[test]
@@ -1859,7 +1907,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x00))),
         ]);
-        assert!(Decoder::compile(&f, &Next::Empty).is_err());
+        assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
     #[test]
@@ -1880,7 +1928,7 @@ mod tests {
                 ]),
             ),
         ]);
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
             &d,
             &[],
@@ -1949,7 +1997,7 @@ mod tests {
     #[test]
     fn compile_repeat1() {
         let f = repeat1(is_byte(0x00));
-        let d = Decoder::compile(&f, &Next::Empty).unwrap();
+        let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
