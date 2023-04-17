@@ -8,10 +8,22 @@
 //!
 //! For more information see <https://docs.rs/expect-test>.
 
-use std::process::Command;
+use expect_test::ExpectFile;
+use std::process::{Command, Output};
 
 fn doodle() -> Command {
     Command::new(env!("CARGO_BIN_EXE_doodle"))
+}
+
+#[track_caller]
+fn check_output(output: Output, expected: ExpectFile) {
+    if !output.status.success() {
+        if !output.stderr.is_empty() {
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        }
+        panic!("command failed to execute. {}", output.status);
+    }
+    expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
 }
 
 mod jpg {
@@ -21,14 +33,14 @@ mod jpg {
     fn test_decode_test_jpg() {
         let output = doodle().args(["test.jpg"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.jpg.stdout");
-        expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
+        check_output(output, expected)
     }
 
     #[test]
     fn test_decode_test2_jpg() {
         let output = doodle().args(["test2.jpg"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test2.jpg.stdout");
-        expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
+        check_output(output, expected)
     }
 }
 
@@ -39,7 +51,7 @@ mod png {
     fn test_decode_test_png() {
         let output = doodle().args(["test.png"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.png.stdout");
-        expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
+        check_output(output, expected)
     }
 }
 
@@ -50,6 +62,6 @@ mod riff {
     fn test_decode_test_webp() {
         let output = doodle().args(["test.webp"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.webp.stdout");
-        expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
+        check_output(output, expected)
     }
 }
