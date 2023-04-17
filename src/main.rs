@@ -8,6 +8,18 @@ use crate::byte_set::ByteSet;
 
 mod byte_set;
 
+#[derive(Clone, Debug)]
+enum Pattern {
+    Binding,
+    Wildcard,
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    Tuple(Vec<Pattern>),
+    Seq(Vec<Pattern>),
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize)]
 pub enum Value {
     Bool(bool),
@@ -21,6 +33,29 @@ pub enum Value {
 
 impl Value {
     const UNIT: Value = Value::Tuple(Vec::new());
+
+    /// Returns `Some` if the pattern successfully matches the value, along with
+    /// any values bound by the pattern
+    fn matches(&self, pattern: &Pattern) -> Option<Vec<Value>> {
+        match (pattern, self) {
+            (Pattern::Binding, head) => Some(vec![head.clone()]),
+            (Pattern::Wildcard, _) => Some(Vec::new()),
+            (Pattern::Bool(b0), Value::Bool(b1)) if b0 == b1 => Some(Vec::new()),
+            (Pattern::U8(i0), Value::U8(i1)) if i0 == i1 => Some(Vec::new()),
+            (Pattern::U16(i0), Value::U16(i1)) if i0 == i1 => Some(Vec::new()),
+            (Pattern::U32(i0), Value::U32(i1)) if i0 == i1 => Some(Vec::new()),
+            (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
+                if ps.len() == vs.len() =>
+            {
+                let mut bindings = Vec::new();
+                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
+                    bindings.extend(v.matches(p)?);
+                }
+                Some(bindings)
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -130,8 +165,8 @@ enum Format {
     WithRelativeOffset(Expr, Box<Format>),
     /// Transform a decoded value with a function
     Map(Func, Box<Format>),
-    /// Conditional format
-    If(Expr, Box<Format>, Box<Format>),
+    /// Pattern match on an expression
+    Match(Expr, Vec<(Pattern, Format)>),
 }
 
 #[derive(Clone, Debug)]
@@ -140,19 +175,13 @@ struct MatchTree {
     branches: Vec<(ByteSet, MatchTree)>,
 }
 
-enum Cond {
-    Expr(Expr),
-    MatchTree(MatchTree),
-}
-
 /// Decoders with a fixed amount of lookahead
 enum Decoder {
     Fail,
     Empty,
     EndOfInput,
     Byte(ByteSet),
-    If(Cond, Box<Decoder>, Box<Decoder>),
-    Switch(MatchTree, Vec<Decoder>),
+    Branch(MatchTree, Vec<Decoder>),
     Cat(Box<Decoder>, Box<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
@@ -162,6 +191,7 @@ enum Decoder {
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Func, Box<Decoder>),
+    Match(Expr, Vec<(Pattern, Decoder)>),
 }
 
 impl Expr {
@@ -195,13 +225,6 @@ impl Expr {
         }
     }
 
-    fn eval_bool(&self, stack: &[Value]) -> bool {
-        match self.eval(stack) {
-            Value::Bool(b) => b,
-            _ => panic!("value is not bool"),
-        }
-    }
-
     fn eval_usize(&self, stack: &[Value]) -> usize {
         match self.eval(stack) {
             Value::U8(n) => usize::from(n),
@@ -215,9 +238,9 @@ impl Expr {
 }
 
 impl Func {
-    fn eval(&self, arg: Value) -> Value {
+    fn eval(&self, stack: &mut Vec<Value>, arg: Value) -> Value {
         match self {
-            Func::Expr(e) => e.eval(&[]),
+            Func::Expr(e) => e.eval(stack),
             Func::TupleProj(i) => match arg {
                 Value::Tuple(vs) => vs[*i].clone(),
                 _ => panic!("TupleProj: expected tuple"),
@@ -289,9 +312,9 @@ impl Format {
             Format::Repeat1(_a) => false,
             Format::RepeatCount(_expr, _a) => true,
             Format::Slice(_expr, _a) => true,
-            Format::Map(_f, a) => a.is_nullable(),
-            Format::If(_expr, a, b) => a.is_nullable() || b.is_nullable(),
             Format::WithRelativeOffset(_, _) => true,
+            Format::Map(_f, a) => a.is_nullable(),
+            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable()),
         }
     }
 }
@@ -419,9 +442,10 @@ impl MatchTree {
                 self.accept(index) // FIXME
             }
             Format::Map(_f, a) => self.add(index, depth, a, next),
-            Format::If(_expr, a, b) => {
-                self.add(index, depth, a, next)?;
-                self.add(index, depth, b, next)?;
+            Format::Match(_, branches) => {
+                for (_, f) in branches {
+                    self.add(index, depth, f, next)?;
+                }
                 Ok(())
             }
         }
@@ -460,15 +484,6 @@ impl MatchTree {
     }
 }
 
-impl Cond {
-    fn eval(&self, stack: &[Value], input: &[u8]) -> bool {
-        match self {
-            Cond::Expr(expr) => expr.eval_bool(stack),
-            Cond::MatchTree(tree) => tree.matches(input) == Some(0),
-        }
-    }
-}
-
 impl Decoder {
     pub fn compile(f: &Format, next: &Next) -> Result<Decoder, String> {
         match f {
@@ -477,10 +492,10 @@ impl Decoder {
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Alt(a, b) => {
-                let da = Box::new(Decoder::compile(a, next)?);
-                let db = Box::new(Decoder::compile(b, next)?);
-                if let Some(tree) = MatchTree::build(&[a, b], next) {
-                    Ok(Decoder::If(Cond::MatchTree(tree), da, db))
+                let da = Decoder::compile(a, next)?;
+                let db = Decoder::compile(b, next)?;
+                if let Some(switch) = MatchTree::build(&[a, b], next) {
+                    Ok(Decoder::Branch(switch, vec![da, db]))
                 } else {
                     Err(format!("cannot build match tree for {:?}", f))
                 }
@@ -494,7 +509,7 @@ impl Decoder {
                     fs.push(f);
                 }
                 if let Some(tree) = MatchTree::build(&fs, next) {
-                    Ok(Decoder::Switch(tree, ds))
+                    Ok(Decoder::Branch(tree, ds))
                 } else {
                     Err(format!("cannot build match tree for {:?}", f))
                 }
@@ -567,10 +582,12 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, next)?);
                 Ok(Decoder::Map(f.clone(), da))
             }
-            Format::If(expr, a, b) => {
-                let da = Box::new(Decoder::compile(a, next)?);
-                let db = Box::new(Decoder::compile(b, next)?);
-                Ok(Decoder::If(Cond::Expr(expr.clone()), da, db))
+            Format::Match(head, branches) => {
+                let branches = branches
+                    .iter()
+                    .map(|(pattern, f)| Ok((pattern.clone(), Decoder::compile(f, next)?)))
+                    .collect::<Result<_, String>>()?;
+                Ok(Decoder::Match(head.clone(), branches))
             }
         }
     }
@@ -595,14 +612,7 @@ impl Decoder {
                     None
                 }
             }
-            Decoder::If(cond, a, b) => {
-                if cond.eval(stack, input) {
-                    a.parse(stack, input)
-                } else {
-                    b.parse(stack, input)
-                }
-            }
-            Decoder::Switch(tree, branches) => {
+            Decoder::Branch(tree, branches) => {
                 let index = tree.matches(input)?;
                 branches[index].parse(stack, input)
             }
@@ -691,7 +701,21 @@ impl Decoder {
             }
             Decoder::Map(f, a) => {
                 let (va, input) = a.parse(stack, input)?;
-                Some((f.eval(va), input))
+                Some((f.eval(stack, va), input))
+            }
+            Decoder::Match(head, branches) => {
+                let head = head.eval(stack);
+                let (defs, format) = branches
+                    .iter()
+                    .find_map(|(pattern, format)| head.matches(&pattern).map(|defs| (defs, format)))
+                    .expect("exhaustive patterns");
+
+                let initial_len = stack.len();
+                stack.extend(defs.clone());
+                let value = format.parse(stack, input);
+                stack.truncate(initial_len);
+
+                value
             }
         }
     }
@@ -937,10 +961,12 @@ fn riff_format() -> Format {
             ("data", Format::Slice(Expr::Var(0), Box::new(data))),
             (
                 "pad",
-                Format::If(
+                Format::Match(
                     Expr::IsEven(Box::new(Expr::Var(1))),
-                    Box::new(Format::Empty),
-                    Box::new(is_byte(0x00)),
+                    vec![
+                        (Pattern::Bool(true), Format::Empty),
+                        (Pattern::Bool(false), is_byte(0x00)),
+                    ],
                 ),
             ),
         ])
@@ -1051,21 +1077,35 @@ fn tiff_format() -> Format {
         ),
         (
             "magic",
-            Format::If(Expr::Var(0), Box::new(u16be()), Box::new(u16le())), // 42
+            Format::Match(
+                Expr::Var(0),
+                vec![
+                    (Pattern::Bool(false), u16le()), // 42
+                    (Pattern::Bool(true), u16be()),  // 42
+                ],
+            ),
         ),
         (
             "offset",
-            Format::If(Expr::Var(1), Box::new(u32be()), Box::new(u32le())),
+            Format::Match(
+                Expr::Var(1),
+                vec![
+                    (Pattern::Bool(false), u32le()),
+                    (Pattern::Bool(true), u32be()),
+                ],
+            ),
         ),
         (
             "ifd",
             Format::WithRelativeOffset(
                 // TODO: Offset from start of the TIFF header
                 Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
-                Box::new(Format::If(
+                Box::new(Format::Match(
                     Expr::Var(2),
-                    Box::new(ifd(true)),
-                    Box::new(ifd(false)),
+                    vec![
+                        (Pattern::Bool(false), ifd(false)),
+                        (Pattern::Bool(true), ifd(true)),
+                    ],
                 )),
             ),
         ),
