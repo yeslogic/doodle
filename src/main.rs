@@ -20,6 +20,12 @@ enum Pattern {
     Seq(Vec<Pattern>),
 }
 
+impl Pattern {
+    fn from_bytes(bs: &[u8]) -> Pattern {
+        Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize)]
 pub enum Value {
     Bool(bool),
@@ -914,6 +920,16 @@ fn any_bytes() -> Format {
     repeat(any_byte())
 }
 
+fn asciiz_string() -> Format {
+    Format::Map(
+        Func::RecordProj("string".to_string()),
+        Box::new(record([
+            ("string", repeat(not_byte(0x00))),
+            ("null", is_byte(0x00)),
+        ])),
+    )
+}
+
 fn u8() -> Format {
     any_byte()
 }
@@ -1247,7 +1263,6 @@ fn jpeg_format() -> Format {
 
     // APP0: Application segment 0 (JFIF)
     let app0_jfif = record([
-        ("identifier", is_bytes(b"JFIF\0")),
         ("version-major", u8()),
         ("version-minor", u8()),
         ("density-units", u8()), // 0 | 1 | 2
@@ -1267,32 +1282,48 @@ fn jpeg_format() -> Format {
         ),
     ]);
 
-    let app0_data = alts([
-        app0_jfif,
-        // FIXME there are other APP0 formats
-        // see https://exiftool.org/TagNames/JPEG.html
+    let app0_data = record([
+        ("identifier", asciiz_string()),
+        (
+            "data",
+            Format::Match(
+                Expr::Var(0),
+                vec![
+                    (Pattern::from_bytes(b"JFIF"), app0_jfif),
+                    // FIXME: there are other APP0 formats
+                    // see https://exiftool.org/TagNames/JPEG.html
+                    (Pattern::Wildcard, any_bytes()),
+                ],
+            ),
+        ),
     ]);
 
     // APP1: Application segment 1 (EXIF)
     //
     // - [Exif Version 2.32, Section 4.5.4](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=24)
-    let app1_exif = record([
-        ("identifier", is_bytes(b"Exif\0")),
-        ("padding", is_byte(0x00)),
-        ("exif", tiff_format()),
-    ]);
+    let app1_exif = record([("padding", is_byte(0x00)), ("exif", tiff_format())]);
 
     // APP1: Application segment 1 (XMP)
-    let app1_xmp = record([
-        ("identifier", is_bytes(b"http://ns.adobe.com/xap/1.0/\0")),
-        ("xmp", any_bytes()),
-    ]);
+    let app1_xmp = record([("xmp", any_bytes())]);
 
-    let app1_data = alts([
-        app1_exif,
-        app1_xmp,
-        // FIXME there are other APP1 formats
-        // see https://exiftool.org/TagNames/JPEG.html
+    let app1_data = record([
+        ("identifier", asciiz_string()),
+        (
+            "data",
+            Format::Match(
+                Expr::Var(0),
+                vec![
+                    (Pattern::from_bytes(b"Exif"), app1_exif),
+                    (
+                        Pattern::from_bytes(b"http://ns.adobe.com/xap/1.0/"),
+                        app1_xmp,
+                    ),
+                    // FIXME: there are other APP1 formats
+                    // see https://exiftool.org/TagNames/JPEG.html
+                    (Pattern::Wildcard, any_bytes()),
+                ],
+            ),
+        ),
     ]);
 
     let sof0 = marker_segment(0xC0, sof_data.clone()); // Start of frame (baseline jpeg)
