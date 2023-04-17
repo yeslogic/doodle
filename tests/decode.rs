@@ -34,3 +34,10 @@ fn test_decode_test2_jpg() {
     let expected = expect_test::expect_file!("expected/decode/test2.jpg.stdout");
     expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
 }
+
+#[test]
+fn test_decode_test_webp() {
+    let output = doodle().args(["test.webp"]).output().unwrap();
+    let expected = expect_test::expect_file!("expected/decode/test.webp.stdout");
+    expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
+}
