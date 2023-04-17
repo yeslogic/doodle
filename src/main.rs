@@ -34,26 +34,32 @@ pub enum Value {
 impl Value {
     const UNIT: Value = Value::Tuple(Vec::new());
 
-    /// Returns `Some` if the pattern successfully matches the value, along with
-    /// any values bound by the pattern
-    fn matches(&self, pattern: &Pattern) -> Option<Vec<Value>> {
+    /// Returns `true` if the pattern successfully matches the value, pushing
+    /// any values bound by the pattern onto the stack
+    fn matches(&self, stack: &mut Vec<Value>, pattern: &Pattern) -> bool {
         match (pattern, self) {
-            (Pattern::Binding, head) => Some(vec![head.clone()]),
-            (Pattern::Wildcard, _) => Some(Vec::new()),
-            (Pattern::Bool(b0), Value::Bool(b1)) if b0 == b1 => Some(Vec::new()),
-            (Pattern::U8(i0), Value::U8(i1)) if i0 == i1 => Some(Vec::new()),
-            (Pattern::U16(i0), Value::U16(i1)) if i0 == i1 => Some(Vec::new()),
-            (Pattern::U32(i0), Value::U32(i1)) if i0 == i1 => Some(Vec::new()),
+            (Pattern::Binding, head) => {
+                stack.push(head.clone());
+                true
+            }
+            (Pattern::Wildcard, _) => true,
+            (Pattern::Bool(b0), Value::Bool(b1)) => b0 == b1,
+            (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
+            (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
+            (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
             {
-                let mut bindings = Vec::new();
+                let initial_len = stack.len();
                 for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    bindings.extend(v.matches(p)?);
+                    if !v.matches(stack, p) {
+                        stack.truncate(initial_len);
+                        return false;
+                    }
                 }
-                Some(bindings)
+                true
             }
-            _ => None,
+            _ => false,
         }
     }
 }
@@ -705,16 +711,13 @@ impl Decoder {
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(stack);
-                let (defs, format) = branches
-                    .iter()
-                    .find_map(|(pattern, format)| head.matches(&pattern).map(|defs| (defs, format)))
-                    .expect("exhaustive patterns");
-
                 let initial_len = stack.len();
-                stack.extend(defs.clone());
-                let value = format.parse(stack, input);
+                let (_, decoder) = branches
+                    .iter()
+                    .find(|(pattern, _)| head.matches(stack, &pattern))
+                    .expect("exhaustive patterns");
+                let value = decoder.parse(stack, input);
                 stack.truncate(initial_len);
-
                 value
             }
         }
