@@ -128,7 +128,6 @@ enum Func {
 /// ⟦ Byte(!{}) ⟧               = .
 /// ⟦ Byte({b}) ⟧               = b
 /// ⟦ Byte({b₀, ... bₙ}) ⟧      = b₀ | ... | bₙ
-/// ⟦ Alt(f₀, f₁) ⟧             = ⟦ f₀ ⟧ | ⟦ f₁ ⟧
 /// ⟦ Switch([]) ⟧              = ∅
 /// ⟦ Switch([f₀, ..., fₙ]) ⟧   = ⟦ f₀ ⟧ | ... | ⟦ fₙ ⟧
 /// ⟦ Cat(f₀, f₁) ⟧             = ⟦ f₀ ⟧ ⟦ f₁ ⟧
@@ -152,8 +151,6 @@ enum Format {
     EndOfInput,
     /// Matches a byte in the given byte set
     Byte(ByteSet),
-    /// Matches the union of the byte strings matched by the two formats
-    Alt(Box<Format>, Box<Format>),
     /// Matches the union of the byte strings matched by all the formats
     Union(Vec<Format>),
     /// Matches the set of byte strings matched by the first format, followed by
@@ -336,7 +333,6 @@ impl Format {
             Format::Fail => false,
             Format::EndOfInput => true,
             Format::Byte(_) => false,
-            Format::Alt(a, b) => a.is_nullable() || b.is_nullable(),
             Format::Union(branches) => branches.iter().any(|f| f.is_nullable()),
             Format::Cat(a, b) => a.is_nullable() && b.is_nullable(),
             Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable()),
@@ -429,11 +425,6 @@ impl<'a> MatchTreeLevel<'a> {
                     self.branches.push((bs, nexts));
                 }
                 self.branches.append(&mut new_branches);
-                Ok(())
-            }
-            Format::Alt(a, b) => {
-                self.add(index, a, next.clone())?;
-                self.add(index, b, next.clone())?;
                 Ok(())
             }
             Format::Union(branches) => {
@@ -546,15 +537,6 @@ impl Decoder {
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
-            Format::Alt(a, b) => {
-                let da = Decoder::compile(a, next.clone())?;
-                let db = Decoder::compile(b, next.clone())?;
-                if let Some(tree) = MatchTree::build(&[a, b], next) {
-                    Ok(Decoder::Branch(tree, vec![da, db]))
-                } else {
-                    Err(format!("cannot build match tree for {:?}", f))
-                }
-            }
             Format::Union(branches) => {
                 let mut ds = Vec::new();
                 let mut fs = Vec::new();
