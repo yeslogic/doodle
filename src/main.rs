@@ -900,6 +900,16 @@ fn repeat_count(len: Expr, format: Format) -> Format {
     Format::RepeatCount(len, Box::new(format))
 }
 
+fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
+    Format::Match(
+        cond,
+        vec![
+            (Pattern::Bool(true), format0),
+            (Pattern::Bool(false), format1),
+        ],
+    )
+}
+
 fn is_byte(b: u8) -> Format {
     Format::Byte(ByteSet::from([b]))
 }
@@ -980,12 +990,10 @@ fn riff_format() -> Format {
             ("data", Format::Slice(Expr::Var(0), Box::new(data))),
             (
                 "pad",
-                Format::Match(
+                if_then_else(
                     Expr::IsEven(Box::new(Expr::Var(1))),
-                    vec![
-                        (Pattern::Bool(true), Format::Empty),
-                        (Pattern::Bool(false), is_byte(0x00)),
-                    ],
+                    Format::Empty,
+                    is_byte(0x00),
                 ),
             ),
         ])
@@ -1096,36 +1104,15 @@ fn tiff_format() -> Format {
         ),
         (
             "magic",
-            Format::Match(
-                Expr::Var(0),
-                vec![
-                    (Pattern::Bool(false), u16le()), // 42
-                    (Pattern::Bool(true), u16be()),  // 42
-                ],
-            ),
+            if_then_else(Expr::Var(0), u16be(), u16le()), // 42
         ),
-        (
-            "offset",
-            Format::Match(
-                Expr::Var(1),
-                vec![
-                    (Pattern::Bool(false), u32le()),
-                    (Pattern::Bool(true), u32be()),
-                ],
-            ),
-        ),
+        ("offset", if_then_else(Expr::Var(1), u32be(), u32le())),
         (
             "ifd",
             Format::WithRelativeOffset(
                 // TODO: Offset from start of the TIFF header
                 Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
-                Box::new(Format::Match(
-                    Expr::Var(2),
-                    vec![
-                        (Pattern::Bool(false), ifd(false)),
-                        (Pattern::Bool(true), ifd(true)),
-                    ],
-                )),
+                Box::new(if_then_else(Expr::Var(2), ifd(true), ifd(false))),
             ),
         ),
     ])
