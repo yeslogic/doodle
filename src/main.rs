@@ -124,7 +124,6 @@ enum Func {
 /// ```text
 /// ⟦ _ ⟧ : Format ⇀ Regexp
 /// ⟦ Fail ⟧                    = ∅
-/// ⟦ Empty ⟧                   = ε
 /// ⟦ Byte({}) ⟧                = ∅
 /// ⟦ Byte(!{}) ⟧               = .
 /// ⟦ Byte({b}) ⟧               = b
@@ -149,8 +148,6 @@ enum Func {
 enum Format {
     /// A format that never matches
     Fail,
-    /// A format that matches the empty byte string
-    Empty,
     /// Matches if the end of the input has been reached
     EndOfInput,
     /// Matches a byte in the given byte set
@@ -183,6 +180,10 @@ enum Format {
     Match(Expr, Vec<(Pattern, Format)>),
 }
 
+impl Format {
+    const EMPTY: Format = Format::Tuple(Vec::new());
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Next<'a> {
     Empty,
@@ -212,7 +213,6 @@ struct MatchTree {
 /// Decoders with a fixed amount of lookahead
 enum Decoder {
     Fail,
-    Empty,
     EndOfInput,
     Byte(ByteSet),
     Branch(MatchTree, Vec<Decoder>),
@@ -334,7 +334,6 @@ impl Format {
     fn is_nullable(&self) -> bool {
         match self {
             Format::Fail => false,
-            Format::Empty => true,
             Format::EndOfInput => true,
             Format::Byte(_) => false,
             Format::Alt(a, b) => a.is_nullable() || b.is_nullable(),
@@ -408,7 +407,6 @@ impl<'a> MatchTreeLevel<'a> {
     pub fn add(&mut self, index: usize, f: &'a Format, next: Rc<Next<'a>>) -> Result<(), ()> {
         match f {
             Format::Fail => Ok(()),
-            Format::Empty => self.add_next(index, next),
             Format::EndOfInput => self.accept(index),
             Format::Byte(bs) => {
                 let mut bs = *bs;
@@ -546,7 +544,6 @@ impl Decoder {
     pub fn compile<'a>(f: &Format, next: Rc<Next<'a>>) -> Result<Decoder, String> {
         match f {
             Format::Fail => Ok(Decoder::Fail),
-            Format::Empty => Ok(Decoder::Empty),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Alt(a, b) => {
@@ -606,7 +603,7 @@ impl Decoder {
                 let da = Box::new(Decoder::compile(a, Rc::new(Next::Repeat(a, next.clone())))?);
                 let astar = Format::Repeat(a.clone());
                 let fa = &Format::Cat(a.clone(), Box::new(astar));
-                let fb = &Format::Empty;
+                let fb = &Format::EMPTY;
                 if let Some(tree) = MatchTree::build(&[fa, fb], next) {
                     Ok(Decoder::While(tree, da))
                 } else {
@@ -619,7 +616,7 @@ impl Decoder {
                 }
                 let da = Box::new(Decoder::compile(a, Rc::new(Next::Repeat(a, next.clone())))?);
                 let astar = Format::Repeat(a.clone());
-                let fa = &Format::Empty;
+                let fa = &Format::EMPTY;
                 let fb = &Format::Cat(a.clone(), Box::new(astar));
                 if let Some(tree) = MatchTree::build(&[fa, fb], next) {
                     Ok(Decoder::Until(tree, da))
@@ -661,7 +658,6 @@ impl Decoder {
     ) -> Option<(Value, &'input [u8])> {
         match self {
             Decoder::Fail => None,
-            Decoder::Empty => Some((Value::UNIT, input)),
             Decoder::EndOfInput => match input {
                 [] => Some((Value::UNIT, &[])),
                 _ => None,
@@ -935,7 +931,7 @@ fn record<Label: ToString>(fields: impl IntoIterator<Item = (Label, Format)>) ->
 }
 
 fn optional(format: Format) -> Format {
-    alts([format, Format::Empty])
+    alts([format, Format::EMPTY])
 }
 
 fn repeat(format: Format) -> Format {
@@ -1042,7 +1038,7 @@ fn riff_format() -> Format {
                 "pad",
                 if_then_else(
                     Expr::IsEven(Box::new(Expr::Var(1))),
-                    Format::Empty,
+                    Format::EMPTY,
                     is_byte(0x00),
                 ),
             ),
@@ -1086,7 +1082,7 @@ fn png_format() -> Format {
     let idat_data = any_bytes();
 
     let iend_tag = is_bytes(b"IEND");
-    let iend_data = Format::Empty; // FIXME ensure IEND length = 0
+    let iend_data = Format::EMPTY; // FIXME ensure IEND length = 0
 
     let other_tag = alts([
         is_bytes(b"PLTE"),
@@ -1576,7 +1572,7 @@ mod tests {
 
     #[test]
     fn compile_empty() {
-        let f = Format::Empty;
+        let f = Format::EMPTY;
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0x00], &[0x00], Value::UNIT);
@@ -1641,7 +1637,7 @@ mod tests {
 
     #[test]
     fn compile_alt_empty() {
-        let f = alts([Format::Empty, Format::Empty]);
+        let f = alts([Format::EMPTY, Format::EMPTY]);
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
 
@@ -1664,7 +1660,7 @@ mod tests {
 
     #[test]
     fn compile_alt_opt() {
-        let f = alts([Format::Empty, is_byte(0x00)]);
+        let f = alts([Format::EMPTY, is_byte(0x00)]);
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0x00));
         accepts(&d, &[], &[], Value::UNIT);
@@ -1674,7 +1670,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_next() {
         let f = Format::Cat(
-            Box::new(alts([Format::Empty, is_byte(0x00)])),
+            Box::new(alts([Format::EMPTY, is_byte(0x00)])),
             Box::new(is_byte(0xFF)),
         );
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
@@ -1697,8 +1693,8 @@ mod tests {
     #[test]
     fn compile_alt_opt_opt() {
         let f = Format::Cat(
-            Box::new(alts([Format::Empty, is_byte(0x00)])),
-            Box::new(alts([Format::Empty, is_byte(0xFF)])),
+            Box::new(alts([Format::EMPTY, is_byte(0x00)])),
+            Box::new(alts([Format::EMPTY, is_byte(0xFF)])),
         );
         let d = Decoder::compile(&f, Rc::new(Next::Empty)).unwrap();
         accepts(
@@ -1732,8 +1728,8 @@ mod tests {
     #[test]
     fn compile_alt_opt_ambiguous() {
         let f = Format::Cat(
-            Box::new(alts([Format::Empty, is_byte(0x00)])),
-            Box::new(alts([Format::Empty, is_byte(0x00)])),
+            Box::new(alts([Format::EMPTY, is_byte(0x00)])),
+            Box::new(alts([Format::EMPTY, is_byte(0x00)])),
         );
         assert!(Decoder::compile(&f, Rc::new(Next::Empty)).is_err());
     }
@@ -1917,7 +1913,7 @@ mod tests {
             (
                 "second-and-third",
                 alts([
-                    Format::Empty,
+                    Format::EMPTY,
                     record([
                         (
                             "second",
