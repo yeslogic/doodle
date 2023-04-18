@@ -11,7 +11,7 @@ use crate::byte_set::ByteSet;
 mod byte_set;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-enum Pattern {
+pub enum Pattern {
     Binding,
     Wildcard,
     Bool(bool),
@@ -97,7 +97,7 @@ impl Value {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-enum Expr {
+pub enum Expr {
     Bool(bool),
     U8(u8),
     U16(u16),
@@ -116,7 +116,7 @@ impl Expr {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-enum Func {
+pub enum Func {
     Expr(Expr),
     TupleProj(usize),
     RecordProj(String),
@@ -169,7 +169,7 @@ enum Func {
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-enum Format {
+pub enum Format {
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -777,10 +777,12 @@ impl Decoder {
 mod render_tree {
     use std::{fmt, io};
 
-    use crate::Value;
+    use crate::{Expr, Format, Func, Value};
 
-    pub fn print_value(value: &Value) {
-        Context::new(io::stdout()).write_value(value).unwrap()
+    pub fn print_decoded_value(value: &Value, format: &Format) {
+        Context::new(io::stdout())
+            .write_decoded_value(value, format)
+            .unwrap()
     }
 
     fn is_atomic_value(value: &Value) -> bool {
@@ -805,6 +807,8 @@ mod render_tree {
         writer: W,
         gutter: Vec<Column>,
         preview_len: Option<usize>,
+        names: Vec<String>,
+        values: Vec<Value>,
     }
 
     impl<W: io::Write> Context<W> {
@@ -813,6 +817,74 @@ mod render_tree {
                 writer,
                 gutter: Vec::new(),
                 preview_len: Some(10),
+                names: Vec::new(),
+                values: Vec::new(),
+            }
+        }
+
+        pub fn write_decoded_value(&mut self, value: &Value, format: &Format) -> io::Result<()> {
+            match format {
+                Format::Fail => panic!("uninhabited format"),
+                Format::EndOfInput => self.write_value(value),
+                Format::Byte(_) => self.write_value(value),
+                Format::Union(branches) => match value {
+                    Value::Variant(label, value) => {
+                        let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
+                        self.write_variant(label, value, Some(format))
+                    }
+                    _ => panic!("expected variant"),
+                },
+                Format::Tuple(formats) => match value {
+                    Value::Tuple(values) => self.write_tuple(values, Some(formats)),
+                    _ => panic!("expected tuple"),
+                },
+                Format::Record(format_fields) => match value {
+                    Value::Record(value_fields) => {
+                        self.write_record(value_fields, Some(format_fields))
+                    }
+                    _ => panic!("expected record"),
+                },
+                Format::Repeat(format)
+                | Format::Repeat1(format)
+                | Format::RepeatCount(_, format) => match value {
+                    Value::Seq(values) => self.write_seq(values, Some(format)),
+                    _ => panic!("expected sequence"),
+                },
+                Format::Slice(_, format) => self.write_decoded_value(value, format),
+                Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
+                Format::Map(Func::Expr(_), _) => self.write_value(value),
+                Format::Map(Func::TupleProj(index), format) => match format.as_ref() {
+                    Format::Tuple(formats) => self.write_decoded_value(value, &formats[*index]),
+                    _ => panic!("expected tuple format"),
+                },
+                Format::Map(Func::RecordProj(label), format) => match format.as_ref() {
+                    Format::Record(fields) => {
+                        let (_, format) = fields.iter().find(|(l, _)| l == label).unwrap();
+                        self.write_decoded_value(value, format)
+                    }
+                    _ => panic!("expected record format"),
+                },
+                Format::Map(Func::Match(_), _) => self.write_value(value),
+                Format::Map(Func::U16Be, _) => self.write_value(value),
+                Format::Map(Func::U16Le, _) => self.write_value(value),
+                Format::Map(Func::U32Be, _) => self.write_value(value),
+                Format::Map(Func::U32Le, _) => self.write_value(value),
+                Format::Map(Func::Stream, _) => self.write_value(value),
+                Format::Match(head, branches) => {
+                    let head = head.eval(&mut self.values);
+                    let initial_len = self.values.len();
+                    let (_, format) = branches
+                        .iter()
+                        .find(|(pattern, _)| head.matches(&mut self.values, pattern))
+                        .expect("exhaustive patterns");
+                    for i in 0..(self.values.len() - initial_len) {
+                        self.names.push(format!("x{i}")); // TODO: use better names
+                    }
+                    self.write_decoded_value(value, &format)?;
+                    self.names.truncate(initial_len);
+                    self.values.truncate(initial_len);
+                    Ok(())
+                }
             }
         }
 
@@ -823,53 +895,104 @@ mod render_tree {
                 Value::U8(i) => write!(&mut self.writer, "{i}"),
                 Value::U16(i) => write!(&mut self.writer, "{i}"),
                 Value::U32(i) => write!(&mut self.writer, "{i}"),
-                Value::Tuple(vals) if vals.is_empty() => write!(&mut self.writer, "()"),
-                Value::Seq(vals) if vals.is_empty() => write!(&mut self.writer, "[]"),
-                Value::Record(fields) if fields.is_empty() => write!(&mut self.writer, "{{}}"),
-                Value::Tuple(vals) => self.write_elems(vals),
-                Value::Seq(vals) => self.write_elems(vals),
-                Value::Record(fields) => self.write_fields(fields),
-                Value::Variant(label, value) => {
-                    if is_atomic_value(value) {
-                        write!(&mut self.writer, "{{ {label} := ")?;
-                        self.write_value(value)?;
-                        write!(&mut self.writer, " }}")
-                    } else {
-                        self.write_field_value_last(label, value)
+                Value::Tuple(vals) => self.write_tuple(vals, None),
+                Value::Seq(vals) => self.write_seq(vals, None),
+                Value::Record(fields) => self.write_record(fields, None),
+                Value::Variant(label, value) => self.write_variant(label, value, None),
+            }
+        }
+
+        fn write_tuple(
+            &mut self,
+            vals: &[Value],
+            formats: Option<&[Format]>,
+        ) -> Result<(), io::Error> {
+            if vals.is_empty() {
+                write!(&mut self.writer, "()")
+            } else {
+                let last_index = vals.len() - 1;
+                for index in 0..last_index {
+                    self.write_field_value_continue(
+                        index,
+                        &vals[index],
+                        formats.map(|fs| &fs[index]),
+                    )?;
+                }
+                self.write_field_value_last(
+                    last_index,
+                    &vals[last_index],
+                    formats.map(|fs| &fs[last_index]),
+                )
+            }
+        }
+
+        fn write_seq(&mut self, vals: &[Value], format: Option<&Format>) -> Result<(), io::Error> {
+            if vals.is_empty() {
+                write!(&mut self.writer, "[]")
+            } else {
+                match self.preview_len {
+                    Some(preview_len)
+                        if vals.len() > preview_len && vals.iter().all(is_atomic_value) =>
+                    {
+                        let last_index = vals.len() - 1;
+                        for (index, val) in vals[0..preview_len].iter().enumerate() {
+                            self.write_field_value_continue(index, val, format)?;
+                        }
+                        if preview_len != last_index {
+                            self.write_field_skipped()?;
+                        }
+                        self.write_field_value_last(last_index, &vals[last_index], format)
+                    }
+                    Some(_) | None => {
+                        let last_index = vals.len() - 1;
+                        for (index, val) in vals[..last_index].iter().enumerate() {
+                            self.write_field_value_continue(index, val, format)?;
+                        }
+                        self.write_field_value_last(last_index, &vals[last_index], format)
                     }
                 }
             }
         }
 
-        fn write_elems(&mut self, vals: &[Value]) -> Result<(), io::Error> {
-            match self.preview_len {
-                Some(max_len) if vals.len() > max_len && vals.iter().all(is_atomic_value) => {
-                    let last_index = vals.len() - 1;
-                    for (index, val) in vals[0..max_len].iter().enumerate() {
-                        self.write_field_value_continue(index, val)?;
-                    }
-                    if max_len != last_index {
-                        self.write_field_skipped()?;
-                    }
-                    self.write_field_value_last(last_index, &vals[last_index])
+        fn write_record(
+            &mut self,
+            value_fields: &[(String, Value)],
+            format_fields: Option<&[(String, Format)]>,
+        ) -> Result<(), io::Error> {
+            if value_fields.is_empty() {
+                write!(&mut self.writer, "{{}}")
+            } else {
+                let initial_len = self.names.len();
+                let last_index = value_fields.len() - 1;
+                for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
+                    let format = format_fields.map(|fs| &fs[index].1);
+                    self.write_field_value_continue(label, value, format)?;
+                    self.names.push(label.clone());
+                    self.values.push(value.clone());
                 }
-                Some(_) | None => {
-                    let last_index = vals.len() - 1;
-                    for (index, val) in vals[..last_index].iter().enumerate() {
-                        self.write_field_value_continue(index, val)?;
-                    }
-                    self.write_field_value_last(last_index, &vals[last_index])
-                }
+                let (label, value) = &value_fields[last_index];
+                let format = format_fields.map(|fs| &fs[last_index].1);
+                self.write_field_value_last(label, value, format)?;
+                self.names.truncate(initial_len);
+                self.values.truncate(initial_len);
+                Ok(())
             }
         }
 
-        fn write_fields(&mut self, fields: &[(String, Value)]) -> Result<(), io::Error> {
-            let last_index = fields.len() - 1;
-            for (label, val) in &fields[..last_index] {
-                self.write_field_value_continue(label, val)?;
+        fn write_variant(
+            &mut self,
+            label: &str,
+            value: &Value,
+            format: Option<&Format>,
+        ) -> io::Result<()> {
+            if is_atomic_value(value) {
+                write!(&mut self.writer, "{{ {label} := ")?;
+                self.write_value(value)?;
+                write!(&mut self.writer, " }}")
+                // TODO: write format
+            } else {
+                self.write_field_value_last(label, value, format)
             }
-            let (label, val) = &fields[last_index];
-            self.write_field_value_last(label, val)
         }
 
         fn write_gutter(&mut self) -> io::Result<()> {
@@ -886,11 +1009,17 @@ mod render_tree {
             &mut self,
             label: impl fmt::Display,
             value: &Value,
+            format: Option<&Format>,
         ) -> io::Result<()> {
             self.write_gutter()?;
-            write!(&mut self.writer, "├── {label} :=")?;
+            write!(&mut self.writer, "├── {label}")?;
+            if let Some(format) = format {
+                write!(&mut self.writer, " <- ")?;
+                self.write_format(format)?;
+            }
+            write!(&mut self.writer, " :=")?;
             self.gutter.push(Column::Branch);
-            self.write_field_value(value)?;
+            self.write_field_value(value, format)?;
             self.gutter.pop();
             Ok(())
         }
@@ -899,29 +1028,192 @@ mod render_tree {
             &mut self,
             label: impl fmt::Display,
             value: &Value,
+            format: Option<&Format>,
         ) -> io::Result<()> {
             self.write_gutter()?;
-            write!(&mut self.writer, "└── {label} :=")?;
+            write!(&mut self.writer, "└── {label}")?;
+            if let Some(format) = format {
+                write!(&mut self.writer, " <- ")?;
+                self.write_format(format)?;
+            }
+            write!(&mut self.writer, " :=")?;
             self.gutter.push(Column::Space);
-            self.write_field_value(value)?;
+            self.write_field_value(value, format)?;
             self.gutter.pop();
             Ok(())
         }
 
-        fn write_field_value(&mut self, value: &Value) -> io::Result<()> {
+        fn write_field_value(&mut self, value: &Value, format: Option<&Format>) -> io::Result<()> {
             if is_atomic_value(value) {
                 write!(&mut self.writer, " ")?;
-                self.write_value(value)?;
+                match format {
+                    Some(format) => self.write_decoded_value(value, format)?,
+                    None => self.write_value(value)?,
+                }
                 writeln!(&mut self.writer)
             } else {
                 writeln!(&mut self.writer)?;
-                self.write_value(value)
+                match format {
+                    Some(format) => self.write_decoded_value(value, format),
+                    None => self.write_value(value),
+                }
             }
         }
 
         fn write_field_skipped(&mut self) -> io::Result<()> {
             self.write_gutter()?;
             writeln!(&mut self.writer, "~")
+        }
+
+        fn write_expr(&mut self, expr: &Expr) -> io::Result<()> {
+            match expr {
+                Expr::Sub(expr0, expr1) => {
+                    self.write_atomic_expr(expr0)?;
+                    write!(&mut self.writer, " - ")?;
+                    self.write_atomic_expr(expr1)
+                }
+                Expr::IsEven(expr) => {
+                    write!(&mut self.writer, "is-even ")?;
+                    self.write_atomic_expr(expr)
+                }
+                expr => self.write_atomic_expr(expr),
+            }
+        }
+
+        fn write_atomic_expr(&mut self, expr: &Expr) -> io::Result<()> {
+            match expr {
+                Expr::Var(index) => {
+                    let name = &self.names[self.names.len() - index - 1];
+                    write!(&mut self.writer, "{name}")
+                }
+                Expr::Bool(b) => write!(&mut self.writer, "{b}"),
+                Expr::U8(i) => write!(&mut self.writer, "{i}"),
+                Expr::U16(i) => write!(&mut self.writer, "{i}"),
+                Expr::U32(i) => write!(&mut self.writer, "{i}"),
+                Expr::Tuple(..) => write!(&mut self.writer, "(...)"),
+                Expr::Record(..) => write!(&mut self.writer, "{{ ... }}"),
+                Expr::Variant(label, expr) => {
+                    write!(&mut self.writer, "{{ {label} := ")?;
+                    self.write_expr(expr)?;
+                    write!(&mut self.writer, " }}")
+                }
+                Expr::Seq(..) => write!(&mut self.writer, "[..]"),
+                expr => {
+                    write!(&mut self.writer, "(")?;
+                    self.write_expr(expr)?;
+                    write!(&mut self.writer, ")")
+                }
+            }
+        }
+
+        fn write_format(&mut self, format: &Format) -> io::Result<()> {
+            match format {
+                Format::Union(_) => write!(&mut self.writer, "_ |...| _"),
+
+                Format::Repeat(format) => {
+                    write!(&mut self.writer, "repeat ")?;
+                    self.write_atomic_format(format)
+                }
+                Format::Repeat1(format) => {
+                    write!(&mut self.writer, "repeat1 ")?;
+                    self.write_atomic_format(format)
+                }
+                Format::RepeatCount(len, format) => {
+                    write!(&mut self.writer, "repeat-count ")?;
+                    self.write_atomic_expr(len)?;
+                    write!(&mut self.writer, " ")?;
+                    self.write_atomic_format(format)
+                }
+                Format::Slice(len, format) => {
+                    write!(&mut self.writer, "slice ")?;
+                    self.write_atomic_expr(len)?;
+                    write!(&mut self.writer, " ")?;
+                    self.write_atomic_format(format)
+                }
+                Format::WithRelativeOffset(offset, format) => {
+                    write!(&mut self.writer, "with-relative-offset ")?;
+                    self.write_atomic_expr(offset)?;
+                    write!(&mut self.writer, " ")?;
+                    self.write_atomic_format(format)
+                }
+
+                Format::Map(func, format) => match func {
+                    Func::Expr(expr) => {
+                        write!(&mut self.writer, "map (always ")?;
+                        self.write_expr(expr)?;
+                        write!(&mut self.writer, ")")?;
+                        self.write_atomic_format(format)
+                    }
+                    Func::TupleProj(index) => {
+                        write!(&mut self.writer, "map _.{index} ")?;
+                        self.write_atomic_format(format)
+                    }
+                    Func::RecordProj(label) => {
+                        write!(&mut self.writer, "map _.{label} ")?;
+                        self.write_atomic_format(format)
+                    }
+                    Func::Match(_) => {
+                        write!(&mut self.writer, "map (fun x => match x {{ ... }}) ")?;
+                        self.write_atomic_format(format)
+                    }
+                    Func::U16Be => write!(&mut self.writer, "u16be"), // FIXME: Hack
+                    Func::U16Le => write!(&mut self.writer, "u16le"), // FIXME: Hack
+                    Func::U32Be => write!(&mut self.writer, "u32be"), // FIXME: Hack
+                    Func::U32Le => write!(&mut self.writer, "u32le"), // FIXME: Hack
+                    Func::Stream => {
+                        write!(&mut self.writer, "map stream ")?;
+                        self.write_atomic_format(format)
+                    }
+                },
+
+                Format::Match(head, _) => {
+                    write!(&mut self.writer, "match ")?;
+                    self.write_atomic_expr(head)?;
+                    write!(&mut self.writer, " {{ ... }}")
+                }
+
+                format => self.write_atomic_format(format),
+            }
+        }
+
+        fn write_atomic_format(&mut self, format: &Format) -> io::Result<()> {
+            match format {
+                Format::Fail => write!(&mut self.writer, "fail"),
+                Format::EndOfInput => write!(&mut self.writer, "end-of-input"),
+
+                Format::Byte(bs) if bs.is_full() => write!(&mut self.writer, "u8"), // FIXME: Hack
+                Format::Byte(bs) => {
+                    if bs.len() < 128 {
+                        write!(&mut self.writer, "[=")?;
+                        for b in bs.iter() {
+                            write!(&mut self.writer, " {b}")?;
+                        }
+                        write!(&mut self.writer, "]")
+                    } else {
+                        write!(&mut self.writer, "[!=")?;
+                        for b in (!bs).iter() {
+                            write!(&mut self.writer, " {b}")?;
+                        }
+                        write!(&mut self.writer, "]")
+                    }
+                }
+
+                Format::Tuple(formats) if formats.is_empty() => write!(&mut self.writer, "()"),
+                Format::Tuple(_) => write!(&mut self.writer, "(...)"),
+
+                Format::Record(fields) if fields.is_empty() => write!(&mut self.writer, "{{}}"),
+                Format::Record(_) => write!(&mut self.writer, "{{ ... }}"),
+
+                Format::Map(Func::U16Be, _) => write!(&mut self.writer, "u16be"), // FIXME: Hack
+                Format::Map(Func::U16Le, _) => write!(&mut self.writer, "u16le"), // FIXME: Hack
+                Format::Map(Func::U32Be, _) => write!(&mut self.writer, "u32be"), // FIXME: Hack
+                Format::Map(Func::U32Le, _) => write!(&mut self.writer, "u32le"), // FIXME: Hack
+                format => {
+                    write!(&mut self.writer, "(")?;
+                    self.write_format(format)?;
+                    write!(&mut self.writer, ")")
+                }
+            }
         }
     }
 }
@@ -1605,7 +1897,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match args.output {
         OutputFormat::Debug => println!("{val:?}"),
         OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
-        OutputFormat::Tree => render_tree::print_value(&val),
+        OutputFormat::Tree => render_tree::print_decoded_value(&val, &format),
     }
 
     Ok(())
