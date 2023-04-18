@@ -72,7 +72,11 @@ impl ByteSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        *self == ByteSet::empty()
+    }
+
+    pub fn is_full(&self) -> bool {
+        *self == ByteSet::full()
     }
 
     pub fn insert(&mut self, b: u8) {
