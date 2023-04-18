@@ -506,8 +506,8 @@ impl Decoder {
             Format::Alt(a, b) => {
                 let da = Decoder::compile(a, next)?;
                 let db = Decoder::compile(b, next)?;
-                if let Some(switch) = MatchTree::build(&[a, b], next) {
-                    Ok(Decoder::Branch(switch, vec![da, db]))
+                if let Some(tree) = MatchTree::build(&[a, b], next) {
+                    Ok(Decoder::Branch(tree, vec![da, db]))
                 } else {
                     Err(format!("cannot build match tree for {:?}", f))
                 }
