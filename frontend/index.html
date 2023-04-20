@@ -1,0 +1,72 @@
+<!--
+Basic frontend for displaying the structure of the binary data from the Rust code.
+
+This needs:
+
+     - the Json output of the Rust code to be in ./test.json
+     - an HTTP server to be running with the 'frontend' directory as its root
+       - e.g. with Python, you can run `python -m http.server`
+     - a browser, obviously
+
+-->
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    main {
+      display: flex;
+      width: 100%;
+      height: 100%;
+
+      flex-flow: row nowrap;
+      align-items: stretch;
+    }
+
+    main > section {
+      flex: 1;
+    }
+
+    ul, li, dl, dt, dd {
+      margin: 0;
+      padding: 0;
+    }
+
+    ul {
+      list-style: none;
+    }
+
+    li {
+    }
+
+    dl {
+    }
+
+    #structure {
+    }
+
+    #binary {
+    }
+
+    </style>
+  </head>
+  <body>
+    <main>
+      <section id="structure">
+      </section>
+      <section id="binary">
+      </section>
+    </main>
+
+    <script src="./display.js"></script>
+    <script>main();</script>
+  </body>
+</html>
