@@ -12,6 +12,7 @@ This needs:
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8">
     <style>
     * {
       box-sizing: border-box;
@@ -20,6 +21,10 @@ This needs:
     body {
       width: 100vw;
       height: 100vh;
+
+      line-height: 4ex;
+
+      font-family: 'MonoLisa', 'VictorMono Nerd Font', 'VictorMono', monospace;
     }
 
     main {
@@ -40,17 +45,115 @@ This needs:
       padding: 0;
     }
 
-    ul {
+    dl {
+      display: flex;
+      flex-flow: row wrap;
+    }
+
+    dt.object {
+      width: 100%;
+    }
+
+    dd {
+      flex: 1;
+    }
+
+    dl ul > li, dl dl > dt {
       list-style: none;
+      border-left: var(--line-size) solid lightgray;
+    }
+
+    li:last-child,
+    dd dt:last-of-type,
+    li > * > :first-child {
+      border-left: 0;
+      padding-left: var(--indent-width);
+    }
+
+    li.string:last-child,
+    li.number:last-child,
+    dd dt:last-of-type,
+    li > * > li.string:first-child,
+    li > * > li.number:first-child {
+      padding-left: calc(var(--indent-width) + var(--spacing-size));
+    }
+
+    dd dt:last-of-type.number,
+    dd dt:last-of-type.string {
+      padding-left: var(--spacing-size);
     }
 
     li {
+      padding: 0;
+      padding-left: var(--indent-width);
+    }
+
+    li, dt, dd {
+      position: relative;
+    }
+
+    /* there shouldn't be any undefined types, so if there are we highlight them
+    with a red outline */
+    .undefined {
+      outline: 1px solid red;
+    }
+
+    .string, .number {
+      padding-left: calc(var(--indent-width) + var(--spacing-size));
+      height: 4ex;
+    }
+
+    li::before {
+      content: '';
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: var(--indent-width);
+      height: 2ex;
+      border-bottom: var(--line-size) solid lightgray;
+    }
+
+    li > * > li:first-child:not(:only-child)::before,
+    li > * > .object:first-child:not(:only-child)::before {
+      content: '';
+      display: block;
+      position: absolute;
+      top: auto;
+      bottom: 0;
+      left: 0;
+      width: var(--indent-width);
+      height: calc(100% - 2ex - var(--line-size));
+      border-left: var(--line-size) solid lightgray;
+      border-top: var(--line-size) solid lightgray;
+      border-bottom: 0;
+    }
+
+    li:last-of-type::before {
+      border-left: var(--line-size) solid lightgray;
+    }
+
+    li:only-of-type::before {
+      border-left: 0;
+    }
+
+    dd.number:before {
+      content: ':=';
+
+      display: block;
+      position: absolute;
+      left: 0;
+      margin-left: 1px;
+      color: gray;
     }
 
     dl {
     }
 
     #structure {
+      --indent-width: 1em;
+      --spacing-size: 0.5em;
+      --line-size: 2px;
     }
 
     #binary {
