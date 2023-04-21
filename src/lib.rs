@@ -11,7 +11,8 @@ use crate::byte_set::ByteSet;
 pub mod byte_set;
 pub mod output;
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum Pattern {
     Binding,
     Wildcard,
@@ -108,7 +109,8 @@ impl Value {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum Expr {
     Var(usize),
     Bool(bool),
@@ -187,7 +189,8 @@ impl Expr {
 /// formats no longer describe regular languages.
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
     ItemVar(usize),
@@ -226,6 +229,7 @@ impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 }
 
+#[derive(Debug, Serialize)]
 pub struct FormatModule {
     names: Vec<String>,
     formats: Vec<Format>,

@@ -19,14 +19,17 @@ pub fn main(module: &mut FormatModule) -> Format {
     let png = png::main(module, &base);
     let riff = riff::main(module, &base);
 
-    Format::Map(
-        Expr::RecordProj(Box::new(Expr::Var(0)), "data".to_string()),
-        Box::new(record([
-            (
-                "data",
-                alts([("gif", gif), ("jpeg", jpeg), ("png", png), ("riff", riff)]),
-            ),
-            ("end", Format::EndOfInput),
-        ])),
+    module.define_format(
+        "main",
+        Format::Map(
+            Expr::RecordProj(Box::new(Expr::Var(0)), "data".to_string()),
+            Box::new(record([
+                (
+                    "data",
+                    alts([("gif", gif), ("jpeg", jpeg), ("png", png), ("riff", riff)]),
+                ),
+                ("end", Format::EndOfInput),
+            ])),
+        ),
     )
 }
