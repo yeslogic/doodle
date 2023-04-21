@@ -1,5 +1,7 @@
 use std::{fmt, ops};
 
+use serde::ser::{Serialize, SerializeSeq, SerializeStruct, Serializer};
+
 /// Compact, allocation-free set of `u8`s.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ByteSet {
@@ -147,6 +149,33 @@ impl ops::Not for ByteSet {
 
     fn not(self) -> ByteSet {
         !&self
+    }
+}
+
+impl Serialize for ByteSet {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        struct All(ByteSet);
+
+        impl Serialize for All {
+            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                let len = usize::try_from(self.0.len()).unwrap();
+                let mut seq = serializer.serialize_seq(Some(len))?;
+                for b in self.0.iter() {
+                    seq.serialize_element(&b)?;
+                }
+                seq.end()
+            }
+        }
+
+        let mut byte_set = serializer.serialize_struct("ByteSet", 2)?;
+        if self.len() < 128 {
+            byte_set.serialize_field("tag", "includes")?;
+            byte_set.serialize_field("data", &All(*self))?;
+        } else {
+            byte_set.serialize_field("tag", "excludes")?;
+            byte_set.serialize_field("data", &All(!*self))?;
+        }
+        byte_set.end()
     }
 }
 

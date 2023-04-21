@@ -31,7 +31,7 @@ mod gif {
 
     #[test]
     fn test_decode_test_gif() {
-        let output = doodle().args(["test.gif"]).output().unwrap();
+        let output = doodle().args(["file", "test.gif"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.gif.stdout");
         check_output(output, expected)
     }
@@ -42,14 +42,14 @@ mod jpeg {
 
     #[test]
     fn test_decode_test_jpg() {
-        let output = doodle().args(["test.jpg"]).output().unwrap();
+        let output = doodle().args(["file", "test.jpg"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.jpg.stdout");
         check_output(output, expected)
     }
 
     #[test]
     fn test_decode_test2_jpg() {
-        let output = doodle().args(["test2.jpg"]).output().unwrap();
+        let output = doodle().args(["file", "test2.jpg"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test2.jpg.stdout");
         check_output(output, expected)
     }
@@ -60,7 +60,7 @@ mod png {
 
     #[test]
     fn test_decode_test_png() {
-        let output = doodle().args(["test.png"]).output().unwrap();
+        let output = doodle().args(["file", "test.png"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.png.stdout");
         check_output(output, expected)
     }
@@ -71,7 +71,7 @@ mod riff {
 
     #[test]
     fn test_decode_test_webp() {
-        let output = doodle().args(["test.webp"]).output().unwrap();
+        let output = doodle().args(["file", "test.webp"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test.webp.stdout");
         check_output(output, expected)
     }

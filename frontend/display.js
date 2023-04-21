@@ -1,10 +1,12 @@
 function main() {
   const structureSection = document.getElementById('structure');
-  fetch('./test.json')
-    .then(r => r.json())
-    .then(json => {
-      structureSection.appendChild(valueToHTML(json));
-    });
+  Promise.all([
+    fetch('./test.json').then(r => r.json()),
+    fetch('./format.json').then(r => r.json()),
+  ]).then(([value, format]) => {
+    // TODO: format-directed printing
+    structureSection.appendChild(valueToHTML(value));
+  });
 }
 
 // Convert a value into HTML.

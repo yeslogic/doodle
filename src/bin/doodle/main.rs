@@ -10,7 +10,15 @@ use doodle::{Decoder, FormatModule};
 mod format;
 
 #[derive(Copy, Clone, ValueEnum)]
-enum OutputFormat {
+enum FormatOutput {
+    /// Use the debug formatter
+    Debug,
+    /// Serialize to JSON
+    Json,
+}
+
+#[derive(Copy, Clone, ValueEnum)]
+enum FileOutput {
     /// Use the debug formatter
     Debug,
     /// Serialize to JSON
@@ -19,33 +27,56 @@ enum OutputFormat {
     Tree,
 }
 
-/// Decode a binary file
 #[derive(Parser)]
-struct Args {
-    /// How decoded values are rendered
-    #[arg(long, default_value = "tree")]
-    output: OutputFormat,
-    /// The binary file to decode
-    #[arg(default_value = "test.jpg")]
-    filename: PathBuf,
+enum Command {
+    /// Dump the format used when decoding files
+    Format {
+        /// How the format is rendered
+        #[arg(long)]
+        output: FormatOutput,
+    },
+    /// Decode a binary file
+    File {
+        /// How decoded values are rendered
+        #[arg(long, default_value = "tree")]
+        output: FileOutput,
+        /// The binary file to decode
+        filename: PathBuf,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    let args = Args::parse();
-    let input = fs::read(args.filename)?;
+    match Command::parse() {
+        Command::Format { output } => {
+            let mut module = FormatModule::new();
+            let _ = format::main(&mut module);
 
-    let mut module = FormatModule::new();
-    let format = format::main(&mut module);
+            match output {
+                FormatOutput::Debug => println!("{module:?}"),
+                FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
+            }
 
-    let (val, _) = Decoder::compile(&module, &format)?
-        .parse(&mut Vec::new(), &input)
-        .ok_or("parse failure")?;
+            Ok(())
+        }
+        Command::File { output, filename } => {
+            let mut module = FormatModule::new();
+            let format = format::main(&mut module);
+            let decoder = Decoder::compile(&module, &format)?;
 
-    match args.output {
-        OutputFormat::Debug => println!("{val:?}"),
-        OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &val).unwrap(),
-        OutputFormat::Tree => doodle::output::tree::print_decoded_value(&module, &val, &format),
+            let input = fs::read(filename)?;
+            let (value, _) = decoder
+                .parse(&mut Vec::new(), &input)
+                .ok_or("parse failure")?;
+
+            match output {
+                FileOutput::Debug => println!("{value:?}"),
+                FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
+                FileOutput::Tree => {
+                    doodle::output::tree::print_decoded_value(&module, &value, &format)
+                }
+            }
+
+            Ok(())
+        }
     }
-
-    Ok(())
 }

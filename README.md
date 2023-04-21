@@ -9,12 +9,13 @@ language, [Fathom](https://github.com/yeslogic/fathom).
 Decoding files using the CLI:
 
 ```sh
-cargo run test2.jpg
+cargo run file test2.jpg
 ```
 
 Viewing decoded data on the web frontend (requires Python):
 
 ```sh
-cargo run -- --output=json test2.jpg > frontend/test.json
+cargo run format --output=json > frontend/format.json
+cargo run file --output=json test2.jpg > frontend/test.json
 python3 -m http.server --directory frontend
 ```
