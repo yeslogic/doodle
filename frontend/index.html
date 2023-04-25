@@ -65,9 +65,13 @@ This needs:
 
     li:last-child,
     dd dt:last-of-type,
-    li > * > :first-child {
+    li > :not(span) > :first-child {
       border-left: 0;
       padding-left: var(--indent-width);
+    }
+
+    li > span {
+        margin-left: var(--indent-width)
     }
 
     li.string:last-child,
@@ -159,6 +163,16 @@ This needs:
     #binary {
     }
 
+.text {
+    font-weight: bold;
+    white-space: pre-wrap;
+    padding: 3px 4px;
+    border-radius: 4px;
+    border: solid black 1px
+}
+.escape { color: blue }
+.printable { }
+.control { color: red }
     </style>
   </head>
   <body>
