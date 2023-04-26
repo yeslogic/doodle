@@ -120,9 +120,11 @@ pub enum Expr {
     Seq(Vec<Expr>),
 
     BitAnd(Box<Expr>, Box<Expr>),
+    Eq(Box<Expr>, Box<Expr>),
+    Ne(Box<Expr>, Box<Expr>),
+    Rem(Box<Expr>, Box<Expr>),
     Shl(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
-    IsEven(Box<Expr>),
 }
 
 impl Expr {
@@ -286,6 +288,24 @@ impl Expr {
                 (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
+            Expr::Eq(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            Expr::Ne(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            Expr::Rem(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
             #[rustfmt::skip]
             Expr::Shl(x, y) => match (x.eval(stack), y.eval(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shl(x, u32::from(y)).unwrap()),
@@ -298,12 +318,6 @@ impl Expr {
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::IsEven(x) => match x.eval(stack) {
-                Value::U8(x) => Value::Bool(x % 2 == 0),
-                Value::U16(x) => Value::Bool(x % 2 == 0),
-                Value::U32(x) => Value::Bool(x % 2 == 0),
-                _ => panic!("IsEven expected number"),
             },
         }
     }
@@ -1094,6 +1108,21 @@ mod render_tree {
 
         fn write_expr(&mut self, expr: &Expr) -> io::Result<()> {
             match expr {
+                Expr::BitAnd(expr0, expr1) => {
+                    self.write_proj_expr(expr0)?;
+                    write!(&mut self.writer, " & ")?;
+                    self.write_proj_expr(expr1)
+                }
+                Expr::Eq(expr0, expr1) => {
+                    self.write_proj_expr(expr0)?;
+                    write!(&mut self.writer, " == ")?;
+                    self.write_proj_expr(expr1)
+                }
+                Expr::Ne(expr0, expr1) => {
+                    self.write_proj_expr(expr0)?;
+                    write!(&mut self.writer, " != ")?;
+                    self.write_proj_expr(expr1)
+                }
                 Expr::Sub(expr0, expr1) => {
                     self.write_proj_expr(expr0)?;
                     write!(&mut self.writer, " - ")?;
@@ -1104,14 +1133,10 @@ mod render_tree {
                     write!(&mut self.writer, " << ")?;
                     self.write_proj_expr(expr1)
                 }
-                Expr::BitAnd(expr0, expr1) => {
+                Expr::Rem(expr0, expr1) => {
                     self.write_proj_expr(expr0)?;
-                    write!(&mut self.writer, " & ")?;
+                    write!(&mut self.writer, " % ")?;
                     self.write_proj_expr(expr1)
-                }
-                Expr::IsEven(expr) => {
-                    write!(&mut self.writer, "is-even ")?;
-                    self.write_proj_expr(expr)
                 }
                 expr => self.write_proj_expr(expr),
             }
@@ -1404,8 +1429,14 @@ fn gif_format() -> Format {
     ]);
 
     fn has_global_color_table(flags: Expr) -> Expr {
-        // flags & 0b10000000
-        Expr::BitAnd(Box::new(flags), Box::new(Expr::U8(0b10000000)))
+        // (flags & 0b10000000) != 0
+        Expr::Ne(
+            Box::new(Expr::BitAnd(
+                Box::new(flags),
+                Box::new(Expr::U8(0b10000000)),
+            )),
+            Box::new(Expr::U8(0)),
+        )
     }
 
     fn color_table_len(flags: Expr) -> Expr {
@@ -1424,18 +1455,13 @@ fn gif_format() -> Format {
         ("logical-screen-descriptor", logical_screen_descriptor),
         (
             "global-color-table",
-            Format::Match(
+            if_then_else(
                 has_global_color_table(Expr::record_proj(Expr::Var(0), "flags")),
-                vec![
-                    (Pattern::U8(0), Format::EMPTY),
-                    (
-                        Pattern::Wildcard,
-                        repeat_count(
-                            color_table_len(Expr::record_proj(Expr::Var(0), "flags")),
-                            color_table_entry,
-                        ),
-                    ),
-                ],
+                repeat_count(
+                    color_table_len(Expr::record_proj(Expr::Var(0), "flags")),
+                    color_table_entry,
+                ),
+                Format::EMPTY,
             ),
         ),
         // TODO: ("blocks", repeat(block)),
@@ -1847,6 +1873,14 @@ fn png_format() -> Format {
 }
 
 fn riff_format() -> Format {
+    fn is_even(num: Expr) -> Expr {
+        // (num % 2) == 0
+        Expr::Eq(
+            Box::new(Expr::Rem(Box::new(num), Box::new(Expr::U32(2)))),
+            Box::new(Expr::U32(0)),
+        )
+    }
+
     fn chunk(tag: Format, data: Format) -> Format {
         record([
             ("tag", tag),
@@ -1854,11 +1888,7 @@ fn riff_format() -> Format {
             ("data", Format::Slice(Expr::Var(0), Box::new(data))),
             (
                 "pad",
-                if_then_else(
-                    Expr::IsEven(Box::new(Expr::Var(1))),
-                    Format::EMPTY,
-                    is_byte(0x00),
-                ),
+                if_then_else(is_even(Expr::Var(1)), Format::EMPTY, is_byte(0x00)),
             ),
         ])
     }
