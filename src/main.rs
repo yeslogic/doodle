@@ -1,3 +1,6 @@
+#![allow(clippy::new_without_default)]
+#![deny(rust_2018_idioms)]
+
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -587,7 +590,7 @@ impl MatchTree {
         }
     }
 
-    fn build<'a>(branches: &[Format], next: Rc<Next<'a>>) -> Option<MatchTree> {
+    fn build(branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         let mut nexts = Nexts::new();
         for (i, f) in branches.iter().enumerate() {
             nexts.add(i, Rc::new(Next::Cat(f, next.clone()))).ok()?;
@@ -598,7 +601,7 @@ impl MatchTree {
 }
 
 impl Decoder {
-    pub fn compile<'a>(f: &Format, next: Rc<Next<'a>>) -> Result<Decoder, String> {
+    pub fn compile(f: &Format, next: Rc<Next<'_>>) -> Result<Decoder, String> {
         match f {
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
@@ -912,7 +915,7 @@ mod render_tree {
                 Format::Map(Func::U32Le, _) => self.write_value(value),
                 Format::Map(Func::Stream, _) => self.write_value(value),
                 Format::Match(head, branches) => {
-                    let head = head.eval(&mut self.values);
+                    let head = head.eval(&self.values);
                     let initial_len = self.values.len();
                     let (_, format) = branches
                         .iter()
@@ -921,7 +924,7 @@ mod render_tree {
                     for i in 0..(self.values.len() - initial_len) {
                         self.names.push(format!("x{i}")); // TODO: use better names
                     }
-                    self.write_decoded_value(value, &format)?;
+                    self.write_decoded_value(value, format)?;
                     self.names.truncate(initial_len);
                     self.values.truncate(initial_len);
                     Ok(())
@@ -1473,6 +1476,7 @@ fn gif_format() -> Format {
 ///
 /// - [JPEG File Interchange Format Version 1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
 /// - [ITU T.81 | ISO IEC 10918-1](https://www.w3.org/Graphics/JPEG/itu-t81.pdf)
+#[allow(clippy::redundant_clone)]
 fn jpeg_format() -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
@@ -1815,15 +1819,14 @@ fn jpeg_format() -> Format {
         ("scans", repeat(scan)),
     ]);
 
-    let jpeg = record([
+    record([
         ("soi", soi.clone()),
         ("frame", frame.clone()),
         ("eoi", eoi.clone()),
-    ]);
-
-    jpeg
+    ])
 }
 
+#[allow(clippy::redundant_clone)]
 fn png_format() -> Format {
     fn chunk(tag: Format, data: Format) -> Format {
         record([
@@ -1872,6 +1875,7 @@ fn png_format() -> Format {
     ])
 }
 
+#[allow(clippy::redundant_clone)]
 fn riff_format() -> Format {
     fn is_even(num: Expr) -> Expr {
         // (num % 2) == 0
@@ -2037,6 +2041,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 }
 
 #[cfg(test)]
+#[allow(clippy::redundant_clone)]
 mod tests {
     use super::*;
 

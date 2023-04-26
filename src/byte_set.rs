@@ -24,7 +24,7 @@ impl ByteSet {
         ByteSet::from_bits([u64::MAX; 4])
     }
 
-    pub fn iter<'this>(&'this self) -> impl 'this + Iterator<Item = u8> {
+    pub fn iter(&self) -> impl '_ + Iterator<Item = u8> {
         (0..=255).filter(|b| self.contains(*b))
     }
 
@@ -97,15 +97,15 @@ impl ByteSet {
     }
 
     pub fn union(&self, other: &ByteSet) -> ByteSet {
-        ByteSet::zip_bits_with(&self, other, |bits0, bits1| bits0 | bits1)
+        ByteSet::zip_bits_with(self, other, |bits0, bits1| bits0 | bits1)
     }
 
     pub fn difference(&self, other: &ByteSet) -> ByteSet {
-        ByteSet::zip_bits_with(&self, other, |b0, b1| b0 & !b1)
+        ByteSet::zip_bits_with(self, other, |b0, b1| b0 & !b1)
     }
 
     pub fn intersection(&self, other: &ByteSet) -> ByteSet {
-        ByteSet::zip_bits_with(&self, other, |bits0, bits1| bits0 & bits1)
+        ByteSet::zip_bits_with(self, other, |bits0, bits1| bits0 & bits1)
     }
 
     pub fn is_disjoint(&self, other: &ByteSet) -> bool {
