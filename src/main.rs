@@ -1728,18 +1728,9 @@ fn png_format() -> Format {
     record([
         ("signature", is_bytes(b"\x89PNG\r\n\x1A\n")),
         ("ihdr", chunk(ihdr_tag, ihdr_data)),
-        (
-            "chunks",
-            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
-        ),
-        (
-            "idat",
-            Format::Repeat1(Box::new(chunk(idat_tag, idat_data))),
-        ),
-        (
-            "more-chunks",
-            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
-        ),
+        ("chunks", repeat(chunk(other_tag.clone(), any_bytes()))),
+        ("idat", repeat1(chunk(idat_tag, idat_data))),
+        ("more-chunks", repeat(chunk(other_tag.clone(), any_bytes()))),
         ("iend", chunk(iend_tag, iend_data)),
     ])
 }
