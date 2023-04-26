@@ -26,7 +26,18 @@ fn check_output(output: Output, expected: ExpectFile) {
     expected.assert_eq(&String::from_utf8_lossy(&output.stdout));
 }
 
-mod jpg {
+mod gif {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_gif() {
+        let output = doodle().args(["test.gif"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.gif.stdout");
+        check_output(output, expected)
+    }
+}
+
+mod jpeg {
     use super::*;
 
     #[test]
