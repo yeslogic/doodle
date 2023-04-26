@@ -14,7 +14,7 @@
     │   ├── flags <- u8 := 244
     │   ├── bg-color-index <- u8 := 0
     │   └── pixel-aspect-ratio <- u8 := 0
-    ├── global-color-table <- match (logical-screen-descriptor.flags & 128) { ... } :=
+    ├── global-color-table <- match ((logical-screen-descriptor.flags & 128) != 0) { ... } :=
     │   ├── 0 <- { ... } :=
     │   │   ├── r <- u8 := 0
     │   │   ├── g <- u8 := 0
