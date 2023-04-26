@@ -95,6 +95,9 @@ function fieldToHTML([name, value]) {
     } else if (name === "tag" && ("Variant" in value) && ("Tuple" in value["Variant"][1])) {
         // FIXME more PNG tags
         valueContent = renderASCII(value["Variant"][1]["Tuple"]);
+    } else if (name === "version" && ("Seq" in value)) {
+        // FIXME GIF 89a version
+        valueContent = renderASCII(value["Seq"]);
     } else {
         valueContent = jsonToHTML(value);
     }
