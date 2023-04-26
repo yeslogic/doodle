@@ -92,6 +92,9 @@ function fieldToHTML([name, value]) {
     } else if ((name === "signature" || name === "tag") && ("Tuple" in value)) {
         // FIXME PNG signature and tags
         valueContent = renderASCII(value["Tuple"]);
+    } else if (name === "tag" && ("Variant" in value) && ("Tuple" in value["Variant"][1])) {
+        // FIXME more PNG tags
+        valueContent = renderASCII(value["Variant"][1]["Tuple"]);
     } else {
         valueContent = jsonToHTML(value);
     }
