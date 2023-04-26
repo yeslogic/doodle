@@ -63,6 +63,16 @@ impl Value {
         Value::Variant(label.into(), value.into())
     }
 
+    fn record_proj(&self, label: &str) -> Value {
+        match self {
+            Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
+                Some((_, v)) => v.clone(),
+                None => panic!("{label} not found in record"),
+            },
+            _ => panic!("expected record"),
+        }
+    }
+
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the stack
     fn matches(&self, stack: &mut Vec<Value>, pattern: &Pattern) -> bool {
@@ -98,21 +108,29 @@ impl Value {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Expr {
+    Var(usize),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
-    Var(usize),
-    Sub(Box<Expr>, Box<Expr>),
-    IsEven(Box<Expr>),
     Tuple(Vec<Expr>),
     Record(Vec<(String, Expr)>),
+    RecordProj(Box<Expr>, String),
     Variant(String, Box<Expr>),
     Seq(Vec<Expr>),
+
+    BitAnd(Box<Expr>, Box<Expr>),
+    Shl(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    IsEven(Box<Expr>),
 }
 
 impl Expr {
     const UNIT: Expr = Expr::Tuple(Vec::new());
+
+    fn record_proj(head: impl Into<Box<Expr>>, label: impl Into<String>) -> Expr {
+        Expr::RecordProj(head.into(), label.into())
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -249,11 +267,32 @@ enum Decoder {
 impl Expr {
     fn eval(&self, stack: &[Value]) -> Value {
         match self {
+            Expr::Var(index) => stack[stack.len() - index - 1].clone(),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::U8(i) => Value::U8(*i),
             Expr::U16(i) => Value::U16(*i),
             Expr::U32(i) => Value::U32(*i),
-            Expr::Var(index) => stack[stack.len() - index - 1].clone(),
+            Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::Record(fields) => {
+                Value::record(fields.iter().map(|(label, expr)| (label, expr.eval(stack))))
+            }
+            Expr::RecordProj(head, label) => head.eval(stack).record_proj(label),
+            Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
+            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+
+            Expr::BitAnd(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
+                (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
+                (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            #[rustfmt::skip]
+            Expr::Shl(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shl(x, u32::from(y)).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_shl(x, u32::from(y)).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
             Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
@@ -266,12 +305,6 @@ impl Expr {
                 Value::U32(x) => Value::Bool(x % 2 == 0),
                 _ => panic!("IsEven expected number"),
             },
-            Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
-            Expr::Record(fields) => {
-                Value::record(fields.iter().map(|(label, expr)| (label, expr.eval(stack))))
-            }
-            Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
-            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
         }
     }
 
@@ -293,13 +326,7 @@ impl Func {
                 Value::Tuple(vs) => vs[*i].clone(),
                 _ => panic!("TupleProj: expected tuple"),
             },
-            Func::RecordProj(label) => match arg {
-                Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
-                    Some((_, v)) => v.clone(),
-                    None => panic!("RecordProj: {label} not found in record"),
-                },
-                _ => panic!("RecordProj: expected record"),
-            },
+            Func::RecordProj(label) => arg.record_proj(label),
             Func::Match(branches) => {
                 let initial_len = stack.len();
                 let (_, expr) = branches
@@ -1068,13 +1095,33 @@ mod render_tree {
         fn write_expr(&mut self, expr: &Expr) -> io::Result<()> {
             match expr {
                 Expr::Sub(expr0, expr1) => {
-                    self.write_atomic_expr(expr0)?;
+                    self.write_proj_expr(expr0)?;
                     write!(&mut self.writer, " - ")?;
-                    self.write_atomic_expr(expr1)
+                    self.write_proj_expr(expr1)
+                }
+                Expr::Shl(expr0, expr1) => {
+                    self.write_proj_expr(expr0)?;
+                    write!(&mut self.writer, " << ")?;
+                    self.write_proj_expr(expr1)
+                }
+                Expr::BitAnd(expr0, expr1) => {
+                    self.write_proj_expr(expr0)?;
+                    write!(&mut self.writer, " & ")?;
+                    self.write_proj_expr(expr1)
                 }
                 Expr::IsEven(expr) => {
                     write!(&mut self.writer, "is-even ")?;
-                    self.write_atomic_expr(expr)
+                    self.write_proj_expr(expr)
+                }
+                expr => self.write_proj_expr(expr),
+            }
+        }
+
+        fn write_proj_expr(&mut self, expr: &Expr) -> io::Result<()> {
+            match expr {
+                Expr::RecordProj(head, label) => {
+                    self.write_proj_expr(head)?;
+                    write!(&mut self.writer, ".{label}")
                 }
                 expr => self.write_atomic_expr(expr),
             }
@@ -1330,6 +1377,70 @@ fn u32le() -> Format {
             any_byte(),
         ])),
     )
+}
+
+/// Graphics Interchange Format (GIF)
+///
+/// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
+fn gif_format() -> Format {
+    // 17. Header
+    let header = record([
+        ("signature", is_bytes(b"GIF")),
+        ("version", repeat_count(Expr::U8(3), any_byte())), // "87a" | "89a" | ...
+    ]);
+
+    // 18. Logical Screen Descriptor
+    let logical_screen_descriptor = record([
+        ("screen-width", u16le()),
+        ("screen-height", u16le()),
+        ("flags", u8()),
+        // TODO: Flags
+        // <Packed Fields>  =      Global Color Table Flag       1 Bit
+        //                         Color Resolution              3 Bits
+        //                         Sort Flag                     1 Bit
+        //                         Size of Global Color Table    3 Bits
+        ("bg-color-index", u8()),
+        ("pixel-aspect-ratio", u8()),
+    ]);
+
+    fn has_global_color_table(flags: Expr) -> Expr {
+        // flags & 0b10000000
+        Expr::BitAnd(Box::new(flags), Box::new(Expr::U8(0b10000000)))
+    }
+
+    fn color_table_len(flags: Expr) -> Expr {
+        // 2 << (flags & 7)
+        Expr::Shl(
+            Box::new(Expr::U8(2)),
+            Box::new(Expr::BitAnd(Box::new(flags), Box::new(Expr::U8(7)))),
+        )
+    }
+
+    // 19. Global Color Table
+    let color_table_entry = record([("r", u8()), ("g", u8()), ("b", u8())]);
+
+    record([
+        ("header", header),
+        ("logical-screen-descriptor", logical_screen_descriptor),
+        (
+            "global-color-table",
+            Format::Match(
+                has_global_color_table(Expr::record_proj(Expr::Var(0), "flags")),
+                vec![
+                    (Pattern::U8(0), Format::EMPTY),
+                    (
+                        Pattern::Wildcard,
+                        repeat_count(
+                            color_table_len(Expr::record_proj(Expr::Var(0), "flags")),
+                            color_table_entry,
+                        ),
+                    ),
+                ],
+            ),
+        ),
+        // TODO: ("blocks", repeat(block)),
+        ("blocks", any_bytes()),
+    ])
 }
 
 /// JPEG File Interchange Format
@@ -1872,6 +1983,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             (
                 "data",
                 alts([
+                    ("gif", gif_format()),
                     ("jpeg", jpeg_format()),
                     ("png", png_format()),
                     ("riff", riff_format()),
