@@ -1332,169 +1332,6 @@ fn u32le() -> Format {
     )
 }
 
-fn riff_format() -> Format {
-    fn chunk(tag: Format, data: Format) -> Format {
-        record([
-            ("tag", tag),
-            ("length", u32le()),
-            ("data", Format::Slice(Expr::Var(0), Box::new(data))),
-            (
-                "pad",
-                if_then_else(
-                    Expr::IsEven(Box::new(Expr::Var(1))),
-                    Format::EMPTY,
-                    is_byte(0x00),
-                ),
-            ),
-        ])
-    }
-
-    let any_tag = Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]); // FIXME ASCII
-
-    let subchunks = record([
-        ("tag", any_tag.clone()),
-        ("chunks", repeat(chunk(any_tag, any_bytes()))),
-    ]);
-
-    chunk(is_bytes(b"RIFF"), subchunks.clone())
-}
-
-fn png_format() -> Format {
-    fn chunk(tag: Format, data: Format) -> Format {
-        record([
-            ("length", u32be()), // FIXME < 2^31
-            ("tag", tag),
-            ("data", Format::Slice(Expr::Var(1), Box::new(data))),
-            ("crc", u32be()), // FIXME check this
-        ])
-    }
-
-    //let any_tag = Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]); // FIXME ASCII
-
-    let ihdr_tag = is_bytes(b"IHDR");
-    let ihdr_data = record([
-        ("width", u32be()),
-        ("height", u32be()),
-        ("bit-depth", u8()),
-        ("color-type", u8()),
-        ("compression-method", u8()),
-        ("filter-method", u8()),
-        ("interlace-method", u8()),
-    ]);
-
-    let idat_tag = is_bytes(b"IDAT");
-    let idat_data = any_bytes();
-
-    let iend_tag = is_bytes(b"IEND");
-    let iend_data = Format::EMPTY; // FIXME ensure IEND length = 0
-
-    let other_tag = alts([
-        ("PLTE", is_bytes(b"PLTE")),
-        ("bKGD", is_bytes(b"bKGD")),
-        ("pHYs", is_bytes(b"pHYs")),
-        ("tIME", is_bytes(b"tIME")),
-        ("tRNS", is_bytes(b"tRNS")),
-        // FIXME other tags excluding IHDR/IDAT/IEND
-    ]);
-
-    record([
-        ("signature", is_bytes(b"\x89PNG\r\n\x1A\n")),
-        ("ihdr", chunk(ihdr_tag, ihdr_data)),
-        (
-            "chunks",
-            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
-        ),
-        (
-            "idat",
-            Format::Repeat1(Box::new(chunk(idat_tag, idat_data))),
-        ),
-        (
-            "more-chunks",
-            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
-        ),
-        ("iend", chunk(iend_tag, iend_data)),
-    ])
-}
-
-/// TIFF Image file header
-///
-/// - [TIFF 6.0 Specification, Section 4.5](https://developer.adobe.com/content/dam/udp/en/open/standards/tiff/TIFF6.pdf#page=13)
-/// - [Exif Version 2.32, Section 4.5.2](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=23)
-fn tiff_format() -> Format {
-    // Image file directory field
-    fn ifd_field(is_be: bool) -> Format {
-        record([
-            ("tag", if is_be { u16be() } else { u16le() }),
-            ("type", if is_be { u16be() } else { u16le() }),
-            ("length", if is_be { u32be() } else { u32le() }),
-            ("offset-or-data", if is_be { u32be() } else { u32le() }),
-            // TODO: Offset from start of the TIFF header for values longer than 4 bytes
-        ])
-    }
-
-    // Image file directory
-    fn ifd(is_be: bool) -> Format {
-        record([
-            ("num-fields", if is_be { u16be() } else { u16le() }),
-            ("fields", repeat_count(Expr::Var(0), ifd_field(is_be))),
-            ("next-ifd-offset", if is_be { u32be() } else { u32le() }),
-            // TODO: Offset from start of the TIFF header (i.e. `offset + 2 + num-fields * 12`)
-            // TODO: Recursive call to `ifd(is_be)`
-            ("next-ifd", any_bytes()),
-        ])
-    }
-
-    record([
-        (
-            "byte-order",
-            alts([
-                (
-                    "le",
-                    Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"II"))),
-                ),
-                (
-                    "be",
-                    Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"MM"))),
-                ),
-            ]),
-        ),
-        (
-            "magic",
-            Format::Match(
-                Expr::Var(0), // byte-order
-                vec![
-                    (Pattern::variant("le", Pattern::UNIT), u16le()), // 42
-                    (Pattern::variant("be", Pattern::UNIT), u16be()), // 42
-                ],
-            ),
-        ),
-        (
-            "offset",
-            Format::Match(
-                Expr::Var(1), // byte-order
-                vec![
-                    (Pattern::variant("le", Pattern::UNIT), u32le()),
-                    (Pattern::variant("be", Pattern::UNIT), u32be()),
-                ],
-            ),
-        ),
-        (
-            "ifd",
-            Format::WithRelativeOffset(
-                // TODO: Offset from start of the TIFF header
-                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
-                Box::new(Format::Match(
-                    Expr::Var(2), // byte-order
-                    vec![
-                        (Pattern::variant("le", Pattern::UNIT), ifd(false)),
-                        (Pattern::variant("be", Pattern::UNIT), ifd(true)),
-                    ],
-                )),
-            ),
-        ),
-    ])
-}
-
 /// JPEG File Interchange Format
 ///
 /// - [JPEG File Interchange Format Version 1.02](https://www.w3.org/Graphics/JPEG/jfif3.pdf)
@@ -1848,6 +1685,169 @@ fn jpeg_format() -> Format {
     ]);
 
     jpeg
+}
+
+fn png_format() -> Format {
+    fn chunk(tag: Format, data: Format) -> Format {
+        record([
+            ("length", u32be()), // FIXME < 2^31
+            ("tag", tag),
+            ("data", Format::Slice(Expr::Var(1), Box::new(data))),
+            ("crc", u32be()), // FIXME check this
+        ])
+    }
+
+    //let any_tag = Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]); // FIXME ASCII
+
+    let ihdr_tag = is_bytes(b"IHDR");
+    let ihdr_data = record([
+        ("width", u32be()),
+        ("height", u32be()),
+        ("bit-depth", u8()),
+        ("color-type", u8()),
+        ("compression-method", u8()),
+        ("filter-method", u8()),
+        ("interlace-method", u8()),
+    ]);
+
+    let idat_tag = is_bytes(b"IDAT");
+    let idat_data = any_bytes();
+
+    let iend_tag = is_bytes(b"IEND");
+    let iend_data = Format::EMPTY; // FIXME ensure IEND length = 0
+
+    let other_tag = alts([
+        ("PLTE", is_bytes(b"PLTE")),
+        ("bKGD", is_bytes(b"bKGD")),
+        ("pHYs", is_bytes(b"pHYs")),
+        ("tIME", is_bytes(b"tIME")),
+        ("tRNS", is_bytes(b"tRNS")),
+        // FIXME other tags excluding IHDR/IDAT/IEND
+    ]);
+
+    record([
+        ("signature", is_bytes(b"\x89PNG\r\n\x1A\n")),
+        ("ihdr", chunk(ihdr_tag, ihdr_data)),
+        (
+            "chunks",
+            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
+        ),
+        (
+            "idat",
+            Format::Repeat1(Box::new(chunk(idat_tag, idat_data))),
+        ),
+        (
+            "more-chunks",
+            Format::Repeat(Box::new(chunk(other_tag.clone(), any_bytes()))),
+        ),
+        ("iend", chunk(iend_tag, iend_data)),
+    ])
+}
+
+fn riff_format() -> Format {
+    fn chunk(tag: Format, data: Format) -> Format {
+        record([
+            ("tag", tag),
+            ("length", u32le()),
+            ("data", Format::Slice(Expr::Var(0), Box::new(data))),
+            (
+                "pad",
+                if_then_else(
+                    Expr::IsEven(Box::new(Expr::Var(1))),
+                    Format::EMPTY,
+                    is_byte(0x00),
+                ),
+            ),
+        ])
+    }
+
+    let any_tag = Format::Tuple(vec![any_byte(), any_byte(), any_byte(), any_byte()]); // FIXME ASCII
+
+    let subchunks = record([
+        ("tag", any_tag.clone()),
+        ("chunks", repeat(chunk(any_tag, any_bytes()))),
+    ]);
+
+    chunk(is_bytes(b"RIFF"), subchunks.clone())
+}
+
+/// TIFF Image file header
+///
+/// - [TIFF 6.0 Specification, Section 4.5](https://developer.adobe.com/content/dam/udp/en/open/standards/tiff/TIFF6.pdf#page=13)
+/// - [Exif Version 2.32, Section 4.5.2](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=23)
+fn tiff_format() -> Format {
+    // Image file directory field
+    fn ifd_field(is_be: bool) -> Format {
+        record([
+            ("tag", if is_be { u16be() } else { u16le() }),
+            ("type", if is_be { u16be() } else { u16le() }),
+            ("length", if is_be { u32be() } else { u32le() }),
+            ("offset-or-data", if is_be { u32be() } else { u32le() }),
+            // TODO: Offset from start of the TIFF header for values longer than 4 bytes
+        ])
+    }
+
+    // Image file directory
+    fn ifd(is_be: bool) -> Format {
+        record([
+            ("num-fields", if is_be { u16be() } else { u16le() }),
+            ("fields", repeat_count(Expr::Var(0), ifd_field(is_be))),
+            ("next-ifd-offset", if is_be { u32be() } else { u32le() }),
+            // TODO: Offset from start of the TIFF header (i.e. `offset + 2 + num-fields * 12`)
+            // TODO: Recursive call to `ifd(is_be)`
+            ("next-ifd", any_bytes()),
+        ])
+    }
+
+    record([
+        (
+            "byte-order",
+            alts([
+                (
+                    "le",
+                    Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"II"))),
+                ),
+                (
+                    "be",
+                    Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"MM"))),
+                ),
+            ]),
+        ),
+        (
+            "magic",
+            Format::Match(
+                Expr::Var(0), // byte-order
+                vec![
+                    (Pattern::variant("le", Pattern::UNIT), u16le()), // 42
+                    (Pattern::variant("be", Pattern::UNIT), u16be()), // 42
+                ],
+            ),
+        ),
+        (
+            "offset",
+            Format::Match(
+                Expr::Var(1), // byte-order
+                vec![
+                    (Pattern::variant("le", Pattern::UNIT), u32le()),
+                    (Pattern::variant("be", Pattern::UNIT), u32be()),
+                ],
+            ),
+        ),
+        (
+            "ifd",
+            Format::WithRelativeOffset(
+                // TODO: Offset from start of the TIFF header
+                Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
+                Box::new(Format::Match(
+                    Expr::Var(2), // byte-order
+                    vec![
+                        (Pattern::variant("le", Pattern::UNIT), ifd(false)),
+                        (Pattern::variant("be", Pattern::UNIT), ifd(true)),
+                    ],
+                )),
+            ),
+        ),
+    ])
 }
 
 #[derive(Copy, Clone, ValueEnum)]
