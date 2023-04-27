@@ -1408,6 +1408,15 @@ fn u32le() -> Format {
 ///
 /// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
 fn gif_format() -> Format {
+    // 15. Data Sub-blocks
+    let subblock = record([
+        ("len-bytes", not_byte(0x00)),
+        ("data", repeat_count(Expr::Var(0), any_byte())),
+    ]);
+
+    // 16. Block Terminator.
+    let block_terminator = is_byte(0x00);
+
     // 17. Header
     let header = record([
         ("signature", is_bytes(b"GIF")),
@@ -1419,7 +1428,7 @@ fn gif_format() -> Format {
         ("screen-width", u16le()),
         ("screen-height", u16le()),
         ("flags", u8()),
-        // TODO: Flags
+        // TODO: Bit data
         // <Packed Fields>  =      Global Color Table Flag       1 Bit
         //                         Color Resolution              3 Bits
         //                         Sort Flag                     1 Bit
@@ -1428,7 +1437,7 @@ fn gif_format() -> Format {
         ("pixel-aspect-ratio", u8()),
     ]);
 
-    fn has_global_color_table(flags: Expr) -> Expr {
+    fn has_color_table(flags: Expr) -> Expr {
         // (flags & 0b10000000) != 0
         Expr::Ne(
             Box::new(Expr::BitAnd(
@@ -1450,22 +1459,128 @@ fn gif_format() -> Format {
     // 19. Global Color Table
     let color_table_entry = record([("r", u8()), ("g", u8()), ("b", u8())]);
 
+    // 20. Image Descriptor.
+    let image_descriptor = record([
+        ("separator", is_byte(0x2C)),
+        ("image-left-position", u16le()),
+        ("image-top-position", u16le()),
+        ("image-width", u16le()),
+        ("image-height", u16le()),
+        ("flags", u8()),
+        // TODO: Bit data
+        // <Packed Fields>  =      Local Color Table Flag        1 Bit
+        //                         Interlace Flag                1 Bit
+        //                         Sort Flag                     1 Bit
+        //                         Reserved                      2 Bits
+        //                         Size of Local Color Table     3 Bits
+
+        // 21. Local Color Table
+        (
+            "local-color-table",
+            if_then_else(
+                has_color_table(Expr::Var(0)),
+                repeat_count(color_table_len(Expr::Var(0)), color_table_entry.clone()),
+                Format::EMPTY,
+            ),
+        ),
+        // 22. Table Based Image Data
+        (
+            "image",
+            record([
+                ("lzw-min-code-size", u8()),
+                ("image-data", repeat(subblock.clone())),
+                ("terminator", block_terminator.clone()),
+            ]),
+        ),
+    ]);
+
+    // 23. Graphic Control Extension
+    let graphic_control_extension = record([
+        ("block-size", is_byte(4)),
+        ("flags", u8()),
+        // TODO: Bit data
+        // <Packed Fields>  =     Reserved                      3 Bits
+        //                        Disposal Method               3 Bits
+        //                        User Input Flag               1 Bit
+        //                        Transparent Color Flag        1 Bit
+        ("delay-time", u16le()),
+        ("transparent-color-index", u8()),
+        ("terminator", block_terminator.clone()),
+    ]);
+
+    // 24. Comment Extension
+    let comment_extension = record([
+        ("comment-data", repeat(subblock.clone())),
+        ("terminator", block_terminator.clone()),
+    ]);
+
+    // 25. Plain Text Extension
+    let plain_text_extension = record([
+        ("block-size", is_byte(12)),
+        ("text-grid-left-position", u16le()),
+        ("text-grid-top-position", u16le()),
+        ("text-grid-width", u16le()),
+        ("text-grid-height", u16le()),
+        ("character-cell-width", u8()),
+        ("character-cell-height", u8()),
+        ("text-foreground-color-index", u8()),
+        ("text-background-color-index", u8()),
+        ("plain-text-data", repeat(subblock.clone())),
+        ("terminator", block_terminator.clone()),
+    ]);
+
+    // 26. Application Extension
+    let application_extension = record([
+        ("block-size", is_byte(11)),
+        ("identifier", repeat_count(Expr::U8(8), any_byte())),
+        ("authentication-code", repeat_count(Expr::U8(3), any_byte())),
+        ("application-data", repeat(subblock.clone())),
+        ("terminator", block_terminator.clone()),
+    ]);
+
+    // 27. Trailer
+    let trailer = record([("separator", is_byte(0x3b))]);
+
+    let extension = record([
+        ("separator", is_byte(0x21)),
+        ("label", is_byte(0xF9)),
+        (
+            "data",
+            Format::Match(
+                Expr::Var(0),
+                vec![
+                    (Pattern::U8(0x01), plain_text_extension.clone()),
+                    (Pattern::U8(0xF9), graphic_control_extension.clone()),
+                    (Pattern::U8(0xFE), comment_extension.clone()),
+                    (Pattern::U8(0xFF), application_extension.clone()),
+                    // TODO: (Pattern::Wildcard, _),
+                ],
+            ),
+        ),
+    ]);
+
+    let block = alts([
+        ("image-descriptor", image_descriptor.clone()),
+        ("extension", extension.clone()),
+    ]);
+
+    // TODO: Follow “Appendix B. GIF Grammar” more closely
     record([
         ("header", header),
         ("logical-screen-descriptor", logical_screen_descriptor),
         (
             "global-color-table",
             if_then_else(
-                has_global_color_table(Expr::record_proj(Expr::Var(0), "flags")),
+                has_color_table(Expr::record_proj(Expr::Var(0), "flags")),
                 repeat_count(
                     color_table_len(Expr::record_proj(Expr::Var(0), "flags")),
-                    color_table_entry,
+                    color_table_entry.clone(),
                 ),
                 Format::EMPTY,
             ),
         ),
-        // TODO: ("blocks", repeat(block)),
-        ("blocks", any_bytes()),
+        ("blocks", repeat(block.clone())),
+        ("trailer", trailer.clone()),
     ])
 }
 
@@ -1510,7 +1625,7 @@ fn jpeg_format() -> Format {
                 Expr::Var(0), // num-image-components
                 record([
                     ("id", u8()),
-                    ("sampling-factor", u8()), // { horizontal <- u4, vertical <- u4 }
+                    ("sampling-factor", u8()), // TODO: Bit data: { horizontal <- u4, vertical <- u4 }
                     ("quantization-table-id", u8()),
                 ]),
             ),
@@ -1543,6 +1658,7 @@ fn jpeg_format() -> Format {
                 Expr::Var(0), // num-image-components
                 record([
                     ("component-selector", u8()), // ???
+                    // TODO: Bit data
                     // dc-entropy-coding-table-id <- u4;
                     // ac-entropy-coding-table-id <- u4;
                     ("entropy-coding-table-ids", u8()),
@@ -1551,7 +1667,7 @@ fn jpeg_format() -> Format {
         ),
         ("start-spectral-selection", u8()),   // ???
         ("end-spectral-selection", u8()),     // ???
-        ("approximation-bit-position", u8()), // { high <- u4, low <- u4 }
+        ("approximation-bit-position", u8()), // TODO: Bit data: { high <- u4, low <- u4 }
     ]);
 
     // DQT: Define quantization table (See ITU T.81 Section B.2.4.1)
@@ -1585,7 +1701,7 @@ fn jpeg_format() -> Format {
                 Expr::Var(0), // num-image-components
                 record([
                     ("id", u8()),
-                    ("sampling-factor", u8()), // { horizontal <- u4, vertical <- u4 }
+                    ("sampling-factor", u8()), // TODO: Bit data: { horizontal <- u4, vertical <- u4 }
                     ("quantization-table-id", is_byte(0)),
                 ]),
             ),
@@ -1594,6 +1710,7 @@ fn jpeg_format() -> Format {
 
     // EXP: Expand reference components (See ITU T.81 Section B.3.3)
     let exp_data = record([
+        // TODO: Bit data
         // expand-horizontal <- u4 // 0 | 1;
         // expand-vertical <- u4 // 0 | 1;
         ("expand-horizontal-vertical", u8()),
