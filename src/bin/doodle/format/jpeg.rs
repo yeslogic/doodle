@@ -378,6 +378,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
         ),
     );
 
+    let some = |expr| Expr::variant("some", expr);
+    let none = || Expr::variant("none", Expr::UNIT);
+
     // A series of entropy coded segments separated by restart markers
     let scan_data = module.define_format(
         "jpeg.scan-data",
@@ -387,15 +390,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
                 Expr::Match(
                     Box::new(Expr::Var(0)),
                     vec![
-                        (Pattern::variant("mcu", Pattern::Binding), Expr::Var(0)),
-                        (Pattern::variant("rst0", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst1", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst2", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst3", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst4", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst5", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst6", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst7", Pattern::Wildcard), Expr::UNIT),
+                        (
+                            Pattern::variant("mcu", Pattern::Binding),
+                            some(Expr::Var(0)),
+                        ),
+                        (Pattern::variant("rst0", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst1", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst2", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst3", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst4", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst5", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst6", Pattern::Wildcard), none()),
+                        (Pattern::variant("rst7", Pattern::Wildcard), none()),
                     ],
                 ),
                 Box::new(alts([

@@ -10,6 +10,25 @@ use crate::byte_set::ByteSet;
 
 pub mod byte_set;
 pub mod output;
+pub mod validation;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
+pub enum Type {
+    Bool,
+    U8,
+    U16,
+    U32,
+    Tuple(Vec<Type>),
+    Record(Vec<(String, Type)>),
+    Variant(Vec<(String, Type)>),
+    Seq(Box<Type>),
+}
+
+impl Type {
+    pub const VOID: Type = Type::Variant(Vec::new());
+    pub const UNIT: Type = Type::Tuple(Vec::new());
+}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
@@ -149,6 +168,10 @@ impl Expr {
 
     pub fn record_proj(head: impl Into<Box<Expr>>, label: impl Into<String>) -> Expr {
         Expr::RecordProj(head.into(), label.into())
+    }
+
+    pub fn variant(label: impl Into<String>, expr: impl Into<Box<Expr>>) -> Expr {
+        Expr::Variant(label.into(), expr.into())
     }
 }
 
@@ -424,7 +447,7 @@ impl Expr {
             },
             Expr::Stream(seq) => match seq.eval(stack) {
                 Value::Seq(values) => {
-                    // FIXME could also condense nested sequences
+                    // FIXME: Use option type
                     Value::Seq(values.into_iter().filter(|v| *v != Value::UNIT).collect())
                 }
                 _ => panic!("Stream: expected Seq"),
