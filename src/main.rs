@@ -1417,7 +1417,7 @@ fn gif_format() -> Format {
         ("data", repeat_count(Expr::Var(0), any_byte())),
     ]);
 
-    // 16. Block Terminator.
+    // 16. Block Terminator
     let block_terminator = is_byte(0x00);
 
     // 17. Header
@@ -1462,7 +1462,7 @@ fn gif_format() -> Format {
     // 19. Global Color Table
     let color_table_entry = record([("r", u8()), ("g", u8()), ("b", u8())]);
 
-    // 20. Image Descriptor.
+    // 20. Image Descriptor
     let image_descriptor = record([
         ("separator", is_byte(0x2C)),
         ("image-left-position", u16le()),
