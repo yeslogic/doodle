@@ -317,7 +317,7 @@ fn gif_format() -> Format {
 
     let extension = record([
         ("separator", is_byte(0x21)),
-        ("label", is_byte(0xF9)),
+        ("label", any_byte()),
         (
             "data",
             Format::Match(
