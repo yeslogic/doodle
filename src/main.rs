@@ -182,6 +182,35 @@ fn u32le() -> Format {
 /// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
 #[allow(clippy::redundant_clone)]
 fn gif_format() -> Format {
+    fn has_color_table(flags: Expr) -> Expr {
+        // (flags & 0b10000000) != 0
+        Expr::Ne(
+            Box::new(Expr::BitAnd(
+                Box::new(flags),
+                Box::new(Expr::U8(0b10000000)),
+            )),
+            Box::new(Expr::U8(0)),
+        )
+    }
+
+    fn color_table_len(flags: Expr) -> Expr {
+        // 2 << (flags & 7)
+        Expr::Shl(
+            Box::new(Expr::U8(2)),
+            Box::new(Expr::BitAnd(Box::new(flags), Box::new(Expr::U8(7)))),
+        )
+    }
+
+    fn color_table(flags: Expr) -> Format {
+        let color_table_entry = record([("r", u8()), ("g", u8()), ("b", u8())]);
+
+        if_then_else(
+            has_color_table(flags.clone()),
+            repeat_count(color_table_len(flags), color_table_entry),
+            Format::EMPTY,
+        )
+    }
+
     // 15. Data Sub-blocks
     let subblock = record([
         ("len-bytes", not_byte(0x00)),
@@ -211,27 +240,8 @@ fn gif_format() -> Format {
         ("pixel-aspect-ratio", u8()),
     ]);
 
-    fn has_color_table(flags: Expr) -> Expr {
-        // (flags & 0b10000000) != 0
-        Expr::Ne(
-            Box::new(Expr::BitAnd(
-                Box::new(flags),
-                Box::new(Expr::U8(0b10000000)),
-            )),
-            Box::new(Expr::U8(0)),
-        )
-    }
-
-    fn color_table_len(flags: Expr) -> Expr {
-        // 2 << (flags & 7)
-        Expr::Shl(
-            Box::new(Expr::U8(2)),
-            Box::new(Expr::BitAnd(Box::new(flags), Box::new(Expr::U8(7)))),
-        )
-    }
-
     // 19. Global Color Table
-    let color_table_entry = record([("r", u8()), ("g", u8()), ("b", u8())]);
+    let global_color_table = color_table;
 
     // 20. Image Descriptor
     let image_descriptor = record([
@@ -247,29 +257,22 @@ fn gif_format() -> Format {
         //                         Sort Flag                     1 Bit
         //                         Reserved                      2 Bits
         //                         Size of Local Color Table     3 Bits
+    ]);
 
-        // 21. Local Color Table
-        (
-            "local-color-table",
-            if_then_else(
-                has_color_table(Expr::Var(0)),
-                repeat_count(color_table_len(Expr::Var(0)), color_table_entry.clone()),
-                Format::EMPTY,
-            ),
-        ),
-        // 22. Table Based Image Data
-        (
-            "image",
-            record([
-                ("lzw-min-code-size", u8()),
-                ("image-data", repeat(subblock.clone())),
-                ("terminator", block_terminator.clone()),
-            ]),
-        ),
+    // 21. Local Color Table
+    let local_color_table = color_table;
+
+    // 22. Table Based Image Data
+    let table_based_image_data = record([
+        ("lzw-min-code-size", u8()),
+        ("image-data", repeat(subblock.clone())),
+        ("terminator", block_terminator.clone()),
     ]);
 
     // 23. Graphic Control Extension
     let graphic_control_extension = record([
+        ("separator", is_byte(0x21)),
+        ("label", is_byte(0xF9)),
         ("block-size", is_byte(4)),
         ("flags", u8()),
         // TODO: Bit data
@@ -284,12 +287,16 @@ fn gif_format() -> Format {
 
     // 24. Comment Extension
     let comment_extension = record([
+        ("separator", is_byte(0x21)),
+        ("label", is_byte(0xFE)),
         ("comment-data", repeat(subblock.clone())),
         ("terminator", block_terminator.clone()),
     ]);
 
     // 25. Plain Text Extension
     let plain_text_extension = record([
+        ("separator", is_byte(0x21)),
+        ("label", is_byte(0x01)),
         ("block-size", is_byte(12)),
         ("text-grid-left-position", u16le()),
         ("text-grid-top-position", u16le()),
@@ -305,6 +312,8 @@ fn gif_format() -> Format {
 
     // 26. Application Extension
     let application_extension = record([
+        ("separator", is_byte(0x21)),
+        ("label", is_byte(0xFF)),
         ("block-size", is_byte(11)),
         ("identifier", repeat_count(Expr::U8(8), any_byte())),
         ("authentication-code", repeat_count(Expr::U8(3), any_byte())),
@@ -315,46 +324,53 @@ fn gif_format() -> Format {
     // 27. Trailer
     let trailer = record([("separator", is_byte(0x3b))]);
 
-    let extension = record([
-        ("separator", is_byte(0x21)),
-        ("label", any_byte()),
+    // Appendix B. GIF Grammar
+
+    let logical_screen = record([
+        ("descriptor", logical_screen_descriptor),
         (
-            "data",
-            Format::Match(
-                Expr::Var(0),
-                vec![
-                    (Pattern::U8(0x01), plain_text_extension.clone()),
-                    (Pattern::U8(0xF9), graphic_control_extension.clone()),
-                    (Pattern::U8(0xFE), comment_extension.clone()),
-                    (Pattern::U8(0xFF), application_extension.clone()),
-                    // TODO: (Pattern::Wildcard, _),
-                ],
-            ),
+            "global-color-table",
+            global_color_table(Expr::record_proj(Expr::Var(0), "flags")),
         ),
+    ]);
+
+    let table_based_image = record([
+        ("descriptor", image_descriptor),
+        (
+            "local-color-table",
+            local_color_table(Expr::record_proj(Expr::Var(0), "flags")),
+        ),
+        ("data", table_based_image_data),
+    ]);
+
+    let graphic_rendering_block = alts([
+        ("table-based-image", table_based_image),
+        ("plain-text-extension", plain_text_extension),
+    ]);
+
+    let graphic_block = record([
+        (
+            "graphic-control-extension",
+            optional(graphic_control_extension),
+        ),
+        ("graphic-rendering-block", graphic_rendering_block),
+    ]);
+
+    let special_purpose_block = alts([
+        ("application-extension", application_extension),
+        ("comment-extension", comment_extension),
     ]);
 
     let block = alts([
-        ("image-descriptor", image_descriptor.clone()),
-        ("extension", extension.clone()),
+        ("graphic-block", graphic_block),
+        ("special-purpose-block", special_purpose_block),
     ]);
 
-    // TODO: Follow “Appendix B. GIF Grammar” more closely
     record([
         ("header", header),
-        ("logical-screen-descriptor", logical_screen_descriptor),
-        (
-            "global-color-table",
-            if_then_else(
-                has_color_table(Expr::record_proj(Expr::Var(0), "flags")),
-                repeat_count(
-                    color_table_len(Expr::record_proj(Expr::Var(0), "flags")),
-                    color_table_entry.clone(),
-                ),
-                Format::EMPTY,
-            ),
-        ),
-        ("blocks", repeat(block.clone())),
-        ("trailer", trailer.clone()),
+        ("logical-screen", logical_screen),
+        ("blocks", repeat(block)),
+        ("trailer", trailer),
     ])
 }
 
