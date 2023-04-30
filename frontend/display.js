@@ -14,7 +14,7 @@ function main() {
 function jsonToHTML(json) {
   let node;
   if (Array.isArray(json)) {
-    node = listToUL(json);
+    node = seqToHTML(json);
   } else if (typeof json === 'object') {
     node = objToDL(json);
   } else {
@@ -23,29 +23,84 @@ function jsonToHTML(json) {
   return node;
 }
 
-// Turn a Javascript list into an unordered list element.
-function listToUL(list) {
-  let result = document.createElement('ul');
-  for (el of list) {
-    let li = document.createElement('li');
-    li.classList.add(typeof el);
-    const content = jsonToHTML(el);
-    li.appendChild(content);
-    result.appendChild(li);
-  }
-  return result;
+function seqToHTML(seq) {
+    if (isRecordSeq(seq)) {
+        let fields = [];
+        for (let [name, value] of seq[0]["Record"]) {
+            fields.push([name, getAtomicType(value)]);
+        }
+        return renderSeqTable(seq, fields);
+    } else {
+        let ul = document.createElement('ul');
+        for (item of seq) {
+            let li = document.createElement('li');
+            ul.appendChild(li);
+            li.classList.add(typeof item);
+            const content = jsonToHTML(item);
+            li.appendChild(content);
+        }
+        return ul;
+    }
 }
 
-function recordToHTML(list) {
-  let result = document.createElement('ul');
-  for (el of list) {
-    let li = document.createElement('li');
-    li.classList.add(typeof el);
-    const content = fieldToHTML(el);
-    li.appendChild(content);
-    result.appendChild(li);
-  }
-  return result;
+function recordToHTML(fields) {
+    if (isFlatRecord(fields)) {
+        return renderRecordTable(fields);
+    } else {
+        let ul = document.createElement('ul');
+        for (field of fields) {
+            let li = document.createElement('li');
+            ul.appendChild(li);
+            li.classList.add(typeof field);
+            const content = fieldToHTML(field);
+            li.appendChild(content);
+        }
+        return ul;
+    }
+}
+
+function isRecordSeq(seq) {
+    return seq.length > 0 && (typeof seq[0] === "object") && ("Record" in seq[0]) && isFlatRecord(seq[0]["Record"]);
+}
+
+function isFlatRecord(fields) {
+    for (let [name, value] of fields) {
+        if (!isAtomicValue(value) && getFieldASCII(name, value) === null) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function isAtomicValue(value) {
+    return getAtomicType(value) !== null;
+}
+
+function getAtomicType(value) {
+    const atomicTypes = ["U8", "U16", "U32"];
+    for (const type of atomicTypes) {
+        if (type in value) return type;
+    }
+    return null;
+}
+
+function getFieldASCII(name, value) {
+    if (name === "identifier" && ("Seq" in value)) {
+        // JPEG APP1 identifier
+        return value["Seq"];
+    } else if ((name === "signature" || name === "tag") && ("Tuple" in value)) {
+        // PNG signature and tags
+        return value["Tuple"];
+    } else if (name === "tag" && ("Variant" in value) && ("Tuple" in value["Variant"][1])) {
+        // more PNG tags
+        return value["Variant"][1]["Tuple"];
+    } else if (name === "version" && ("Seq" in value)) {
+        // GIF 89a version
+        return value["Seq"];
+    }
+    else {
+        return null;
+    }
 }
 
 // Turn a Javascript object into a definition list element.
@@ -64,6 +119,9 @@ function objToDL(obj) {
 
     if (key === "Record") {
         const content = recordToHTML(obj[key]);
+        dd.appendChild(content);
+    } else if (key === "Seq") {
+        const content = seqToHTML(obj[key]);
         dd.appendChild(content);
     } else {
         const content = jsonToHTML(obj[key]);
@@ -86,18 +144,9 @@ function fieldToHTML([name, value]) {
     liName.appendChild(nameContent);
 
     let valueContent;
-    if (name === "identifier" && ("Seq" in value)) {
-        // FIXME JPEG APP1 identifier
-        valueContent = renderASCII(value["Seq"]);
-    } else if ((name === "signature" || name === "tag") && ("Tuple" in value)) {
-        // FIXME PNG signature and tags
-        valueContent = renderASCII(value["Tuple"]);
-    } else if (name === "tag" && ("Variant" in value) && ("Tuple" in value["Variant"][1])) {
-        // FIXME more PNG tags
-        valueContent = renderASCII(value["Variant"][1]["Tuple"]);
-    } else if (name === "version" && ("Seq" in value)) {
-        // FIXME GIF 89a version
-        valueContent = renderASCII(value["Seq"]);
+    let valueASCII = getFieldASCII(name, value);
+    if (valueASCII !== null) {
+        valueContent = renderASCII(valueASCII);
     } else {
         valueContent = jsonToHTML(value);
     }
@@ -106,6 +155,56 @@ function fieldToHTML([name, value]) {
     ul.appendChild(liName);
     ul.appendChild(liValue);
     return ul;
+}
+
+function renderRecordTable(record) {
+    let table = document.createElement("table");
+    table.border = 1;
+    for (let [name, value] of record) {
+        let tr = document.createElement("tr");
+        table.appendChild(tr);
+        let th = document.createElement("th");
+        tr.appendChild(th);
+        th.textContent = name;
+        let td = document.createElement("td");
+        tr.appendChild(td);
+        let content;
+        let valueASCII = getFieldASCII(name, value);
+        if (valueASCII !== null) {
+            content = renderASCII(valueASCII);
+        } else {
+            content = jsonToHTML(value);
+        }
+        td.appendChild(content);
+    }
+    return table;
+}
+
+function renderSeqTable(seq, fields) {
+    let table = document.createElement("table");
+    table.border = 1;
+    let tr = document.createElement("tr");
+    table.appendChild(tr);
+    let map = {};
+    for (let [name, type] of fields) {
+        let th = document.createElement("th");
+        tr.appendChild(th);
+        th.textContent = name + " : " + type;
+        map[name] = type;
+    }
+    for (let item of seq) {
+        let record = item["Record"];
+        let tr = document.createElement("tr");
+        table.appendChild(tr);
+        for (let [name, value] of record) {
+            let type = map[name];
+            let td = document.createElement("td");
+            tr.appendChild(td);
+            let content = jsonToHTML(value[type]);
+            td.appendChild(content);
+        }
+    }
+    return table;
 }
 
 function renderASCII(seq) {
