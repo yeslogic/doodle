@@ -191,6 +191,8 @@ pub enum Func {
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Format {
+    /// Reference to a top-level item
+    ItemVar(usize),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -222,6 +224,35 @@ pub enum Format {
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
+}
+
+pub struct FormatModule {
+    names: Vec<String>,
+    formats: Vec<Format>,
+}
+
+impl FormatModule {
+    pub fn new() -> FormatModule {
+        FormatModule {
+            names: Vec::new(),
+            formats: Vec::new(),
+        }
+    }
+
+    pub fn define_format(&mut self, name: impl Into<String>, format: Format) -> Format {
+        let level = self.names.len();
+        self.names.push(name.into());
+        self.formats.push(format);
+        Format::ItemVar(level)
+    }
+
+    fn get_name(&self, level: usize) -> &str {
+        &self.names[level]
+    }
+
+    fn get_format(&self, level: usize) -> &Format {
+        &self.formats[level]
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -397,21 +428,22 @@ impl Func {
 
 impl Format {
     /// Returns `true` if the format matches the empty byte string
-    fn is_nullable(&self) -> bool {
+    fn is_nullable(&self, module: &FormatModule) -> bool {
         match self {
+            Format::ItemVar(level) => module.get_format(*level).is_nullable(module),
             Format::Fail => false,
             Format::EndOfInput => true,
             Format::Byte(_) => false,
-            Format::Union(branches) => branches.iter().any(|(_, f)| f.is_nullable()),
-            Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable()),
-            Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable()),
-            Format::Repeat(_a) => true,
-            Format::Repeat1(_a) => false,
-            Format::RepeatCount(_expr, _a) => true,
-            Format::Slice(_expr, _a) => true,
+            Format::Union(branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
+            Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable(module)),
+            Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable(module)),
+            Format::Repeat(_) => true,
+            Format::Repeat1(_) => false,
+            Format::RepeatCount(_, _) => true,
+            Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
-            Format::Map(_f, a) => a.is_nullable(),
-            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable()),
+            Format::Map(_, f) => f.is_nullable(module),
+            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
         }
     }
 }
@@ -448,28 +480,42 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
-    fn add_next(&mut self, index: usize, next: Rc<Next<'a>>) -> Result<(), ()> {
+    fn add_next(
+        &mut self,
+        module: &'a FormatModule,
+        index: usize,
+        next: Rc<Next<'a>>,
+    ) -> Result<(), ()> {
         match next.as_ref() {
             Next::Empty => self.accept(index),
-            Next::Cat(f, next) => self.add(index, f, next.clone()),
+            Next::Cat(f, next) => self.add(module, index, f, next.clone()),
             Next::Tuple(fs, next) => match fs.split_first() {
-                None => self.add_next(index, next.clone()),
-                Some((f, fs)) => self.add(index, f, Rc::new(Next::Tuple(fs, next.clone()))),
+                None => self.add_next(module, index, next.clone()),
+                Some((f, fs)) => self.add(module, index, f, Rc::new(Next::Tuple(fs, next.clone()))),
             },
             Next::Record(fs, next) => match fs.split_first() {
-                None => self.add_next(index, next.clone()),
-                Some(((_n, f), fs)) => self.add(index, f, Rc::new(Next::Record(fs, next.clone()))),
+                None => self.add_next(module, index, next.clone()),
+                Some(((_n, f), fs)) => {
+                    self.add(module, index, f, Rc::new(Next::Record(fs, next.clone())))
+                }
             },
             Next::Repeat(a, next0) => {
-                self.add_next(index, next0.clone())?;
-                self.add(index, a, next)?;
+                self.add_next(module, index, next0.clone())?;
+                self.add(module, index, a, next)?;
                 Ok(())
             }
         }
     }
 
-    pub fn add(&mut self, index: usize, f: &'a Format, next: Rc<Next<'a>>) -> Result<(), ()> {
+    pub fn add(
+        &mut self,
+        module: &'a FormatModule,
+        index: usize,
+        f: &'a Format,
+        next: Rc<Next<'a>>,
+    ) -> Result<(), ()> {
         match f {
+            Format::ItemVar(level) => self.add(module, index, module.get_format(*level), next),
             Format::Fail => Ok(()),
             Format::EndOfInput => self.accept(index),
             Format::Byte(bs) => {
@@ -497,27 +543,30 @@ impl<'a> MatchTreeLevel<'a> {
             }
             Format::Union(branches) => {
                 for (_, f) in branches {
-                    self.add(index, f, next.clone())?;
+                    self.add(module, index, f, next.clone())?;
                 }
                 Ok(())
             }
             Format::Tuple(fields) => match fields.split_first() {
-                None => self.add_next(index, next.clone()),
-                Some((a, fields)) => self.add(index, a, Rc::new(Next::Tuple(fields, next.clone()))),
+                None => self.add_next(module, index, next.clone()),
+                Some((a, fields)) => {
+                    self.add(module, index, a, Rc::new(Next::Tuple(fields, next.clone())))
+                }
             },
             Format::Record(fields) => match fields.split_first() {
-                None => self.add_next(index, next.clone()),
+                None => self.add_next(module, index, next.clone()),
                 Some(((_, a), fields)) => {
-                    self.add(index, a, Rc::new(Next::Record(fields, next.clone())))
+                    let next = Rc::new(Next::Record(fields, next.clone()));
+                    self.add(module, index, a, next)
                 }
             },
             Format::Repeat(a) => {
-                self.add_next(index, next.clone())?;
-                self.add(index, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                self.add_next(module, index, next.clone())?;
+                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 Ok(())
             }
             Format::Repeat1(a) => {
-                self.add(index, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 Ok(())
             }
             Format::RepeatCount(_expr, _a) => {
@@ -529,10 +578,10 @@ impl<'a> MatchTreeLevel<'a> {
             Format::WithRelativeOffset(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Map(_f, a) => self.add(index, a, next),
+            Format::Map(_f, a) => self.add(module, index, a, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
-                    self.add(index, f, next.clone())?;
+                    self.add(module, index, f, next.clone())?;
                 }
                 Ok(())
             }
@@ -550,17 +599,17 @@ impl<'a> MatchTreeLevel<'a> {
         })
     }
 
-    fn grow(mut nexts: Nexts<'a>, depth: usize) -> Option<MatchTree> {
+    fn grow(module: &FormatModule, mut nexts: Nexts<'a>, depth: usize) -> Option<MatchTree> {
         if let Some(tree) = MatchTreeLevel::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
             let mut tree = MatchTreeLevel::reject();
             for (i, next) in nexts.set.drain() {
-                tree.add_next(i, next).ok()?;
+                tree.add_next(module, i, next).ok()?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
-                let t = MatchTreeLevel::grow(nexts, depth - 1)?;
+                let t = MatchTreeLevel::grow(module, nexts, depth - 1)?;
                 branches.push((bs, t));
             }
             Some(MatchTree {
@@ -588,23 +637,30 @@ impl MatchTree {
         }
     }
 
-    fn build(branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
+    fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         let mut nexts = Nexts::new();
         for (i, f) in branches.iter().enumerate() {
             nexts.add(i, Rc::new(Next::Cat(f, next.clone()))).ok()?;
         }
         const MAX_DEPTH: usize = 32;
-        MatchTreeLevel::grow(nexts, MAX_DEPTH)
+        MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
     }
 }
 
 impl Decoder {
-    pub fn compile(f: &Format) -> Result<Decoder, String> {
-        Decoder::compile_next(f, Rc::new(Next::Empty))
+    pub fn compile(module: &FormatModule, format: &Format) -> Result<Decoder, String> {
+        Decoder::compile_next(module, format, Rc::new(Next::Empty))
     }
 
-    fn compile_next(f: &Format, next: Rc<Next<'_>>) -> Result<Decoder, String> {
-        match f {
+    fn compile_next(
+        module: &FormatModule,
+        format: &Format,
+        next: Rc<Next<'_>>,
+    ) -> Result<Decoder, String> {
+        match format {
+            Format::ItemVar(level) => {
+                Decoder::compile_next(module, module.get_format(*level), next)
+            }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
@@ -612,23 +668,24 @@ impl Decoder {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
-                    ds.push((label.clone(), Decoder::compile_next(f, next.clone())?));
+                    ds.push((
+                        label.clone(),
+                        Decoder::compile_next(module, f, next.clone())?,
+                    ));
                     fs.push(f.clone());
                 }
-                if let Some(tree) = MatchTree::build(&fs, next) {
+                if let Some(tree) = MatchTree::build(module, &fs, next) {
                     Ok(Decoder::Branch(tree, ds))
                 } else {
-                    Err(format!("cannot build match tree for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", format))
                 }
             }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let df = Decoder::compile_next(
-                        f,
-                        Rc::new(Next::Tuple(fields.as_slice(), next.clone())),
-                    )?;
+                    let next = Rc::new(Next::Tuple(fields.as_slice(), next.clone()));
+                    let df = Decoder::compile_next(module, f, next)?;
                     dfields.push(df);
                 }
                 Ok(Decoder::Tuple(dfields))
@@ -637,70 +694,65 @@ impl Decoder {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some((name, f)) = fields.next() {
-                    let df = Decoder::compile_next(
-                        f,
-                        Rc::new(Next::Record(fields.as_slice(), next.clone())),
-                    )?;
+                    let next = Rc::new(Next::Record(fields.as_slice(), next.clone()));
+                    let df = Decoder::compile_next(module, f, next)?;
                     dfields.push((name.clone(), df));
                 }
                 Ok(Decoder::Record(dfields))
             }
             Format::Repeat(a) => {
-                if a.is_nullable() {
+                if a.is_nullable(module) {
                     return Err("cannot repeat nullable format".to_string());
                 }
-                let da = Box::new(Decoder::compile_next(
-                    a,
-                    Rc::new(Next::Repeat(a, next.clone())),
-                )?);
+                let da = Decoder::compile_next(module, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
-                if let Some(tree) = MatchTree::build(&[fa, fb], next) {
-                    Ok(Decoder::While(tree, da))
+                if let Some(tree) = MatchTree::build(module, &[fa, fb], next) {
+                    Ok(Decoder::While(tree, Box::new(da)))
                 } else {
-                    Err(format!("cannot build match tree for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", format))
                 }
             }
             Format::Repeat1(a) => {
-                if a.is_nullable() {
+                if a.is_nullable(module) {
                     return Err("cannot repeat nullable format".to_string());
                 }
-                let da = Box::new(Decoder::compile_next(
-                    a,
-                    Rc::new(Next::Repeat(a, next.clone())),
-                )?);
+                let da = Decoder::compile_next(module, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::EMPTY;
                 let fb = Format::Tuple(vec![(**a).clone(), astar]);
-                if let Some(tree) = MatchTree::build(&[fa, fb], next) {
-                    Ok(Decoder::Until(tree, da))
+                if let Some(tree) = MatchTree::build(module, &[fa, fb], next) {
+                    Ok(Decoder::Until(tree, Box::new(da)))
                 } else {
-                    Err(format!("cannot build match tree for {:?}", f))
+                    Err(format!("cannot build match tree for {:?}", format))
                 }
             }
             Format::RepeatCount(expr, a) => {
                 // FIXME probably not right
-                let da = Box::new(Decoder::compile_next(a, next)?);
+                let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
             Format::Slice(expr, a) => {
-                let da = Box::new(Decoder::compile_next(a, Rc::new(Next::Empty))?);
+                let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
             Format::WithRelativeOffset(expr, a) => {
-                let da = Box::new(Decoder::compile_next(a, Rc::new(Next::Empty))?);
+                let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
             Format::Map(f, a) => {
-                let da = Box::new(Decoder::compile_next(a, next)?);
+                let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::Map(f.clone(), da))
             }
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
                     .map(|(pattern, f)| {
-                        Ok((pattern.clone(), Decoder::compile_next(f, next.clone())?))
+                        Ok((
+                            pattern.clone(),
+                            Decoder::compile_next(module, f, next.clone())?,
+                        ))
                     })
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
@@ -886,7 +938,7 @@ mod tests {
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -894,7 +946,7 @@ mod tests {
     #[test]
     fn compile_empty() {
         let f = Format::EMPTY;
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0x00], &[0x00], Value::UNIT);
     }
@@ -902,7 +954,7 @@ mod tests {
     #[test]
     fn compile_byte_is() {
         let f = is_byte(0x00);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
         rejects(&d, &[0xFF]);
@@ -912,7 +964,7 @@ mod tests {
     #[test]
     fn compile_byte_not() {
         let f = not_byte(0x00);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
@@ -922,7 +974,7 @@ mod tests {
     #[test]
     fn compile_alt() {
         let f = alts::<&str>([]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -930,7 +982,7 @@ mod tests {
     #[test]
     fn compile_alt_byte() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0xFF))]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[0x00], &[], Value::variant("a", Value::U8(0x00)));
         accepts(&d, &[0xFF], &[], Value::variant("b", Value::U8(0xFF)));
         rejects(&d, &[0x11]);
@@ -940,39 +992,39 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0x00))]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
     fn compile_alt_fail() {
         let f = alts([("a", Format::Fail), ("b", Format::Fail)]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         rejects(&d, &[]);
     }
 
     #[test]
     fn compile_alt_end_of_input() {
         let f = alts([("a", Format::EndOfInput), ("b", Format::EndOfInput)]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
         let f = alts([("a", Format::EMPTY), ("b", Format::EMPTY)]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
     fn compile_alt_fail_end_of_input() {
         let f = alts([("a", Format::Fail), ("b", Format::EndOfInput)]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[], &[], Value::variant("b", Value::UNIT));
     }
 
     #[test]
     fn compile_alt_end_of_input_or_byte() {
         let f = alts([("a", Format::EndOfInput), ("b", is_byte(0x00))]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[], &[], Value::variant("a", Value::UNIT));
         accepts(&d, &[0x00], &[], Value::variant("b", Value::U8(0x00)));
         accepts(
@@ -987,7 +1039,7 @@ mod tests {
     #[test]
     fn compile_alt_opt() {
         let f = alts([("a", Format::EMPTY), ("b", is_byte(0x00))]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[0x00], &[], Value::variant("b", Value::U8(0x00)));
         accepts(&d, &[], &[], Value::variant("a", Value::UNIT));
         accepts(&d, &[0xFF], &[0xFF], Value::variant("a", Value::UNIT));
@@ -996,7 +1048,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_next() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), is_byte(0xFF)]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1016,7 +1068,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_opt() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0xFF))]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1076,7 +1128,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_ambiguous() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0x00))]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
@@ -1102,7 +1154,7 @@ mod tests {
             ("7", alt.clone()),
         ]);
         let f = alts([("a", rec.clone()), ("b", rec.clone())]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
@@ -1112,13 +1164,13 @@ mod tests {
             ("b", is_byte(0x01)),
             ("c", is_byte(0x02)),
         ]));
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1133,13 +1185,13 @@ mod tests {
     #[test]
     fn compile_repeat_repeat() {
         let f = repeat(repeat(is_byte(0x00)));
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
     fn compile_cat_repeat() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), repeat(is_byte(0xFF))]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(
             &d,
             &[],
@@ -1187,7 +1239,7 @@ mod tests {
     #[test]
     fn compile_cat_end_of_input() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::EndOfInput]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1201,7 +1253,7 @@ mod tests {
     #[test]
     fn compile_cat_repeat_end_of_input() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), Format::EndOfInput]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(
             &d,
             &[],
@@ -1223,7 +1275,7 @@ mod tests {
     #[test]
     fn compile_cat_repeat_ambiguous() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), repeat(is_byte(0x00))]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
@@ -1233,7 +1285,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x7F))),
         ]);
-        assert!(Decoder::compile(&f).is_ok());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_ok());
     }
 
     #[test]
@@ -1243,7 +1295,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x00))),
         ]);
-        assert!(Decoder::compile(&f).is_err());
+        assert!(Decoder::compile(&FormatModule::new(), &f).is_err());
     }
 
     #[test]
@@ -1261,7 +1313,7 @@ mod tests {
                 ])),
             ),
         ]);
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         accepts(
             &d,
             &[],
@@ -1336,7 +1388,7 @@ mod tests {
     #[test]
     fn compile_repeat1() {
         let f = repeat1(is_byte(0x00));
-        let d = Decoder::compile(&f).unwrap();
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
