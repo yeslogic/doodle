@@ -71,8 +71,9 @@ impl<W: io::Write> Context<W> {
                     _ => panic!("expected sequence"),
                 }
             }
-            Format::Slice(_, format) => self.write_decoded_value(value, format),
-            Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
+            Format::WithInput(format) => self.write_decoded_value(value, format),
+            Format::TakeBytes(_, format) => self.write_decoded_value(value, format),
+            Format::DropBytes(_, format) => self.write_decoded_value(value, format),
             Format::Map(Func::Expr(_), _) => self.write_value(value),
             Format::Map(Func::TupleProj(index), format) => match format.as_ref() {
                 Format::Tuple(formats) => self.write_decoded_value(value, &formats[*index]),
@@ -368,14 +369,18 @@ impl<W: io::Write> Context<W> {
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
             }
-            Format::Slice(len, format) => {
-                write!(&mut self.writer, "slice ")?;
+            Format::WithInput(format) => {
+                write!(&mut self.writer, "with-input ")?;
+                self.write_atomic_format(format)
+            }
+            Format::TakeBytes(len, format) => {
+                write!(&mut self.writer, "take-bytes ")?;
                 self.write_atomic_expr(len)?;
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
             }
-            Format::WithRelativeOffset(offset, format) => {
-                write!(&mut self.writer, "with-relative-offset ")?;
+            Format::DropBytes(offset, format) => {
+                write!(&mut self.writer, "drop-bytes ")?;
                 self.write_atomic_expr(offset)?;
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)

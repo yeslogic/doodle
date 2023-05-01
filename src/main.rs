@@ -393,7 +393,7 @@ fn jpeg_format() -> Format {
             ("length", u16be()),
             (
                 "data",
-                Format::Slice(
+                Format::TakeBytes(
                     Expr::Sub(
                         Box::new(Expr::Var(0)), // length
                         Box::new(Expr::U16(2)),
@@ -736,7 +736,7 @@ fn png_format() -> Format {
         record([
             ("length", u32be()), // FIXME < 2^31
             ("tag", tag),
-            ("data", Format::Slice(Expr::Var(1), Box::new(data))),
+            ("data", Format::TakeBytes(Expr::Var(1), Box::new(data))),
             ("crc", u32be()), // FIXME check this
         ])
     }
@@ -793,7 +793,7 @@ fn riff_format() -> Format {
         record([
             ("tag", tag),
             ("length", u32le()),
-            ("data", Format::Slice(Expr::Var(0), Box::new(data))),
+            ("data", Format::TakeBytes(Expr::Var(0), Box::new(data))),
             (
                 "pad",
                 if_then_else(is_even(Expr::Var(1)), Format::EMPTY, is_byte(0x00)),
@@ -875,7 +875,7 @@ fn tiff_format() -> Format {
         ),
         (
             "ifd",
-            Format::WithRelativeOffset(
+            Format::WithInput(Box::new(Format::DropBytes(
                 // TODO: Offset from start of the TIFF header
                 Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
                 Box::new(Format::Match(
@@ -885,7 +885,7 @@ fn tiff_format() -> Format {
                         (Pattern::variant("be", Pattern::UNIT), ifd(true)),
                     ],
                 )),
-            ),
+            ))),
         ),
     ])
 }

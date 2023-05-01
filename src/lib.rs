@@ -210,10 +210,14 @@ pub enum Format {
     Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
     RepeatCount(Expr, Box<Format>),
-    /// Restrict a format to a sub-stream of a given number of bytes
-    Slice(Expr, Box<Format>),
-    /// Matches a format at a byte offset relative to the current stream position
-    WithRelativeOffset(Expr, Box<Format>),
+    /// Matches a format without consuming the input
+    WithInput(Box<Format>),
+    /// Takes a given number of bytes from the start of the input, matching
+    /// the format against those bytes
+    TakeBytes(Expr, Box<Format>),
+    /// Drops a given number of bytes from the start of the input, matching
+    /// the format against the remaining input
+    DropBytes(Expr, Box<Format>),
     /// Transform a decoded value with a function
     Map(Func, Box<Format>),
     /// Pattern match on an expression
@@ -261,8 +265,9 @@ pub enum Decoder {
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
-    Slice(Expr, Box<Decoder>),
-    WithRelativeOffset(Expr, Box<Decoder>),
+    WithInput(Box<Decoder>),
+    TakeBytes(Expr, Box<Decoder>),
+    DropBytes(Expr, Box<Decoder>),
     Map(Func, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
 }
@@ -408,8 +413,9 @@ impl Format {
             Format::Repeat(_a) => true,
             Format::Repeat1(_a) => false,
             Format::RepeatCount(_expr, _a) => true,
-            Format::Slice(_expr, _a) => true,
-            Format::WithRelativeOffset(_, _) => true,
+            Format::WithInput(_) => true,
+            Format::TakeBytes(_, _) => true,
+            Format::DropBytes(_, _) => true,
             Format::Map(_f, a) => a.is_nullable(),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable()),
         }
@@ -523,10 +529,13 @@ impl<'a> MatchTreeLevel<'a> {
             Format::RepeatCount(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Slice(_expr, _a) => {
+            Format::WithInput(_) => {
                 self.accept(index) // FIXME
             }
-            Format::WithRelativeOffset(_expr, _a) => {
+            Format::TakeBytes(_, _) => {
+                self.accept(index) // FIXME
+            }
+            Format::DropBytes(_, _) => {
                 self.accept(index) // FIXME
             }
             Format::Map(_f, a) => self.add(index, a, next),
@@ -684,13 +693,17 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
-            Format::Slice(expr, a) => {
+            Format::WithInput(a) => {
                 let da = Box::new(Decoder::compile_next(a, Rc::new(Next::Empty))?);
-                Ok(Decoder::Slice(expr.clone(), da))
+                Ok(Decoder::WithInput(da))
             }
-            Format::WithRelativeOffset(expr, a) => {
+            Format::TakeBytes(expr, a) => {
                 let da = Box::new(Decoder::compile_next(a, Rc::new(Next::Empty))?);
-                Ok(Decoder::WithRelativeOffset(expr.clone(), da))
+                Ok(Decoder::TakeBytes(expr.clone(), da))
+            }
+            Format::DropBytes(expr, a) => {
+                let da = Box::new(Decoder::compile_next(a, Rc::new(Next::Empty))?);
+                Ok(Decoder::DropBytes(expr.clone(), da))
             }
             Format::Map(f, a) => {
                 let da = Box::new(Decoder::compile_next(a, next)?);
@@ -791,7 +804,11 @@ impl Decoder {
                 }
                 Some((Value::Seq(v), input))
             }
-            Decoder::Slice(expr, a) => {
+            Decoder::WithInput(a) => {
+                let (v, _) = a.parse(stack, input)?;
+                Some((v, input))
+            }
+            Decoder::TakeBytes(expr, a) => {
                 let size = expr.eval_usize(stack);
                 if size <= input.len() {
                     let (slice, input) = input.split_at(size);
@@ -801,11 +818,11 @@ impl Decoder {
                     None
                 }
             }
-            Decoder::WithRelativeOffset(expr, a) => {
+            Decoder::DropBytes(expr, a) => {
                 let offset = expr.eval_usize(stack);
                 if offset <= input.len() {
                     let (_, slice) = input.split_at(offset);
-                    let (v, _) = a.parse(stack, slice)?;
+                    let (v, input) = a.parse(stack, slice)?;
                     Some((v, input))
                 } else {
                     None
