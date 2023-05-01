@@ -5,7 +5,7 @@
     │   │   └── app0 <- { ... } :=
     │   │       ├── marker <- map _.1 (...) := 224
     │   │       ├── length <- u16be := 16
-    │   │       └── data <- slice (length - 2) { ... } :=
+    │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │           ├── identifier <- map _.string { ... } :=
     │   │           │   ├── 0 <- [!= 0] := 74
     │   │           │   ├── 1 <- [!= 0] := 70
@@ -25,7 +25,7 @@
     │   │   │   └── dqt <- { ... } :=
     │   │   │       ├── marker <- map _.1 (...) := 219
     │   │   │       ├── length <- u16be := 67
-    │   │   │       └── data <- slice (length - 2) { ... } :=
+    │   │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │   │           ├── precision-table-id <- u8 := 0
     │   │   │           └── elements <- repeat u8 :=
     │   │   │               ├── 0 <- u8 := 8
@@ -44,7 +44,7 @@
     │   │       └── dqt <- { ... } :=
     │   │           ├── marker <- map _.1 (...) := 219
     │   │           ├── length <- u16be := 67
-    │   │           └── data <- slice (length - 2) { ... } :=
+    │   │           └── data <- take-bytes (length - 2) { ... } :=
     │   │               ├── precision-table-id <- u8 := 1
     │   │               └── elements <- repeat u8 :=
     │   │                   ├── 0 <- u8 := 9
@@ -63,7 +63,7 @@
     │   │   └── sof0 <- { ... } :=
     │   │       ├── marker <- map _.1 (...) := 192
     │   │       ├── length <- u16be := 17
-    │   │       └── data <- slice (length - 2) { ... } :=
+    │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │           ├── sample-precision <- u8 := 8
     │   │           ├── num-lines <- u16be := 97
     │   │           ├── num-samples-per-line <- u16be := 105
@@ -87,7 +87,7 @@
     │   │   │   │   └── dht <- { ... } :=
     │   │   │   │       ├── marker <- map _.1 (...) := 196
     │   │   │   │       ├── length <- u16be := 27
-    │   │   │   │       └── data <- slice (length - 2) { ... } :=
+    │   │   │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │   │   │           ├── class-table-id <- u8 := 0
     │   │   │   │           ├── num-codes <- repeat-count 16 u8 :=
     │   │   │   │           │   ├── 0 <- u8 := 0
@@ -115,7 +115,7 @@
     │   │   │   │   └── dht <- { ... } :=
     │   │   │   │       ├── marker <- map _.1 (...) := 196
     │   │   │   │       ├── length <- u16be := 58
-    │   │   │   │       └── data <- slice (length - 2) { ... } :=
+    │   │   │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │   │   │           ├── class-table-id <- u8 := 16
     │   │   │   │           ├── num-codes <- repeat-count 16 u8 :=
     │   │   │   │           │   ├── 0 <- u8 := 0
@@ -147,7 +147,7 @@
     │   │   │   │   └── dht <- { ... } :=
     │   │   │   │       ├── marker <- map _.1 (...) := 196
     │   │   │   │       ├── length <- u16be := 26
-    │   │   │   │       └── data <- slice (length - 2) { ... } :=
+    │   │   │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │   │   │           ├── class-table-id <- u8 := 1
     │   │   │   │           ├── num-codes <- repeat-count 16 u8 :=
     │   │   │   │           │   ├── 0 <- u8 := 0
@@ -174,7 +174,7 @@
     │   │   │       └── dht <- { ... } :=
     │   │   │           ├── marker <- map _.1 (...) := 196
     │   │   │           ├── length <- u16be := 38
-    │   │   │           └── data <- slice (length - 2) { ... } :=
+    │   │   │           └── data <- take-bytes (length - 2) { ... } :=
     │   │   │               ├── class-table-id <- u8 := 17
     │   │   │               ├── num-codes <- repeat-count 16 u8 :=
     │   │   │               │   ├── 0 <- u8 := 0
@@ -205,7 +205,7 @@
     │   │   ├── sos <- { ... } :=
     │   │   │   ├── marker <- map _.1 (...) := 218
     │   │   │   ├── length <- u16be := 12
-    │   │   │   └── data <- slice (length - 2) { ... } :=
+    │   │   │   └── data <- take-bytes (length - 2) { ... } :=
     │   │   │       ├── num-image-components <- u8 := 3
     │   │   │       ├── image-components <- repeat-count num-image-components { ... } :=
     │   │   │       │   ├── 0 <- { ... } :=

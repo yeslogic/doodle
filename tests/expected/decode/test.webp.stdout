@@ -5,7 +5,7 @@
     │   ├── 2 <- [= 70] := 70
     │   └── 3 <- [= 70] := 70
     ├── length <- u32le := 1140
-    ├── data <- slice length { ... } :=
+    ├── data <- take-bytes length { ... } :=
     │   ├── tag <- (...) :=
     │   │   ├── 0 <- u8 := 87
     │   │   ├── 1 <- u8 := 69
@@ -19,7 +19,7 @@
     │       │   │   ├── 2 <- u8 := 56
     │       │   │   └── 3 <- u8 := 88
     │       │   ├── length <- u32le := 10
-    │       │   ├── data <- slice length (repeat u8) :=
+    │       │   ├── data <- take-bytes length (repeat u8) :=
     │       │   │   ├── 0 <- u8 := 8
     │       │   │   ├── 1 <- u8 := 0
     │       │   │   ├── 2 <- u8 := 0
@@ -38,7 +38,7 @@
     │       │   │   ├── 2 <- u8 := 56
     │       │   │   └── 3 <- u8 := 76
     │       │   ├── length <- u32le := 963
-    │       │   ├── data <- slice length (repeat u8) :=
+    │       │   ├── data <- take-bytes length (repeat u8) :=
     │       │   │   ├── 0 <- u8 := 47
     │       │   │   ├── 1 <- u8 := 72
     │       │   │   ├── 2 <- u8 := 128
@@ -59,7 +59,7 @@
     │           │   ├── 2 <- u8 := 73
     │           │   └── 3 <- u8 := 70
     │           ├── length <- u32le := 138
-    │           ├── data <- slice length (repeat u8) :=
+    │           ├── data <- take-bytes length (repeat u8) :=
     │           │   ├── 0 <- u8 := 69
     │           │   ├── 1 <- u8 := 120
     │           │   ├── 2 <- u8 := 105

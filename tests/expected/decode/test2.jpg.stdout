@@ -5,7 +5,7 @@
     │   │   └── app1 <- { ... } :=
     │   │       ├── marker <- map _.1 (...) := 225
     │   │       ├── length <- u16be := 5426
-    │   │       └── data <- slice (length - 2) { ... } :=
+    │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │           ├── identifier <- map _.string { ... } :=
     │   │           │   ├── 0 <- [!= 0] := 69
     │   │           │   ├── 1 <- [!= 0] := 120
@@ -17,7 +17,7 @@
     │   │                   ├── byte-order <- _ |...| _ := { be := () }
     │   │                   ├── magic <- match byte-order { ... } := 42
     │   │                   ├── offset <- match byte-order { ... } := 8
-    │   │                   └── ifd <- with-relative-offset (offset - 8) (match byte-order { ... }) :=
+    │   │                   └── ifd <- with-input (drop-bytes (offset - 8) (match byte-order { ... })) :=
     │   │                       ├── num-fields <- u16be := 7
     │   │                       ├── fields <- repeat-count num-fields { ... } :=
     │   │                       │   ├── 0 <- { ... } :=
@@ -74,7 +74,7 @@
     │   │   │   └── app13 <- { ... } :=
     │   │   │       ├── marker <- map _.1 (...) := 237
     │   │   │       ├── length <- u16be := 10600
-    │   │   │       └── data <- slice (length - 2) (repeat u8) :=
+    │   │   │       └── data <- take-bytes (length - 2) (repeat u8) :=
     │   │   │           ├── 0 <- u8 := 80
     │   │   │           ├── 1 <- u8 := 104
     │   │   │           ├── 2 <- u8 := 111
@@ -91,7 +91,7 @@
     │   │   │   └── app1 <- { ... } :=
     │   │   │       ├── marker <- map _.1 (...) := 225
     │   │   │       ├── length <- u16be := 4429
-    │   │   │       └── data <- slice (length - 2) { ... } :=
+    │   │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │   │           ├── identifier <- map _.string { ... } :=
     │   │   │           │   ├── 0 <- [!= 0] := 104
     │   │   │           │   ├── 1 <- [!= 0] := 116
@@ -123,7 +123,7 @@
     │   │   │   └── app2 <- { ... } :=
     │   │   │       ├── marker <- map _.1 (...) := 226
     │   │   │       ├── length <- u16be := 576
-    │   │   │       └── data <- slice (length - 2) (repeat u8) :=
+    │   │   │       └── data <- take-bytes (length - 2) (repeat u8) :=
     │   │   │           ├── 0 <- u8 := 73
     │   │   │           ├── 1 <- u8 := 67
     │   │   │           ├── 2 <- u8 := 67
@@ -140,7 +140,7 @@
     │   │   │   └── app14 <- { ... } :=
     │   │   │       ├── marker <- map _.1 (...) := 238
     │   │   │       ├── length <- u16be := 14
-    │   │   │       └── data <- slice (length - 2) (repeat u8) :=
+    │   │   │       └── data <- take-bytes (length - 2) (repeat u8) :=
     │   │   │           ├── 0 <- u8 := 65
     │   │   │           ├── 1 <- u8 := 100
     │   │   │           ├── 2 <- u8 := 111
@@ -157,7 +157,7 @@
     │   │       └── dqt <- { ... } :=
     │   │           ├── marker <- map _.1 (...) := 219
     │   │           ├── length <- u16be := 132
-    │   │           └── data <- slice (length - 2) { ... } :=
+    │   │           └── data <- take-bytes (length - 2) { ... } :=
     │   │               ├── precision-table-id <- u8 := 0
     │   │               └── elements <- repeat u8 :=
     │   │                   ├── 0 <- u8 := 2
@@ -176,7 +176,7 @@
     │   │   └── sof0 <- { ... } :=
     │   │       ├── marker <- map _.1 (...) := 192
     │   │       ├── length <- u16be := 17
-    │   │       └── data <- slice (length - 2) { ... } :=
+    │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │           ├── sample-precision <- u8 := 8
     │   │           ├── num-lines <- u16be := 709
     │   │           ├── num-samples-per-line <- u16be := 709
@@ -200,13 +200,13 @@
     │   │   │   │   └── dri <- { ... } :=
     │   │   │   │       ├── marker <- map _.1 (...) := 221
     │   │   │   │       ├── length <- u16be := 4
-    │   │   │   │       └── data <- slice (length - 2) { ... } :=
+    │   │   │   │       └── data <- take-bytes (length - 2) { ... } :=
     │   │   │   │           └── restart-interval <- u16be := 89
     │   │   │   └── 1 <- _ |...| _ :=
     │   │   │       └── dht <- { ... } :=
     │   │   │           ├── marker <- map _.1 (...) := 196
     │   │   │           ├── length <- u16be := 418
-    │   │   │           └── data <- slice (length - 2) { ... } :=
+    │   │   │           └── data <- take-bytes (length - 2) { ... } :=
     │   │   │               ├── class-table-id <- u8 := 0
     │   │   │               ├── num-codes <- repeat-count 16 u8 :=
     │   │   │               │   ├── 0 <- u8 := 0
@@ -237,7 +237,7 @@
     │   │   ├── sos <- { ... } :=
     │   │   │   ├── marker <- map _.1 (...) := 218
     │   │   │   ├── length <- u16be := 12
-    │   │   │   └── data <- slice (length - 2) { ... } :=
+    │   │   │   └── data <- take-bytes (length - 2) { ... } :=
     │   │   │       ├── num-image-components <- u8 := 3
     │   │   │       ├── image-components <- repeat-count num-image-components { ... } :=
     │   │   │       │   ├── 0 <- { ... } :=
