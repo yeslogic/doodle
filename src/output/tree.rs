@@ -1,9 +1,9 @@
 use std::{fmt, io};
 
-use crate::{Expr, Format, Func, Value};
+use crate::{Expr, Format, FormatModule, Func, Value};
 
-pub fn print_decoded_value(value: &Value, format: &Format) {
-    Context::new(io::stdout())
+pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
+    Context::new(io::stdout(), module)
         .write_decoded_value(value, format)
         .unwrap()
 }
@@ -26,20 +26,22 @@ enum Column {
     Space,
 }
 
-pub struct Context<W: io::Write> {
+pub struct Context<'module, W: io::Write> {
     writer: W,
     gutter: Vec<Column>,
     preview_len: Option<usize>,
+    module: &'module FormatModule,
     names: Vec<String>,
     values: Vec<Value>,
 }
 
-impl<W: io::Write> Context<W> {
-    pub fn new(writer: W) -> Context<W> {
+impl<'module, W: io::Write> Context<'module, W> {
+    pub fn new(writer: W, module: &'module FormatModule) -> Context<'module, W> {
         Context {
             writer,
             gutter: Vec::new(),
             preview_len: Some(10),
+            module,
             names: Vec::new(),
             values: Vec::new(),
         }
@@ -47,6 +49,9 @@ impl<W: io::Write> Context<W> {
 
     pub fn write_decoded_value(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
+            Format::ItemVar(level) => {
+                self.write_decoded_value(value, self.module.get_format(*level))
+            }
             Format::Fail => panic!("uninhabited format"),
             Format::EndOfInput => self.write_value(value),
             Format::Byte(_) => self.write_value(value),
@@ -381,34 +386,26 @@ impl<W: io::Write> Context<W> {
                 self.write_atomic_format(format)
             }
 
-            Format::Map(func, format) => match func {
-                Func::Expr(expr) => {
-                    write!(&mut self.writer, "map (always ")?;
-                    self.write_expr(expr)?;
-                    write!(&mut self.writer, ")")?;
-                    self.write_atomic_format(format)
+            Format::Map(func, format) => {
+                write!(&mut self.writer, "map ")?;
+                match func {
+                    Func::Expr(expr) => {
+                        write!(&mut self.writer, "(always ")?;
+                        self.write_expr(expr)?;
+                        write!(&mut self.writer, ")")?;
+                    }
+                    Func::TupleProj(index) => write!(&mut self.writer, "_.{index}")?,
+                    Func::RecordProj(label) => write!(&mut self.writer, "_.{label}")?,
+                    Func::Match(_) => write!(&mut self.writer, "(match {{ ... }})")?,
+                    Func::U16Be => write!(&mut self.writer, "u16be")?,
+                    Func::U16Le => write!(&mut self.writer, "u16le")?,
+                    Func::U32Be => write!(&mut self.writer, "u32be")?,
+                    Func::U32Le => write!(&mut self.writer, "u32le")?,
+                    Func::Stream => write!(&mut self.writer, "stream")?,
                 }
-                Func::TupleProj(index) => {
-                    write!(&mut self.writer, "map _.{index} ")?;
-                    self.write_atomic_format(format)
-                }
-                Func::RecordProj(label) => {
-                    write!(&mut self.writer, "map _.{label} ")?;
-                    self.write_atomic_format(format)
-                }
-                Func::Match(_) => {
-                    write!(&mut self.writer, "map (fun x => match x {{ ... }}) ")?;
-                    self.write_atomic_format(format)
-                }
-                Func::U16Be => write!(&mut self.writer, "u16be"), // FIXME: Hack
-                Func::U16Le => write!(&mut self.writer, "u16le"), // FIXME: Hack
-                Func::U32Be => write!(&mut self.writer, "u32be"), // FIXME: Hack
-                Func::U32Le => write!(&mut self.writer, "u32le"), // FIXME: Hack
-                Func::Stream => {
-                    write!(&mut self.writer, "map stream ")?;
-                    self.write_atomic_format(format)
-                }
-            },
+                write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
 
             Format::Match(head, _) => {
                 write!(&mut self.writer, "match ")?;
@@ -422,10 +419,12 @@ impl<W: io::Write> Context<W> {
 
     fn write_atomic_format(&mut self, format: &Format) -> io::Result<()> {
         match format {
+            Format::ItemVar(var) => {
+                write!(&mut self.writer, "{}", self.module.get_name(*var))
+            }
             Format::Fail => write!(&mut self.writer, "fail"),
             Format::EndOfInput => write!(&mut self.writer, "end-of-input"),
 
-            Format::Byte(bs) if bs.is_full() => write!(&mut self.writer, "u8"), // FIXME: Hack
             Format::Byte(bs) => {
                 if bs.len() < 128 {
                     write!(&mut self.writer, "[=")?;
@@ -448,10 +447,6 @@ impl<W: io::Write> Context<W> {
             Format::Record(fields) if fields.is_empty() => write!(&mut self.writer, "{{}}"),
             Format::Record(_) => write!(&mut self.writer, "{{ ... }}"),
 
-            Format::Map(Func::U16Be, _) => write!(&mut self.writer, "u16be"), // FIXME: Hack
-            Format::Map(Func::U16Le, _) => write!(&mut self.writer, "u16le"), // FIXME: Hack
-            Format::Map(Func::U32Be, _) => write!(&mut self.writer, "u32be"), // FIXME: Hack
-            Format::Map(Func::U32Le, _) => write!(&mut self.writer, "u32le"), // FIXME: Hack
             format => {
                 write!(&mut self.writer, "(")?;
                 self.write_format(format)?;
