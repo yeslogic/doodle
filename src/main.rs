@@ -217,9 +217,12 @@ fn gif_format(module: &mut FormatModule, base: &BaseModule) -> Format {
         )
     }
 
-    let color_table = |flags: Expr| {
-        let color_table_entry = record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]);
+    let color_table_entry = module.define_format(
+        "gif.color-table-entry",
+        record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]),
+    );
 
+    let color_table = |flags: Expr| {
         if_then_else(
             has_color_table(flags.clone()),
             repeat_count(color_table_len(flags), color_table_entry),
@@ -266,7 +269,7 @@ fn gif_format(module: &mut FormatModule, base: &BaseModule) -> Format {
     );
 
     // 19. Global Color Table
-    let global_color_table = color_table;
+    let global_color_table = color_table.clone();
 
     // 20. Image Descriptor
     let image_descriptor = module.define_format(
@@ -288,7 +291,7 @@ fn gif_format(module: &mut FormatModule, base: &BaseModule) -> Format {
     );
 
     // 21. Local Color Table
-    let local_color_table = color_table;
+    let local_color_table = color_table.clone();
 
     // 22. Table Based Image Data
     let table_based_image_data = module.define_format(
