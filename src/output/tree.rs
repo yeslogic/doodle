@@ -76,6 +76,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     _ => panic!("expected sequence"),
                 }
             }
+            Format::Peek(format) => self.write_decoded_value(value, format),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
             Format::Map(Func::Expr(_), _) => self.write_value(value),
