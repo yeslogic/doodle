@@ -212,6 +212,8 @@ pub enum Format {
     Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
     RepeatCount(Expr, Box<Format>),
+    /// Parse a format without advancing the stream position afterwards
+    Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
@@ -292,6 +294,7 @@ pub enum Decoder {
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
+    Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Func, Box<Decoder>),
@@ -440,6 +443,7 @@ impl Format {
             Format::Repeat(_) => true,
             Format::Repeat1(_) => false,
             Format::RepeatCount(_, _) => true,
+            Format::Peek(_) => true,
             Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
             Format::Map(_, f) => f.is_nullable(module),
@@ -570,6 +574,9 @@ impl<'a> MatchTreeLevel<'a> {
                 Ok(())
             }
             Format::RepeatCount(_expr, _a) => {
+                self.accept(index) // FIXME
+            }
+            Format::Peek(_a) => {
                 self.accept(index) // FIXME
             }
             Format::Slice(_expr, _a) => {
@@ -733,6 +740,10 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
+            Format::Peek(a) => {
+                let da = Box::new(Decoder::compile_next(module, a, next)?);
+                Ok(Decoder::Peek(da))
+            }
             Format::Slice(expr, a) => {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
@@ -842,6 +853,10 @@ impl Decoder {
                     v.push(va);
                 }
                 Some((Value::Seq(v), input))
+            }
+            Decoder::Peek(a) => {
+                let (v, _next_input) = a.parse(stack, input)?;
+                Some((v, input))
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_usize(stack);
