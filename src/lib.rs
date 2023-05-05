@@ -234,6 +234,8 @@ pub enum Format {
     Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
+    /// Parse bitstream
+    Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
     WithRelativeOffset(Expr, Box<Format>),
     /// Compute a value
@@ -317,6 +319,7 @@ pub enum Decoder {
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
+    Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Compute(Expr),
     Match(Expr, Vec<(Pattern, Decoder)>),
@@ -573,6 +576,7 @@ impl Format {
             Format::RepeatUntilSeq(_, f) => f.is_nullable(module),
             Format::Peek(_) => true,
             Format::Slice(_, _) => true,
+            Format::Bits(f) => f.is_nullable(module),
             Format::WithRelativeOffset(_, _) => true,
             Format::Compute(_) => true,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
@@ -714,6 +718,9 @@ impl<'a> MatchTreeLevel<'a> {
                 self.accept(index) // FIXME
             }
             Format::Slice(_expr, _a) => {
+                self.accept(index) // FIXME
+            }
+            Format::Bits(_a) => {
                 self.accept(index) // FIXME
             }
             Format::WithRelativeOffset(_expr, _a) => {
@@ -892,6 +899,10 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
+            Format::Bits(a) => {
+                let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
+                Ok(Decoder::Bits(da))
+            }
             Format::WithRelativeOffset(expr, a) => {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
@@ -1044,6 +1055,19 @@ impl Decoder {
                 } else {
                     None
                 }
+            }
+            Decoder::Bits(a) => {
+                let mut bits = Vec::with_capacity(input.len() * 8);
+                for b in input {
+                    for i in 0..8 {
+                        bits.push((b & (1 << i)) >> i);
+                    }
+                }
+                let (v, bits) = a.parse(stack, &bits)?;
+                let bytes_remain = bits.len() >> 3;
+                let bytes_read = input.len() - bytes_remain;
+                let input = &input[bytes_read..];
+                Some((v, input))
             }
             Decoder::WithRelativeOffset(expr, a) => {
                 let offset = expr.eval_usize(stack);
