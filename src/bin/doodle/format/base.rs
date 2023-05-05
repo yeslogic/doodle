@@ -1,44 +1,52 @@
 use doodle::byte_set::ByteSet;
-use doodle::{Expr, Format, FormatModule, Func, Pattern};
+use doodle::{BaseFormat, Expr, Format, FormatModule, Func, Pattern};
 
-pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
-    Format::Tuple(formats.into_iter().collect())
+pub fn tuple<T>(formats: impl IntoIterator<Item = BaseFormat<T>>) -> BaseFormat<T> {
+    BaseFormat::Tuple(formats.into_iter().collect())
 }
 
-pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
-    Format::Union(
+pub fn alts<Label: Into<String>, T>(
+    fields: impl IntoIterator<Item = (Label, BaseFormat<T>)>,
+) -> BaseFormat<T> {
+    BaseFormat::Union(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
             .collect(),
     )
 }
 
-pub fn record<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
-    Format::Record(
+pub fn record<Label: Into<String>, T>(
+    fields: impl IntoIterator<Item = (Label, BaseFormat<T>)>,
+) -> BaseFormat<T> {
+    BaseFormat::Record(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
             .collect(),
     )
 }
 
-pub fn optional(format: Format) -> Format {
-    alts([("some", format), ("none", Format::EMPTY)])
+pub fn optional<T>(format: BaseFormat<T>) -> BaseFormat<T> {
+    alts([("some", format), ("none", BaseFormat::EMPTY)])
 }
 
-pub fn repeat(format: Format) -> Format {
-    Format::Repeat(Box::new(format))
+pub fn repeat<T>(format: BaseFormat<T>) -> BaseFormat<T> {
+    BaseFormat::Repeat(Box::new(format))
 }
 
-pub fn repeat1(format: Format) -> Format {
-    Format::Repeat1(Box::new(format))
+pub fn repeat1<T>(format: BaseFormat<T>) -> BaseFormat<T> {
+    BaseFormat::Repeat1(Box::new(format))
 }
 
-pub fn repeat_count(len: Expr, format: Format) -> Format {
-    Format::RepeatCount(len, Box::new(format))
+pub fn repeat_count<T>(len: Expr, format: BaseFormat<T>) -> BaseFormat<T> {
+    BaseFormat::RepeatCount(len, Box::new(format))
 }
 
-pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
-    Format::Match(
+pub fn if_then_else<T>(
+    cond: Expr,
+    format0: BaseFormat<T>,
+    format1: BaseFormat<T>,
+) -> BaseFormat<T> {
+    BaseFormat::Match(
         cond,
         vec![
             (Pattern::Bool(true), format0),
