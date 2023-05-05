@@ -4,6 +4,7 @@ use crate::format::base::*;
 
 mod base;
 
+mod deflate;
 mod gif;
 mod jpeg;
 mod png;
