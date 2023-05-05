@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::byte_set::ByteSet;
 
+pub mod bit_set;
 pub mod byte_set;
 pub mod output;
 
