@@ -234,31 +234,39 @@ impl<T> BaseFormat<T> {
     pub const EMPTY: BaseFormat<T> = BaseFormat::Tuple(Vec::new());
 }
 
-pub struct FormatModule {
+pub type FormatModule = BaseFormatModule<ByteSet>;
+
+pub type BitFormatModule = BaseFormatModule<BitSet>;
+
+pub struct BaseFormatModule<T> {
     names: Vec<String>,
-    formats: Vec<Format>,
+    formats: Vec<BaseFormat<T>>,
 }
 
-impl FormatModule {
-    pub fn new() -> FormatModule {
-        FormatModule {
+impl<T> BaseFormatModule<T> {
+    pub fn new() -> BaseFormatModule<T> {
+        BaseFormatModule {
             names: Vec::new(),
             formats: Vec::new(),
         }
     }
 
-    pub fn define_format(&mut self, name: impl Into<String>, format: Format) -> Format {
+    pub fn define_format(
+        &mut self,
+        name: impl Into<String>,
+        format: BaseFormat<T>,
+    ) -> BaseFormat<T> {
         let level = self.names.len();
         self.names.push(name.into());
         self.formats.push(format);
-        Format::ItemVar(level)
+        BaseFormat::ItemVar(level)
     }
 
     fn get_name(&self, level: usize) -> &str {
         &self.names[level]
     }
 
-    fn get_format(&self, level: usize) -> &Format {
+    fn get_format(&self, level: usize) -> &BaseFormat<T> {
         &self.formats[level]
     }
 }
