@@ -118,6 +118,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Peek(format) => self.write_decoded_value(value, format),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
+            Format::Bits(format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
             Format::Compute(_expr) => self.write_value(value),
             Format::Match(head, branches) => {
@@ -700,6 +701,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "slice ")?;
                 self.write_atomic_expr(len)?;
                 write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
+            Format::Bits(format) => {
+                write!(&mut self.writer, "bits ")?;
                 self.write_atomic_format(format)
             }
             Format::WithRelativeOffset(offset, format) => {

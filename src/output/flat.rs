@@ -137,6 +137,9 @@ fn check_covered(
         Format::Slice(_, format) => {
             check_covered(module, path, format)?;
         }
+        Format::Bits(format) => {
+            check_covered(module, path, format)?;
+        }
         Format::WithRelativeOffset(_, _) => {} // FIXME
         Format::Compute(_expr) => {}
         Format::Match(_head, branches) => {
@@ -219,6 +222,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Peek(format) => self.write_flat(value, format),
             Format::Slice(_, format) => self.write_flat(value, format),
+            Format::Bits(format) => self.write_flat(value, format),
             Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Compute(_expr) => Ok(()),
             Format::Match(head, branches) => {
