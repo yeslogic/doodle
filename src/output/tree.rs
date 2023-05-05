@@ -54,7 +54,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             }
             Format::Fail => panic!("uninhabited format"),
             Format::EndOfInput => self.write_value(value),
-            Format::Byte(_) => self.write_value(value),
+            Format::Token(_) => self.write_value(value),
             Format::Union(branches) => match value {
                 Value::Variant(label, value) => {
                     let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
@@ -426,7 +426,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Fail => write!(&mut self.writer, "fail"),
             Format::EndOfInput => write!(&mut self.writer, "end-of-input"),
 
-            Format::Byte(bs) => {
+            Format::Token(bs) => {
                 if bs.len() < 128 {
                     write!(&mut self.writer, "[=")?;
                     for b in bs.iter() {

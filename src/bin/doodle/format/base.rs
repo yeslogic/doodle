@@ -48,11 +48,11 @@ pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
 }
 
 pub fn is_byte(b: u8) -> Format {
-    Format::Byte(ByteSet::from([b]))
+    Format::Token(ByteSet::from([b]))
 }
 
 pub fn not_byte(b: u8) -> Format {
-    Format::Byte(!ByteSet::from([b]))
+    Format::Token(!ByteSet::from([b]))
 }
 
 pub fn is_bytes(bytes: &[u8]) -> Format {
@@ -79,7 +79,7 @@ impl BaseModule {
 }
 
 pub fn main(module: &mut FormatModule) -> BaseModule {
-    let u8 = module.define_format("base.u8", Format::Byte(ByteSet::full()));
+    let u8 = module.define_format("base.u8", Format::Token(ByteSet::full()));
 
     let u16be = module.define_format(
         "base.u16be",

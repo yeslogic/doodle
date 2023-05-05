@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use serde::Serialize;
 
+use crate::bit_set::BitSet;
 use crate::byte_set::ByteSet;
 
 pub mod bit_set;
@@ -191,42 +192,46 @@ pub enum Func {
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Format {
+pub enum BaseFormat<T> {
     /// Reference to a top-level item
     ItemVar(usize),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
     EndOfInput,
-    /// Matches a byte in the given byte set
-    Byte(ByteSet),
+    /// Matches a token in the given token set
+    Token(T),
     /// Matches the union of the byte strings matched by all the formats
-    Union(Vec<(String, Format)>),
+    Union(Vec<(String, BaseFormat<T>)>),
     /// Matches a sequence of concatenated formats
-    Tuple(Vec<Format>),
+    Tuple(Vec<BaseFormat<T>>),
     /// Matches a sequence of named formats where later formats can depend on
     /// the decoded value of earlier formats
-    Record(Vec<(String, Format)>),
+    Record(Vec<(String, BaseFormat<T>)>),
     /// Repeat a format zero-or-more times
-    Repeat(Box<Format>),
+    Repeat(Box<BaseFormat<T>>),
     /// Repeat a format one-or-more times
-    Repeat1(Box<Format>),
+    Repeat1(Box<BaseFormat<T>>),
     /// Repeat a format an exact number of times
-    RepeatCount(Expr, Box<Format>),
+    RepeatCount(Expr, Box<BaseFormat<T>>),
     /// Parse a format without advancing the stream position afterwards
-    Peek(Box<Format>),
+    Peek(Box<BaseFormat<T>>),
     /// Restrict a format to a sub-stream of a given number of bytes
-    Slice(Expr, Box<Format>),
+    Slice(Expr, Box<BaseFormat<T>>),
     /// Matches a format at a byte offset relative to the current stream position
-    WithRelativeOffset(Expr, Box<Format>),
+    WithRelativeOffset(Expr, Box<BaseFormat<T>>),
     /// Transform a decoded value with a function
-    Map(Func, Box<Format>),
+    Map(Func, Box<BaseFormat<T>>),
     /// Pattern match on an expression
-    Match(Expr, Vec<(Pattern, Format)>),
+    Match(Expr, Vec<(Pattern, BaseFormat<T>)>),
 }
 
-impl Format {
-    pub const EMPTY: Format = Format::Tuple(Vec::new());
+pub type Format = BaseFormat<ByteSet>;
+
+pub type BitFormat = BaseFormat<BitSet>;
+
+impl<T> BaseFormat<T> {
+    pub const EMPTY: BaseFormat<T> = BaseFormat::Tuple(Vec::new());
 }
 
 pub struct FormatModule {
@@ -437,7 +442,7 @@ impl Format {
             Format::ItemVar(level) => module.get_format(*level).is_nullable(module),
             Format::Fail => false,
             Format::EndOfInput => true,
-            Format::Byte(_) => false,
+            Format::Token(_) => false,
             Format::Union(branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
             Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable(module)),
             Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable(module)),
@@ -523,7 +528,7 @@ impl<'a> MatchTreeLevel<'a> {
             Format::ItemVar(level) => self.add(module, index, module.get_format(*level), next),
             Format::Fail => Ok(()),
             Format::EndOfInput => self.accept(index),
-            Format::Byte(bs) => {
+            Format::Token(bs) => {
                 let mut bs = *bs;
                 let mut new_branches = Vec::new();
                 for (bs0, nexts) in self.branches.iter_mut() {
@@ -671,7 +676,7 @@ impl Decoder {
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
-            Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
+            Format::Token(bs) => Ok(Decoder::Byte(*bs)),
             Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
@@ -932,11 +937,11 @@ mod tests {
     }
 
     fn is_byte(b: u8) -> Format {
-        Format::Byte(ByteSet::from([b]))
+        Format::Token(ByteSet::from([b]))
     }
 
     fn not_byte(b: u8) -> Format {
-        Format::Byte(!ByteSet::from([b]))
+        Format::Token(!ByteSet::from([b]))
     }
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
