@@ -298,22 +298,26 @@ pub struct MatchTree {
 }
 
 /// Decoders with a fixed amount of lookahead
-pub enum Decoder {
+pub enum BaseDecoder<T> {
     Fail,
     EndOfInput,
-    Byte(ByteSet),
-    Branch(MatchTree, Vec<(String, Decoder)>),
-    Tuple(Vec<Decoder>),
-    Record(Vec<(String, Decoder)>),
-    While(MatchTree, Box<Decoder>),
-    Until(MatchTree, Box<Decoder>),
-    RepeatCount(Expr, Box<Decoder>),
-    Peek(Box<Decoder>),
-    Slice(Expr, Box<Decoder>),
-    WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Func, Box<Decoder>),
-    Match(Expr, Vec<(Pattern, Decoder)>),
+    Token(T),
+    Branch(MatchTree, Vec<(String, BaseDecoder<T>)>),
+    Tuple(Vec<BaseDecoder<T>>),
+    Record(Vec<(String, BaseDecoder<T>)>),
+    While(MatchTree, Box<BaseDecoder<T>>),
+    Until(MatchTree, Box<BaseDecoder<T>>),
+    RepeatCount(Expr, Box<BaseDecoder<T>>),
+    Peek(Box<BaseDecoder<T>>),
+    Slice(Expr, Box<BaseDecoder<T>>),
+    WithRelativeOffset(Expr, Box<BaseDecoder<T>>),
+    Map(Func, Box<BaseDecoder<T>>),
+    Match(Expr, Vec<(Pattern, BaseDecoder<T>)>),
 }
+
+pub type Decoder = BaseDecoder<ByteSet>;
+
+pub type BitDecoder = BaseDecoder<BitSet>;
 
 impl Expr {
     fn eval(&self, stack: &[Value]) -> Value {
@@ -684,7 +688,7 @@ impl Decoder {
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
-            Format::Token(bs) => Ok(Decoder::Byte(*bs)),
+            Format::Token(bs) => Ok(Decoder::Token(*bs)),
             Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
@@ -796,7 +800,7 @@ impl Decoder {
                 [] => Some((Value::UNIT, &[])),
                 _ => None,
             },
-            Decoder::Byte(bs) => {
+            Decoder::Token(bs) => {
                 let (&b, input) = input.split_first()?;
                 if bs.contains(b) {
                     Some((Value::U8(b), input))
