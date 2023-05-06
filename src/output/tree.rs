@@ -301,6 +301,11 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " != ")?;
                 self.write_proj_expr(expr1)
             }
+            Expr::Add(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " + ")?;
+                self.write_proj_expr(expr1)
+            }
             Expr::Sub(expr0, expr1) => {
                 self.write_proj_expr(expr0)?;
                 write!(&mut self.writer, " - ")?;
