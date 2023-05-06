@@ -165,6 +165,7 @@ pub enum Expr {
     FlatMap(Box<Expr>, Box<Expr>),
     FlatMapAccum(Box<Expr>, Box<Expr>, Box<Expr>),
     Dup(Box<Expr>, Box<Expr>),
+    Inflate(Box<Expr>),
 }
 
 impl Expr {
@@ -257,10 +258,35 @@ pub enum Format {
     Compute(Expr),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
+    /// Format generated dynamically
+    Dynamic(DynFormat),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum DynFormat {
+    Huffman(Expr, Option<Expr>),
 }
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
+
+    pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+        Format::Union(
+            (fields.into_iter())
+                .map(|(label, format)| (label.into(), format))
+                .collect(),
+        )
+    }
+
+    pub fn record<Label: Into<String>>(
+        fields: impl IntoIterator<Item = (Label, Format)>,
+    ) -> Format {
+        Format::Record(
+            (fields.into_iter())
+                .map(|(label, format)| (label.into(), format))
+                .collect(),
+        )
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -339,6 +365,7 @@ pub enum Decoder {
     WithRelativeOffset(Expr, Box<Decoder>),
     Compute(Expr),
     Match(Expr, Vec<(Pattern, Decoder)>),
+    Dynamic(DynFormat),
 }
 
 impl Expr {
@@ -547,6 +574,13 @@ impl Expr {
                 }
                 Value::Seq(vs)
             }
+            Expr::Inflate(seq) => match seq.eval(stack) {
+                Value::Seq(values) => {
+                    let vs = inflate(&values);
+                    Value::Seq(vs)
+                }
+                _ => panic!("Inflate: expected Seq"),
+            },
         }
     }
 
@@ -601,6 +635,7 @@ impl Format {
             Format::WithRelativeOffset(_, _) => true,
             Format::Compute(_) => true,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
+            Format::Dynamic(DynFormat::Huffman(_, _)) => false,
         }
     }
 }
@@ -756,6 +791,9 @@ impl<'a> MatchTreeLevel<'a> {
                     self.add(module, index, f, next.clone())?;
                 }
                 Ok(())
+            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => {
+                self.accept(index) // FIXME
             }
         }
     }
@@ -993,6 +1031,7 @@ impl Decoder {
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
             }
+            Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
         }
     }
 
@@ -1164,8 +1203,143 @@ impl Decoder {
                 stack.truncate(initial_len);
                 value
             }
+            Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
+                let lengths_val = lengths_expr.eval(stack);
+                let lengths = value_to_vec_usize(&lengths_val);
+                let lengths = match opt_values_expr {
+                    None => lengths,
+                    Some(e) => {
+                        let values = value_to_vec_usize(&e.eval(stack));
+                        let mut new_lengths = [0].repeat(values.len());
+                        for i in 0..lengths.len() {
+                            new_lengths[values[i]] = lengths[i];
+                        }
+                        new_lengths
+                    }
+                };
+                let f = make_huffman_codes(&lengths);
+                let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
+                d.parse(stack, input)
+            }
         }
     }
+}
+
+fn value_to_vec_usize(v: &Value) -> Vec<usize> {
+    let vs = match v {
+        Value::Seq(vs) => vs,
+        _ => panic!("expected Seq"),
+    };
+    vs.iter()
+        .map(|v| match v.coerce_record_to_value() {
+            Value::U8(n) => n as usize,
+            Value::U16(n) => n as usize,
+            _ => panic!("expected U8 or U16"),
+        })
+        .collect::<Vec<usize>>()
+}
+
+fn make_huffman_codes(lengths: &[usize]) -> Format {
+    let max_length = *lengths.iter().max().unwrap();
+    let mut bl_count = [0].repeat(max_length + 1);
+
+    for len in lengths {
+        bl_count[*len] += 1;
+    }
+
+    let mut next_code = [0].repeat(max_length + 1);
+    let mut code = 0;
+    bl_count[0] = 0;
+
+    for bits in 1..max_length + 1 {
+        code = (code + bl_count[bits - 1]) << 1;
+        next_code[bits] = code;
+    }
+
+    let mut codes = Vec::with_capacity(lengths.len());
+
+    for n in 0..lengths.len() {
+        let len = lengths[n];
+        if len != 0 {
+            codes.push((n.to_string(), bit_range(len, next_code[len], n)));
+            //println!("{:?}", codes[codes.len()-1]);
+            next_code[len] += 1;
+        } else {
+            //codes.push((n.to_string(), Format::Fail));
+        }
+    }
+
+    Format::alts(codes)
+}
+
+fn bit_range(n: usize, bits: usize, val: usize) -> Format {
+    let mut fs = Vec::with_capacity(n);
+    for i in 0..n {
+        let r = n - 1 - i;
+        let b = (bits & (1 << r)) >> r != 0;
+        fs.push(is_bit(b));
+    }
+    Format::record([
+        ("bits", Format::Tuple(fs)),
+        (
+            "@value",
+            Format::Compute(if val > 255 {
+                Expr::U16(val.try_into().unwrap())
+            } else {
+                Expr::U8(val.try_into().unwrap())
+            }),
+        ),
+    ])
+}
+
+fn is_bit(b: bool) -> Format {
+    Format::Byte(ByteSet::from([if b { 1 } else { 0 }]))
+}
+
+fn inflate(codes: &[Value]) -> Vec<Value> {
+    let mut vs = Vec::new();
+    for code in codes {
+        match code {
+            Value::Variant(name, v) => match (name.as_str(), v.as_ref()) {
+                ("literal", v) => match v.coerce_record_to_value() {
+                    Value::U8(b) => vs.push(Value::U8(b)),
+                    _ => panic!("inflate: expected U8"),
+                },
+                ("reference", Value::Record(fields)) => {
+                    let length = &fields
+                        .iter()
+                        .find(|(label, _)| label == "length")
+                        .unwrap()
+                        .1;
+                    let distance = &fields
+                        .iter()
+                        .find(|(label, _)| label == "distance")
+                        .unwrap()
+                        .1;
+                    match (length, distance) {
+                        (Value::U16(length), Value::U16(distance)) => {
+                            let length = *length as usize;
+                            let distance = *distance as usize;
+                            if distance > vs.len() {
+                                panic!("inflate: distance out of range");
+                            }
+                            let start = vs.len() - distance;
+                            for i in 0..length {
+                                vs.push(vs[start + i].clone());
+                            }
+                        }
+                        _ => panic!(
+                            "inflate: unexpected length/distance {:?} {:?}",
+                            length, distance
+                        ),
+                    }
+                }
+                _ => panic!("inflate: unknown code"),
+            },
+            _ => panic!("inflate: expected variant"),
+        }
+    }
+    vs
 }
 
 #[cfg(test)]

@@ -70,6 +70,7 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
 }
 
 pub struct BaseModule {
+    bit: Format,
     u8: Format,
     u16be: Format,
     u16le: Format,
@@ -81,6 +82,7 @@ pub struct BaseModule {
 
 #[rustfmt::skip]
 impl BaseModule {
+    pub fn bit(&self) -> Format { self.bit.clone() }
     pub fn u8(&self) -> Format { self.u8.clone() }
     pub fn u16be(&self) -> Format { self.u16be.clone() }
     pub fn u16le(&self) -> Format { self.u16le.clone() }
@@ -91,6 +93,8 @@ impl BaseModule {
 }
 
 pub fn main(module: &mut FormatModule) -> BaseModule {
+    let bit = module.define_format("base.bit", Format::Byte(ByteSet::full()));
+
     let u8 = module.define_format("base.u8", Format::Byte(ByteSet::full()));
 
     let u16be = module.define_format(
@@ -151,6 +155,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     );
 
     BaseModule {
+        bit,
         u8,
         u16be,
         u16le,
