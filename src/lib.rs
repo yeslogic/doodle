@@ -224,6 +224,8 @@ pub enum Format {
     WithRelativeOffset(Expr, Box<Format>),
     /// Transform a decoded value with a function
     Map(Func, Box<Format>),
+    /// Transform a decoded value with an expr
+    MapExpr(Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
 }
@@ -302,6 +304,7 @@ pub enum Decoder {
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Func, Box<Decoder>),
+    MapExpr(Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
 }
 
@@ -467,6 +470,7 @@ impl Format {
             Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
             Format::Map(_, f) => f.is_nullable(module),
+            Format::MapExpr(_, f) => f.is_nullable(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
         }
     }
@@ -606,6 +610,7 @@ impl<'a> MatchTreeLevel<'a> {
                 self.accept(index) // FIXME
             }
             Format::Map(_f, a) => self.add(module, index, a, next),
+            Format::MapExpr(_expr, a) => self.add(module, index, a, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
                     self.add(module, index, f, next.clone())?;
@@ -776,6 +781,10 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::Map(f.clone(), da))
             }
+            Format::MapExpr(expr, a) => {
+                let da = Box::new(Decoder::compile_next(module, a, next)?);
+                Ok(Decoder::MapExpr(expr.clone(), da))
+            }
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
@@ -901,6 +910,13 @@ impl Decoder {
             Decoder::Map(f, a) => {
                 let (va, input) = a.parse(stack, input)?;
                 Some((f.eval(stack, va), input))
+            }
+            Decoder::MapExpr(expr, a) => {
+                let (va, input) = a.parse(stack, input)?;
+                stack.push(va);
+                let v = expr.eval(stack);
+                stack.pop();
+                Some((v, input))
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(stack);

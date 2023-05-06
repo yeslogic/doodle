@@ -97,6 +97,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Map(Func::U32Be, _) => self.write_value(value),
             Format::Map(Func::U32Le, _) => self.write_value(value),
             Format::Map(Func::Stream, _) => self.write_value(value),
+            Format::MapExpr(_expr, _) => self.write_value(value),
             Format::Match(head, branches) => {
                 let head = head.eval(&self.values);
                 let initial_len = self.values.len();
@@ -419,6 +420,17 @@ impl<'module, W: io::Write> Context<'module, W> {
                     Func::Stream => write!(&mut self.writer, "stream")?,
                 }
                 write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
+
+            Format::MapExpr(expr, format) => {
+                let name = "x";
+                write!(&mut self.writer, "map (fun {name} => ")?;
+                self.names.push(name.to_string());
+                // FIXME push value
+                self.write_expr(expr)?;
+                self.names.pop();
+                write!(&mut self.writer, ") ")?;
                 self.write_atomic_format(format)
             }
 
