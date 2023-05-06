@@ -19,6 +19,14 @@ pub struct Context<'module, W: io::Write> {
 
 fn is_show_format(name: &str) -> Option<&'static str> {
     match name {
+        // gzip
+        "gzip.header" => Some("gzip header"),
+        "gzip.fname" => Some("gzip filename"),
+        "gzip.footer" => Some("gzip footer"),
+
+        // deflate
+        "deflate.block" => Some("deflate block"),
+
         // GIF
         "gif.header" => Some("Header"),
         "gif.trailer" => Some("Trailer"),
@@ -147,6 +155,7 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
+        Format::Dynamic(_) => {} // FIXME
     }
     Ok(())
 }
@@ -240,6 +249,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.values.truncate(initial_len);
                 Ok(())
             }
+            Format::Dynamic(_) => Ok(()), // FIXME
         }
     }
 }
