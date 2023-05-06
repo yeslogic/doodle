@@ -115,6 +115,7 @@ pub enum Expr {
     U16(u16),
     U32(u32),
     Tuple(Vec<Expr>),
+    TupleProj(Box<Expr>, usize),
     Record(Vec<(String, Expr)>),
     RecordProj(Box<Expr>, String),
     Variant(String, Box<Expr>),
@@ -312,6 +313,10 @@ impl Expr {
             Expr::U16(i) => Value::U16(*i),
             Expr::U32(i) => Value::U32(*i),
             Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::TupleProj(head, index) => match head.eval(stack) {
+                Value::Tuple(vs) => vs[*index].clone(),
+                _ => panic!("expected tuple"),
+            },
             Expr::Record(fields) => {
                 Value::record(fields.iter().map(|(label, expr)| (label, expr.eval(stack))))
             }

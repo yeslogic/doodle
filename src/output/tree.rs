@@ -332,6 +332,10 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn write_proj_expr(&mut self, expr: &Expr) -> io::Result<()> {
         match expr {
+            Expr::TupleProj(head, index) => {
+                self.write_proj_expr(head)?;
+                write!(&mut self.writer, ".{index}")
+            }
             Expr::RecordProj(head, label) => {
                 self.write_proj_expr(head)?;
                 write!(&mut self.writer, ".{label}")
