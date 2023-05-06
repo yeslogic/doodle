@@ -125,6 +125,7 @@ pub enum Expr {
     Ne(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
     Shl(Box<Expr>, Box<Expr>),
+    Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
 }
 
@@ -346,6 +347,12 @@ impl Expr {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            Expr::Add(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
             Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
