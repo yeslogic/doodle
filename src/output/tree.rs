@@ -135,6 +135,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.values.truncate(initial_len);
                 Ok(())
             }
+            Format::Dynamic(_) => self.write_value(value),
         }
     }
 
@@ -616,6 +617,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, ") ")?;
                 self.write_proj_expr(expr)
             }
+            Expr::Inflate(expr) => {
+                write!(&mut self.writer, "inflate ")?;
+                self.write_proj_expr(expr)
+            }
 
             expr => self.write_proj_expr(expr),
         }
@@ -722,6 +727,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "match ")?;
                 self.write_proj_expr(head)?;
                 write!(&mut self.writer, " {{ ... }}")
+            }
+
+            Format::Dynamic(_) => {
+                write!(&mut self.writer, "dynamic")
             }
 
             format => self.write_atomic_format(format),

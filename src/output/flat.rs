@@ -146,6 +146,7 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
+        Format::Dynamic(_) => {} // FIXME
     }
     Ok(())
 }
@@ -238,6 +239,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.values.truncate(initial_len);
                 Ok(())
             }
+            Format::Dynamic(_) => Ok(()), // FIXME
         }
     }
 }
