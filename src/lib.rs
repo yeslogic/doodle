@@ -121,6 +121,7 @@ pub enum Expr {
     Seq(Vec<Expr>),
 
     BitAnd(Box<Expr>, Box<Expr>),
+    BitOr(Box<Expr>, Box<Expr>),
     Eq(Box<Expr>, Box<Expr>),
     Ne(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
@@ -322,6 +323,12 @@ impl Expr {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
                 (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
                 (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            Expr::BitOr(x, y) => match (x.eval(stack), y.eval(stack)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
+                (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
+                (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
             Expr::Eq(x, y) => match (x.eval(stack), y.eval(stack)) {
