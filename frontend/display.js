@@ -87,7 +87,7 @@ function recordToHTML(fields) {
 }
 
 function isRecordSeq(seq) {
-  return seq.length > 0 && (seq[0].tag === "Record") && isFlatRecord(seq[0].data);
+  return seq.length > 0 && seq[0].tag === "Record" && isFlatRecord(seq[0].data);
 }
 
 function isFlatRecord(fields) {
@@ -112,20 +112,19 @@ function getAtomicType(value) {
 }
 
 function getFieldASCII(name, value) {
-  if (name === "identifier" && (value.tag === "Seq")) {
+  if (name === "identifier" && value.tag === "Seq") {
     // JPEG APP1 identifier
     return value.data;
-  } else if ((name === "signature" || name === "tag") && (value.tag === "Tuple")) {
+  } else if ((name === "signature" || name === "tag") && value.tag === "Tuple") {
     // PNG signature and tags
     return value.data;
-  } else if (name === "tag" && (value.tag === "Variant") && (value.data[1].tag === "Tuple")) {
+  } else if (name === "tag" && value.tag === "Variant" && value.data[1].tag === "Tuple") {
     // more PNG tags
     return value.data[1].data;
-  } else if (name === "version" && (value.tag === "Seq")) {
+  } else if (name === "version" && value.tag === "Seq") {
     // GIF 89a version
     return value.data;
-  }
-  else {
+  } else {
     return null;
   }
 }
