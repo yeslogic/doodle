@@ -52,10 +52,9 @@ function valueToHTML(value) {
 
 function seqToHTML(seq) {
   if (isRecordSeq(seq)) {
-    let fields = [];
-    for (let [name, value] of seq[0].data) {
-      fields.push([name, getAtomicType(value)]);
-    }
+    let fields = seq[0].data.map(([name, value]) => {
+      return [name, getAtomicType(value)];
+    });
     return renderSeqTable(seq, fields);
   } else {
     let ul = document.createElement('ul');
@@ -91,12 +90,9 @@ function isRecordSeq(seq) {
 }
 
 function isFlatRecord(fields) {
-  for (let [name, value] of fields) {
-    if (!isAtomicValue(value) && getFieldASCII(name, value) === null) {
-      return false;
-    }
-  }
-  return true;
+  return fields.every(([name, value]) => {
+    return isAtomicValue(value) || getFieldASCII(name, value) !== null;
+  });
 }
 
 function isAtomicValue(value) {
@@ -104,11 +100,7 @@ function isAtomicValue(value) {
 }
 
 function getAtomicType(value) {
-  const atomicTypes = ["U8", "U16", "U32"];
-  for (const type of atomicTypes) {
-    if (value.tag === type) return type;
-  }
-  return null;
+  return ["U8", "U16", "U32"].includes(value.tag) ? value.tag : null;
 }
 
 function getFieldASCII(name, value) {
