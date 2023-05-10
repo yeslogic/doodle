@@ -4,23 +4,51 @@ function main() {
   fetch('./test.json')
     .then(r => r.json())
     .then(json => {
-      structureSection.appendChild(jsonToHTML(json));
+      structureSection.appendChild(valueToHTML(json));
     });
 }
 
-// Convert some parsed Json into HTML.
+// Convert a value into HTML.
 //
 // FIXME: somehow this modifies the Json object passed to it.
-function jsonToHTML(json) {
-  let node;
-  if (Array.isArray(json)) {
-    node = seqToHTML(json);
-  } else if (typeof json === 'object') {
-    node = objToDL(json);
-  } else {
-    node = document.createTextNode(json);
+function valueToHTML(value) {
+  let result = document.createElement('dl');
+
+  let dt = document.createElement('dt');
+  let dd = document.createElement('dd');
+
+  dt.classList.add(typeof value.data);
+  dd.classList.add(typeof value.data);
+
+  dt.appendChild(document.createTextNode(value.tag));
+  result.appendChild(dt);
+
+  switch (value.tag) {
+    case "Bool":
+    case "U8":
+    case "U16":
+    case "U32":
+      dd.appendChild(document.createTextNode(value.data));
+      break;
+    case "Record":
+      dd.appendChild(recordToHTML(value.data));
+      break;
+    case "Variant":
+      dd.appendChild(recordToHTML([value.data]));
+      break;
+    case "Seq":
+    case "Tuple":
+      dd.appendChild(seqToHTML(value.data));
+      break;
+    default:
+      // NOTE: Should never happen!
+      dd.appendChild(document.createTextNode(value.data));
+      break;
   }
-  return node;
+
+  result.appendChild(dd);
+
+  return result;
 }
 
 function seqToHTML(seq) {
@@ -36,7 +64,7 @@ function seqToHTML(seq) {
       let li = document.createElement('li');
       ul.appendChild(li);
       li.classList.add(typeof item);
-      const content = jsonToHTML(item);
+      const content = valueToHTML(item);
       li.appendChild(content);
     }
     return ul;
@@ -60,7 +88,7 @@ function recordToHTML(fields) {
 }
 
 function isRecordSeq(seq) {
-  return seq.length > 0 && (typeof seq[0] === "object") && (seq[0].tag === "Record") && isFlatRecord(seq[0].data);
+  return seq.length > 0 && (seq[0].tag === "Record") && isFlatRecord(seq[0].data);
 }
 
 function isFlatRecord(fields) {
@@ -103,45 +131,6 @@ function getFieldASCII(name, value) {
   }
 }
 
-// Turn a Javascript object into a definition list element.
-function objToDL(obj) {
-  let result = document.createElement('dl');
-
-  let dt = document.createElement('dt');
-  let dd = document.createElement('dd');
-
-  dt.classList.add(typeof obj.data);
-  dd.classList.add(typeof obj.data);
-
-  dt.appendChild(document.createTextNode(obj.tag));
-  result.appendChild(dt);
-
-  switch (obj.tag) {
-    case "Bool":
-    case "U8":
-    case "U16":
-    case "U32":
-      dd.appendChild(document.createTextNode(obj.data));
-      break;
-    case "Record":
-      dd.appendChild(recordToHTML(obj.data));
-      break;
-    case "Variant": // FIXME: Render this better
-    case "Seq":
-    case "Tuple":
-      dd.appendChild(seqToHTML(obj.data));
-      break;
-    default:
-      // NOTE: Should never happen!
-      dd.appendChild(document.createTextNode(obj.data));
-      break;
-  }
-
-  result.appendChild(dd);
-
-  return result;
-}
-
 function fieldToHTML([name, value]) {
   let ul = document.createElement('ul');
   let liName = document.createElement('li');
@@ -157,7 +146,7 @@ function fieldToHTML([name, value]) {
   if (valueASCII !== null) {
     valueContent = renderASCII(valueASCII);
   } else {
-    valueContent = jsonToHTML(value);
+    valueContent = valueToHTML(value);
   }
   liValue.appendChild(valueContent);
 
@@ -182,7 +171,7 @@ function renderRecordTable(record) {
     if (valueASCII !== null) {
       content = renderASCII(valueASCII);
     } else {
-      content = jsonToHTML(value);
+      content = valueToHTML(value);
     }
     td.appendChild(content);
   }
@@ -206,7 +195,7 @@ function renderSeqTable(seq, fields) {
       for (let [_, value] of item.data) {
         let td = document.createElement("td");
         tr.appendChild(td);
-        let content = jsonToHTML(value.data);
+        let content = document.createTextNode(value.data);
         td.appendChild(content);
       }
     }
