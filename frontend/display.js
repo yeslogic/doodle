@@ -58,7 +58,7 @@ function seqToHTML(seq) {
     return renderSeqTable(seq, fields);
   } else {
     let ul = document.createElement('ul');
-    for (item of seq) {
+    for (const item of seq) {
       let li = document.createElement('li');
       ul.appendChild(li);
       li.classList.add(typeof item);
@@ -74,7 +74,7 @@ function recordToHTML(fields) {
     return renderRecordTable(fields);
   } else {
     let ul = document.createElement('ul');
-    for (field of fields) {
+    for (const field of fields) {
       let li = document.createElement('li');
       ul.appendChild(li);
       li.classList.add(typeof field);
