@@ -1,6 +1,5 @@
 function main() {
   const structureSection = document.getElementById('structure');
-  let testJson;
   fetch('./test.json')
     .then(r => r.json())
     .then(json => {
