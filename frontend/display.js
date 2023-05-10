@@ -156,7 +156,6 @@ function fieldToHTML([name, value]) {
 
 function renderRecordTable(record) {
   let table = document.createElement("table");
-  table.border = 1;
   for (let [name, value] of record) {
     let tr = document.createElement("tr");
     table.appendChild(tr);
@@ -179,7 +178,6 @@ function renderRecordTable(record) {
 
 function renderSeqTable(seq, fields) {
   let table = document.createElement("table");
-  table.border = 1;
   let tr = document.createElement("tr");
   table.appendChild(tr);
   for (let [name, type] of fields) {
