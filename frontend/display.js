@@ -26,7 +26,7 @@ function jsonToHTML(json) {
 function seqToHTML(seq) {
   if (isRecordSeq(seq)) {
     let fields = [];
-    for (let [name, value] of seq[0]["Record"]) {
+    for (let [name, value] of seq[0].data) {
       fields.push([name, getAtomicType(value)]);
     }
     return renderSeqTable(seq, fields);
@@ -60,7 +60,7 @@ function recordToHTML(fields) {
 }
 
 function isRecordSeq(seq) {
-  return seq.length > 0 && (typeof seq[0] === "object") && ("Record" in seq[0]) && isFlatRecord(seq[0]["Record"]);
+  return seq.length > 0 && (typeof seq[0] === "object") && (seq[0].tag === "Record") && isFlatRecord(seq[0].data);
 }
 
 function isFlatRecord(fields) {
@@ -79,24 +79,24 @@ function isAtomicValue(value) {
 function getAtomicType(value) {
   const atomicTypes = ["U8", "U16", "U32"];
   for (const type of atomicTypes) {
-    if (type in value) return type;
+    if (value.tag === type) return type;
   }
   return null;
 }
 
 function getFieldASCII(name, value) {
-  if (name === "identifier" && ("Seq" in value)) {
+  if (name === "identifier" && (value.tag === "Seq")) {
     // JPEG APP1 identifier
-    return value["Seq"];
-  } else if ((name === "signature" || name === "tag") && ("Tuple" in value)) {
+    return value.data;
+  } else if ((name === "signature" || name === "tag") && (value.tag === "Tuple")) {
     // PNG signature and tags
-    return value["Tuple"];
-  } else if (name === "tag" && ("Variant" in value) && ("Tuple" in value["Variant"][1])) {
+    return value.data;
+  } else if (name === "tag" && (value.tag === "Variant") && (value.data[1].tag === "Tuple")) {
     // more PNG tags
-    return value["Variant"][1]["Tuple"];
-  } else if (name === "version" && ("Seq" in value)) {
+    return value.data[1].data;
+  } else if (name === "version" && (value.tag === "Seq")) {
     // GIF 89a version
-    return value["Seq"];
+    return value.data;
   }
   else {
     return null;
@@ -106,30 +106,39 @@ function getFieldASCII(name, value) {
 // Turn a Javascript object into a definition list element.
 function objToDL(obj) {
   let result = document.createElement('dl');
-  const keys = Object.keys(obj);
-  for (key of keys) {
-    let dt = document.createElement('dt');
-    let dd = document.createElement('dd');
 
-    dt.classList.add(typeof obj[key]);
-    dd.classList.add(typeof obj[key]);
+  let dt = document.createElement('dt');
+  let dd = document.createElement('dd');
 
-    dt.appendChild(document.createTextNode(key));
-    result.appendChild(dt);
+  dt.classList.add(typeof obj.data);
+  dd.classList.add(typeof obj.data);
 
-    if (key === "Record") {
-      const content = recordToHTML(obj[key]);
-      dd.appendChild(content);
-    } else if (key === "Seq") {
-      const content = seqToHTML(obj[key]);
-      dd.appendChild(content);
-    } else {
-      const content = jsonToHTML(obj[key]);
-      dd.appendChild(content);
-    }
+  dt.appendChild(document.createTextNode(obj.tag));
+  result.appendChild(dt);
 
-    result.appendChild(dd);
+  switch (obj.tag) {
+    case "Bool":
+    case "U8":
+    case "U16":
+    case "U32":
+      dd.appendChild(document.createTextNode(obj.data));
+      break;
+    case "Record":
+      dd.appendChild(recordToHTML(obj.data));
+      break;
+    case "Variant": // FIXME: Render this better
+    case "Seq":
+    case "Tuple":
+      dd.appendChild(seqToHTML(obj.data));
+      break;
+    default:
+      // NOTE: Should never happen!
+      dd.appendChild(document.createTextNode(obj.data));
+      break;
   }
+
+  result.appendChild(dd);
+
   return result;
 }
 
@@ -140,7 +149,7 @@ function fieldToHTML([name, value]) {
   liName.classList.add(typeof name);
   liValue.classList.add(typeof value);
 
-  const nameContent = jsonToHTML(name);
+  const nameContent = document.createTextNode(name);
   liName.appendChild(nameContent);
 
   let valueContent;
@@ -185,23 +194,21 @@ function renderSeqTable(seq, fields) {
   table.border = 1;
   let tr = document.createElement("tr");
   table.appendChild(tr);
-  let map = {};
   for (let [name, type] of fields) {
     let th = document.createElement("th");
     tr.appendChild(th);
     th.textContent = name + " : " + type;
-    map[name] = type;
   }
   for (let item of seq) {
-    let record = item["Record"];
-    let tr = document.createElement("tr");
-    table.appendChild(tr);
-    for (let [name, value] of record) {
-      let type = map[name];
-      let td = document.createElement("td");
-      tr.appendChild(td);
-      let content = jsonToHTML(value[type]);
-      td.appendChild(content);
+    if (item.tag === "Record") {
+      let tr = document.createElement("tr");
+      table.appendChild(tr);
+      for (let [_, value] of item.data) {
+        let td = document.createElement("td");
+        tr.appendChild(td);
+        let content = jsonToHTML(value.data);
+        td.appendChild(content);
+      }
     }
   }
   return table;
@@ -218,24 +225,26 @@ function renderASCII(seq) {
   span.className = "text";
   let run = null;
   for (let item of seq) {
-    let b = item["U8"];
-    let type, text;
-    if (b >= 0x20 && b < 0x7F) {
-      type = "printable";
-      text = String.fromCharCode(b);
-    } else if (b in escapes) {
-      type = "escape";
-      text = "\\" + escapes[b];
-    } else {
-      type = "control";
-      text = "\\x" + b.toString(16).padStart(2, '0');
+    if (item.tag === "U8") {
+      let b = item.data;
+      let type, text;
+      if (b >= 0x20 && b < 0x7F) {
+        type = "printable";
+        text = String.fromCharCode(b);
+      } else if (b in escapes) {
+        type = "escape";
+        text = "\\" + escapes[b];
+      } else {
+        type = "control";
+        text = "\\x" + b.toString(16).padStart(2, '0');
+      }
+      if (!run || run.className !== type) {
+        run = document.createElement("span");
+        run.className = type;
+        span.appendChild(run);
+      }
+      run.textContent += text;
     }
-    if (!run || run.className !== type) {
-      run = document.createElement("span");
-      run.className = type;
-      span.appendChild(run);
-    }
-    run.textContent += text;
   }
   return span;
 }
