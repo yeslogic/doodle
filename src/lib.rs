@@ -37,6 +37,7 @@ impl Pattern {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum Value {
     Bool(bool),
     U8(u8),
