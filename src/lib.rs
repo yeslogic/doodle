@@ -121,6 +121,7 @@ pub enum Expr {
     RecordProj(Box<Expr>, String),
     Variant(String, Box<Expr>),
     Seq(Vec<Expr>),
+    Match(Box<Expr>, Vec<(Pattern, Expr)>),
 
     BitAnd(Box<Expr>, Box<Expr>),
     BitOr(Box<Expr>, Box<Expr>),
@@ -130,6 +131,12 @@ pub enum Expr {
     Shl(Box<Expr>, Box<Expr>),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
+
+    U16Be(Box<Expr>),
+    U16Le(Box<Expr>),
+    U32Be(Box<Expr>),
+    U32Le(Box<Expr>),
+    Stream(Box<Expr>),
 }
 
 impl Expr {
@@ -138,19 +145,6 @@ impl Expr {
     pub fn record_proj(head: impl Into<Box<Expr>>, label: impl Into<String>) -> Expr {
         Expr::RecordProj(head.into(), label.into())
     }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Func {
-    Expr(Expr),
-    TupleProj(usize),
-    RecordProj(String),
-    Match(Vec<(Pattern, Expr)>),
-    U16Be,
-    U16Le,
-    U32Be,
-    U32Le,
-    Stream,
 }
 
 /// Binary format descriptions
@@ -222,10 +216,8 @@ pub enum Format {
     Slice(Expr, Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
     WithRelativeOffset(Expr, Box<Format>),
-    /// Transform a decoded value with a function
-    Map(Func, Box<Format>),
     /// Transform a decoded value with an expr
-    MapExpr(Expr, Box<Format>),
+    Map(Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
 }
@@ -303,13 +295,12 @@ pub enum Decoder {
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Func, Box<Decoder>),
-    MapExpr(Expr, Box<Decoder>),
+    Map(Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
 }
 
 impl Expr {
-    fn eval(&self, stack: &[Value]) -> Value {
+    fn eval(&self, stack: &mut Vec<Value>) -> Value {
         match self {
             Expr::Var(index) => stack[stack.len() - index - 1].clone(),
             Expr::Bool(b) => Value::Bool(*b),
@@ -327,6 +318,17 @@ impl Expr {
             Expr::RecordProj(head, label) => head.eval(stack).record_proj(label),
             Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
             Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::Match(head, branches) => {
+                let head = head.eval(stack);
+                let initial_len = stack.len();
+                let (_, expr) = branches
+                    .iter()
+                    .find(|(pattern, _)| head.matches(stack, pattern))
+                    .expect("exhaustive patterns");
+                let value = expr.eval(stack);
+                stack.truncate(initial_len);
+                value
+            }
 
             Expr::BitAnd(x, y) => match (x.eval(stack), y.eval(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
@@ -377,77 +379,50 @@ impl Expr {
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
+
+            Expr::U16Be(bytes) => match bytes.eval_tuple(stack).as_slice() {
+                [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
+                _ => panic!("U16Be: expected (U8, U8)"),
+            },
+            Expr::U16Le(bytes) => match bytes.eval_tuple(stack).as_slice() {
+                [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
+                _ => panic!("U16Le: expected (U8, U8)"),
+            },
+            Expr::U32Be(bytes) => match bytes.eval_tuple(stack).as_slice() {
+                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                    Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
+                }
+                _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
+            },
+            Expr::U32Le(bytes) => match bytes.eval_tuple(stack).as_slice() {
+                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                    Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
+                }
+                _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
+            },
+            Expr::Stream(seq) => match seq.eval(stack) {
+                Value::Seq(values) => {
+                    // FIXME could also condense nested sequences
+                    Value::Seq(values.into_iter().filter(|v| *v != Value::UNIT).collect())
+                }
+                _ => panic!("Stream: expected Seq"),
+            },
         }
     }
 
-    fn eval_usize(&self, stack: &[Value]) -> usize {
+    fn eval_usize(&self, stack: &mut Vec<Value>) -> usize {
         match self.eval(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
-            _ => panic!("value is not number"),
+            _ => panic!("value is not a number"),
         }
     }
-}
 
-impl Func {
-    fn eval(&self, stack: &mut Vec<Value>, arg: Value) -> Value {
-        match self {
-            Func::Expr(e) => e.eval(stack),
-            Func::TupleProj(i) => match arg {
-                Value::Tuple(vs) => vs[*i].clone(),
-                _ => panic!("TupleProj: expected tuple"),
-            },
-            Func::RecordProj(label) => arg.record_proj(label),
-            Func::Match(branches) => {
-                let initial_len = stack.len();
-                let (_, expr) = branches
-                    .iter()
-                    .find(|(pattern, _)| arg.matches(stack, pattern))
-                    .expect("exhaustive patterns");
-                let value = expr.eval(stack);
-                stack.truncate(initial_len);
-                value
-            }
-            Func::U16Be => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
-                    _ => panic!("U16Be: expected (U8, U8)"),
-                },
-                _ => panic!("U16Be: expected (_, _)"),
-            },
-            Func::U16Le => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
-                    _ => panic!("U16Le: expected (U8, U8)"),
-                },
-                _ => panic!("U16Le: expected (_, _)"),
-            },
-            Func::U32Be => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
-                    }
-                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
-                },
-                _ => panic!("U32Be: expected (_, _, _, _)"),
-            },
-            Func::U32Le => match arg {
-                Value::Tuple(vs) => match vs.as_slice() {
-                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                        Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
-                    }
-                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
-                },
-                _ => panic!("U32Le: expected (_, _, _, _)"),
-            },
-            Func::Stream => match arg {
-                Value::Seq(vs) => {
-                    // FIXME could also condense nested sequences
-                    Value::Seq(vs.into_iter().filter(|v| *v != Value::UNIT).collect())
-                }
-                _ => panic!("Stream: expected Seq"),
-            },
+    fn eval_tuple(&self, stack: &mut Vec<Value>) -> Vec<Value> {
+        match self.eval(stack) {
+            Value::Tuple(values) => values,
+            _ => panic!("value is not a tuple"),
         }
     }
 }
@@ -470,7 +445,6 @@ impl Format {
             Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
             Format::Map(_, f) => f.is_nullable(module),
-            Format::MapExpr(_, f) => f.is_nullable(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
         }
     }
@@ -609,8 +583,7 @@ impl<'a> MatchTreeLevel<'a> {
             Format::WithRelativeOffset(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Map(_f, a) => self.add(module, index, a, next),
-            Format::MapExpr(_expr, a) => self.add(module, index, a, next),
+            Format::Map(_expr, a) => self.add(module, index, a, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
                     self.add(module, index, f, next.clone())?;
@@ -777,13 +750,9 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
-            Format::Map(f, a) => {
+            Format::Map(expr, a) => {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
-                Ok(Decoder::Map(f.clone(), da))
-            }
-            Format::MapExpr(expr, a) => {
-                let da = Box::new(Decoder::compile_next(module, a, next)?);
-                Ok(Decoder::MapExpr(expr.clone(), da))
+                Ok(Decoder::Map(expr.clone(), da))
             }
             Format::Match(head, branches) => {
                 let branches = branches
@@ -907,11 +876,7 @@ impl Decoder {
                     None
                 }
             }
-            Decoder::Map(f, a) => {
-                let (va, input) = a.parse(stack, input)?;
-                Some((f.eval(stack, va), input))
-            }
-            Decoder::MapExpr(expr, a) => {
+            Decoder::Map(expr, a) => {
                 let (va, input) = a.parse(stack, input)?;
                 stack.push(va);
                 let v = expr.eval(stack);

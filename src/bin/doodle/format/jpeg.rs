@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule, Func, Pattern};
+use doodle::{Expr, Format, FormatModule, Pattern};
 
 use crate::format::base::*;
 
@@ -10,7 +10,7 @@ use crate::format::base::*;
 pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Format {
     fn marker(id: u8) -> Format {
         Format::Map(
-            Func::TupleProj(1),
+            Expr::TupleProj(Box::new(Expr::Var(0)), 1),
             Box::new(tuple([is_byte(0xFF), is_byte(id)])),
         )
     }
@@ -364,10 +364,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
     let mcu = module.define_format(
         "jpeg.mcu",
         Format::Map(
-            Func::Match(vec![
-                (Pattern::variant("byte", Pattern::Binding), Expr::Var(0)),
-                (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
-            ]),
+            Expr::Match(
+                Box::new(Expr::Var(0)),
+                vec![
+                    (Pattern::variant("byte", Pattern::Binding), Expr::Var(0)),
+                    (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
+                ],
+            ),
             Box::new(alts([
                 ("byte", not_byte(0xFF)),
                 ("zero", tuple([is_byte(0xFF), is_byte(0x00)])),
@@ -379,19 +382,22 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
     let scan_data = module.define_format(
         "jpeg.scan-data",
         Format::Map(
-            Func::Stream,
+            Expr::Stream(Box::new(Expr::Var(0))),
             Box::new(repeat(Format::Map(
-                Func::Match(vec![
-                    (Pattern::variant("mcu", Pattern::Binding), Expr::Var(0)),
-                    (Pattern::variant("rst0", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst1", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst2", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst3", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst4", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst5", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst6", Pattern::Wildcard), Expr::UNIT),
-                    (Pattern::variant("rst7", Pattern::Wildcard), Expr::UNIT),
-                ]),
+                Expr::Match(
+                    Box::new(Expr::Var(0)),
+                    vec![
+                        (Pattern::variant("mcu", Pattern::Binding), Expr::Var(0)),
+                        (Pattern::variant("rst0", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst1", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst2", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst3", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst4", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst5", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst6", Pattern::Wildcard), Expr::UNIT),
+                        (Pattern::variant("rst7", Pattern::Wildcard), Expr::UNIT),
+                    ],
+                ),
                 Box::new(alts([
                     // FIXME: Extract into separate ECS repetition
                     ("mcu", mcu), // TODO: repeat(mcu),

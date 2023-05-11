@@ -1,4 +1,4 @@
-use doodle::{Format, FormatModule, Func};
+use doodle::{Expr, Format, FormatModule};
 
 use crate::format::base::*;
 
@@ -20,7 +20,7 @@ pub fn main(module: &mut FormatModule) -> Format {
     let riff = riff::main(module, &base);
 
     Format::Map(
-        Func::RecordProj("data".to_string()),
+        Expr::RecordProj(Box::new(Expr::Var(0)), "data".to_string()),
         Box::new(record([
             (
                 "data",
