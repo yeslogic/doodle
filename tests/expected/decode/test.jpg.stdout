@@ -3,7 +3,7 @@
     ├── frame <- jpeg.frame :=
     │   ├── initial-segment <- _ |...| _ :=
     │   │   └── app0 <- jpeg.app0 :=
-    │   │       ├── marker <- map _.1 (...) := 224
+    │   │       ├── marker <- map (fun x => x.1) (...) := 224
     │   │       ├── length <- base.u16be := 16
     │   │       └── data <- slice (length - 2) jpeg.app0-data :=
     │   │           ├── identifier <- base.asciiz-string :=
@@ -23,7 +23,7 @@
     │   ├── segments <- repeat jpeg.table-or-misc :=
     │   │   ├── 0 <- jpeg.table-or-misc :=
     │   │   │   └── dqt <- jpeg.dqt :=
-    │   │   │       ├── marker <- map _.1 (...) := 219
+    │   │   │       ├── marker <- map (fun x => x.1) (...) := 219
     │   │   │       ├── length <- base.u16be := 67
     │   │   │       └── data <- slice (length - 2) jpeg.dqt-data :=
     │   │   │           ├── precision-table-id <- base.u8 := 0
@@ -42,7 +42,7 @@
     │   │   │               └── 63 <- base.u8 := 50
     │   │   └── 1 <- jpeg.table-or-misc :=
     │   │       └── dqt <- jpeg.dqt :=
-    │   │           ├── marker <- map _.1 (...) := 219
+    │   │           ├── marker <- map (fun x => x.1) (...) := 219
     │   │           ├── length <- base.u16be := 67
     │   │           └── data <- slice (length - 2) jpeg.dqt-data :=
     │   │               ├── precision-table-id <- base.u8 := 1
@@ -61,7 +61,7 @@
     │   │                   └── 63 <- base.u8 := 50
     │   ├── header <- jpeg.frame-header :=
     │   │   └── sof0 <- jpeg.sof0 :=
-    │   │       ├── marker <- map _.1 (...) := 192
+    │   │       ├── marker <- map (fun x => x.1) (...) := 192
     │   │       ├── length <- base.u16be := 17
     │   │       └── data <- slice (length - 2) jpeg.sof-data :=
     │   │           ├── sample-precision <- base.u8 := 8
@@ -85,7 +85,7 @@
     │   │   ├── segments <- repeat jpeg.table-or-misc :=
     │   │   │   ├── 0 <- jpeg.table-or-misc :=
     │   │   │   │   └── dht <- jpeg.dht :=
-    │   │   │   │       ├── marker <- map _.1 (...) := 196
+    │   │   │   │       ├── marker <- map (fun x => x.1) (...) := 196
     │   │   │   │       ├── length <- base.u16be := 27
     │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
     │   │   │   │           ├── class-table-id <- base.u8 := 0
@@ -113,7 +113,7 @@
     │   │   │   │               └── 7 <- base.u8 := 1
     │   │   │   ├── 1 <- jpeg.table-or-misc :=
     │   │   │   │   └── dht <- jpeg.dht :=
-    │   │   │   │       ├── marker <- map _.1 (...) := 196
+    │   │   │   │       ├── marker <- map (fun x => x.1) (...) := 196
     │   │   │   │       ├── length <- base.u16be := 58
     │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
     │   │   │   │           ├── class-table-id <- base.u8 := 16
@@ -145,7 +145,7 @@
     │   │   │   │               └── 38 <- base.u8 := 225
     │   │   │   ├── 2 <- jpeg.table-or-misc :=
     │   │   │   │   └── dht <- jpeg.dht :=
-    │   │   │   │       ├── marker <- map _.1 (...) := 196
+    │   │   │   │       ├── marker <- map (fun x => x.1) (...) := 196
     │   │   │   │       ├── length <- base.u16be := 26
     │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
     │   │   │   │           ├── class-table-id <- base.u8 := 1
@@ -172,7 +172,7 @@
     │   │   │   │               └── 6 <- base.u8 := 6
     │   │   │   └── 3 <- jpeg.table-or-misc :=
     │   │   │       └── dht <- jpeg.dht :=
-    │   │   │           ├── marker <- map _.1 (...) := 196
+    │   │   │           ├── marker <- map (fun x => x.1) (...) := 196
     │   │   │           ├── length <- base.u16be := 38
     │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
     │   │   │               ├── class-table-id <- base.u8 := 17
@@ -203,7 +203,7 @@
     │   │   │                   ~
     │   │   │                   └── 18 <- base.u8 := 145
     │   │   ├── sos <- jpeg.sos :=
-    │   │   │   ├── marker <- map _.1 (...) := 218
+    │   │   │   ├── marker <- map (fun x => x.1) (...) := 218
     │   │   │   ├── length <- base.u16be := 12
     │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
     │   │   │       ├── num-image-components <- base.u8 := 3

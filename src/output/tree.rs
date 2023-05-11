@@ -1,6 +1,6 @@
 use std::{fmt, io};
 
-use crate::{Expr, Format, FormatModule, Func, Value};
+use crate::{Expr, Format, FormatModule, Value};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     Context::new(io::stdout(), module)
@@ -79,27 +79,24 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Peek(format) => self.write_decoded_value(value, format),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
-            Format::Map(Func::Expr(_), _) => self.write_value(value),
-            Format::Map(Func::TupleProj(index), format) => match format.as_ref() {
-                Format::Tuple(formats) => self.write_decoded_value(value, &formats[*index]),
-                _ => panic!("expected tuple format"),
+            Format::Map(expr, format) => match expr {
+                Expr::RecordProj(head, label) => match (head.as_ref(), format.as_ref()) {
+                    (Expr::Var(0), Format::Record(fields)) => {
+                        let (_, format) = fields.iter().find(|(l, _)| l == label).unwrap();
+                        self.write_decoded_value(value, format)
+                    }
+                    _ => self.write_value(value),
+                },
+                Expr::TupleProj(head, index) => match (head.as_ref(), format.as_ref()) {
+                    (Expr::Var(0), Format::Tuple(formats)) => {
+                        self.write_decoded_value(value, &formats[*index])
+                    }
+                    _ => self.write_value(value),
+                },
+                _ => self.write_value(value),
             },
-            Format::Map(Func::RecordProj(label), format) => match format.as_ref() {
-                Format::Record(fields) => {
-                    let (_, format) = fields.iter().find(|(l, _)| l == label).unwrap();
-                    self.write_decoded_value(value, format)
-                }
-                _ => panic!("expected record format"),
-            },
-            Format::Map(Func::Match(_), _) => self.write_value(value),
-            Format::Map(Func::U16Be, _) => self.write_value(value),
-            Format::Map(Func::U16Le, _) => self.write_value(value),
-            Format::Map(Func::U32Be, _) => self.write_value(value),
-            Format::Map(Func::U32Le, _) => self.write_value(value),
-            Format::Map(Func::Stream, _) => self.write_value(value),
-            Format::MapExpr(_expr, _) => self.write_value(value),
             Format::Match(head, branches) => {
-                let head = head.eval(&self.values);
+                let head = head.eval(&mut self.values);
                 let initial_len = self.values.len();
                 let (_, format) = branches
                     .iter()
@@ -287,6 +284,12 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn write_expr(&mut self, expr: &Expr) -> io::Result<()> {
         match expr {
+            Expr::Match(head, _) => {
+                write!(&mut self.writer, "match ")?;
+                self.write_proj_expr(head)?;
+                write!(&mut self.writer, " {{ ... }}")
+            }
+
             Expr::BitAnd(expr0, expr1) => {
                 self.write_proj_expr(expr0)?;
                 write!(&mut self.writer, " & ")?;
@@ -327,6 +330,28 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " % ")?;
                 self.write_proj_expr(expr1)
             }
+
+            Expr::U16Be(bytes) => {
+                write!(&mut self.writer, "u16be ")?;
+                self.write_proj_expr(bytes)
+            }
+            Expr::U16Le(bytes) => {
+                write!(&mut self.writer, "u16le ")?;
+                self.write_proj_expr(bytes)
+            }
+            Expr::U32Be(bytes) => {
+                write!(&mut self.writer, "u32be ")?;
+                self.write_proj_expr(bytes)
+            }
+            Expr::U32Le(bytes) => {
+                write!(&mut self.writer, "u32le ")?;
+                self.write_proj_expr(bytes)
+            }
+            Expr::Stream(seq) => {
+                write!(&mut self.writer, "stream ")?;
+                self.write_proj_expr(seq)
+            }
+
             expr => self.write_proj_expr(expr),
         }
     }
@@ -402,28 +427,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_atomic_format(format)
             }
 
-            Format::Map(func, format) => {
-                write!(&mut self.writer, "map ")?;
-                match func {
-                    Func::Expr(expr) => {
-                        write!(&mut self.writer, "(always ")?;
-                        self.write_expr(expr)?;
-                        write!(&mut self.writer, ")")?;
-                    }
-                    Func::TupleProj(index) => write!(&mut self.writer, "_.{index}")?,
-                    Func::RecordProj(label) => write!(&mut self.writer, "_.{label}")?,
-                    Func::Match(_) => write!(&mut self.writer, "(match {{ ... }})")?,
-                    Func::U16Be => write!(&mut self.writer, "u16be")?,
-                    Func::U16Le => write!(&mut self.writer, "u16le")?,
-                    Func::U32Be => write!(&mut self.writer, "u32be")?,
-                    Func::U32Le => write!(&mut self.writer, "u32le")?,
-                    Func::Stream => write!(&mut self.writer, "stream")?,
-                }
-                write!(&mut self.writer, " ")?;
-                self.write_atomic_format(format)
-            }
-
-            Format::MapExpr(expr, format) => {
+            Format::Map(expr, format) => {
                 let name = "x";
                 write!(&mut self.writer, "map (fun {name} => ")?;
                 self.names.push(name.to_string());
@@ -436,7 +440,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
             Format::Match(head, _) => {
                 write!(&mut self.writer, "match ")?;
-                self.write_atomic_expr(head)?;
+                self.write_proj_expr(head)?;
                 write!(&mut self.writer, " {{ ... }}")
             }
 

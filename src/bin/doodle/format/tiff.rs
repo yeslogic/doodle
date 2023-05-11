@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule, Func, Pattern};
+use doodle::{Expr, Format, FormatModule, Pattern};
 
 use crate::format::base::*;
 
@@ -45,14 +45,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
             (
                 "byte-order",
                 alts([
-                    (
-                        "le",
-                        Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"II"))),
-                    ),
-                    (
-                        "be",
-                        Format::Map(Func::Expr(Expr::UNIT), Box::new(is_bytes(b"MM"))),
-                    ),
+                    ("le", Format::Map(Expr::UNIT, Box::new(is_bytes(b"II")))),
+                    ("be", Format::Map(Expr::UNIT, Box::new(is_bytes(b"MM")))),
                 ]),
             ),
             (

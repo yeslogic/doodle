@@ -1,5 +1,5 @@
 use doodle::byte_set::ByteSet;
-use doodle::{Expr, Format, FormatModule, Func, Pattern};
+use doodle::{Expr, Format, FormatModule, Pattern};
 
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
@@ -83,18 +83,24 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
 
     let u16be = module.define_format(
         "base.u16be",
-        Format::Map(Func::U16Be, Box::new(tuple([u8.clone(), u8.clone()]))),
+        Format::Map(
+            Expr::U16Be(Box::new(Expr::Var(0))),
+            Box::new(tuple([u8.clone(), u8.clone()])),
+        ),
     );
 
     let u16le = module.define_format(
         "base.u16le",
-        Format::Map(Func::U16Le, Box::new(tuple([u8.clone(), u8.clone()]))),
+        Format::Map(
+            Expr::U16Le(Box::new(Expr::Var(0))),
+            Box::new(tuple([u8.clone(), u8.clone()])),
+        ),
     );
 
     let u32be = module.define_format(
         "base.u32be",
         Format::Map(
-            Func::U32Be,
+            Expr::U32Be(Box::new(Expr::Var(0))),
             Box::new(tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()])),
         ),
     );
@@ -102,7 +108,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u32le = module.define_format(
         "base.u32le",
         Format::Map(
-            Func::U32Le,
+            Expr::U32Le(Box::new(Expr::Var(0))),
             Box::new(tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()])),
         ),
     );
@@ -110,7 +116,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let asciiz_string = module.define_format(
         "base.asciiz-string",
         Format::Map(
-            Func::RecordProj("string".to_string()),
+            Expr::RecordProj(Box::new(Expr::Var(0)), "string".to_string()),
             Box::new(record([
                 ("string", repeat(not_byte(0x00))),
                 ("null", is_byte(0x00)),
