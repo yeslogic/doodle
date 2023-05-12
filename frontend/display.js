@@ -13,10 +13,10 @@ function main() {
 //
 // FIXME: somehow this modifies the Json object passed to it.
 function valueToHTML(value) {
-  let result = document.createElement('dl');
+  const result = document.createElement('dl');
 
-  let dt = document.createElement('dt');
-  let dd = document.createElement('dd');
+  const dt = document.createElement('dt');
+  const dd = document.createElement('dd');
 
   dt.classList.add(typeof value.data);
   dd.classList.add(typeof value.data);
@@ -54,14 +54,14 @@ function valueToHTML(value) {
 
 function seqToHTML(seq) {
   if (isRecordSeq(seq)) {
-    let fields = seq[0].data.map(([name, value]) => {
+    const fields = seq[0].data.map(([name, value]) => {
       return [name, getAtomicType(value)];
     });
     return renderSeqTable(seq, fields);
   } else {
-    let ul = document.createElement('ul');
+    const ul = document.createElement('ul');
     for (const item of seq) {
-      let li = document.createElement('li');
+      const li = document.createElement('li');
       ul.appendChild(li);
       li.classList.add(typeof item);
       const content = valueToHTML(item);
@@ -75,9 +75,9 @@ function recordToHTML(fields) {
   if (isFlatRecord(fields)) {
     return renderRecordTable(fields);
   } else {
-    let ul = document.createElement('ul');
+    const ul = document.createElement('ul');
     for (const field of fields) {
-      let li = document.createElement('li');
+      const li = document.createElement('li');
       ul.appendChild(li);
       li.classList.add(typeof field);
       const content = fieldToHTML(field);
@@ -124,9 +124,9 @@ function getFieldASCII(name, value) {
 }
 
 function fieldToHTML([name, value]) {
-  let ul = document.createElement('ul');
-  let liName = document.createElement('li');
-  let liValue = document.createElement('li');
+  const ul = document.createElement('ul');
+  const liName = document.createElement('li');
+  const liValue = document.createElement('li');
   liName.classList.add(typeof name);
   liValue.classList.add(typeof value);
 
@@ -134,7 +134,7 @@ function fieldToHTML([name, value]) {
   liName.appendChild(nameContent);
 
   let valueContent;
-  let valueASCII = getFieldASCII(name, value);
+  const valueASCII = getFieldASCII(name, value);
   if (valueASCII !== null) {
     valueContent = renderASCII(valueASCII);
   } else {
@@ -148,17 +148,17 @@ function fieldToHTML([name, value]) {
 }
 
 function renderRecordTable(record) {
-  let table = document.createElement('table');
-  for (let [name, value] of record) {
-    let tr = document.createElement('tr');
+  const table = document.createElement('table');
+  for (const [name, value] of record) {
+    const tr = document.createElement('tr');
     table.appendChild(tr);
-    let th = document.createElement('th');
+    const th = document.createElement('th');
     tr.appendChild(th);
     th.textContent = name;
-    let td = document.createElement('td');
+    const td = document.createElement('td');
     tr.appendChild(td);
     let content;
-    let valueASCII = getFieldASCII(name, value);
+    const valueASCII = getFieldASCII(name, value);
     if (valueASCII !== null) {
       content = renderASCII(valueASCII);
     } else {
@@ -170,22 +170,22 @@ function renderRecordTable(record) {
 }
 
 function renderSeqTable(seq, fields) {
-  let table = document.createElement('table');
-  let tr = document.createElement('tr');
+  const table = document.createElement('table');
+  const tr = document.createElement('tr');
   table.appendChild(tr);
-  for (let [name, type] of fields) {
-    let th = document.createElement('th');
+  for (const [name, type] of fields) {
+    const th = document.createElement('th');
     tr.appendChild(th);
     th.textContent = name + ' : ' + type;
   }
-  for (let item of seq) {
+  for (const item of seq) {
     if (item.tag === 'Record') {
-      let tr = document.createElement('tr');
+      const tr = document.createElement('tr');
       table.appendChild(tr);
-      for (let [_, value] of item.data) {
-        let td = document.createElement('td');
+      for (const [_, value] of item.data) {
+        const td = document.createElement('td');
         tr.appendChild(td);
-        let content = document.createTextNode(value.data);
+        const content = document.createTextNode(value.data);
         td.appendChild(content);
       }
     }
@@ -200,12 +200,12 @@ function renderASCII(seq) {
     0x0A: 'n',
     0x0D: 'r',
   };
-  let span = document.createElement('span');
+  const span = document.createElement('span');
   span.className = 'text';
   let run = null;
-  for (let item of seq) {
+  for (const item of seq) {
     if (item.tag === 'U8') {
-      let b = item.data;
+      const b = item.data;
       let type, text;
       if (b >= 0x20 && b < 0x7F) {
         type = 'printable';
