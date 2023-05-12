@@ -25,20 +25,20 @@ function valueToHTML(value) {
   result.appendChild(dt);
 
   switch (value.tag) {
-    case "Bool":
-    case "U8":
-    case "U16":
-    case "U32":
+    case 'Bool':
+    case 'U8':
+    case 'U16':
+    case 'U32':
       dd.appendChild(document.createTextNode(value.data));
       break;
-    case "Record":
+    case 'Record':
       dd.appendChild(recordToHTML(value.data));
       break;
-    case "Variant":
+    case 'Variant':
       dd.appendChild(recordToHTML([value.data]));
       break;
-    case "Seq":
-    case "Tuple":
+    case 'Seq':
+    case 'Tuple':
       dd.appendChild(seqToHTML(value.data));
       break;
     default:
@@ -88,7 +88,7 @@ function recordToHTML(fields) {
 }
 
 function isRecordSeq(seq) {
-  return seq.length > 0 && seq[0].tag === "Record" && isFlatRecord(seq[0].data);
+  return seq.length > 0 && seq[0].tag === 'Record' && isFlatRecord(seq[0].data);
 }
 
 function isFlatRecord(fields) {
@@ -102,20 +102,20 @@ function isAtomicValue(value) {
 }
 
 function getAtomicType(value) {
-  return ["U8", "U16", "U32"].includes(value.tag) ? value.tag : null;
+  return ['U8', 'U16', 'U32'].includes(value.tag) ? value.tag : null;
 }
 
 function getFieldASCII(name, value) {
-  if (name === "identifier" && value.tag === "Seq") {
+  if (name === 'identifier' && value.tag === 'Seq') {
     // JPEG APP1 identifier
     return value.data;
-  } else if ((name === "signature" || name === "tag") && value.tag === "Tuple") {
+  } else if ((name === 'signature' || name === 'tag') && value.tag === 'Tuple') {
     // PNG signature and tags
     return value.data;
-  } else if (name === "tag" && value.tag === "Variant" && value.data[1].tag === "Tuple") {
+  } else if (name === 'tag' && value.tag === 'Variant' && value.data[1].tag === 'Tuple') {
     // more PNG tags
     return value.data[1].data;
-  } else if (name === "version" && value.tag === "Seq") {
+  } else if (name === 'version' && value.tag === 'Seq') {
     // GIF 89a version
     return value.data;
   } else {
@@ -148,14 +148,14 @@ function fieldToHTML([name, value]) {
 }
 
 function renderRecordTable(record) {
-  let table = document.createElement("table");
+  let table = document.createElement('table');
   for (let [name, value] of record) {
-    let tr = document.createElement("tr");
+    let tr = document.createElement('tr');
     table.appendChild(tr);
-    let th = document.createElement("th");
+    let th = document.createElement('th');
     tr.appendChild(th);
     th.textContent = name;
-    let td = document.createElement("td");
+    let td = document.createElement('td');
     tr.appendChild(td);
     let content;
     let valueASCII = getFieldASCII(name, value);
@@ -170,20 +170,20 @@ function renderRecordTable(record) {
 }
 
 function renderSeqTable(seq, fields) {
-  let table = document.createElement("table");
-  let tr = document.createElement("tr");
+  let table = document.createElement('table');
+  let tr = document.createElement('tr');
   table.appendChild(tr);
   for (let [name, type] of fields) {
-    let th = document.createElement("th");
+    let th = document.createElement('th');
     tr.appendChild(th);
-    th.textContent = name + " : " + type;
+    th.textContent = name + ' : ' + type;
   }
   for (let item of seq) {
-    if (item.tag === "Record") {
-      let tr = document.createElement("tr");
+    if (item.tag === 'Record') {
+      let tr = document.createElement('tr');
       table.appendChild(tr);
       for (let [_, value] of item.data) {
-        let td = document.createElement("td");
+        let td = document.createElement('td');
         tr.appendChild(td);
         let content = document.createTextNode(value.data);
         td.appendChild(content);
@@ -200,25 +200,25 @@ function renderASCII(seq) {
     0x0A: 'n',
     0x0D: 'r',
   };
-  let span = document.createElement("span");
-  span.className = "text";
+  let span = document.createElement('span');
+  span.className = 'text';
   let run = null;
   for (let item of seq) {
-    if (item.tag === "U8") {
+    if (item.tag === 'U8') {
       let b = item.data;
       let type, text;
       if (b >= 0x20 && b < 0x7F) {
-        type = "printable";
+        type = 'printable';
         text = String.fromCharCode(b);
       } else if (b in escapes) {
-        type = "escape";
-        text = "\\" + escapes[b];
+        type = 'escape';
+        text = '\\' + escapes[b];
       } else {
-        type = "control";
-        text = "\\x" + b.toString(16).padStart(2, '0');
+        type = 'control';
+        text = '\\x' + b.toString(16).padStart(2, '0');
       }
       if (!run || run.className !== type) {
-        run = document.createElement("span");
+        run = document.createElement('span');
         run.className = type;
         span.appendChild(run);
       }
