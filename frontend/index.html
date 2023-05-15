@@ -14,169 +14,169 @@ This needs:
   <head>
     <meta charset="utf-8">
     <style>
-    * {
-      box-sizing: border-box;
-    }
+      * {
+        box-sizing: border-box;
+      }
 
-    body {
-      width: 100vw;
-      height: 100vh;
+      body {
+        width: 100vw;
+        height: 100vh;
 
-      line-height: 4ex;
+        line-height: 4ex;
 
-      font-family: 'MonoLisa', 'VictorMono Nerd Font', 'VictorMono', monospace;
-    }
+        font-family: 'MonoLisa', 'VictorMono Nerd Font', 'VictorMono', monospace;
+      }
 
-    main {
-      display: flex;
-      width: 100%;
-      height: 100%;
+      main {
+        display: flex;
+        width: 100%;
+        height: 100%;
 
-      flex-flow: row nowrap;
-      align-items: stretch;
-    }
+        flex-flow: row nowrap;
+        align-items: stretch;
+      }
 
-    main > section {
-      flex: 1;
-    }
+      main > section {
+        flex: 1;
+      }
 
-    ul, li, dl, dt, dd {
-      margin: 0;
-      padding: 0;
-    }
+      ul, li, dl, dt, dd {
+        margin: 0;
+        padding: 0;
+      }
 
-    dl {
-      display: flex;
-      flex-flow: row wrap;
-    }
+      dl {
+        display: flex;
+        flex-flow: row wrap;
+      }
 
-    dt.object {
-      width: 100%;
-    }
+      dt.object {
+        width: 100%;
+      }
 
-    dd {
-      flex: 1;
-    }
+      dd {
+        flex: 1;
+      }
 
-    dl ul > li, dl dl > dt {
-      list-style: none;
-      border-left: var(--line-size) solid lightgray;
-    }
+      dl ul > li, dl dl > dt {
+        list-style: none;
+        border-left: var(--line-size) solid lightgray;
+      }
 
-    li:last-child,
-    dd dt:last-of-type,
-    li > :not(.text) > :first-child {
-      border-left: 0;
-      padding-left: var(--indent-width);
-    }
+      li:last-child,
+      dd dt:last-of-type,
+      li > :not(.text) > :first-child {
+        border-left: 0;
+        padding-left: var(--indent-width);
+      }
 
-    li > span {
-        margin-left: var(--indent-width);
-    }
+      li > span {
+          margin-left: var(--indent-width);
+      }
 
-    li.string:last-child,
-    li.number:last-child,
-    dd dt:last-of-type,
-    li > * > li.string:first-child,
-    li > * > li.number:first-child {
-      padding-left: calc(var(--indent-width) + var(--spacing-size));
-    }
+      li.string:last-child,
+      li.number:last-child,
+      dd dt:last-of-type,
+      li > * > li.string:first-child,
+      li > * > li.number:first-child {
+        padding-left: calc(var(--indent-width) + var(--spacing-size));
+      }
 
-    dd dt:last-of-type.number,
-    dd dt:last-of-type.string {
-      padding-left: var(--spacing-size);
-    }
+      dd dt:last-of-type.number,
+      dd dt:last-of-type.string {
+        padding-left: var(--spacing-size);
+      }
 
-    li {
-      padding: 0;
-      padding-left: var(--indent-width);
-    }
+      li {
+        padding: 0;
+        padding-left: var(--indent-width);
+      }
 
-    li, dt, dd {
-      position: relative;
-    }
+      li, dt, dd {
+        position: relative;
+      }
 
-    /* there shouldn't be any undefined types, so if there are we highlight them
-    with a red outline */
-    .undefined {
-      outline: 1px solid red;
-    }
+      /* there shouldn't be any undefined types, so if there are we highlight them
+      with a red outline */
+      .undefined {
+        outline: 1px solid red;
+      }
 
-    .string, .number {
-      padding-left: calc(var(--indent-width) + var(--spacing-size));
-      height: 4ex;
-    }
+      .string, .number {
+        padding-left: calc(var(--indent-width) + var(--spacing-size));
+        height: 4ex;
+      }
 
-    li::before {
-      content: '';
-      display: block;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: var(--indent-width);
-      height: 2ex;
-      border-bottom: var(--line-size) solid lightgray;
-    }
+      li::before {
+        content: '';
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: var(--indent-width);
+        height: 2ex;
+        border-bottom: var(--line-size) solid lightgray;
+      }
 
-    li > * > li:first-child:not(:only-child)::before,
-    li > * > .object:first-child:not(:only-child)::before {
-      content: '';
-      display: block;
-      position: absolute;
-      top: auto;
-      bottom: 0;
-      left: 0;
-      width: var(--indent-width);
-      height: calc(100% - 2ex - var(--line-size));
-      border-left: var(--line-size) solid lightgray;
-      border-top: var(--line-size) solid lightgray;
-      border-bottom: 0;
-    }
+      li > * > li:first-child:not(:only-child)::before,
+      li > * > .object:first-child:not(:only-child)::before {
+        content: '';
+        display: block;
+        position: absolute;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        width: var(--indent-width);
+        height: calc(100% - 2ex - var(--line-size));
+        border-left: var(--line-size) solid lightgray;
+        border-top: var(--line-size) solid lightgray;
+        border-bottom: 0;
+      }
 
-    li:last-of-type::before {
-      border-left: var(--line-size) solid lightgray;
-    }
+      li:last-of-type::before {
+        border-left: var(--line-size) solid lightgray;
+      }
 
-    dd.number:before {
-      content: ':=';
+      dd.number:before {
+        content: ':=';
 
-      display: block;
-      position: absolute;
-      left: 0;
-      margin-left: 1px;
-      color: gray;
-    }
+        display: block;
+        position: absolute;
+        left: 0;
+        margin-left: 1px;
+        color: gray;
+      }
 
-    dl {
-    }
+      dl {
+      }
 
-    table {
-      border: 1px outset;
-    }
+      table {
+        border: 1px outset;
+      }
 
-    th, td {
-      border: 1px inset;
-    }
+      th, td {
+        border: 1px inset;
+      }
 
-    #structure {
-      --indent-width: 1em;
-      --spacing-size: 0.5em;
-      --line-size: 2px;
-    }
+      #structure {
+        --indent-width: 1em;
+        --spacing-size: 0.5em;
+        --line-size: 2px;
+      }
 
-    #binary {
-    }
+      #binary {
+      }
 
-.text {
-    font-weight: bold;
-    white-space: pre-wrap;
-    padding: 3px 4px;
-    border-radius: 4px;
-    border: solid black 1px;
-}
-.escape { color: blue }
-.printable { }
-.control { color: red }
+      .text {
+          font-weight: bold;
+          white-space: pre-wrap;
+          padding: 3px 4px;
+          border-radius: 4px;
+          border: solid black 1px;
+      }
+      .escape { color: blue }
+      .printable { }
+      .control { color: red }
     </style>
   </head>
   <body>
