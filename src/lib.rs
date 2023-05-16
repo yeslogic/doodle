@@ -89,6 +89,7 @@ impl Value {
             (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
             (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
             (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
+            // FIXME: reverse order?
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
             {

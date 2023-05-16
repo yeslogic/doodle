@@ -1,18 +1,9 @@
-function main() {
-  const structureSection = document.getElementById('structure');
-  Promise.all([
-    fetch('./test.json').then(r => r.json()),
-    fetch('./format.json').then(r => r.json()),
-  ]).then(([value, format]) => {
-    // TODO: format-directed printing
-    structureSection.appendChild(valueToHTML(value));
-  });
-}
+import { Empty, evaluate } from './semantics.js';
 
 // Convert a value into HTML.
 //
 // FIXME: somehow this modifies the Json object passed to it.
-function valueToHTML(value) {
+export function valueToHTML(value) {
   const result = document.createElement('dl');
 
   const dt = document.createElement('dt');
