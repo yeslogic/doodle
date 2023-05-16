@@ -52,15 +52,15 @@ function valueToHTML(value) {
   return result;
 }
 
-function seqToHTML(seq) {
-  if (isRecordSeq(seq)) {
-    const fields = seq[0].data.map(([name, value]) => {
+function seqToHTML(items) {
+  if (isRecordSeq(items)) {
+    const fields = items[0].data.map(([name, value]) => {
       return [name, value.tag];
     });
-    return renderSeqTable(seq, fields);
+    return renderSeqTable(items, fields);
   } else {
     const ul = document.createElement('ul');
-    for (const item of seq) {
+    for (const item of items) {
       const li = document.createElement('li');
       ul.appendChild(li);
       const content = valueToHTML(item);
@@ -85,8 +85,8 @@ function recordToHTML(fields) {
   }
 }
 
-function isRecordSeq(seq) {
-  return seq.length > 0 && seq[0].tag === 'Record' && isFlatRecord(seq[0].data);
+function isRecordSeq(items) {
+  return items.length > 0 && items[0].tag === 'Record' && isFlatRecord(items[0].data);
 }
 
 function isFlatRecord(fields) {
@@ -143,9 +143,9 @@ function fieldValueToHTML(name, value) {
   }
 }
 
-function renderRecordTable(record) {
+function renderRecordTable(fields) {
   const table = document.createElement('table');
-  for (const [name, value] of record) {
+  for (const [name, value] of fields) {
     const tr = document.createElement('tr');
     table.appendChild(tr);
     const th = document.createElement('th');
@@ -159,7 +159,7 @@ function renderRecordTable(record) {
   return table;
 }
 
-function renderSeqTable(seq, fields) {
+function renderSeqTable(items, fields) {
   const table = document.createElement('table');
   const tr = document.createElement('tr');
   table.appendChild(tr);
@@ -168,7 +168,7 @@ function renderSeqTable(seq, fields) {
     tr.appendChild(th);
     th.textContent = name + ' : ' + type;
   }
-  for (const item of seq) {
+  for (const item of items) {
     if (item.tag === 'Record') {
       const tr = document.createElement('tr');
       table.appendChild(tr);
@@ -183,7 +183,7 @@ function renderSeqTable(seq, fields) {
   return table;
 }
 
-function renderASCII(seq) {
+function renderASCII(items) {
   const escapes = {
     0x00: '0',
     0x09: 't',
@@ -193,7 +193,7 @@ function renderASCII(seq) {
   const span = document.createElement('span');
   span.className = 'text';
   let run = null;
-  for (const item of seq) {
+  for (const item of items) {
     if (item.tag === 'U8') {
       const b = item.data;
       let type, text;
