@@ -130,19 +130,21 @@ function fieldToHTML(name, value) {
 
   const nameContent = document.createTextNode(name);
   liName.appendChild(nameContent);
-
-  let valueContent;
-  const valueASCII = getFieldASCII(name, value);
-  if (valueASCII !== null) {
-    valueContent = renderASCII(valueASCII);
-  } else {
-    valueContent = valueToHTML(value);
-  }
+  const valueContent = fieldValueToHTML(name, value);
   liValue.appendChild(valueContent);
 
   ul.appendChild(liName);
   ul.appendChild(liValue);
   return ul;
+}
+
+function fieldValueToHTML(name, value) {
+  const ascii = getFieldASCII(name, value);
+  if (ascii === null) {
+    return valueToHTML(value);
+  } else {
+    return renderASCII(value.data);
+  }
 }
 
 function renderRecordTable(record) {
@@ -155,14 +157,8 @@ function renderRecordTable(record) {
     th.textContent = name;
     const td = document.createElement('td');
     tr.appendChild(td);
-    let content;
-    const valueASCII = getFieldASCII(name, value);
-    if (valueASCII !== null) {
-      content = renderASCII(valueASCII);
-    } else {
-      content = valueToHTML(value);
-    }
-    td.appendChild(content);
+    const valueContent = fieldValueToHTML(name, value);
+    td.appendChild(valueContent);
   }
   return table;
 }
