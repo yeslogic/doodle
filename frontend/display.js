@@ -55,7 +55,7 @@ function valueToHTML(value) {
 function seqToHTML(seq) {
   if (isRecordSeq(seq)) {
     const fields = seq[0].data.map(([name, value]) => {
-      return [name, getAtomicType(value)];
+      return [name, value.tag];
     });
     return renderSeqTable(seq, fields);
   } else {
@@ -96,11 +96,7 @@ function isFlatRecord(fields) {
 }
 
 function isAtomicValue(value) {
-  return getAtomicType(value) !== null;
-}
-
-function getAtomicType(value) {
-  return ['U8', 'U16', 'U32'].includes(value.tag) ? value.tag : null;
+  return ['U8', 'U16', 'U32'].includes(value.tag);
 }
 
 function getFieldASCII(name, value) {
