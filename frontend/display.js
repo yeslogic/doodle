@@ -63,7 +63,6 @@ function seqToHTML(seq) {
     for (const item of seq) {
       const li = document.createElement('li');
       ul.appendChild(li);
-      li.classList.add(typeof item);
       const content = valueToHTML(item);
       li.appendChild(content);
     }
@@ -79,7 +78,6 @@ function recordToHTML(fields) {
     for (const field of fields) {
       const li = document.createElement('li');
       ul.appendChild(li);
-      li.classList.add(typeof field);
       const content = fieldToHTML(field);
       li.appendChild(content);
     }
