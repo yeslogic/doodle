@@ -60,7 +60,7 @@ This needs:
 
       dl ul > li, dl dl > dt {
         list-style: none;
-        border-left: var(--line-size) solid lightgray;
+        border-left: var(--branch-border);
       }
 
       li:last-child,
@@ -115,7 +115,7 @@ This needs:
         left: 0;
         width: var(--indent-width);
         height: 2ex;
-        border-bottom: var(--line-size) solid lightgray;
+        border-bottom: var(--branch-border);
       }
 
       li > * > li:first-child:not(:only-child)::before,
@@ -128,13 +128,13 @@ This needs:
         left: 0;
         width: var(--indent-width);
         height: calc(100% - 2ex - var(--line-size));
-        border-left: var(--line-size) solid lightgray;
-        border-top: var(--line-size) solid lightgray;
+        border-left: var(--branch-border);
+        border-top: var(--branch-border);
         border-bottom: 0;
       }
 
       li:last-of-type::before {
-        border-left: var(--line-size) solid lightgray;
+        border-left: var(--branch-border);
       }
 
       dd.number:before {
@@ -162,6 +162,7 @@ This needs:
         --indent-width: 1em;
         --spacing-size: 0.5em;
         --line-size: 2px;
+        --branch-border: var(--line-size) solid lightgray;
       }
 
       #binary {
