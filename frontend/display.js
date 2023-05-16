@@ -75,10 +75,10 @@ function recordToHTML(fields) {
     return renderRecordTable(fields);
   } else {
     const ul = document.createElement('ul');
-    for (const field of fields) {
+    for (const [name, value] of fields) {
       const li = document.createElement('li');
       ul.appendChild(li);
-      const content = fieldToHTML(field);
+      const content = fieldToHTML(name, value);
       li.appendChild(content);
     }
     return ul;
@@ -121,7 +121,7 @@ function getFieldASCII(name, value) {
   }
 }
 
-function fieldToHTML([name, value]) {
+function fieldToHTML(name, value) {
   const ul = document.createElement('ul');
   const liName = document.createElement('li');
   const liValue = document.createElement('li');
