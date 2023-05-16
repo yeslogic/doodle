@@ -96,7 +96,7 @@ function isFlatRecord(fields) {
 }
 
 function isAtomicValue(value) {
-  return ['U8', 'U16', 'U32'].includes(value.tag);
+  return ['Bool', 'U8', 'U16', 'U32'].includes(value.tag);
 }
 
 function getFieldASCII(name, value) {
