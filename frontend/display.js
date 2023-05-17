@@ -1,4 +1,115 @@
-import { Empty, evaluate } from './semantics.js';
+import { Empty, evaluate, matches, bindPatternNames } from './semantics.js';
+
+export class Context {
+  constructor(module) {
+    this.module = module;
+    this.localNames = new Empty;
+    this.localValues = new Empty;
+  }
+
+  lookupItemName(level) {
+    return this.module.names[level];
+  }
+
+  lookupItemFormat(level) {
+    return this.module.formats[level];
+  }
+
+  bindLocalDef(name, value) {
+    let context = new Context(this.module);
+    context.localNames = this.localNames.extend(name);
+    context.localValues = this.localValues.extend(value);
+    return context;
+  }
+
+  bindLocalParam(name) {
+    return this.bindLocalDef(name, null /* FIXME: bind variable */);
+  }
+
+  bindPattern(pattern, value) {
+    const localValues = matches(this.localValues, pattern, value);
+    if (localValues) {
+      let context = new Context(this.module);
+      context.localNames = bindPatternNames(this.localNames, pattern);
+      context.localValues = localValues;
+      return context;
+    } else {
+      return null;
+    }
+  }
+
+  decodedValueToHTML(value, format) {
+    switch (format.tag) {
+      case 'ItemVar': {
+        const itemFormat = this.lookupItemFormat(format.data);
+        return this.decodedValueToHTML(value, itemFormat);
+      }
+      case 'Fail': throw 'uninhabited format';
+      case 'EndOfInput': return valueToHTML(value);
+      case 'Byte': return valueToHTML(value);
+      case 'Union': switch (value.tag) {
+        case 'Variant': {
+          const [label, variantValue] = value.data;
+          for (const [branchLabel, branchFormat] of format.data) {
+            return valueToHTML(value); // TODO: use format
+          }
+          throw `missing branch ${label} in union format`;
+        }
+        default:
+          throw `expected variant, found ${value.tag}`;
+      }
+      case 'Tuple': switch (value.tag) {
+        case 'Tuple': {
+          const formats = format.data;
+          const values = value.data;
+          return valueToHTML(value); // TODO: use format
+        }
+        default:
+          throw `expected tuple, found ${value.tag}`;
+      }
+      case 'Record': switch (value.tag) {
+        case 'Record': {
+          const formatFields = format.data;
+          const valueFields = value.data;
+          return valueToHTML(value); // TODO: use format
+        }
+        default:
+          throw `expected record, found ${value.tag}`;
+      }
+      case 'Repeat': return valueToHTML(value); // TODO: use format
+      case 'Repeat1': return valueToHTML(value); // TODO: use format
+      case 'RepeatCount': return valueToHTML(value); // TODO: use format
+      case 'RepeatUntil': return valueToHTML(value); // TODO: use format
+      case 'Peek':
+        return this.decodedValueToHTML(value, format.data);
+      case 'Slice':
+      case 'WithRelativeOffset': {
+        const [_, innerFormat] = format.data;
+        return this.decodedValueToHTML(value, innerFormat);
+      }
+      case 'Map': {
+        const [expr, innerFormat] = format.data;
+        const valueFormat = mappedFormat(expr, innerFormat);
+        return valueFormat
+          ? this.decodedValueToHTML(value, valueFormat)
+          : valueToHTML(value);
+      }
+      case 'Match': {
+        const [headExpr, branches] = format.data;
+        const headValue = evaluate(this.localValues, headExpr);
+        for (const [pattern, branchFormat] of branches) {
+          const context = this.bindPattern(pattern, headValue);
+          if (context) {
+            return context.decodedValueToHTML(value, branchFormat);
+          }
+        }
+        throw 'non-exhaustive patterns';
+      }
+      default:
+        throw `unknown tag ${format.tag}`;
+    }
+  }
+}
 
 // Convert a value into HTML.
 //
@@ -33,9 +144,7 @@ export function valueToHTML(value) {
       dd.appendChild(seqToHTML(value.data));
       break;
     default:
-      // NOTE: Should never happen!
-      dd.appendChild(document.createTextNode(value.data));
-      break;
+      throw `unknown tag ${format.tag}`;
   }
 
   result.appendChild(dd);
@@ -207,4 +316,32 @@ function renderASCII(items) {
     }
   }
   return span;
+}
+
+function mappedFormat(expr, format) {
+  switch (expr.tag) {
+    case 'Var':
+      return expr.data === 0 ? format : null;
+    case 'RecordProj': {
+      const [head, label] = expr.data;
+      const headFormat = mappedFormat(head, format);
+      if (headFormat && headFormat.tag === 'Record') {
+        const [_, fieldFormat] = headFormat.data.find(([fieldLabel, _]) => fieldLabel == label);
+        return fieldFormat;
+      } else {
+        return null;
+      }
+    }
+    case 'TupleProj': {
+      const [head, index] = expr.data;
+      const headFormat = mappedFormat(head, format);
+      if (headFormat && headFormat.tag === 'Tuple') {
+        return headFormat.data[index];
+      } else {
+        return null;
+      }
+    }
+    default:
+      return null;
+  }
 }

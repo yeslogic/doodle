@@ -22,7 +22,9 @@ export class Extend extends Env {
 }
 
 export class Empty extends Env {
-  constructor() { }
+  constructor() {
+    super();
+  }
 
   lookup(_) {
     return null;
@@ -130,7 +132,7 @@ function evaluateTuple(env, expr) {
   }
 }
 
-function matches(env, pattern, value) {
+export function matches(env, pattern, value) {
   switch (pattern.tag) {
     case 'Binding':
       return env.extend(value);
@@ -162,12 +164,48 @@ function matches(env, pattern, value) {
           return extendedEnv;
         }
         case 'Variant': {
-          const [label0, p] = pattern.data;
-          const [label1, v] = value.data;
-          return label0 === label1 ? matches(env, p, v) : null;
+          const [label0, variantPattern] = pattern.data;
+          const [label1, variantValue] = value.data;
+          return label0 === label1
+            ? matches(env, variantPattern, variantValue)
+            : null;
         }
         default:
           throw `unexpected tag ${pattern.tag}`;
       }
+  }
+}
+
+export function bindPatternNames(env, pattern) {
+  return bindPatternCount(env, pattern, 0);
+}
+
+function bindPatternCount(env, pattern, count) {
+  switch (pattern.tag) {
+    case 'Binding':
+      let name = `x${count}`; // TODO: use better name
+      count++;
+      return env.extend(`x${count}`);
+    case 'Wildcard':
+    case 'Bool':
+    case 'U8':
+    case 'U16':
+    case 'U32':
+      return env;
+    case 'Tuple':
+    case 'Seq': {
+      let extendedEnv = env;
+      // FIXME: reverse order?
+      for (const itemPattern of pattern.data) {
+        extendedEnv = bindPatternCount(extendedEnv, itemPattern, count);
+      }
+      return extendedEnv;
+    }
+    case 'Variant': {
+      const [_, variantPattern] = pattern.data;
+      return bindPatternCount(env, variantPattern, count);
+    }
+    default:
+      throw `unexpected tag ${pattern.tag}`;
   }
 }
