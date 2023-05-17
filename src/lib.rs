@@ -799,16 +799,20 @@ impl Decoder {
                 Some((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Tuple(fields) => {
+                let initial_len = stack.len();
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for f in fields {
                     let (vf, next_input) = f.parse(stack, input)?;
                     input = next_input;
                     v.push(vf.clone());
+                    stack.push(vf);
                 }
+                stack.truncate(initial_len);
                 Some((Value::Tuple(v), input))
             }
             Decoder::Record(fields) => {
+                let initial_len = stack.len();
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for (name, f) in fields {
@@ -817,9 +821,7 @@ impl Decoder {
                     v.push((name.clone(), vf.clone()));
                     stack.push(vf);
                 }
-                for _ in fields {
-                    stack.pop();
-                }
+                stack.truncate(initial_len);
                 Some((Value::Record(v), input))
             }
             Decoder::While(tree, a) => {
