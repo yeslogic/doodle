@@ -213,6 +213,8 @@ pub enum Format {
     Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
     RepeatCount(Expr, Box<Format>),
+    /// Repeat a format until a condition is satisfied by its last item
+    RepeatUntil(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
@@ -296,6 +298,7 @@ pub enum Decoder {
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
+    RepeatUntil(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -414,6 +417,13 @@ impl Expr {
         }
     }
 
+    fn eval_bool(&self, stack: &mut Vec<Value>) -> bool {
+        match self.eval(stack) {
+            Value::Bool(b) => b,
+            _ => panic!("value is not a bool"),
+        }
+    }
+
     fn eval_usize(&self, stack: &mut Vec<Value>) -> usize {
         match self.eval(stack) {
             Value::U8(n) => usize::from(n),
@@ -445,6 +455,7 @@ impl Format {
             Format::Repeat(_) => true,
             Format::Repeat1(_) => false,
             Format::RepeatCount(_, _) => true,
+            Format::RepeatUntil(_, f) => f.is_nullable(module),
             Format::Peek(_) => true,
             Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
@@ -576,6 +587,9 @@ impl<'a> MatchTreeLevel<'a> {
                 Ok(())
             }
             Format::RepeatCount(_expr, _a) => {
+                self.accept(index) // FIXME
+            }
+            Format::RepeatUntil(_expr, _a) => {
                 self.accept(index) // FIXME
             }
             Format::Peek(_a) => {
@@ -742,6 +756,11 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
+            Format::RepeatUntil(expr, a) => {
+                // FIXME probably not right
+                let da = Box::new(Decoder::compile_next(module, a, next)?);
+                Ok(Decoder::RepeatUntil(expr.clone(), da))
+            }
             Format::Peek(a) => {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::Peek(da))
@@ -853,6 +872,22 @@ impl Decoder {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
+                }
+                Some((Value::Seq(v), input))
+            }
+            Decoder::RepeatUntil(expr, a) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                loop {
+                    let (va, next_input) = a.parse(stack, input)?;
+                    input = next_input;
+                    stack.push(va);
+                    let done = expr.eval_bool(stack);
+                    let va = stack.pop()?;
+                    v.push(va);
+                    if done {
+                        break;
+                    }
                 }
                 Some((Value::Seq(v), input))
             }

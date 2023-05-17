@@ -70,12 +70,13 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Value::Record(value_fields) => self.write_record(value_fields, Some(format_fields)),
                 _ => panic!("expected record"),
             },
-            Format::Repeat(format) | Format::Repeat1(format) | Format::RepeatCount(_, format) => {
-                match value {
-                    Value::Seq(values) => self.write_seq(values, Some(format)),
-                    _ => panic!("expected sequence"),
-                }
-            }
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatUntil(_, format) => match value {
+                Value::Seq(values) => self.write_seq(values, Some(format)),
+                _ => panic!("expected sequence"),
+            },
             Format::Peek(format) => self.write_decoded_value(value, format),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
@@ -410,6 +411,12 @@ impl<'module, W: io::Write> Context<'module, W> {
             }
             Format::RepeatCount(len, format) => {
                 write!(&mut self.writer, "repeat-count ")?;
+                self.write_atomic_expr(len)?;
+                write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
+            Format::RepeatUntil(len, format) => {
+                write!(&mut self.writer, "repeat-until ")?;
                 self.write_atomic_expr(len)?;
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
