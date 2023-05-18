@@ -13,43 +13,23 @@ function main() {
 //
 // FIXME: somehow this modifies the Json object passed to it.
 function valueToHTML(value) {
-  const result = document.createElement('dl');
-
-  const dt = document.createElement('dt');
-  const dd = document.createElement('dd');
-
-  dt.classList.add(typeof value.data);
-  dd.classList.add(typeof value.data);
-
-  dt.appendChild(document.createTextNode(value.tag));
-  result.appendChild(dt);
-
   switch (value.tag) {
     case 'Bool':
     case 'U8':
     case 'U16':
     case 'U32':
-      dd.appendChild(document.createTextNode(value.data));
-      break;
+      return document.createTextNode(value.data);
     case 'Record':
-      dd.appendChild(recordToHTML(value.data));
-      break;
+      return recordToHTML(value.data);
     case 'Variant':
-      dd.appendChild(recordToHTML([value.data]));
-      break;
+      return recordToHTML([value.data]);
     case 'Seq':
     case 'Tuple':
-      dd.appendChild(seqToHTML(value.data));
-      break;
+      return seqToHTML(value.data);
     default:
       // NOTE: Should never happen!
-      dd.appendChild(document.createTextNode(value.data));
-      break;
+      return document.createTextNode(value.data);
   }
-
-  result.appendChild(dd);
-
-  return result;
 }
 
 function seqToHTML(items) {
