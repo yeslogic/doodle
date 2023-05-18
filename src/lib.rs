@@ -844,7 +844,7 @@ impl Decoder {
             Decoder::While(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
-                while tree.matches(input) == Some(0) {
+                while tree.matches(input)? == 0 {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
@@ -858,7 +858,7 @@ impl Decoder {
                     let (va, next_input) = a.parse(stack, input)?;
                     input = next_input;
                     v.push(va);
-                    if tree.matches(input) == Some(0) {
+                    if tree.matches(input)? == 0 {
                         break;
                     }
                 }
