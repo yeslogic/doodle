@@ -42,14 +42,14 @@ dd {
   flex: 1;
 }
 
-dl ul > li, dl dl > dt {
+#structure ul > li, #structure dl > dt {
   list-style: none;
   border-left: var(--branch-border);
 }
 
-li:last-child,
-dd dt:last-of-type,
-li > :not(.text) > :first-child {
+#structure li:last-child,
+#structure dd dt:last-of-type,
+#structure li > :not(.text) > :first-child {
   border-left: 0;
   padding-left: var(--indent-width);
 }
@@ -58,11 +58,11 @@ li > span {
   margin-left: var(--indent-width);
 }
 
-li.string:last-child,
-li.number:last-child,
-dd dt:last-of-type,
-li > * > li.string:first-child,
-li > * > li.number:first-child {
+#structure li.string:last-child,
+#structure li.number:last-child,
+#structure dd dt:last-of-type,
+#structure li > * > li.string:first-child,
+#structure li > * > li.number:first-child {
   padding-left: calc(var(--indent-width) + var(--spacing-size));
 }
 
