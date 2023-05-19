@@ -134,6 +134,9 @@ pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
 
+    AsU16(Box<Expr>),
+    AsU32(Box<Expr>),
+
     U16Be(Box<Expr>),
     U16Le(Box<Expr>),
     U32Be(Box<Expr>),
@@ -385,6 +388,18 @@ impl Expr {
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+
+            Expr::AsU16(x) => match x.eval(stack) {
+                Value::U8(x) => Value::U16(u16::from(x)),
+                Value::U16(x) => Value::U16(x),
+                x => panic!("cannot convert {x:?} to U16"),
+            },
+            Expr::AsU32(x) => match x.eval(stack) {
+                Value::U8(x) => Value::U32(u32::from(x)),
+                Value::U16(x) => Value::U32(u32::from(x)),
+                Value::U32(x) => Value::U32(x),
+                x => panic!("cannot convert {x:?} to U32"),
             },
 
             Expr::U16Be(bytes) => match bytes.eval_tuple(stack).as_slice() {
