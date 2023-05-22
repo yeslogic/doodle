@@ -46,14 +46,9 @@ ul, li {
   margin-left: var(--spacing-size);
 }
 
-#structure li:is(.string, .number) {
+#structure li.label,
+#structure li:is(.Bool, .U8, .U16, .U32) {
   padding-left: calc(var(--indent-width) + var(--spacing-size));
-}
-
-/* there shouldn't be any undefined types, so if there are we highlight them
-with a red outline */
-.undefined {
-  outline: 1px solid red;
 }
 
 li::before {
