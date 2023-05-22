@@ -24,71 +24,36 @@ main > section {
   flex: 1;
 }
 
-ul, li, dl, dt, dd {
+ul, li {
   margin: 0;
   padding: 0;
 }
 
-dl {
-  display: flex;
-  flex-flow: row wrap;
-}
-
-dt.object {
-  width: 100%;
-}
-
-dd {
-  flex: 1;
-}
-
-#structure ul > li, #structure dl > dt {
+#structure li {
   list-style: none;
   border-left: var(--branch-border);
+  padding-left: var(--indent-width);
+  position: relative;
 }
 
 #structure li:last-child,
-#structure dd dt:last-of-type,
-#structure li > :not(.text) > :first-child {
+#structure li > ul > li:first-child {
   border-left: 0;
-  padding-left: var(--indent-width);
 }
 
-li > span {
-  margin-left: var(--indent-width);
+#structure li > .text,
+#structure li > table {
+  margin-left: var(--spacing-size);
 }
 
-#structure li.string:last-child,
-#structure li.number:last-child,
-#structure dd dt:last-of-type,
-#structure li > * > li.string:first-child,
-#structure li > * > li.number:first-child {
+#structure li:is(.string, .number) {
   padding-left: calc(var(--indent-width) + var(--spacing-size));
-}
-
-dd dt:last-of-type.number,
-dd dt:last-of-type.string {
-  padding-left: var(--spacing-size);
-}
-
-li {
-  padding: 0;
-  padding-left: var(--indent-width);
-}
-
-li, dt, dd {
-  position: relative;
 }
 
 /* there shouldn't be any undefined types, so if there are we highlight them
 with a red outline */
 .undefined {
   outline: 1px solid red;
-}
-
-.string, .number {
-  padding-left: calc(var(--indent-width) + var(--spacing-size));
-  height: 4ex;
 }
 
 li::before {
@@ -102,8 +67,7 @@ li::before {
   border-bottom: var(--branch-border);
 }
 
-li > * > li:first-child:not(:only-child)::before,
-li > * > .object:first-child:not(:only-child)::before {
+li > ul > li:first-child:not(:only-child)::before {
   content: '';
   display: block;
   position: absolute;
@@ -120,18 +84,6 @@ li > * > .object:first-child:not(:only-child)::before {
 li:last-of-type::before {
   border-left: var(--branch-border);
 }
-
-dd.number:before {
-  content: ':=';
-
-  display: block;
-  position: absolute;
-  left: 0;
-  margin-left: 1px;
-  color: gray;
-}
-
-dl {}
 
 table {
   border: 1px outset;
