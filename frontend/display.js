@@ -42,6 +42,7 @@ function seqToHTML(items) {
     const ul = document.createElement('ul');
     for (const item of items) {
       const li = document.createElement('li');
+      li.classList.add(typeof item.data);
       ul.appendChild(li);
       const content = valueToHTML(item);
       li.appendChild(content);
@@ -102,7 +103,7 @@ function fieldToHTML(name, value) {
   const liName = document.createElement('li');
   const liValue = document.createElement('li');
   liName.classList.add(typeof name);
-  liValue.classList.add(typeof value);
+  liValue.classList.add(typeof value.data);
 
   const nameContent = document.createTextNode(name);
   liName.appendChild(nameContent);
