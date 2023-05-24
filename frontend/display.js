@@ -34,8 +34,8 @@ function valueToHTML(value) {
 
 function seqToHTML(items) {
   if (isRecordSeq(items)) {
-    const fields = items[0].data.map(([name, value]) => {
-      return [name, value.tag];
+    const fields = items[0].data.map(([label, value]) => {
+      return [label, value.tag];
     });
     return renderSeqTable(items, fields);
   } else {
@@ -56,10 +56,10 @@ function recordToHTML(fields) {
     return renderRecordTable(fields);
   } else {
     const ul = document.createElement('ul');
-    for (const [name, value] of fields) {
+    for (const [label, value] of fields) {
       const li = document.createElement('li');
       ul.appendChild(li);
-      const content = fieldToHTML(name, value);
+      const content = fieldToHTML(label, value);
       li.appendChild(content);
     }
     return ul;
@@ -71,8 +71,8 @@ function isRecordSeq(items) {
 }
 
 function isFlatRecord(fields) {
-  return fields.every(([name, value]) => {
-    return isAtomicValue(value) || getFieldASCII(name, value) !== null;
+  return fields.every(([label, value]) => {
+    return isAtomicValue(value) || getFieldASCII(label, value) !== null;
   });
 }
 
@@ -80,17 +80,17 @@ function isAtomicValue(value) {
   return ['Bool', 'U8', 'U16', 'U32'].includes(value.tag);
 }
 
-function getFieldASCII(name, value) {
-  if (name === 'identifier' && value.tag === 'Seq') {
+function getFieldASCII(label, value) {
+  if (label === 'identifier' && value.tag === 'Seq') {
     // JPEG APP1 identifier
     return value.data;
-  } else if ((name === 'signature' || name === 'tag') && value.tag === 'Tuple') {
+  } else if ((label === 'signature' || label === 'tag') && value.tag === 'Tuple') {
     // PNG signature and tags
     return value.data;
-  } else if (name === 'tag' && value.tag === 'Variant' && value.data[1].tag === 'Tuple') {
+  } else if (label === 'tag' && value.tag === 'Variant' && value.data[1].tag === 'Tuple') {
     // more PNG tags
     return value.data[1].data;
-  } else if (name === 'version' && value.tag === 'Seq') {
+  } else if (label === 'version' && value.tag === 'Seq') {
     // GIF 89a version
     return value.data;
   } else {
@@ -98,25 +98,25 @@ function getFieldASCII(name, value) {
   }
 }
 
-function fieldToHTML(name, value) {
+function fieldToHTML(label, value) {
   const ul = document.createElement('ul');
-  const liName = document.createElement('li');
+  const liLabel = document.createElement('li');
   const liValue = document.createElement('li');
-  liName.classList.add('label');
+  liLabel.classList.add('label');
   liValue.classList.add(value.tag);
 
-  const nameContent = document.createTextNode(name);
-  liName.appendChild(nameContent);
-  const valueContent = fieldValueToHTML(name, value);
+  const nameContent = document.createTextNode(label);
+  liLabel.appendChild(nameContent);
+  const valueContent = fieldValueToHTML(label, value);
   liValue.appendChild(valueContent);
 
-  ul.appendChild(liName);
+  ul.appendChild(liLabel);
   ul.appendChild(liValue);
   return ul;
 }
 
-function fieldValueToHTML(name, value) {
-  const ascii = getFieldASCII(name, value);
+function fieldValueToHTML(label, value) {
+  const ascii = getFieldASCII(label, value);
   if (ascii === null) {
     return valueToHTML(value);
   } else {
@@ -126,15 +126,15 @@ function fieldValueToHTML(name, value) {
 
 function renderRecordTable(fields) {
   const table = document.createElement('table');
-  for (const [name, value] of fields) {
+  for (const [label, value] of fields) {
     const tr = document.createElement('tr');
     table.appendChild(tr);
     const th = document.createElement('th');
     tr.appendChild(th);
-    th.textContent = name;
+    th.textContent = label;
     const td = document.createElement('td');
     tr.appendChild(td);
-    const valueContent = fieldValueToHTML(name, value);
+    const valueContent = fieldValueToHTML(label, value);
     td.appendChild(valueContent);
   }
   return table;
@@ -144,10 +144,10 @@ function renderSeqTable(items, fields) {
   const table = document.createElement('table');
   const tr = document.createElement('tr');
   table.appendChild(tr);
-  for (const [name, type] of fields) {
+  for (const [label, type] of fields) {
     const th = document.createElement('th');
     tr.appendChild(th);
-    th.textContent = name + ' : ' + type;
+    th.textContent = label + ' : ' + type;
   }
   for (const item of items) {
     if (item.tag === 'Record') {
