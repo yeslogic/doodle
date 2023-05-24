@@ -51,6 +51,12 @@ ul, li {
   padding-left: calc(var(--indent-width) + var(--spacing-size));
 }
 
+#structure li.label::after {
+  color: gray;
+  content: ':=';
+  margin-left: var(--spacing-size);
+}
+
 li::before {
   content: '';
   display: block;
