@@ -446,10 +446,16 @@ impl Expr {
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
             Expr::Stream(seq) => match seq.eval(stack) {
-                Value::Seq(values) => {
-                    // FIXME: Use option type
-                    Value::Seq(values.into_iter().filter(|v| *v != Value::UNIT).collect())
-                }
+                Value::Seq(values) => Value::Seq(
+                    values
+                        .into_iter()
+                        .filter_map(|value| match value {
+                            Value::Variant(label, value) if label == "some" => Some(*value),
+                            Value::Variant(label, _) if label == "none" => None,
+                            _ => panic!("expected option"),
+                        })
+                        .collect(),
+                ),
                 _ => panic!("Stream: expected Seq"),
             },
         }
