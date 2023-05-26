@@ -51,6 +51,30 @@ impl<'module> Context<'module> {
         }
     }
 
+    pub fn check_type(&self, r#type: &Type) {
+        match r#type {
+            Type::Bool | Type::U8 | Type::U16 | Type::U32 => {}
+            Type::Tuple(types) => {
+                for r#type in types {
+                    self.check_type(r#type);
+                }
+            }
+            Type::Record(fields) => {
+                // TODO: Check labels are unique
+                for (label, r#type) in fields {
+                    self.check_type(r#type);
+                }
+            }
+            Type::Variant(branches) => {
+                // TODO: Check labels are unique
+                for (label, r#type) in branches {
+                    self.check_type(r#type);
+                }
+            }
+            Type::Seq(r#type) => self.check_type(r#type),
+        }
+    }
+
     pub fn check_format(&mut self, format: &Format) {
         match format {
             Format::ItemVar(level) => todo!(),
