@@ -9,10 +9,7 @@ use crate::format::base::*;
 #[allow(clippy::redundant_clone)]
 pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Format {
     fn marker(id: u8) -> Format {
-        Format::Map(
-            Expr::TupleProj(Box::new(Expr::Var(0)), 1),
-            Box::new(tuple([is_byte(0xFF), is_byte(id)])),
-        )
+        record([("ff", is_byte(0xFF)), ("marker", is_byte(id))])
     }
 
     let marker_segment = |id: u8, data: Format| {
@@ -23,7 +20,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
                 "data",
                 Format::Slice(
                     Expr::Sub(
-                        Box::new(Expr::Var(0)), // length
+                        Box::new(Expr::RecordProj(
+                            Box::new(Expr::Var(0)),
+                            "@value".to_string(),
+                        )), // length
                         Box::new(Expr::U16(2)),
                     ),
                     Box::new(data),
@@ -218,7 +218,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
             (
                 "data",
                 Format::Match(
-                    Expr::Var(0), // identifier
+                    Expr::RecordProj(Box::new(Expr::Var(0)), "string".to_string()),
                     vec![
                         (Pattern::from_bytes(b"JFIF"), app0_jfif),
                         // FIXME: there are other APP0 formats
@@ -248,7 +248,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
             (
                 "data",
                 Format::Match(
-                    Expr::Var(0), // identifier
+                    Expr::RecordProj(Box::new(Expr::Var(0)), "string".to_string()),
                     vec![
                         (Pattern::from_bytes(b"Exif"), app1_exif),
                         (
@@ -363,83 +363,98 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
     // MCU: Minimum coded unit
     let mcu = module.define_format(
         "jpeg.mcu",
-        Format::Map(
-            Expr::Match(
-                Box::new(Expr::Var(0)),
-                vec![
-                    (Pattern::variant("byte", Pattern::Binding), Expr::Var(0)),
-                    (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
-                ],
+        record([
+            (
+                "mcu",
+                (alts([
+                    ("byte", not_byte(0xFF)),
+                    ("zero", tuple([is_byte(0xFF), is_byte(0x00)])),
+                ])),
             ),
-            Box::new(alts([
-                ("byte", not_byte(0xFF)),
-                ("zero", tuple([is_byte(0xFF), is_byte(0x00)])),
-            ])),
-        ),
+            (
+                "@value",
+                Format::Compute(Expr::Match(
+                    Box::new(Expr::Var(0)),
+                    vec![
+                        (Pattern::variant("byte", Pattern::Binding), Expr::Var(0)),
+                        (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
+                    ],
+                )),
+            ),
+        ]),
     );
 
     // A series of entropy coded segments separated by restart markers
     let scan_data = module.define_format(
         "jpeg.scan-data",
-        Format::Map(
-            Expr::FlatMap(
-                Box::new(Expr::Match(
-                    Box::new(Expr::Var(0)),
-                    vec![
-                        (
-                            Pattern::variant("mcu", Pattern::Binding),
-                            Expr::Seq(vec![Expr::Var(0)]),
-                        ),
-                        (
-                            Pattern::variant("rst0", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst1", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst2", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst3", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst4", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst5", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst6", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                        (
-                            Pattern::variant("rst7", Pattern::Wildcard),
-                            Expr::Seq(vec![]),
-                        ),
-                    ],
-                )),
-                Box::new(Expr::Var(0)),
+        record([
+            (
+                "scan-data",
+                repeat(alts([
+                    // FIXME: Extract into separate ECS repetition
+                    ("mcu", mcu), // TODO: repeat(mcu),
+                    // FIXME: Restart markers should cycle in order from rst0-rst7
+                    ("rst0", rst0),
+                    ("rst1", rst1),
+                    ("rst2", rst2),
+                    ("rst3", rst3),
+                    ("rst4", rst4),
+                    ("rst5", rst5),
+                    ("rst6", rst6),
+                    ("rst7", rst7),
+                ])),
             ),
-            Box::new(repeat(alts([
-                // FIXME: Extract into separate ECS repetition
-                ("mcu", mcu), // TODO: repeat(mcu),
-                // FIXME: Restart markers should cycle in order from rst0-rst7
-                ("rst0", rst0),
-                ("rst1", rst1),
-                ("rst2", rst2),
-                ("rst3", rst3),
-                ("rst4", rst4),
-                ("rst5", rst5),
-                ("rst6", rst6),
-                ("rst7", rst7),
-            ]))),
-        ),
+            (
+                "scan-data-stream",
+                Format::Compute(Expr::FlatMap(
+                    Box::new(Expr::Match(
+                        Box::new(Expr::Var(0)),
+                        vec![
+                            (
+                                Pattern::variant("mcu", Pattern::Binding),
+                                Expr::Seq(vec![Expr::RecordProj(
+                                    Box::new(Expr::Var(0)),
+                                    "@value".to_string(),
+                                )]),
+                            ),
+                            (
+                                Pattern::variant("rst0", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst1", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst2", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst3", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst4", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst5", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst6", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                            (
+                                Pattern::variant("rst7", Pattern::Wildcard),
+                                Expr::Seq(vec![]),
+                            ),
+                        ],
+                    )),
+                    Box::new(Expr::Var(0)),
+                )),
+            ),
+        ]),
     );
 
     let scan = module.define_format(

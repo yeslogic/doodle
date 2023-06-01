@@ -93,45 +93,57 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
 
     let u16be = module.define_format(
         "base.u16be",
-        Format::Map(
-            Expr::U16Be(Box::new(Expr::Var(0))),
-            Box::new(tuple([u8.clone(), u8.clone()])),
-        ),
+        record([
+            ("bytes", tuple([u8.clone(), u8.clone()])),
+            (
+                "@value",
+                Format::Compute(Expr::U16Be(Box::new(Expr::Var(0)))),
+            ),
+        ]),
     );
 
     let u16le = module.define_format(
         "base.u16le",
-        Format::Map(
-            Expr::U16Le(Box::new(Expr::Var(0))),
-            Box::new(tuple([u8.clone(), u8.clone()])),
-        ),
+        record([
+            ("bytes", tuple([u8.clone(), u8.clone()])),
+            (
+                "@value",
+                Format::Compute(Expr::U16Le(Box::new(Expr::Var(0)))),
+            ),
+        ]),
     );
 
     let u32be = module.define_format(
         "base.u32be",
-        Format::Map(
-            Expr::U32Be(Box::new(Expr::Var(0))),
-            Box::new(tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()])),
-        ),
+        record([
+            (
+                "bytes",
+                tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()]),
+            ),
+            (
+                "@value",
+                Format::Compute(Expr::U32Be(Box::new(Expr::Var(0)))),
+            ),
+        ]),
     );
 
     let u32le = module.define_format(
         "base.u32le",
-        Format::Map(
-            Expr::U32Le(Box::new(Expr::Var(0))),
-            Box::new(tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()])),
-        ),
+        record([
+            (
+                "bytes",
+                tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()]),
+            ),
+            (
+                "@value",
+                Format::Compute(Expr::U32Le(Box::new(Expr::Var(0)))),
+            ),
+        ]),
     );
 
     let asciiz_string = module.define_format(
         "base.asciiz-string",
-        Format::Map(
-            Expr::RecordProj(Box::new(Expr::Var(0)), "string".to_string()),
-            Box::new(record([
-                ("string", repeat(not_byte(0x00))),
-                ("null", is_byte(0x00)),
-            ])),
-        ),
+        record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
     );
 
     BaseModule {

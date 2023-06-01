@@ -28,7 +28,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                 "num-fields",
                 if is_be { base.u16be() } else { base.u16le() },
             ),
-            ("fields", repeat_count(Expr::Var(0), ifd_field(is_be))),
+            (
+                "fields",
+                repeat_count(
+                    Expr::RecordProj(Box::new(Expr::Var(0)), "@value".to_string()),
+                    ifd_field(is_be),
+                ),
+            ),
             (
                 "next-ifd-offset",
                 if is_be { base.u32be() } else { base.u32le() },
@@ -44,18 +50,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         record([
             (
                 "byte-order",
-                alts([
-                    ("le", Format::Map(Expr::UNIT, Box::new(is_bytes(b"II")))),
-                    ("be", Format::Map(Expr::UNIT, Box::new(is_bytes(b"MM")))),
-                ]),
+                alts([("le", is_bytes(b"II")), ("be", is_bytes(b"MM"))]),
             ),
             (
                 "magic",
                 Format::Match(
                     Expr::Var(0), // byte-order
                     vec![
-                        (Pattern::variant("le", Pattern::UNIT), base.u16le()), // 42
-                        (Pattern::variant("be", Pattern::UNIT), base.u16be()), // 42
+                        (Pattern::variant("le", Pattern::Wildcard), base.u16le()), // 42
+                        (Pattern::variant("be", Pattern::Wildcard), base.u16be()), // 42
                     ],
                 ),
             ),
@@ -64,8 +67,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                 Format::Match(
                     Expr::Var(1), // byte-order
                     vec![
-                        (Pattern::variant("le", Pattern::UNIT), base.u32le()),
-                        (Pattern::variant("be", Pattern::UNIT), base.u32be()),
+                        (Pattern::variant("le", Pattern::Wildcard), base.u32le()),
+                        (Pattern::variant("be", Pattern::Wildcard), base.u32be()),
                     ],
                 ),
             ),
@@ -73,12 +76,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                 "ifd",
                 Format::WithRelativeOffset(
                     // TODO: Offset from start of the TIFF header
-                    Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
+                    Expr::Sub(
+                        Box::new(Expr::RecordProj(
+                            Box::new(Expr::Var(0)),
+                            "@value".to_string(),
+                        )),
+                        Box::new(Expr::U32(8)),
+                    ),
                     Box::new(Format::Match(
                         Expr::Var(2), // byte-order
                         vec![
-                            (Pattern::variant("le", Pattern::UNIT), ifd(false)),
-                            (Pattern::variant("be", Pattern::UNIT), ifd(true)),
+                            (Pattern::variant("le", Pattern::Wildcard), ifd(false)),
+                            (Pattern::variant("be", Pattern::Wildcard), ifd(true)),
                         ],
                     )),
                 ),
