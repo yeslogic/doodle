@@ -366,8 +366,18 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "u32le ")?;
                 self.write_proj_expr(bytes)
             }
-            Expr::Stream(seq) => {
-                write!(&mut self.writer, "stream ")?;
+            Expr::FlatMap(expr, seq) => {
+                write!(&mut self.writer, "flat-map (")?;
+                self.write_expr(expr)?;
+                write!(&mut self.writer, ") ")?;
+                self.write_proj_expr(seq)
+            }
+            Expr::FlatMapAccum(expr, accum, seq) => {
+                write!(&mut self.writer, "flat-map-accum (")?;
+                self.write_expr(expr)?;
+                write!(&mut self.writer, ", ")?;
+                self.write_expr(accum)?;
+                write!(&mut self.writer, ") ")?;
                 self.write_proj_expr(seq)
             }
 

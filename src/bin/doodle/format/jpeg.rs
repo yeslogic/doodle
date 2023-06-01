@@ -382,36 +382,63 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
     let scan_data = module.define_format(
         "jpeg.scan-data",
         Format::Map(
-            Expr::Stream(Box::new(Expr::Var(0))),
-            Box::new(repeat(Format::Map(
-                Expr::Match(
+            Expr::FlatMap(
+                Box::new(Expr::Match(
                     Box::new(Expr::Var(0)),
                     vec![
-                        (Pattern::variant("mcu", Pattern::Binding), Expr::Var(0)),
-                        (Pattern::variant("rst0", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst1", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst2", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst3", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst4", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst5", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst6", Pattern::Wildcard), Expr::UNIT),
-                        (Pattern::variant("rst7", Pattern::Wildcard), Expr::UNIT),
+                        (
+                            Pattern::variant("mcu", Pattern::Binding),
+                            Expr::Seq(vec![Expr::Var(0)]),
+                        ),
+                        (
+                            Pattern::variant("rst0", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst1", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst2", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst3", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst4", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst5", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst6", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
+                        (
+                            Pattern::variant("rst7", Pattern::Wildcard),
+                            Expr::Seq(vec![]),
+                        ),
                     ],
-                ),
-                Box::new(alts([
-                    // FIXME: Extract into separate ECS repetition
-                    ("mcu", mcu), // TODO: repeat(mcu),
-                    // FIXME: Restart markers should cycle in order from rst0-rst7
-                    ("rst0", rst0),
-                    ("rst1", rst1),
-                    ("rst2", rst2),
-                    ("rst3", rst3),
-                    ("rst4", rst4),
-                    ("rst5", rst5),
-                    ("rst6", rst6),
-                    ("rst7", rst7),
-                ])),
-            ))),
+                )),
+                Box::new(Expr::Var(0)),
+            ),
+            Box::new(repeat(alts([
+                // FIXME: Extract into separate ECS repetition
+                ("mcu", mcu), // TODO: repeat(mcu),
+                // FIXME: Restart markers should cycle in order from rst0-rst7
+                ("rst0", rst0),
+                ("rst1", rst1),
+                ("rst2", rst2),
+                ("rst3", rst3),
+                ("rst4", rst4),
+                ("rst5", rst5),
+                ("rst6", rst6),
+                ("rst7", rst7),
+            ]))),
         ),
     );
 
