@@ -21,28 +21,6 @@ fn is_atomic_value(value: &Value) -> bool {
     }
 }
 
-/// Attempt to recover a format that can be used to render a value that was
-/// decoded with a map format. We currently handle cases like:
-///
-/// - `map (fun x => x) format`
-/// - `map (fun x => x.foo) format`
-/// - `map (fun x => x.3) format`
-/// - `map (fun x => x.foo.bar.3) format`
-fn mapped_format<'format>(expr: &Expr, format: &'format Format) -> Option<&'format Format> {
-    match expr {
-        Expr::Var(0) => Some(format),
-        Expr::RecordProj(head, label) => match mapped_format(head, format)? {
-            Format::Record(fields) => fields.iter().find_map(|(l, f)| (l == label).then_some(f)),
-            _ => None,
-        },
-        Expr::TupleProj(head, index) => match mapped_format(head, format)? {
-            Format::Tuple(formats) => formats.get(*index),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
 enum Column {
     Branch,
     Space,
@@ -104,10 +82,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Peek(format) => self.write_decoded_value(value, format),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
-            Format::Map(expr, format) => match mapped_format(expr, format) {
-                Some(format) => self.write_decoded_value(value, format),
-                None => self.write_value(value),
-            },
+            Format::Compute(_expr) => self.write_value(value),
             Format::Match(head, branches) => {
                 let head = head.eval(&mut self.values);
                 let initial_len = self.values.len();
@@ -511,15 +486,9 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_atomic_format(format)
             }
 
-            Format::Map(expr, format) => {
-                let name = "x";
-                write!(&mut self.writer, "map (fun {name} => ")?;
-                self.names.push(name.to_string());
-                // FIXME push value
-                self.write_expr(expr)?;
-                self.names.pop();
-                write!(&mut self.writer, ") ")?;
-                self.write_atomic_format(format)
+            Format::Compute(expr) => {
+                write!(&mut self.writer, "compute ")?;
+                self.write_expr(expr)
             }
 
             Format::Match(head, _) => {
