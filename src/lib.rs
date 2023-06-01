@@ -141,7 +141,9 @@ pub enum Expr {
     U16Le(Box<Expr>),
     U32Be(Box<Expr>),
     U32Le(Box<Expr>),
-    Stream(Box<Expr>),
+
+    FlatMap(Box<Expr>, Box<Expr>),
+    FlatMapAccum(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -422,12 +424,40 @@ impl Expr {
                 }
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
-            Expr::Stream(seq) => match seq.eval(stack) {
+            Expr::FlatMap(expr, seq) => match seq.eval(stack) {
                 Value::Seq(values) => {
-                    // FIXME could also condense nested sequences
-                    Value::Seq(values.into_iter().filter(|v| *v != Value::UNIT).collect())
+                    let mut vs = Vec::new();
+                    for v in values {
+                        stack.push(v);
+                        if let Value::Seq(vn) = expr.eval(stack) {
+                            vs.extend(vn);
+                        } else {
+                            panic!("FlatMap: expected Seq");
+                        }
+                        stack.pop();
+                    }
+                    Value::Seq(vs)
                 }
-                _ => panic!("Stream: expected Seq"),
+                _ => panic!("FlatMap: expected Seq"),
+            },
+            Expr::FlatMapAccum(expr, accum, seq) => match seq.eval(stack) {
+                Value::Seq(values) => {
+                    let mut accum = accum.eval(stack);
+                    let mut vs = Vec::new();
+                    for v in values {
+                        stack.push(Value::Tuple(vec![accum, v]));
+                        accum = match expr.eval_tuple(stack).as_mut_slice() {
+                            [accum, Value::Seq(vn)] => {
+                                vs.extend_from_slice(&vn);
+                                accum.clone()
+                            }
+                            _ => panic!("FlatMapAccum: expected two values"),
+                        };
+                        stack.pop();
+                    }
+                    Value::Seq(vs)
+                }
+                _ => panic!("FlatMapAccum: expected Seq"),
             },
         }
     }
