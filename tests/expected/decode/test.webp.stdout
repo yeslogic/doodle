@@ -5,13 +5,7 @@
 │       │   ├── 1 <- [= 73] := 73
 │       │   ├── 2 <- [= 70] := 70
 │       │   └── 3 <- [= 70] := 70
-│       ├── length <- base.u32le :=
-│       │   ├── bytes <- (...) :=
-│       │   │   ├── 0 <- base.u8 := 116
-│       │   │   ├── 1 <- base.u8 := 4
-│       │   │   ├── 2 <- base.u8 := 0
-│       │   │   └── 3 <- base.u8 := 0
-│       │   └── @value <- compute u32le bytes := 1140
+│       ├── length <- base.u32le := 1140
 │       ├── data <- slice (length.@value) riff.subchunks :=
 │       │   ├── tag <- riff.any-tag :=
 │       │   │   ├── 0 <- base.u8 := 87
@@ -25,13 +19,7 @@
 │       │       │   │   ├── 1 <- base.u8 := 80
 │       │       │   │   ├── 2 <- base.u8 := 56
 │       │       │   │   └── 3 <- base.u8 := 88
-│       │       │   ├── length <- base.u32le :=
-│       │       │   │   ├── bytes <- (...) :=
-│       │       │   │   │   ├── 0 <- base.u8 := 10
-│       │       │   │   │   ├── 1 <- base.u8 := 0
-│       │       │   │   │   ├── 2 <- base.u8 := 0
-│       │       │   │   │   └── 3 <- base.u8 := 0
-│       │       │   │   └── @value <- compute u32le bytes := 10
+│       │       │   ├── length <- base.u32le := 10
 │       │       │   ├── data <- slice (length.@value) (repeat base.u8) :=
 │       │       │   │   ├── 0 <- base.u8 := 8
 │       │       │   │   ├── 1 <- base.u8 := 0
@@ -50,13 +38,7 @@
 │       │       │   │   ├── 1 <- base.u8 := 80
 │       │       │   │   ├── 2 <- base.u8 := 56
 │       │       │   │   └── 3 <- base.u8 := 76
-│       │       │   ├── length <- base.u32le :=
-│       │       │   │   ├── bytes <- (...) :=
-│       │       │   │   │   ├── 0 <- base.u8 := 195
-│       │       │   │   │   ├── 1 <- base.u8 := 3
-│       │       │   │   │   ├── 2 <- base.u8 := 0
-│       │       │   │   │   └── 3 <- base.u8 := 0
-│       │       │   │   └── @value <- compute u32le bytes := 963
+│       │       │   ├── length <- base.u32le := 963
 │       │       │   ├── data <- slice (length.@value) (repeat base.u8) :=
 │       │       │   │   ├── 0 <- base.u8 := 47
 │       │       │   │   ├── 1 <- base.u8 := 72
@@ -77,13 +59,7 @@
 │       │           │   ├── 1 <- base.u8 := 88
 │       │           │   ├── 2 <- base.u8 := 73
 │       │           │   └── 3 <- base.u8 := 70
-│       │           ├── length <- base.u32le :=
-│       │           │   ├── bytes <- (...) :=
-│       │           │   │   ├── 0 <- base.u8 := 138
-│       │           │   │   ├── 1 <- base.u8 := 0
-│       │           │   │   ├── 2 <- base.u8 := 0
-│       │           │   │   └── 3 <- base.u8 := 0
-│       │           │   └── @value <- compute u32le bytes := 138
+│       │           ├── length <- base.u32le := 138
 │       │           ├── data <- slice (length.@value) (repeat base.u8) :=
 │       │           │   ├── 0 <- base.u8 := 69
 │       │           │   ├── 1 <- base.u8 := 120

@@ -9,11 +9,7 @@
 │       │   │       ├── marker <- { ... } :=
 │       │   │       │   ├── ff <- [= 255] := 255
 │       │   │       │   └── marker <- [= 225] := 225
-│       │   │       ├── length <- base.u16be :=
-│       │   │       │   ├── bytes <- (...) :=
-│       │   │       │   │   ├── 0 <- base.u8 := 21
-│       │   │       │   │   └── 1 <- base.u8 := 50
-│       │   │       │   └── @value <- compute u16be bytes := 5426
+│       │   │       ├── length <- base.u16be := 5426
 │       │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
 │       │   │           ├── identifier <- base.asciiz-string :=
 │       │   │           │   ├── string <- repeat [!= 0] :=
@@ -29,207 +25,47 @@
 │       │   │                   │   └── be <- (...) :=
 │       │   │                   │       ├── 0 <- [= 77] := 77
 │       │   │                   │       └── 1 <- [= 77] := 77
-│       │   │                   ├── magic <- match byte-order { ... } :=
-│       │   │                   │   ├── bytes <- (...) :=
-│       │   │                   │   │   ├── 0 <- base.u8 := 0
-│       │   │                   │   │   └── 1 <- base.u8 := 42
-│       │   │                   │   └── @value <- compute u16be bytes := 42
-│       │   │                   ├── offset <- match byte-order { ... } :=
-│       │   │                   │   ├── bytes <- (...) :=
-│       │   │                   │   │   ├── 0 <- base.u8 := 0
-│       │   │                   │   │   ├── 1 <- base.u8 := 0
-│       │   │                   │   │   ├── 2 <- base.u8 := 0
-│       │   │                   │   │   └── 3 <- base.u8 := 8
-│       │   │                   │   └── @value <- compute u32be bytes := 8
+│       │   │                   ├── magic <- match byte-order { ... } := 42
+│       │   │                   ├── offset <- match byte-order { ... } := 8
 │       │   │                   └── ifd <- with-relative-offset (offset.@value - 8) (match byte-order { ... }) :=
-│       │   │                       ├── num-fields <- base.u16be :=
-│       │   │                       │   ├── bytes <- (...) :=
-│       │   │                       │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   └── 1 <- base.u8 := 7
-│       │   │                       │   └── @value <- compute u16be bytes := 7
+│       │   │                       ├── num-fields <- base.u16be := 7
 │       │   │                       ├── fields <- repeat-count (num-fields.@value) { ... } :=
 │       │   │                       │   ├── 0 <- { ... } :=
-│       │   │                       │   │   ├── tag <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 1
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 18
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 274
-│       │   │                       │   │   ├── type <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 3
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 3
-│       │   │                       │   │   ├── length <- base.u32be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 3 <- base.u8 := 1
-│       │   │                       │   │   │   └── @value <- compute u32be bytes := 1
-│       │   │                       │   │   └── offset-or-data <- base.u32be :=
-│       │   │                       │   │       ├── bytes <- (...) :=
-│       │   │                       │   │       │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 1 <- base.u8 := 1
-│       │   │                       │   │       │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │       │   └── 3 <- base.u8 := 0
-│       │   │                       │   │       └── @value <- compute u32be bytes := 65536
+│       │   │                       │   │   ├── tag <- base.u16be := 274
+│       │   │                       │   │   ├── type <- base.u16be := 3
+│       │   │                       │   │   ├── length <- base.u32be := 1
+│       │   │                       │   │   └── offset-or-data <- base.u32be := 65536
 │       │   │                       │   ├── 1 <- { ... } :=
-│       │   │                       │   │   ├── tag <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 1
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 26
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 282
-│       │   │                       │   │   ├── type <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 5
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 5
-│       │   │                       │   │   ├── length <- base.u32be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 3 <- base.u8 := 1
-│       │   │                       │   │   │   └── @value <- compute u32be bytes := 1
-│       │   │                       │   │   └── offset-or-data <- base.u32be :=
-│       │   │                       │   │       ├── bytes <- (...) :=
-│       │   │                       │   │       │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │       │   └── 3 <- base.u8 := 98
-│       │   │                       │   │       └── @value <- compute u32be bytes := 98
+│       │   │                       │   │   ├── tag <- base.u16be := 282
+│       │   │                       │   │   ├── type <- base.u16be := 5
+│       │   │                       │   │   ├── length <- base.u32be := 1
+│       │   │                       │   │   └── offset-or-data <- base.u32be := 98
 │       │   │                       │   ├── 2 <- { ... } :=
-│       │   │                       │   │   ├── tag <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 1
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 27
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 283
-│       │   │                       │   │   ├── type <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 5
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 5
-│       │   │                       │   │   ├── length <- base.u32be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 3 <- base.u8 := 1
-│       │   │                       │   │   │   └── @value <- compute u32be bytes := 1
-│       │   │                       │   │   └── offset-or-data <- base.u32be :=
-│       │   │                       │   │       ├── bytes <- (...) :=
-│       │   │                       │   │       │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │       │   └── 3 <- base.u8 := 106
-│       │   │                       │   │       └── @value <- compute u32be bytes := 106
+│       │   │                       │   │   ├── tag <- base.u16be := 283
+│       │   │                       │   │   ├── type <- base.u16be := 5
+│       │   │                       │   │   ├── length <- base.u32be := 1
+│       │   │                       │   │   └── offset-or-data <- base.u32be := 106
 │       │   │                       │   ├── 3 <- { ... } :=
-│       │   │                       │   │   ├── tag <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 1
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 40
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 296
-│       │   │                       │   │   ├── type <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 3
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 3
-│       │   │                       │   │   ├── length <- base.u32be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 3 <- base.u8 := 1
-│       │   │                       │   │   │   └── @value <- compute u32be bytes := 1
-│       │   │                       │   │   └── offset-or-data <- base.u32be :=
-│       │   │                       │   │       ├── bytes <- (...) :=
-│       │   │                       │   │       │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 1 <- base.u8 := 2
-│       │   │                       │   │       │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │       │   └── 3 <- base.u8 := 0
-│       │   │                       │   │       └── @value <- compute u32be bytes := 131072
+│       │   │                       │   │   ├── tag <- base.u16be := 296
+│       │   │                       │   │   ├── type <- base.u16be := 3
+│       │   │                       │   │   ├── length <- base.u32be := 1
+│       │   │                       │   │   └── offset-or-data <- base.u32be := 131072
 │       │   │                       │   ├── 4 <- { ... } :=
-│       │   │                       │   │   ├── tag <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 1
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 49
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 305
-│       │   │                       │   │   ├── type <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 2
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 2
-│       │   │                       │   │   ├── length <- base.u32be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 3 <- base.u8 := 30
-│       │   │                       │   │   │   └── @value <- compute u32be bytes := 30
-│       │   │                       │   │   └── offset-or-data <- base.u32be :=
-│       │   │                       │   │       ├── bytes <- (...) :=
-│       │   │                       │   │       │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │       │   └── 3 <- base.u8 := 114
-│       │   │                       │   │       └── @value <- compute u32be bytes := 114
+│       │   │                       │   │   ├── tag <- base.u16be := 305
+│       │   │                       │   │   ├── type <- base.u16be := 2
+│       │   │                       │   │   ├── length <- base.u32be := 30
+│       │   │                       │   │   └── offset-or-data <- base.u32be := 114
 │       │   │                       │   ├── 5 <- { ... } :=
-│       │   │                       │   │   ├── tag <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 1
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 50
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 306
-│       │   │                       │   │   ├── type <- base.u16be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 1 <- base.u8 := 2
-│       │   │                       │   │   │   └── @value <- compute u16be bytes := 2
-│       │   │                       │   │   ├── length <- base.u32be :=
-│       │   │                       │   │   │   ├── bytes <- (...) :=
-│       │   │                       │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   │   │   └── 3 <- base.u8 := 20
-│       │   │                       │   │   │   └── @value <- compute u32be bytes := 20
-│       │   │                       │   │   └── offset-or-data <- base.u32be :=
-│       │   │                       │   │       ├── bytes <- (...) :=
-│       │   │                       │   │       │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │       │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │       │   └── 3 <- base.u8 := 144
-│       │   │                       │   │       └── @value <- compute u32be bytes := 144
+│       │   │                       │   │   ├── tag <- base.u16be := 306
+│       │   │                       │   │   ├── type <- base.u16be := 2
+│       │   │                       │   │   ├── length <- base.u32be := 20
+│       │   │                       │   │   └── offset-or-data <- base.u32be := 144
 │       │   │                       │   └── 6 <- { ... } :=
-│       │   │                       │       ├── tag <- base.u16be :=
-│       │   │                       │       │   ├── bytes <- (...) :=
-│       │   │                       │       │   │   ├── 0 <- base.u8 := 135
-│       │   │                       │       │   │   └── 1 <- base.u8 := 105
-│       │   │                       │       │   └── @value <- compute u16be bytes := 34665
-│       │   │                       │       ├── type <- base.u16be :=
-│       │   │                       │       │   ├── bytes <- (...) :=
-│       │   │                       │       │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │       │   │   └── 1 <- base.u8 := 4
-│       │   │                       │       │   └── @value <- compute u16be bytes := 4
-│       │   │                       │       ├── length <- base.u32be :=
-│       │   │                       │       │   ├── bytes <- (...) :=
-│       │   │                       │       │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │       │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │       │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │       │   │   └── 3 <- base.u8 := 1
-│       │   │                       │       │   └── @value <- compute u32be bytes := 1
-│       │   │                       │       └── offset-or-data <- base.u32be :=
-│       │   │                       │           ├── bytes <- (...) :=
-│       │   │                       │           │   ├── 0 <- base.u8 := 0
-│       │   │                       │           │   ├── 1 <- base.u8 := 0
-│       │   │                       │           │   ├── 2 <- base.u8 := 0
-│       │   │                       │           │   └── 3 <- base.u8 := 164
-│       │   │                       │           └── @value <- compute u32be bytes := 164
-│       │   │                       ├── next-ifd-offset <- base.u32be :=
-│       │   │                       │   ├── bytes <- (...) :=
-│       │   │                       │   │   ├── 0 <- base.u8 := 0
-│       │   │                       │   │   ├── 1 <- base.u8 := 0
-│       │   │                       │   │   ├── 2 <- base.u8 := 0
-│       │   │                       │   │   └── 3 <- base.u8 := 208
-│       │   │                       │   └── @value <- compute u32be bytes := 208
+│       │   │                       │       ├── tag <- base.u16be := 34665
+│       │   │                       │       ├── type <- base.u16be := 4
+│       │   │                       │       ├── length <- base.u32be := 1
+│       │   │                       │       └── offset-or-data <- base.u32be := 164
+│       │   │                       ├── next-ifd-offset <- base.u32be := 208
 │       │   │                       └── next-ifd <- repeat base.u8 :=
 │       │   │                           ├── 0 <- base.u8 := 0
 │       │   │                           ├── 1 <- base.u8 := 45
@@ -249,11 +85,7 @@
 │       │   │   │       ├── marker <- { ... } :=
 │       │   │   │       │   ├── ff <- [= 255] := 255
 │       │   │   │       │   └── marker <- [= 237] := 237
-│       │   │   │       ├── length <- base.u16be :=
-│       │   │   │       │   ├── bytes <- (...) :=
-│       │   │   │       │   │   ├── 0 <- base.u8 := 41
-│       │   │   │       │   │   └── 1 <- base.u8 := 104
-│       │   │   │       │   └── @value <- compute u16be bytes := 10600
+│       │   │   │       ├── length <- base.u16be := 10600
 │       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 80
 │       │   │   │           ├── 1 <- base.u8 := 104
@@ -272,11 +104,7 @@
 │       │   │   │       ├── marker <- { ... } :=
 │       │   │   │       │   ├── ff <- [= 255] := 255
 │       │   │   │       │   └── marker <- [= 225] := 225
-│       │   │   │       ├── length <- base.u16be :=
-│       │   │   │       │   ├── bytes <- (...) :=
-│       │   │   │       │   │   ├── 0 <- base.u8 := 17
-│       │   │   │       │   │   └── 1 <- base.u8 := 77
-│       │   │   │       │   └── @value <- compute u16be bytes := 4429
+│       │   │   │       ├── length <- base.u16be := 4429
 │       │   │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
 │       │   │   │           ├── identifier <- base.asciiz-string :=
 │       │   │   │           │   ├── string <- repeat [!= 0] :=
@@ -312,11 +140,7 @@
 │       │   │   │       ├── marker <- { ... } :=
 │       │   │   │       │   ├── ff <- [= 255] := 255
 │       │   │   │       │   └── marker <- [= 226] := 226
-│       │   │   │       ├── length <- base.u16be :=
-│       │   │   │       │   ├── bytes <- (...) :=
-│       │   │   │       │   │   ├── 0 <- base.u8 := 2
-│       │   │   │       │   │   └── 1 <- base.u8 := 64
-│       │   │   │       │   └── @value <- compute u16be bytes := 576
+│       │   │   │       ├── length <- base.u16be := 576
 │       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 73
 │       │   │   │           ├── 1 <- base.u8 := 67
@@ -335,11 +159,7 @@
 │       │   │   │       ├── marker <- { ... } :=
 │       │   │   │       │   ├── ff <- [= 255] := 255
 │       │   │   │       │   └── marker <- [= 238] := 238
-│       │   │   │       ├── length <- base.u16be :=
-│       │   │   │       │   ├── bytes <- (...) :=
-│       │   │   │       │   │   ├── 0 <- base.u8 := 0
-│       │   │   │       │   │   └── 1 <- base.u8 := 14
-│       │   │   │       │   └── @value <- compute u16be bytes := 14
+│       │   │   │       ├── length <- base.u16be := 14
 │       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 65
 │       │   │   │           ├── 1 <- base.u8 := 100
@@ -358,11 +178,7 @@
 │       │   │           ├── marker <- { ... } :=
 │       │   │           │   ├── ff <- [= 255] := 255
 │       │   │           │   └── marker <- [= 219] := 219
-│       │   │           ├── length <- base.u16be :=
-│       │   │           │   ├── bytes <- (...) :=
-│       │   │           │   │   ├── 0 <- base.u8 := 0
-│       │   │           │   │   └── 1 <- base.u8 := 132
-│       │   │           │   └── @value <- compute u16be bytes := 132
+│       │   │           ├── length <- base.u16be := 132
 │       │   │           └── data <- slice (length.@value - 2) jpeg.dqt-data :=
 │       │   │               ├── precision-table-id <- base.u8 := 0
 │       │   │               └── elements <- repeat base.u8 :=
@@ -383,23 +199,11 @@
 │       │   │       ├── marker <- { ... } :=
 │       │   │       │   ├── ff <- [= 255] := 255
 │       │   │       │   └── marker <- [= 192] := 192
-│       │   │       ├── length <- base.u16be :=
-│       │   │       │   ├── bytes <- (...) :=
-│       │   │       │   │   ├── 0 <- base.u8 := 0
-│       │   │       │   │   └── 1 <- base.u8 := 17
-│       │   │       │   └── @value <- compute u16be bytes := 17
+│       │   │       ├── length <- base.u16be := 17
 │       │   │       └── data <- slice (length.@value - 2) jpeg.sof-data :=
 │       │   │           ├── sample-precision <- base.u8 := 8
-│       │   │           ├── num-lines <- base.u16be :=
-│       │   │           │   ├── bytes <- (...) :=
-│       │   │           │   │   ├── 0 <- base.u8 := 2
-│       │   │           │   │   └── 1 <- base.u8 := 197
-│       │   │           │   └── @value <- compute u16be bytes := 709
-│       │   │           ├── num-samples-per-line <- base.u16be :=
-│       │   │           │   ├── bytes <- (...) :=
-│       │   │           │   │   ├── 0 <- base.u8 := 2
-│       │   │           │   │   └── 1 <- base.u8 := 197
-│       │   │           │   └── @value <- compute u16be bytes := 709
+│       │   │           ├── num-lines <- base.u16be := 709
+│       │   │           ├── num-samples-per-line <- base.u16be := 709
 │       │   │           ├── num-image-components <- base.u8 := 3
 │       │   │           └── image-components <- repeat-count num-image-components jpeg.sof-image-component :=
 │       │   │               ├── 0 <- jpeg.sof-image-component :=
@@ -421,27 +225,15 @@
 │       │   │   │   │       ├── marker <- { ... } :=
 │       │   │   │   │       │   ├── ff <- [= 255] := 255
 │       │   │   │   │       │   └── marker <- [= 221] := 221
-│       │   │   │   │       ├── length <- base.u16be :=
-│       │   │   │   │       │   ├── bytes <- (...) :=
-│       │   │   │   │       │   │   ├── 0 <- base.u8 := 0
-│       │   │   │   │       │   │   └── 1 <- base.u8 := 4
-│       │   │   │   │       │   └── @value <- compute u16be bytes := 4
+│       │   │   │   │       ├── length <- base.u16be := 4
 │       │   │   │   │       └── data <- slice (length.@value - 2) jpeg.dri-data :=
-│       │   │   │   │           └── restart-interval <- base.u16be :=
-│       │   │   │   │               ├── bytes <- (...) :=
-│       │   │   │   │               │   ├── 0 <- base.u8 := 0
-│       │   │   │   │               │   └── 1 <- base.u8 := 89
-│       │   │   │   │               └── @value <- compute u16be bytes := 89
+│       │   │   │   │           └── restart-interval <- base.u16be := 89
 │       │   │   │   └── 1 <- jpeg.table-or-misc :=
 │       │   │   │       └── dht <- jpeg.dht :=
 │       │   │   │           ├── marker <- { ... } :=
 │       │   │   │           │   ├── ff <- [= 255] := 255
 │       │   │   │           │   └── marker <- [= 196] := 196
-│       │   │   │           ├── length <- base.u16be :=
-│       │   │   │           │   ├── bytes <- (...) :=
-│       │   │   │           │   │   ├── 0 <- base.u8 := 1
-│       │   │   │           │   │   └── 1 <- base.u8 := 162
-│       │   │   │           │   └── @value <- compute u16be bytes := 418
+│       │   │   │           ├── length <- base.u16be := 418
 │       │   │   │           └── data <- slice (length.@value - 2) jpeg.dht-data :=
 │       │   │   │               ├── class-table-id <- base.u8 := 0
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
@@ -474,11 +266,7 @@
 │       │   │   │   ├── marker <- { ... } :=
 │       │   │   │   │   ├── ff <- [= 255] := 255
 │       │   │   │   │   └── marker <- [= 218] := 218
-│       │   │   │   ├── length <- base.u16be :=
-│       │   │   │   │   ├── bytes <- (...) :=
-│       │   │   │   │   │   ├── 0 <- base.u8 := 0
-│       │   │   │   │   │   └── 1 <- base.u8 := 12
-│       │   │   │   │   └── @value <- compute u16be bytes := 12
+│       │   │   │   ├── length <- base.u16be := 12
 │       │   │   │   └── data <- slice (length.@value - 2) jpeg.sos-data :=
 │       │   │   │       ├── num-image-components <- base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
@@ -496,51 +284,18 @@
 │       │   │   │       └── approximation-bit-position <- base.u8 := 0
 │       │   │   └── data <- jpeg.scan-data :=
 │       │   │       ├── scan-data <- repeat (_ |...| _) :=
-│       │   │       │   ├── 0 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 248 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 248
-│       │   │       │   ├── 1 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 204 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 204
-│       │   │       │   ├── 2 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 64 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 64
-│       │   │       │   ├── 3 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 237 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 237
-│       │   │       │   ├── 4 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 185 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 185
-│       │   │       │   ├── 5 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 29 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 29
-│       │   │       │   ├── 6 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 72 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 72
-│       │   │       │   ├── 7 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 223 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 223
-│       │   │       │   ├── 8 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 62 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 62
-│       │   │       │   ├── 9 <- _ |...| _ :=
-│       │   │       │   │   └── mcu <- jpeg.mcu :=
-│       │   │       │   │       ├── mcu <- _ |...| _ := { byte := 221 }
-│       │   │       │   │       └── @value <- compute match mcu { ... } := 221
+│       │   │       │   ├── 0 <- _ |...| _ := { mcu := 248 }
+│       │   │       │   ├── 1 <- _ |...| _ := { mcu := 204 }
+│       │   │       │   ├── 2 <- _ |...| _ := { mcu := 64 }
+│       │   │       │   ├── 3 <- _ |...| _ := { mcu := 237 }
+│       │   │       │   ├── 4 <- _ |...| _ := { mcu := 185 }
+│       │   │       │   ├── 5 <- _ |...| _ := { mcu := 29 }
+│       │   │       │   ├── 6 <- _ |...| _ := { mcu := 72 }
+│       │   │       │   ├── 7 <- _ |...| _ := { mcu := 223 }
+│       │   │       │   ├── 8 <- _ |...| _ := { mcu := 62 }
+│       │   │       │   ├── 9 <- _ |...| _ := { mcu := 221 }
 │       │   │       │   ~
-│       │   │       │   └── 80492 <- _ |...| _ :=
-│       │   │       │       └── mcu <- jpeg.mcu :=
-│       │   │       │           ├── mcu <- _ |...| _ := { byte := 95 }
-│       │   │       │           └── @value <- compute match mcu { ... } := 95
+│       │   │       │   └── 80492 <- _ |...| _ := { mcu := 95 }
 │       │   │       └── scan-data-stream <- compute flat-map (match scan-data { ... }) scan-data :=
 │       │   │           ├── 0 := 248
 │       │   │           ├── 1 := 204
