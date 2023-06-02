@@ -8,6 +8,13 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
         .unwrap()
 }
 
+fn atomic_value_to_string(value: &Value) -> String {
+    match value {
+        Value::U8(n) => n.to_string(),
+        _ => panic!("expected atomic value"),
+    }
+}
+
 enum Column {
     Branch,
     Space,
@@ -25,12 +32,14 @@ pub struct Context<'module, W: io::Write> {
 
 pub struct Flags {
     collapse_computed_values: bool,
+    tables_for_record_sequences: bool,
 }
 
 impl<'module, W: io::Write> Context<'module, W> {
     pub fn new(writer: W, module: &'module FormatModule) -> Context<'module, W> {
         let flags = Flags {
             collapse_computed_values: true,
+            tables_for_record_sequences: true,
         };
         Context {
             writer,
@@ -72,7 +81,15 @@ impl<'module, W: io::Write> Context<'module, W> {
             | Format::RepeatCount(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
-                Value::Seq(values) => self.write_seq(values, Some(format)),
+                Value::Seq(values) => {
+                    if self.flags.tables_for_record_sequences
+                        && self.is_record_with_atomic_fields(format).is_some()
+                    {
+                        self.write_seq_records(values, format)
+                    } else {
+                        self.write_seq(values, Some(format))
+                    }
+                }
                 _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_decoded_value(value, format),
@@ -150,6 +167,82 @@ impl<'module, W: io::Write> Context<'module, W> {
                     self.write_field_value_last(last_index, &vals[last_index], format)
                 }
             }
+        }
+    }
+
+    fn write_seq_records(&mut self, vals: &[Value], format: &Format) -> Result<(), io::Error> {
+        let fields = self.is_record_with_atomic_fields(format).unwrap();
+        let mut cols = Vec::new();
+        let mut header = Vec::new();
+        for (label, _) in fields {
+            cols.push(label.len());
+            header.push(label.clone());
+        }
+        let mut rows = Vec::new();
+        for v in vals {
+            let mut row = Vec::new();
+            if let Value::Record(fields) = v {
+                for (i, (_l, v)) in fields.iter().enumerate() {
+                    let cell = atomic_value_to_string(v);
+                    cols[i] = std::cmp::max(cols[i], cell.len());
+                    row.push(cell);
+                }
+            } else {
+                panic!("expected record value");
+            }
+            rows.push(row);
+        }
+        self.write_table(&cols, &header, &rows)
+    }
+
+    fn write_table(
+        &mut self,
+        cols: &[usize],
+        header: &[String],
+        rows: &[Vec<String>],
+    ) -> Result<(), io::Error> {
+        self.write_gutter()?;
+        write!(&mut self.writer, "└── ")?;
+        for (i, th) in header.iter().enumerate() {
+            write!(&mut self.writer, " {:>width$}", th, width = cols[i])?;
+        }
+        writeln!(&mut self.writer)?;
+        self.gutter.push(Column::Space);
+        for tr in rows {
+            self.write_gutter()?;
+            for (i, td) in tr.iter().enumerate() {
+                write!(&mut self.writer, " {:>width$}", td, width = cols[i])?;
+            }
+            writeln!(&mut self.writer)?;
+        }
+        self.gutter.pop();
+        Ok(())
+    }
+
+    fn is_atomic_format(&self, format: &Format) -> bool {
+        match format {
+            Format::ItemVar(level) => self.is_atomic_format(self.module.get_format(*level)),
+            Format::Byte(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_record_with_atomic_fields<'a>(
+        &'a self,
+        format: &'a Format,
+    ) -> Option<&'a [(String, Format)]> {
+        match format {
+            Format::ItemVar(level) => {
+                self.is_record_with_atomic_fields(self.module.get_format(*level))
+            }
+            Format::Record(fields) => {
+                if fields.iter().all(|(_l, f)| self.is_atomic_format(f)) {
+                    Some(fields)
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 
