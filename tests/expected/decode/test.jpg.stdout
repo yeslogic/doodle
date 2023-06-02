@@ -82,18 +82,10 @@
 │       │   │           ├── num-samples-per-line <- base.u16be := 105
 │       │   │           ├── num-image-components <- base.u8 := 3
 │       │   │           └── image-components <- repeat-count num-image-components jpeg.sof-image-component :=
-│       │   │               ├── 0 <- jpeg.sof-image-component :=
-│       │   │               │   ├── id <- base.u8 := 1
-│       │   │               │   ├── sampling-factor <- base.u8 := 34
-│       │   │               │   └── quantization-table-id <- base.u8 := 0
-│       │   │               ├── 1 <- jpeg.sof-image-component :=
-│       │   │               │   ├── id <- base.u8 := 2
-│       │   │               │   ├── sampling-factor <- base.u8 := 17
-│       │   │               │   └── quantization-table-id <- base.u8 := 1
-│       │   │               └── 2 <- jpeg.sof-image-component :=
-│       │   │                   ├── id <- base.u8 := 3
-│       │   │                   ├── sampling-factor <- base.u8 := 17
-│       │   │                   └── quantization-table-id <- base.u8 := 1
+│       │   │               └──  id sampling-factor quantization-table-id
+│       │   │                     1              34                     0
+│       │   │                     2              17                     1
+│       │   │                     3              17                     1
 │       │   ├── scan <- jpeg.scan :=
 │       │   │   ├── segments <- repeat jpeg.table-or-misc :=
 │       │   │   │   ├── 0 <- jpeg.table-or-misc :=
@@ -231,15 +223,10 @@
 │       │   │   │   └── data <- slice (length.@value - 2) jpeg.sos-data :=
 │       │   │   │       ├── num-image-components <- base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
-│       │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
-│       │   │   │       │   │   ├── component-selector <- base.u8 := 1
-│       │   │   │       │   │   └── entropy-coding-table-ids <- base.u8 := 0
-│       │   │   │       │   ├── 1 <- jpeg.sos-image-component :=
-│       │   │   │       │   │   ├── component-selector <- base.u8 := 2
-│       │   │   │       │   │   └── entropy-coding-table-ids <- base.u8 := 17
-│       │   │   │       │   └── 2 <- jpeg.sos-image-component :=
-│       │   │   │       │       ├── component-selector <- base.u8 := 3
-│       │   │   │       │       └── entropy-coding-table-ids <- base.u8 := 17
+│       │   │   │       │   └──  component-selector entropy-coding-table-ids
+│       │   │   │       │                         1                        0
+│       │   │   │       │                         2                       17
+│       │   │   │       │                         3                       17
 │       │   │   │       ├── start-spectral-selection <- base.u8 := 0
 │       │   │   │       ├── end-spectral-selection <- base.u8 := 63
 │       │   │   │       └── approximation-bit-position <- base.u8 := 0

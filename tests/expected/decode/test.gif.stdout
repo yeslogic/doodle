@@ -17,51 +17,39 @@
 │       │   │   ├── bg-color-index <- base.u8 := 0
 │       │   │   └── pixel-aspect-ratio <- base.u8 := 0
 │       │   └── global-color-table <- match ((descriptor.flags & 128) != 0) { ... } :=
-│       │       ├── 0 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 0
-│       │       │   ├── g <- base.u8 := 0
-│       │       │   └── b <- base.u8 := 0
-│       │       ├── 1 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 162
-│       │       │   ├── g <- base.u8 := 161
-│       │       │   └── b <- base.u8 := 162
-│       │       ├── 2 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 158
-│       │       │   ├── g <- base.u8 := 157
-│       │       │   └── b <- base.u8 := 158
-│       │       ├── 3 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 114
-│       │       │   ├── g <- base.u8 := 117
-│       │       │   └── b <- base.u8 := 117
-│       │       ├── 4 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 124
-│       │       │   ├── g <- base.u8 := 126
-│       │       │   └── b <- base.u8 := 126
-│       │       ├── 5 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 132
-│       │       │   ├── g <- base.u8 := 134
-│       │       │   └── b <- base.u8 := 134
-│       │       ├── 6 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 205
-│       │       │   ├── g <- base.u8 := 206
-│       │       │   └── b <- base.u8 := 206
-│       │       ├── 7 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 196
-│       │       │   ├── g <- base.u8 := 197
-│       │       │   └── b <- base.u8 := 197
-│       │       ├── 8 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 173
-│       │       │   ├── g <- base.u8 := 174
-│       │       │   └── b <- base.u8 := 174
-│       │       ├── 9 <- gif.color-table-entry :=
-│       │       │   ├── r <- base.u8 := 143
-│       │       │   ├── g <- base.u8 := 144
-│       │       │   └── b <- base.u8 := 144
-│       │       ~
-│       │       └── 31 <- gif.color-table-entry :=
-│       │           ├── r <- base.u8 := 0
-│       │           ├── g <- base.u8 := 0
-│       │           └── b <- base.u8 := 0
+│       │       └──    r   g   b
+│       │              0   0   0
+│       │            162 161 162
+│       │            158 157 158
+│       │            114 117 117
+│       │            124 126 126
+│       │            132 134 134
+│       │            205 206 206
+│       │            196 197 197
+│       │            173 174 174
+│       │            143 144 144
+│       │            152 150 151
+│       │            149 159 157
+│       │            212 229 225
+│       │             52  56  55
+│       │             88  92  91
+│       │            231 239 237
+│       │            156 170 166
+│       │             72  75  74
+│       │            179 182 181
+│       │            103 105 104
+│       │            191 193 192
+│       │            211 212 211
+│       │            218 218 217
+│       │            226 224 223
+│       │            231 229 229
+│       │            187 186 186
+│       │            168 167 167
+│       │            201 201 201
+│       │            138 138 138
+│       │              0   0   0
+│       │              0   0   0
+│       │              0   0   0
 │       ├── blocks <- repeat gif.block :=
 │       │   └── 0 <- gif.block :=
 │       │       └── graphic-block <- gif.graphic-block :=
