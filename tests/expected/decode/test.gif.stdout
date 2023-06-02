@@ -11,16 +11,8 @@
 │       │       └── 2 <- base.u8 := 97
 │       ├── logical-screen <- gif.logical-screen :=
 │       │   ├── descriptor <- gif.logical-screen-descriptor :=
-│       │   │   ├── screen-width <- base.u16le :=
-│       │   │   │   ├── bytes <- (...) :=
-│       │   │   │   │   ├── 0 <- base.u8 := 50
-│       │   │   │   │   └── 1 <- base.u8 := 0
-│       │   │   │   └── @value <- compute u16le bytes := 50
-│       │   │   ├── screen-height <- base.u16le :=
-│       │   │   │   ├── bytes <- (...) :=
-│       │   │   │   │   ├── 0 <- base.u8 := 50
-│       │   │   │   │   └── 1 <- base.u8 := 0
-│       │   │   │   └── @value <- compute u16le bytes := 50
+│       │   │   ├── screen-width <- base.u16le := 50
+│       │   │   ├── screen-height <- base.u16le := 50
 │       │   │   ├── flags <- base.u8 := 244
 │       │   │   ├── bg-color-index <- base.u8 := 0
 │       │   │   └── pixel-aspect-ratio <- base.u8 := 0
@@ -79,37 +71,17 @@
 │       │           │       ├── label <- [= 249] := 249
 │       │           │       ├── block-size <- [= 4] := 4
 │       │           │       ├── flags <- base.u8 := 1
-│       │           │       ├── delay-time <- base.u16le :=
-│       │           │       │   ├── bytes <- (...) :=
-│       │           │       │   │   ├── 0 <- base.u8 := 0
-│       │           │       │   │   └── 1 <- base.u8 := 0
-│       │           │       │   └── @value <- compute u16le bytes := 0
+│       │           │       ├── delay-time <- base.u16le := 0
 │       │           │       ├── transparent-color-index <- base.u8 := 0
 │       │           │       └── terminator <- gif.block-terminator := 0
 │       │           └── graphic-rendering-block <- gif.graphic-rendering-block :=
 │       │               └── table-based-image <- gif.table-based-image :=
 │       │                   ├── descriptor <- gif.image-descriptor :=
 │       │                   │   ├── separator <- [= 44] := 44
-│       │                   │   ├── image-left-position <- base.u16le :=
-│       │                   │   │   ├── bytes <- (...) :=
-│       │                   │   │   │   ├── 0 <- base.u8 := 0
-│       │                   │   │   │   └── 1 <- base.u8 := 0
-│       │                   │   │   └── @value <- compute u16le bytes := 0
-│       │                   │   ├── image-top-position <- base.u16le :=
-│       │                   │   │   ├── bytes <- (...) :=
-│       │                   │   │   │   ├── 0 <- base.u8 := 0
-│       │                   │   │   │   └── 1 <- base.u8 := 0
-│       │                   │   │   └── @value <- compute u16le bytes := 0
-│       │                   │   ├── image-width <- base.u16le :=
-│       │                   │   │   ├── bytes <- (...) :=
-│       │                   │   │   │   ├── 0 <- base.u8 := 50
-│       │                   │   │   │   └── 1 <- base.u8 := 0
-│       │                   │   │   └── @value <- compute u16le bytes := 50
-│       │                   │   ├── image-height <- base.u16le :=
-│       │                   │   │   ├── bytes <- (...) :=
-│       │                   │   │   │   ├── 0 <- base.u8 := 50
-│       │                   │   │   │   └── 1 <- base.u8 := 0
-│       │                   │   │   └── @value <- compute u16le bytes := 50
+│       │                   │   ├── image-left-position <- base.u16le := 0
+│       │                   │   ├── image-top-position <- base.u16le := 0
+│       │                   │   ├── image-width <- base.u16le := 50
+│       │                   │   ├── image-height <- base.u16le := 50
 │       │                   │   └── flags <- base.u8 := 0
 │       │                   ├── local-color-table <- match ((descriptor.flags & 128) != 0) { ... } := ()
 │       │                   └── data <- gif.table-based-image-data :=

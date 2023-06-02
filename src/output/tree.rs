@@ -8,19 +8,6 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
         .unwrap()
 }
 
-fn is_atomic_value(value: &Value) -> bool {
-    match value {
-        Value::Bool(_) => true,
-        Value::U8(_) => true,
-        Value::U16(_) => true,
-        Value::U32(_) => true,
-        Value::Tuple(values) => values.is_empty(),
-        Value::Record(fields) => fields.is_empty(),
-        Value::Seq(values) => values.is_empty(),
-        Value::Variant(_, value) => is_atomic_value(value),
-    }
-}
-
 enum Column {
     Branch,
     Space,
@@ -30,17 +17,26 @@ pub struct Context<'module, W: io::Write> {
     writer: W,
     gutter: Vec<Column>,
     preview_len: Option<usize>,
+    flags: Flags,
     module: &'module FormatModule,
     names: Vec<String>,
     values: Vec<Value>,
 }
 
+pub struct Flags {
+    collapse_computed_values: bool,
+}
+
 impl<'module, W: io::Write> Context<'module, W> {
     pub fn new(writer: W, module: &'module FormatModule) -> Context<'module, W> {
+        let flags = Flags {
+            collapse_computed_values: true,
+        };
         Context {
             writer,
             gutter: Vec::new(),
             preview_len: Some(10),
+            flags,
             module,
             names: Vec::new(),
             values: Vec::new(),
@@ -164,6 +160,8 @@ impl<'module, W: io::Write> Context<'module, W> {
     ) -> Result<(), io::Error> {
         if value_fields.is_empty() {
             write!(&mut self.writer, "{{}}")
+        } else if let Some((_, v)) = value_fields.iter().find(|(label, _)| label == "@value") {
+            self.write_value(v)
         } else {
             let initial_len = self.names.len();
             let last_index = value_fields.len() - 1;
@@ -188,7 +186,7 @@ impl<'module, W: io::Write> Context<'module, W> {
         value: &Value,
         format: Option<&Format>,
     ) -> io::Result<()> {
-        if is_atomic_value(value) {
+        if self.is_atomic_value(value) {
             write!(&mut self.writer, "{{ {label} := ")?;
             self.write_value(value)?;
             write!(&mut self.writer, " }}")
@@ -247,7 +245,7 @@ impl<'module, W: io::Write> Context<'module, W> {
     }
 
     fn write_field_value(&mut self, value: &Value, format: Option<&Format>) -> io::Result<()> {
-        if is_atomic_value(value) {
+        if self.is_atomic_value(value) {
             write!(&mut self.writer, " ")?;
             match format {
                 Some(format) => self.write_decoded_value(value, format)?,
@@ -266,6 +264,27 @@ impl<'module, W: io::Write> Context<'module, W> {
     fn write_field_skipped(&mut self) -> io::Result<()> {
         self.write_gutter()?;
         writeln!(&mut self.writer, "~")
+    }
+
+    fn is_atomic_value(&self, value: &Value) -> bool {
+        match value {
+            Value::Bool(_) => true,
+            Value::U8(_) => true,
+            Value::U16(_) => true,
+            Value::U32(_) => true,
+            Value::Tuple(values) => values.is_empty(),
+            Value::Record(fields) => {
+                fields.is_empty()
+                    || (self.flags.collapse_computed_values
+                        && fields
+                            .iter()
+                            .find(|(label, _)| label == "@value")
+                            .map(|(_, value)| self.is_atomic_value(value))
+                            .unwrap_or(false))
+            }
+            Value::Seq(values) => values.is_empty(),
+            Value::Variant(_, value) => self.is_atomic_value(value),
+        }
     }
 
     fn write_expr(&mut self, expr: &Expr) -> io::Result<()> {
