@@ -1,14 +1,10 @@
 ├── data <- _ |...| _ :=
 │   └── jpeg <- jpeg.main :=
-│       ├── soi <- jpeg.soi :=
-│       │   ├── ff <- [= 255] := 255
-│       │   └── marker <- [= 216] := 216
+│       ├── soi <- jpeg.soi
 │       ├── frame <- jpeg.frame :=
 │       │   ├── initial-segment <- _ |...| _ :=
 │       │   │   └── app1 <- jpeg.app1 :=
-│       │   │       ├── marker <- { ... } :=
-│       │   │       │   ├── ff <- [= 255] := 255
-│       │   │       │   └── marker <- [= 225] := 225
+│       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 5426
 │       │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
 │       │   │           ├── identifier <- base.asciiz-string :=
@@ -17,14 +13,12 @@
 │       │   │           │   │   ├── 1 <- [!= 0] := 120
 │       │   │           │   │   ├── 2 <- [!= 0] := 105
 │       │   │           │   │   └── 3 <- [!= 0] := 102
-│       │   │           │   └── null <- [= 0] := 0
+│       │   │           │   └── null <- [= 0]
 │       │   │           └── data <- match identifier.string { ... } :=
-│       │   │               ├── padding <- [= 0] := 0
+│       │   │               ├── padding <- [= 0]
 │       │   │               └── exif <- tiff.main :=
 │       │   │                   ├── byte-order <- _ |...| _ :=
-│       │   │                   │   └── be <- (...) :=
-│       │   │                   │       ├── 0 <- [= 77] := 77
-│       │   │                   │       └── 1 <- [= 77] := 77
+│       │   │                   │   └── be <- (...)
 │       │   │                   ├── magic <- match byte-order { ... } := 42
 │       │   │                   ├── offset <- match byte-order { ... } := 8
 │       │   │                   └── ifd <- with-relative-offset (offset.@value - 8) (match byte-order { ... }) :=
@@ -82,9 +76,7 @@
 │       │   ├── segments <- repeat jpeg.table-or-misc :=
 │       │   │   ├── 0 <- jpeg.table-or-misc :=
 │       │   │   │   └── app13 <- jpeg.app13 :=
-│       │   │   │       ├── marker <- { ... } :=
-│       │   │   │       │   ├── ff <- [= 255] := 255
-│       │   │   │       │   └── marker <- [= 237] := 237
+│       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 10600
 │       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 80
@@ -101,9 +93,7 @@
 │       │   │   │           └── 10597 <- base.u8 := 0
 │       │   │   ├── 1 <- jpeg.table-or-misc :=
 │       │   │   │   └── app1 <- jpeg.app1 :=
-│       │   │   │       ├── marker <- { ... } :=
-│       │   │   │       │   ├── ff <- [= 255] := 255
-│       │   │   │       │   └── marker <- [= 225] := 225
+│       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 4429
 │       │   │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
 │       │   │   │           ├── identifier <- base.asciiz-string :=
@@ -120,7 +110,7 @@
 │       │   │   │           │   │   ├── 9 <- [!= 0] := 46
 │       │   │   │           │   │   ~
 │       │   │   │           │   │   └── 27 <- [!= 0] := 47
-│       │   │   │           │   └── null <- [= 0] := 0
+│       │   │   │           │   └── null <- [= 0]
 │       │   │   │           └── data <- match identifier.string { ... } :=
 │       │   │   │               └── xmp <- repeat base.u8 :=
 │       │   │   │                   ├── 0 <- base.u8 := 60
@@ -137,9 +127,7 @@
 │       │   │   │                   └── 4397 <- base.u8 := 62
 │       │   │   ├── 2 <- jpeg.table-or-misc :=
 │       │   │   │   └── app2 <- jpeg.app2 :=
-│       │   │   │       ├── marker <- { ... } :=
-│       │   │   │       │   ├── ff <- [= 255] := 255
-│       │   │   │       │   └── marker <- [= 226] := 226
+│       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 576
 │       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 73
@@ -156,9 +144,7 @@
 │       │   │   │           └── 573 <- base.u8 := 156
 │       │   │   ├── 3 <- jpeg.table-or-misc :=
 │       │   │   │   └── app14 <- jpeg.app14 :=
-│       │   │   │       ├── marker <- { ... } :=
-│       │   │   │       │   ├── ff <- [= 255] := 255
-│       │   │   │       │   └── marker <- [= 238] := 238
+│       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 14
 │       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 65
@@ -175,9 +161,7 @@
 │       │   │   │           └── 11 <- base.u8 := 1
 │       │   │   └── 4 <- jpeg.table-or-misc :=
 │       │   │       └── dqt <- jpeg.dqt :=
-│       │   │           ├── marker <- { ... } :=
-│       │   │           │   ├── ff <- [= 255] := 255
-│       │   │           │   └── marker <- [= 219] := 219
+│       │   │           ├── marker <- { ... }
 │       │   │           ├── length <- base.u16be := 132
 │       │   │           └── data <- slice (length.@value - 2) jpeg.dqt-data :=
 │       │   │               ├── precision-table-id <- base.u8 := 0
@@ -196,9 +180,7 @@
 │       │   │                   └── 128 <- base.u8 := 12
 │       │   ├── header <- jpeg.frame-header :=
 │       │   │   └── sof0 <- jpeg.sof0 :=
-│       │   │       ├── marker <- { ... } :=
-│       │   │       │   ├── ff <- [= 255] := 255
-│       │   │       │   └── marker <- [= 192] := 192
+│       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 17
 │       │   │       └── data <- slice (length.@value - 2) jpeg.sof-data :=
 │       │   │           ├── sample-precision <- base.u8 := 8
@@ -214,17 +196,13 @@
 │       │   │   ├── segments <- repeat jpeg.table-or-misc :=
 │       │   │   │   ├── 0 <- jpeg.table-or-misc :=
 │       │   │   │   │   └── dri <- jpeg.dri :=
-│       │   │   │   │       ├── marker <- { ... } :=
-│       │   │   │   │       │   ├── ff <- [= 255] := 255
-│       │   │   │   │       │   └── marker <- [= 221] := 221
+│       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 4
 │       │   │   │   │       └── data <- slice (length.@value - 2) jpeg.dri-data :=
 │       │   │   │   │           └── restart-interval <- base.u16be := 89
 │       │   │   │   └── 1 <- jpeg.table-or-misc :=
 │       │   │   │       └── dht <- jpeg.dht :=
-│       │   │   │           ├── marker <- { ... } :=
-│       │   │   │           │   ├── ff <- [= 255] := 255
-│       │   │   │           │   └── marker <- [= 196] := 196
+│       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 418
 │       │   │   │           └── data <- slice (length.@value - 2) jpeg.dht-data :=
 │       │   │   │               ├── class-table-id <- base.u8 := 0
@@ -255,9 +233,7 @@
 │       │   │   │                   ~
 │       │   │   │                   └── 398 <- base.u8 := 250
 │       │   │   ├── sos <- jpeg.sos :=
-│       │   │   │   ├── marker <- { ... } :=
-│       │   │   │   │   ├── ff <- [= 255] := 255
-│       │   │   │   │   └── marker <- [= 218] := 218
+│       │   │   │   ├── marker <- { ... }
 │       │   │   │   ├── length <- base.u16be := 12
 │       │   │   │   └── data <- slice (length.@value - 2) jpeg.sos-data :=
 │       │   │   │       ├── num-image-components <- base.u8 := 3
@@ -298,7 +274,5 @@
 │       │   │           └── 80404 := 95
 │       │   ├── dnl <- _ |...| _ := { none := () }
 │       │   └── scans <- repeat jpeg.scan := []
-│       └── eoi <- jpeg.eoi :=
-│           ├── ff <- [= 255] := 255
-│           └── marker <- [= 217] := 217
-└── end <- end-of-input := ()
+│       └── eoi <- jpeg.eoi
+└── end <- end-of-input
