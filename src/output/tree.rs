@@ -32,6 +32,7 @@ pub struct Context<'module, W: io::Write> {
 
 pub struct Flags {
     collapse_computed_values: bool,
+    omit_implied_values: bool,
     tables_for_record_sequences: bool,
 }
 
@@ -39,6 +40,7 @@ impl<'module, W: io::Write> Context<'module, W> {
     pub fn new(writer: W, module: &'module FormatModule) -> Context<'module, W> {
         let flags = Flags {
             collapse_computed_values: true,
+            omit_implied_values: true,
             tables_for_record_sequences: true,
         };
         Context {
@@ -219,6 +221,17 @@ impl<'module, W: io::Write> Context<'module, W> {
         Ok(())
     }
 
+    fn is_implied_value_format(&self, format: &Format) -> bool {
+        match format {
+            Format::ItemVar(level) => self.is_implied_value_format(self.module.get_format(*level)),
+            Format::EndOfInput => true,
+            Format::Byte(bs) => bs.len() == 1,
+            Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
+            Format::Record(fields) => fields.iter().all(|(_, f)| self.is_implied_value_format(f)),
+            _ => false,
+        }
+    }
+
     fn is_atomic_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level) => self.is_atomic_format(self.module.get_format(*level)),
@@ -311,7 +324,6 @@ impl<'module, W: io::Write> Context<'module, W> {
             write!(&mut self.writer, " <- ")?;
             self.write_format(format)?;
         }
-        write!(&mut self.writer, " :=")?;
         self.gutter.push(Column::Branch);
         self.write_field_value(value, format)?;
         self.gutter.pop();
@@ -330,7 +342,6 @@ impl<'module, W: io::Write> Context<'module, W> {
             write!(&mut self.writer, " <- ")?;
             self.write_format(format)?;
         }
-        write!(&mut self.writer, " :=")?;
         self.gutter.push(Column::Space);
         self.write_field_value(value, format)?;
         self.gutter.pop();
@@ -338,18 +349,28 @@ impl<'module, W: io::Write> Context<'module, W> {
     }
 
     fn write_field_value(&mut self, value: &Value, format: Option<&Format>) -> io::Result<()> {
-        if self.is_atomic_value(value) {
-            write!(&mut self.writer, " ")?;
-            match format {
-                Some(format) => self.write_decoded_value(value, format)?,
-                None => self.write_value(value)?,
+        match format {
+            Some(format) => {
+                if self.flags.omit_implied_values && self.is_implied_value_format(format) {
+                    writeln!(&mut self.writer)
+                } else if self.is_atomic_value(value) {
+                    write!(&mut self.writer, " := ")?;
+                    self.write_decoded_value(value, format)?;
+                    writeln!(&mut self.writer)
+                } else {
+                    writeln!(&mut self.writer, " :=")?;
+                    self.write_decoded_value(value, format)
+                }
             }
-            writeln!(&mut self.writer)
-        } else {
-            writeln!(&mut self.writer)?;
-            match format {
-                Some(format) => self.write_decoded_value(value, format),
-                None => self.write_value(value),
+            None => {
+                if self.is_atomic_value(value) {
+                    write!(&mut self.writer, " := ")?;
+                    self.write_value(value)?;
+                    writeln!(&mut self.writer)
+                } else {
+                    writeln!(&mut self.writer, " :=")?;
+                    self.write_value(value)
+                }
             }
         }
     }
