@@ -1,10 +1,7 @@
 ├── data <- _ |...| _ :=
 │   └── gif <- gif.main :=
 │       ├── header <- gif.header :=
-│       │   ├── signature <- (...) :=
-│       │   │   ├── 0 <- [= 71] := 71
-│       │   │   ├── 1 <- [= 73] := 73
-│       │   │   └── 2 <- [= 70] := 70
+│       │   ├── signature <- (...)
 │       │   └── version <- repeat-count 3 base.u8 :=
 │       │       ├── 0 <- base.u8 := 56
 │       │       ├── 1 <- base.u8 := 57
@@ -55,17 +52,17 @@
 │       │       └── graphic-block <- gif.graphic-block :=
 │       │           ├── graphic-control-extension <- _ |...| _ :=
 │       │           │   └── some <- gif.graphic-control-extension :=
-│       │           │       ├── separator <- [= 33] := 33
-│       │           │       ├── label <- [= 249] := 249
-│       │           │       ├── block-size <- [= 4] := 4
+│       │           │       ├── separator <- [= 33]
+│       │           │       ├── label <- [= 249]
+│       │           │       ├── block-size <- [= 4]
 │       │           │       ├── flags <- base.u8 := 1
 │       │           │       ├── delay-time <- base.u16le := 0
 │       │           │       ├── transparent-color-index <- base.u8 := 0
-│       │           │       └── terminator <- gif.block-terminator := 0
+│       │           │       └── terminator <- gif.block-terminator
 │       │           └── graphic-rendering-block <- gif.graphic-rendering-block :=
 │       │               └── table-based-image <- gif.table-based-image :=
 │       │                   ├── descriptor <- gif.image-descriptor :=
-│       │                   │   ├── separator <- [= 44] := 44
+│       │                   │   ├── separator <- [= 44]
 │       │                   │   ├── image-left-position <- base.u16le := 0
 │       │                   │   ├── image-top-position <- base.u16le := 0
 │       │                   │   ├── image-width <- base.u16le := 50
@@ -150,7 +147,6 @@
 │       │                       │           ├── 9 <- base.u8 := 1
 │       │                       │           ~
 │       │                       │           └── 80 <- base.u8 := 8
-│       │                       └── terminator <- gif.block-terminator := 0
-│       └── trailer <- gif.trailer :=
-│           └── separator <- [= 59] := 59
-└── end <- end-of-input := ()
+│       │                       └── terminator <- gif.block-terminator
+│       └── trailer <- gif.trailer
+└── end <- end-of-input

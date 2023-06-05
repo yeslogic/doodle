@@ -1,10 +1,6 @@
 ├── data <- _ |...| _ :=
 │   └── riff <- riff.main :=
-│       ├── tag <- (...) :=
-│       │   ├── 0 <- [= 82] := 82
-│       │   ├── 1 <- [= 73] := 73
-│       │   ├── 2 <- [= 70] := 70
-│       │   └── 3 <- [= 70] := 70
+│       ├── tag <- (...)
 │       ├── length <- base.u32le := 1140
 │       ├── data <- slice (length.@value) riff.subchunks :=
 │       │   ├── tag <- riff.any-tag :=
@@ -75,4 +71,4 @@
 │       │           │   └── 137 <- base.u8 := 0
 │       │           └── pad <- match ((length.@value % 2) == 0) { ... } := ()
 │       └── pad <- match ((length.@value % 2) == 0) { ... } := ()
-└── end <- end-of-input := ()
+└── end <- end-of-input
