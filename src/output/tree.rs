@@ -34,6 +34,7 @@ pub struct Flags {
     collapse_computed_values: bool,
     omit_implied_values: bool,
     tables_for_record_sequences: bool,
+    pretty_ascii_strings: bool,
 }
 
 impl<'module, W: io::Write> Context<'module, W> {
@@ -42,6 +43,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             collapse_computed_values: true,
             omit_implied_values: true,
             tables_for_record_sequences: true,
+            pretty_ascii_strings: true,
         };
         Context {
             writer,
@@ -57,7 +59,19 @@ impl<'module, W: io::Write> Context<'module, W> {
     pub fn write_decoded_value(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
             Format::ItemVar(level) => {
-                self.write_decoded_value(value, self.module.get_format(*level))
+                if self.flags.pretty_ascii_strings
+                    && self.module.get_name(*level) == "base.asciiz-string"
+                {
+                    self.write_ascii_string(value)
+                } else if self.flags.pretty_ascii_strings
+                    && self.module.get_name(*level) == "base.ascii-char"
+                {
+                    write!(&mut self.writer, "'")?;
+                    self.write_ascii_char(value)?;
+                    write!(&mut self.writer, "'")
+                } else {
+                    self.write_decoded_value(value, self.module.get_format(*level))
+                }
             }
             Format::Fail => panic!("uninhabited format"),
             Format::EndOfInput => self.write_value(value),
@@ -71,7 +85,13 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected variant"),
             },
             Format::Tuple(formats) => match value {
-                Value::Tuple(values) => self.write_tuple(values, Some(formats)),
+                Value::Tuple(values) => {
+                    if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
+                        self.write_ascii_seq(values)
+                    } else {
+                        self.write_tuple(values, Some(formats))
+                    }
+                }
                 _ => panic!("expected tuple"),
             },
             Format::Record(format_fields) => match value {
@@ -88,6 +108,8 @@ impl<'module, W: io::Write> Context<'module, W> {
                         && self.is_record_with_atomic_fields(format).is_some()
                     {
                         self.write_seq_records(values, format)
+                    } else if self.flags.pretty_ascii_strings && self.is_ascii_char_format(format) {
+                        self.write_ascii_seq(values)
                     } else {
                         self.write_seq(values, Some(format))
                     }
@@ -127,6 +149,42 @@ impl<'module, W: io::Write> Context<'module, W> {
             Value::Seq(vals) => self.write_seq(vals, None),
             Value::Record(fields) => self.write_record(fields, None),
             Value::Variant(label, value) => self.write_variant(label, value, None),
+        }
+    }
+
+    fn write_ascii_string(&mut self, value: &Value) -> io::Result<()> {
+        let vs = match value {
+            Value::Record(fields) => {
+                match fields.iter().find(|(label, _)| label == "string").unwrap() {
+                    (_, Value::Seq(vs)) => vs,
+                    _ => panic!("expected sequence value"),
+                }
+            }
+            _ => panic!("expected record value"),
+        };
+        self.write_ascii_seq(vs)
+    }
+
+    fn write_ascii_seq(&mut self, vals: &[Value]) -> Result<(), io::Error> {
+        write!(&mut self.writer, "\"")?;
+        for v in vals {
+            self.write_ascii_char(v)?;
+        }
+        write!(&mut self.writer, "\"")
+    }
+
+    fn write_ascii_char(&mut self, v: &Value) -> io::Result<()> {
+        let b = match v {
+            Value::U8(b) => *b,
+            _ => panic!("expected U8 value"),
+        };
+        match b {
+            0x00 => write!(&mut self.writer, "\\0"),
+            0x09 => write!(&mut self.writer, "\\t"),
+            0x0A => write!(&mut self.writer, "\\n"),
+            0x0D => write!(&mut self.writer, "\\r"),
+            32..=127 => write!(&mut self.writer, "{}", b as char),
+            _ => write!(&mut self.writer, "\\x{:02X}", b),
         }
     }
 
@@ -232,6 +290,33 @@ impl<'module, W: io::Write> Context<'module, W> {
         }
     }
 
+    fn is_ascii_string_format(&self, format: &Format) -> bool {
+        match format {
+            Format::ItemVar(level) => {
+                self.module.get_name(*level) == "base.asciiz-string"
+                    || self.is_ascii_string_format(self.module.get_format(*level))
+            }
+            Format::Tuple(formats) => self.is_ascii_tuple_format(formats),
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatUntilLast(_, format)
+            | Format::RepeatUntilSeq(_, format) => self.is_ascii_char_format(format),
+            _ => false,
+        }
+    }
+
+    fn is_ascii_tuple_format(&self, formats: &[Format]) -> bool {
+        !formats.is_empty() && formats.iter().all(|f| self.is_ascii_char_format(f))
+    }
+
+    fn is_ascii_char_format(&self, format: &Format) -> bool {
+        match format {
+            Format::ItemVar(level) => self.module.get_name(*level) == "base.ascii-char",
+            _ => false,
+        }
+    }
+
     fn is_atomic_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level) => self.is_atomic_format(self.module.get_format(*level)),
@@ -292,7 +377,7 @@ impl<'module, W: io::Write> Context<'module, W> {
         value: &Value,
         format: Option<&Format>,
     ) -> io::Result<()> {
-        if self.is_atomic_value(value) {
+        if self.is_atomic_value(value, format) {
             write!(&mut self.writer, "{{ {label} := ")?;
             self.write_value(value)?;
             write!(&mut self.writer, " }}")
@@ -353,7 +438,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Some(format) => {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
                     writeln!(&mut self.writer)
-                } else if self.is_atomic_value(value) {
+                } else if self.is_atomic_value(value, Some(format)) {
                     write!(&mut self.writer, " := ")?;
                     self.write_decoded_value(value, format)?;
                     writeln!(&mut self.writer)
@@ -363,7 +448,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
             }
             None => {
-                if self.is_atomic_value(value) {
+                if self.is_atomic_value(value, None) {
                     write!(&mut self.writer, " := ")?;
                     self.write_value(value)?;
                     writeln!(&mut self.writer)
@@ -380,7 +465,12 @@ impl<'module, W: io::Write> Context<'module, W> {
         writeln!(&mut self.writer, "~")
     }
 
-    fn is_atomic_value(&self, value: &Value) -> bool {
+    fn is_atomic_value(&self, value: &Value, format: Option<&Format>) -> bool {
+        if let Some(format) = format {
+            if self.flags.pretty_ascii_strings && self.is_ascii_string_format(format) {
+                return true;
+            }
+        }
         match value {
             Value::Bool(_) => true,
             Value::U8(_) => true,
@@ -393,11 +483,11 @@ impl<'module, W: io::Write> Context<'module, W> {
                         && fields
                             .iter()
                             .find(|(label, _)| label == "@value")
-                            .map(|(_, value)| self.is_atomic_value(value))
+                            .map(|(_, value)| self.is_atomic_value(value, None))
                             .unwrap_or(false))
             }
             Value::Seq(values) => values.is_empty(),
-            Value::Variant(_, value) => self.is_atomic_value(value),
+            Value::Variant(_, value) => self.is_atomic_value(value, None),
         }
     }
 

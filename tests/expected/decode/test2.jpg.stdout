@@ -7,13 +7,7 @@
 │       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 5426
 │       │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
-│       │   │           ├── identifier <- base.asciiz-string :=
-│       │   │           │   ├── string <- repeat [!= 0] :=
-│       │   │           │   │   ├── 0 <- [!= 0] := 69
-│       │   │           │   │   ├── 1 <- [!= 0] := 120
-│       │   │           │   │   ├── 2 <- [!= 0] := 105
-│       │   │           │   │   └── 3 <- [!= 0] := 102
-│       │   │           │   └── null <- [= 0]
+│       │   │           ├── identifier <- base.asciiz-string := "Exif"
 │       │   │           └── data <- match identifier.string { ... } :=
 │       │   │               ├── padding <- [= 0]
 │       │   │               └── exif <- tiff.main :=
@@ -96,21 +90,7 @@
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 4429
 │       │   │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
-│       │   │   │           ├── identifier <- base.asciiz-string :=
-│       │   │   │           │   ├── string <- repeat [!= 0] :=
-│       │   │   │           │   │   ├── 0 <- [!= 0] := 104
-│       │   │   │           │   │   ├── 1 <- [!= 0] := 116
-│       │   │   │           │   │   ├── 2 <- [!= 0] := 116
-│       │   │   │           │   │   ├── 3 <- [!= 0] := 112
-│       │   │   │           │   │   ├── 4 <- [!= 0] := 58
-│       │   │   │           │   │   ├── 5 <- [!= 0] := 47
-│       │   │   │           │   │   ├── 6 <- [!= 0] := 47
-│       │   │   │           │   │   ├── 7 <- [!= 0] := 110
-│       │   │   │           │   │   ├── 8 <- [!= 0] := 115
-│       │   │   │           │   │   ├── 9 <- [!= 0] := 46
-│       │   │   │           │   │   ~
-│       │   │   │           │   │   └── 27 <- [!= 0] := 47
-│       │   │   │           │   └── null <- [= 0]
+│       │   │   │           ├── identifier <- base.asciiz-string := "http://ns.adobe.com/xap/1.0/"
 │       │   │   │           └── data <- match identifier.string { ... } :=
 │       │   │   │               └── xmp <- repeat base.u8 :=
 │       │   │   │                   ├── 0 <- base.u8 := 60

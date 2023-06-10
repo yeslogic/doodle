@@ -75,6 +75,7 @@ pub struct BaseModule {
     u16le: Format,
     u32be: Format,
     u32le: Format,
+    ascii_char: Format,
     asciiz_string: Format,
 }
 
@@ -85,6 +86,7 @@ impl BaseModule {
     pub fn u16le(&self) -> Format { self.u16le.clone() }
     pub fn u32be(&self) -> Format { self.u32be.clone() }
     pub fn u32le(&self) -> Format { self.u32le.clone() }
+    pub fn ascii_char(&self) -> Format { self.ascii_char.clone() }
     pub fn asciiz_string(&self) -> Format { self.asciiz_string.clone() }
 }
 
@@ -141,6 +143,8 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         ]),
     );
 
+    let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
+
     let asciiz_string = module.define_format(
         "base.asciiz-string",
         record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
@@ -152,6 +156,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         u16le,
         u32be,
         u32le,
+        ascii_char,
         asciiz_string,
     }
 }
