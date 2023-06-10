@@ -7,13 +7,7 @@
 │       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 16
 │       │   │       └── data <- slice (length.@value - 2) jpeg.app0-data :=
-│       │   │           ├── identifier <- base.asciiz-string :=
-│       │   │           │   ├── string <- repeat [!= 0] :=
-│       │   │           │   │   ├── 0 <- [!= 0] := 74
-│       │   │           │   │   ├── 1 <- [!= 0] := 70
-│       │   │           │   │   ├── 2 <- [!= 0] := 73
-│       │   │           │   │   └── 3 <- [!= 0] := 70
-│       │   │           │   └── null <- [= 0]
+│       │   │           ├── identifier <- base.asciiz-string := "JFIF"
 │       │   │           └── data <- match identifier.string { ... } :=
 │       │   │               ├── version-major <- base.u8 := 1
 │       │   │               ├── version-minor <- base.u8 := 1

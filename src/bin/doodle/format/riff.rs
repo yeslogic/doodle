@@ -39,7 +39,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
 
     let any_tag = module.define_format(
         "riff.any-tag",
-        tuple([base.u8(), base.u8(), base.u8(), base.u8()]), // FIXME: ASCII
+        tuple([
+            base.ascii_char(),
+            base.ascii_char(),
+            base.ascii_char(),
+            base.ascii_char(),
+        ]),
     );
 
     let subchunks = module.define_format(
