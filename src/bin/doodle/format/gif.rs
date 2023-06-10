@@ -56,7 +56,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         "gif.header",
         record([
             ("signature", is_bytes(b"GIF")),
-            ("version", repeat_count(Expr::U8(3), base.u8())), // "87a" | "89a" | ...
+            ("version", repeat_count(Expr::U8(3), base.ascii_char())), // "87a" | "89a" | ...
         ]),
     );
 

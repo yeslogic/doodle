@@ -2,10 +2,7 @@
 │   └── gif <- gif.main :=
 │       ├── header <- gif.header :=
 │       │   ├── signature <- (...)
-│       │   └── version <- repeat-count 3 base.u8 :=
-│       │       ├── 0 <- base.u8 := 56
-│       │       ├── 1 <- base.u8 := 57
-│       │       └── 2 <- base.u8 := 97
+│       │   └── version <- repeat-count 3 base.ascii-char := "89a"
 │       ├── logical-screen <- gif.logical-screen :=
 │       │   ├── descriptor <- gif.logical-screen-descriptor :=
 │       │   │   ├── screen-width <- base.u16le := 50
