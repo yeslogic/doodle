@@ -159,9 +159,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             write!(&mut self.writer, "[]")
         } else {
             match self.preview_len {
-                Some(preview_len)
-                    if vals.len() > preview_len && vals.iter().all(is_atomic_value) =>
-                {
+                Some(preview_len) if vals.len() > preview_len => {
                     let last_index = vals.len() - 1;
                     for (index, val) in vals[0..preview_len].iter().enumerate() {
                         self.write_field_value_continue(index, val, format)?;
