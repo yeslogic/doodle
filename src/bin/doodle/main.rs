@@ -25,6 +25,8 @@ enum FileOutput {
     Json,
     /// Display as a human-readable tree
     Tree,
+    /// Display as a filtered flat list
+    Flat,
 }
 
 #[derive(Parser)]
@@ -73,6 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
                 FileOutput::Tree => {
                     doodle::output::tree::print_decoded_value(&module, &value, &format)
+                }
+                FileOutput::Flat => {
+                    doodle::output::flat::print_decoded_value(&module, &value, &format)
                 }
             }
 
