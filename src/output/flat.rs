@@ -29,7 +29,16 @@ fn is_show_format(name: &str) -> Option<&'static str> {
         "gif.special-purpose-block" => Some("Special Purpose Block"),
 
         // PNG
-        "png.main" => Some("png.main"),
+        "png.signature" => Some("PNG signature"),
+        "png.ihdr" => Some("Image Header"),
+        "png.iend" => Some("Image Trailer"),
+        "png.idat" => Some("Image Data"),
+        "png.bkgd" => Some("Background color"),
+        "png.phys" => Some("Physical Pixel Dimensions"),
+        "png.plte" => Some("Palette"),
+        "png.time" => Some("Last-modification Time"),
+        "png.trns" => Some("Transparency"),
+        "png.other-chunk" => Some("Other Chunk"),
 
         // RIFF, WebP
         "riff.main" => Some("riff.main"),
