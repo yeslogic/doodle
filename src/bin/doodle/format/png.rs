@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule};
+use doodle::{Expr, Format, FormatModule, Pattern};
 
 use crate::format::base::*;
 
@@ -37,40 +37,112 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
             ("interlace-method", base.u8()),
         ]),
     );
+    let ihdr = module.define_format("png.ihdr", chunk(ihdr_tag, ihdr_data));
 
     let idat_tag = module.define_format("png.idat-tag", is_bytes(b"IDAT"));
     let idat_data = module.define_format("png.idat-data", repeat(base.u8()));
+    let idat = module.define_format("png.idat", chunk(idat_tag, idat_data));
 
     let iend_tag = module.define_format("png.iend-tag", is_bytes(b"IEND"));
     let iend_data = module.define_format("png.iend-data", Format::EMPTY); // FIXME ensure IEND length = 0
+    let iend = module.define_format("png.iend", chunk(iend_tag, iend_data));
 
-    let other_tag = module.define_format(
-        "png.other-tag",
+    let bkgd_data = Format::Match(
+        Expr::RecordProj(
+            Box::new(Expr::RecordProj(Box::new(Expr::Var(2)), "data".to_string())),
+            "color-type".to_string(),
+        ),
+        vec![
+            (Pattern::U8(0), record([("greyscale", base.u16be())])),
+            (Pattern::U8(4), record([("greyscale", base.u16be())])),
+            (
+                Pattern::U8(2),
+                record([
+                    ("red", base.u16be()),
+                    ("green", base.u16be()),
+                    ("blue", base.u16be()),
+                ]),
+            ),
+            (
+                Pattern::U8(6),
+                record([
+                    ("red", base.u16be()),
+                    ("green", base.u16be()),
+                    ("blue", base.u16be()),
+                ]),
+            ),
+            (Pattern::U8(3), record([("palette-index", base.u8())])),
+        ],
+    );
+    let bkgd = module.define_format("png.bkgd", chunk(is_bytes(b"bKGD"), bkgd_data));
+
+    let phys_data = record([
+        ("pixels-per-unit-x", base.u32be()),
+        ("pixels-per-unit-y", base.u32be()),
+        ("unit-specifier", base.u8()),
+    ]);
+    let phys = module.define_format("png.phys", chunk(is_bytes(b"pHYs"), phys_data));
+
+    let palette_entry = record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]);
+    let plte_data = repeat1(palette_entry);
+    let plte = module.define_format("png.plte", chunk(is_bytes(b"PLTE"), plte_data));
+
+    let time_data = record([
+        ("year", base.u16be()),
+        ("month", base.u8()),
+        ("day", base.u8()),
+        ("hour", base.u8()),
+        ("minute", base.u8()),
+        ("second", base.u8()),
+    ]);
+    let time = module.define_format("png.time", chunk(is_bytes(b"tIME"), time_data));
+
+    let trns_data = Format::Match(
+        Expr::RecordProj(
+            Box::new(Expr::RecordProj(Box::new(Expr::Var(2)), "data".to_string())),
+            "color-type".to_string(),
+        ),
+        vec![
+            (Pattern::U8(0), record([("greyscale", base.u16be())])),
+            (
+                Pattern::U8(2),
+                record([
+                    ("red", base.u16be()),
+                    ("green", base.u16be()),
+                    ("blue", base.u16be()),
+                ]),
+            ),
+            (
+                Pattern::U8(3),
+                repeat(record([("palette-index", base.u8())])),
+            ),
+        ],
+    );
+    let trns = module.define_format("png.trns", chunk(is_bytes(b"tRNS"), trns_data));
+
+    let png_chunk = module.define_format(
+        "png.chunk",
         alts([
-            ("PLTE", is_bytes(b"PLTE")),
-            ("bKGD", is_bytes(b"bKGD")),
-            ("pHYs", is_bytes(b"pHYs")),
-            ("tIME", is_bytes(b"tIME")),
-            ("tRNS", is_bytes(b"tRNS")),
+            ("bKGD", bkgd),
+            ("pHYs", phys),
+            ("PLTE", plte),
+            ("tIME", time),
+            ("tRNS", trns),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
     );
 
+    let png_signature = module.define_format("png.signature", is_bytes(b"\x89PNG\r\n\x1A\n"));
+
     module.define_format(
         "png.main",
         record([
-            ("signature", is_bytes(b"\x89PNG\r\n\x1A\n")),
-            ("ihdr", chunk(ihdr_tag, ihdr_data)),
-            (
-                "chunks",
-                repeat(chunk(other_tag.clone(), repeat(base.u8()))),
-            ),
-            ("idat", repeat1(chunk(idat_tag, idat_data))),
-            (
-                "more-chunks",
-                repeat(chunk(other_tag.clone(), repeat(base.u8()))),
-            ),
-            ("iend", chunk(iend_tag, iend_data)),
+            ("signature", png_signature),
+            ("ihdr", ihdr),
+            ("chunks", repeat(png_chunk.clone())),
+            ("idat", repeat1(idat)),
+            ("more-chunks", repeat(png_chunk.clone())),
+            ("iend", iend),
         ]),
     )
 }
