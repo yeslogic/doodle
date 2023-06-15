@@ -38,7 +38,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
     };
 
     let any_tag = module.define_format(
-        "riff.any-tag",
+        "riff.tag",
         tuple([
             base.ascii_char(),
             base.ascii_char(),
@@ -47,12 +47,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         ]),
     );
 
+    let any_chunk = module.define_format("riff.chunk", chunk(any_tag.clone(), repeat(base.u8())));
+
     let subchunks = module.define_format(
         "riff.subchunks",
-        record([
-            ("tag", any_tag.clone()),
-            ("chunks", repeat(chunk(any_tag, repeat(base.u8())))),
-        ]),
+        record([("tag", any_tag.clone()), ("chunks", repeat(any_chunk))]),
     );
 
     module.define_format("riff.main", chunk(is_bytes(b"RIFF"), subchunks.clone()))
