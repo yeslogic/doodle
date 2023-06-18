@@ -366,6 +366,14 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "u32le ")?;
                 self.write_proj_expr(bytes)
             }
+            Expr::SubSeq(seq, start, length) => {
+                write!(&mut self.writer, "sub-seq (")?;
+                self.write_expr(start)?;
+                write!(&mut self.writer, ", ")?;
+                self.write_expr(length)?;
+                write!(&mut self.writer, ") ")?;
+                self.write_proj_expr(seq)
+            }
             Expr::FlatMap(expr, seq) => {
                 write!(&mut self.writer, "flat-map (")?;
                 self.write_expr(expr)?;
