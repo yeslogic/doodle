@@ -122,6 +122,7 @@ pub enum Expr {
     Record(Vec<(String, Expr)>),
     RecordProj(Box<Expr>, String),
     Variant(String, Box<Expr>),
+    UnwrapVariant(Box<Expr>),
     Seq(Vec<Expr>),
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
 
@@ -330,6 +331,10 @@ impl Expr {
             }
             Expr::RecordProj(head, label) => head.eval(stack).record_proj(label),
             Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
+            Expr::UnwrapVariant(expr) => match expr.eval(stack) {
+                Value::Variant(_label, value) => *value.clone(),
+                _ => panic!("expected variant"),
+            },
             Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
             Expr::Match(head, branches) => {
                 let head = head.eval(stack);
