@@ -342,6 +342,14 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_proj_expr(expr1)
             }
 
+            Expr::AsU16(expr) => {
+                write!(&mut self.writer, "as-u16 ")?;
+                self.write_proj_expr(expr)
+            }
+            Expr::AsU32(expr) => {
+                write!(&mut self.writer, "as-u32 ")?;
+                self.write_proj_expr(expr)
+            }
             Expr::U16Be(bytes) => {
                 write!(&mut self.writer, "u16be ")?;
                 self.write_proj_expr(bytes)
