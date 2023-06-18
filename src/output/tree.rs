@@ -424,6 +424,11 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_expr(expr)?;
                 write!(&mut self.writer, " }}")
             }
+            Expr::UnwrapVariant(expr) => {
+                write!(&mut self.writer, "unwrap(")?;
+                self.write_expr(expr)?;
+                write!(&mut self.writer, ")")
+            }
             Expr::Seq(..) => write!(&mut self.writer, "[..]"),
             expr => {
                 write!(&mut self.writer, "(")?;
