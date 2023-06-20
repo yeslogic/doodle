@@ -227,7 +227,9 @@ pub enum Format {
     /// Repeat a format an exact number of times
     RepeatCount(Expr, Box<Format>),
     /// Repeat a format until a condition is satisfied by its last item
-    RepeatUntil(Expr, Box<Format>),
+    RepeatUntilLast(Expr, Box<Format>),
+    /// Repeat a format until a condition is satisfied by the sequence
+    RepeatUntilSeq(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
@@ -311,7 +313,8 @@ pub enum Decoder {
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
-    RepeatUntil(Expr, Box<Decoder>),
+    RepeatUntilLast(Expr, Box<Decoder>),
+    RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -566,7 +569,8 @@ impl Format {
             Format::Repeat(_) => true,
             Format::Repeat1(_) => false,
             Format::RepeatCount(_, _) => true,
-            Format::RepeatUntil(_, f) => f.is_nullable(module),
+            Format::RepeatUntilLast(_, f) => f.is_nullable(module),
+            Format::RepeatUntilSeq(_, f) => f.is_nullable(module),
             Format::Peek(_) => true,
             Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
@@ -700,7 +704,10 @@ impl<'a> MatchTreeLevel<'a> {
             Format::RepeatCount(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::RepeatUntil(_expr, _a) => {
+            Format::RepeatUntilLast(_expr, _a) => {
+                self.accept(index) // FIXME
+            }
+            Format::RepeatUntilSeq(_expr, _a) => {
                 self.accept(index) // FIXME
             }
             Format::Peek(_a) => {
@@ -867,10 +874,15 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
             }
-            Format::RepeatUntil(expr, a) => {
+            Format::RepeatUntilLast(expr, a) => {
                 // FIXME probably not right
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
-                Ok(Decoder::RepeatUntil(expr.clone(), da))
+                Ok(Decoder::RepeatUntilLast(expr.clone(), da))
+            }
+            Format::RepeatUntilSeq(expr, a) => {
+                // FIXME probably not right
+                let da = Box::new(Decoder::compile_next(module, a, next)?);
+                Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
             }
             Format::Peek(a) => {
                 let da = Box::new(Decoder::compile_next(module, a, next)?);
@@ -986,7 +998,7 @@ impl Decoder {
                 }
                 Some((Value::Seq(v), input))
             }
-            Decoder::RepeatUntil(expr, a) => {
+            Decoder::RepeatUntilLast(expr, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
@@ -996,6 +1008,26 @@ impl Decoder {
                     let done = expr.eval_bool(stack);
                     let va = stack.pop()?;
                     v.push(va);
+                    if done {
+                        break;
+                    }
+                }
+                Some((Value::Seq(v), input))
+            }
+            Decoder::RepeatUntilSeq(expr, a) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                loop {
+                    let (va, next_input) = a.parse(stack, input)?;
+                    input = next_input;
+                    v.push(va);
+                    stack.push(Value::Seq(v));
+                    let done = expr.eval_bool(stack);
+                    v = if let Value::Seq(v) = stack.pop().unwrap() {
+                        v
+                    } else {
+                        panic!("expected Seq")
+                    };
                     if done {
                         break;
                     }
