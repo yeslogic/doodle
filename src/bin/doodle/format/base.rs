@@ -37,6 +37,16 @@ pub fn repeat_count(len: Expr, format: Format) -> Format {
     Format::RepeatCount(len, Box::new(format))
 }
 
+#[allow(dead_code)]
+pub fn repeat_until_last(cond: Expr, format: Format) -> Format {
+    Format::RepeatUntilLast(cond, Box::new(format))
+}
+
+#[allow(dead_code)]
+pub fn repeat_until_seq(cond: Expr, format: Format) -> Format {
+    Format::RepeatUntilSeq(cond, Box::new(format))
+}
+
 pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
     Format::Match(
         cond,

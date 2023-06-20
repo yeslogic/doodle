@@ -95,7 +95,8 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
-            | Format::RepeatUntil(_, format) => match value {
+            | Format::RepeatUntilLast(_, format)
+            | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => self.write_seq(values, Some(format)),
                 _ => panic!("expected sequence"),
             },
@@ -484,8 +485,14 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
             }
-            Format::RepeatUntil(len, format) => {
-                write!(&mut self.writer, "repeat-until ")?;
+            Format::RepeatUntilLast(len, format) => {
+                write!(&mut self.writer, "repeat-until-last ")?;
+                self.write_atomic_expr(len)?;
+                write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
+            Format::RepeatUntilSeq(len, format) => {
+                write!(&mut self.writer, "repeat-until-seq ")?;
                 self.write_atomic_expr(len)?;
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
