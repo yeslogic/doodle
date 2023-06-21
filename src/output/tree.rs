@@ -384,6 +384,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "u32le ")?;
                 self.write_proj_expr(bytes)
             }
+            Expr::SeqLength(seq) => {
+                write!(&mut self.writer, "seq-length ")?;
+                self.write_proj_expr(seq)
+            }
             Expr::SubSeq(seq, start, length) => {
                 write!(&mut self.writer, "sub-seq (")?;
                 self.write_expr(start)?;
