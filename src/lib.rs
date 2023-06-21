@@ -150,6 +150,7 @@ pub enum Expr {
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
     FlatMap(Box<Expr>, Box<Expr>),
     FlatMapAccum(Box<Expr>, Box<Expr>, Box<Expr>),
+    Dup(Box<Expr>, Box<Expr>),
 }
 
 impl Expr {
@@ -503,6 +504,15 @@ impl Expr {
                 }
                 _ => panic!("FlatMapAccum: expected Seq"),
             },
+            Expr::Dup(count, expr) => {
+                let count = count.eval_usize(stack);
+                let v = expr.eval(stack);
+                let mut vs = Vec::new();
+                for _ in 0..count {
+                    vs.push(v.clone());
+                }
+                Value::Seq(vs)
+            }
         }
     }
 
