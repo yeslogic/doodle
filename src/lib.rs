@@ -147,6 +147,7 @@ pub enum Expr {
     U32Be(Box<Expr>),
     U32Le(Box<Expr>),
 
+    SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
     FlatMap(Box<Expr>, Box<Expr>),
     FlatMapAccum(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -457,6 +458,17 @@ impl Expr {
                     Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
                 }
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
+            },
+            Expr::SeqLength(seq) => match seq.eval(stack) {
+                Value::Seq(values) => {
+                    let len = values.len();
+                    if len < 65536 {
+                        Value::U16(len as u16)
+                    } else {
+                        Value::U32(len as u32)
+                    }
+                }
+                _ => panic!("SeqLength: expected Seq"),
             },
             Expr::SubSeq(seq, start, length) => match seq.eval(stack) {
                 Value::Seq(values) => {
