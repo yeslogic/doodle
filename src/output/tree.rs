@@ -410,6 +410,12 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, ") ")?;
                 self.write_proj_expr(seq)
             }
+            Expr::Dup(count, expr) => {
+                write!(&mut self.writer, "dup (")?;
+                self.write_expr(count)?;
+                write!(&mut self.writer, ") ")?;
+                self.write_proj_expr(expr)
+            }
 
             expr => self.write_proj_expr(expr),
         }
