@@ -321,6 +321,26 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " != ")?;
                 self.write_proj_expr(expr1)
             }
+            Expr::Lt(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " < ")?;
+                self.write_proj_expr(expr1)
+            }
+            Expr::Gt(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " > ")?;
+                self.write_proj_expr(expr1)
+            }
+            Expr::Lte(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " <= ")?;
+                self.write_proj_expr(expr1)
+            }
+            Expr::Gte(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " >= ")?;
+                self.write_proj_expr(expr1)
+            }
             Expr::Add(expr0, expr1) => {
                 self.write_proj_expr(expr0)?;
                 write!(&mut self.writer, " + ")?;
