@@ -152,6 +152,7 @@ pub enum Expr {
     FlatMap(Box<Expr>, Box<Expr>),
     FlatMapAccum(Box<Expr>, Box<Expr>, Box<Expr>),
     Dup(Box<Expr>, Box<Expr>),
+    Inflate(Box<Expr>),
 }
 
 impl Expr {
@@ -234,16 +235,43 @@ pub enum Format {
     Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
+    /// Parse bitstream
+    Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
     WithRelativeOffset(Expr, Box<Format>),
-    /// Transform a decoded value with an expr
-    Map(Expr, Box<Format>),
+    /// Compute a value
+    Compute(Expr),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
+    /// Format generated dynamically
+    Dynamic(DynFormat),
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum DynFormat {
+    Huffman(Expr, Option<Expr>),
 }
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
+
+    pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+        Format::Union(
+            (fields.into_iter())
+                .map(|(label, format)| (label.into(), format))
+                .collect(),
+        )
+    }
+
+    pub fn record<Label: Into<String>>(
+        fields: impl IntoIterator<Item = (Label, Format)>,
+    ) -> Format {
+        Format::Record(
+            (fields.into_iter())
+                .map(|(label, format)| (label.into(), format))
+                .collect(),
+        )
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -317,9 +345,11 @@ pub enum Decoder {
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
+    Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Expr, Box<Decoder>),
+    Compute(Expr),
     Match(Expr, Vec<(Pattern, Decoder)>),
+    Dynamic(DynFormat),
 }
 
 impl Expr {
@@ -528,6 +558,13 @@ impl Expr {
                 }
                 Value::Seq(vs)
             }
+            Expr::Inflate(seq) => match seq.eval(stack) {
+                Value::Seq(values) => {
+                    let vs = inflate(&values);
+                    Value::Seq(vs)
+                }
+                _ => panic!("Inflate: expected Seq"),
+            },
         }
     }
 
@@ -573,9 +610,11 @@ impl Format {
             Format::RepeatUntilSeq(_, f) => f.is_nullable(module),
             Format::Peek(_) => true,
             Format::Slice(_, _) => true,
+            Format::Bits(f) => f.is_nullable(module),
             Format::WithRelativeOffset(_, _) => true,
-            Format::Map(_, f) => f.is_nullable(module),
+            Format::Compute(_) => true,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
+            Format::Dynamic(DynFormat::Huffman(_, _)) => false,
         }
     }
 }
@@ -680,13 +719,13 @@ impl<'a> MatchTreeLevel<'a> {
                 Ok(())
             }
             Format::Tuple(fields) => match fields.split_first() {
-                None => self.add_next(module, index, next.clone()),
+                None => self.add_next(module, index, next),
                 Some((a, fields)) => {
                     self.add(module, index, a, Rc::new(Next::Tuple(fields, next.clone())))
                 }
             },
             Format::Record(fields) => match fields.split_first() {
-                None => self.add_next(module, index, next.clone()),
+                None => self.add_next(module, index, next),
                 Some(((_, a), fields)) => {
                     let next = Rc::new(Next::Record(fields, next.clone()));
                     self.add(module, index, a, next)
@@ -716,15 +755,21 @@ impl<'a> MatchTreeLevel<'a> {
             Format::Slice(_expr, _a) => {
                 self.accept(index) // FIXME
             }
+            Format::Bits(_a) => {
+                self.accept(index) // FIXME
+            }
             Format::WithRelativeOffset(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Map(_expr, a) => self.add(module, index, a, next),
+            Format::Compute(_expr) => self.add_next(module, index, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
                     self.add(module, index, f, next.clone())?;
                 }
                 Ok(())
+            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => {
+                self.accept(index) // FIXME
             }
         }
     }
@@ -892,14 +937,15 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
+            Format::Bits(a) => {
+                let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
+                Ok(Decoder::Bits(da))
+            }
             Format::WithRelativeOffset(expr, a) => {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
-            Format::Map(expr, a) => {
-                let da = Box::new(Decoder::compile_next(module, a, next)?);
-                Ok(Decoder::Map(expr.clone(), da))
-            }
+            Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
@@ -912,6 +958,7 @@ impl Decoder {
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
             }
+            Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
         }
     }
 
@@ -1048,6 +1095,19 @@ impl Decoder {
                     None
                 }
             }
+            Decoder::Bits(a) => {
+                let mut bits = Vec::with_capacity(input.len() * 8);
+                for b in input {
+                    for i in 0..8 {
+                        bits.push((b & (1 << i)) >> i);
+                    }
+                }
+                let (v, bits) = a.parse(stack, &bits)?;
+                let bytes_remain = bits.len() >> 3;
+                let bytes_read = input.len() - bytes_remain;
+                let input = &input[bytes_read..];
+                Some((v, input))
+            }
             Decoder::WithRelativeOffset(expr, a) => {
                 let offset = expr.eval_usize(stack);
                 if offset <= input.len() {
@@ -1058,11 +1118,8 @@ impl Decoder {
                     None
                 }
             }
-            Decoder::Map(expr, a) => {
-                let (va, input) = a.parse(stack, input)?;
-                stack.push(va);
+            Decoder::Compute(expr) => {
                 let v = expr.eval(stack);
-                stack.pop();
                 Some((v, input))
             }
             Decoder::Match(head, branches) => {
@@ -1076,8 +1133,142 @@ impl Decoder {
                 stack.truncate(initial_len);
                 value
             }
+            Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
+                let lengths_val = lengths_expr.eval(stack);
+                let lengths = value_to_vec_usize(&lengths_val);
+                let lengths = match opt_values_expr {
+                    None => lengths,
+                    Some(e) => {
+                        let values = value_to_vec_usize(&e.eval(stack));
+                        let mut new_lengths = [0].repeat(values.len());
+                        for i in 0..lengths.len() {
+                            new_lengths[values[i]] = lengths[i];
+                        }
+                        new_lengths
+                    }
+                };
+                let f = make_huffman_codes(&lengths);
+                let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
+                d.parse(stack, input)
+            }
         }
     }
+}
+
+fn value_to_vec_usize(v: &Value) -> Vec<usize> {
+    let vs = match v {
+        Value::Seq(vs) => vs,
+        _ => panic!("expected Seq"),
+    };
+    vs.iter()
+        .map(|v| match v {
+            Value::U8(n) => *n as usize,
+            Value::U16(n) => *n as usize,
+            _ => panic!("expected U8 or U16"),
+        })
+        .collect::<Vec<usize>>()
+}
+
+fn make_huffman_codes(lengths: &[usize]) -> Format {
+    let max_length = *lengths.iter().max().unwrap();
+    let mut bl_count = [0].repeat(max_length + 1);
+
+    for len in lengths {
+        bl_count[*len] += 1;
+    }
+
+    let mut next_code = [0].repeat(max_length + 1);
+    let mut code = 0;
+    bl_count[0] = 0;
+
+    for bits in 1..max_length + 1 {
+        code = (code + bl_count[bits - 1]) << 1;
+        next_code[bits] = code;
+    }
+
+    let mut codes = Vec::with_capacity(lengths.len());
+
+    for n in 0..lengths.len() {
+        let len = lengths[n];
+        if len != 0 {
+            codes.push((n.to_string(), bit_range(len, next_code[len], n)));
+            //println!("{:?}", codes[codes.len()-1]);
+            next_code[len] += 1;
+        } else {
+            //codes.push((n.to_string(), Format::Fail));
+        }
+    }
+
+    Format::alts(codes)
+}
+
+fn bit_range(n: usize, bits: usize, val: usize) -> Format {
+    let mut fs = Vec::with_capacity(n);
+    for i in 0..n {
+        let r = n - 1 - i;
+        let b = (bits & (1 << r)) >> r != 0;
+        fs.push(is_bit(b));
+    }
+    Format::record([
+        ("bits", Format::Tuple(fs)),
+        (
+            "@value",
+            Format::Compute(if val > 255 {
+                Expr::U16(val.try_into().unwrap())
+            } else {
+                Expr::U8(val.try_into().unwrap())
+            }),
+        ),
+    ])
+}
+
+fn is_bit(b: bool) -> Format {
+    Format::Byte(ByteSet::from([if b { 1 } else { 0 }]))
+}
+
+fn inflate(codes: &[Value]) -> Vec<Value> {
+    let mut vs = Vec::new();
+    for code in codes {
+        match code {
+            Value::Variant(name, v) => match (name.as_str(), v.as_ref()) {
+                ("literal", Value::U8(b)) => {
+                    vs.push(Value::U8(*b));
+                }
+                ("reference", Value::Record(fields)) => {
+                    let length = &fields
+                        .iter()
+                        .find(|(label, _)| label == "length")
+                        .unwrap()
+                        .1;
+                    let distance = &fields
+                        .iter()
+                        .find(|(label, _)| label == "distance")
+                        .unwrap()
+                        .1;
+                    match (length, distance) {
+                        (Value::U16(length), Value::U16(distance)) => {
+                            let length = *length as usize;
+                            let distance = *distance as usize;
+                            if distance > vs.len() {
+                                panic!("inflate: distance out of range");
+                            }
+                            let start = vs.len() - distance;
+                            for i in 0..length {
+                                vs.push(vs[start + i].clone());
+                            }
+                        }
+                        _ => panic!(
+                            "inflate: unexpected length/distance {:?} {:?}",
+                            length, distance
+                        ),
+                    }
+                }
+                _ => panic!("inflate: unknown code"),
+            },
+            _ => panic!("inflate: expected variant"),
+        }
+    }
+    vs
 }
 
 #[cfg(test)]
