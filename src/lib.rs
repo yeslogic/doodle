@@ -236,8 +236,8 @@ pub enum Format {
     Slice(Expr, Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
     WithRelativeOffset(Expr, Box<Format>),
-    /// Transform a decoded value with an expr
-    Map(Expr, Box<Format>),
+    /// Compute a value
+    Compute(Expr),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
 }
@@ -318,7 +318,7 @@ pub enum Decoder {
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Expr, Box<Decoder>),
+    Compute(Expr),
     Match(Expr, Vec<(Pattern, Decoder)>),
 }
 
@@ -574,7 +574,7 @@ impl Format {
             Format::Peek(_) => true,
             Format::Slice(_, _) => true,
             Format::WithRelativeOffset(_, _) => true,
-            Format::Map(_, f) => f.is_nullable(module),
+            Format::Compute(_) => true,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
         }
     }
@@ -680,13 +680,13 @@ impl<'a> MatchTreeLevel<'a> {
                 Ok(())
             }
             Format::Tuple(fields) => match fields.split_first() {
-                None => self.add_next(module, index, next.clone()),
+                None => self.add_next(module, index, next),
                 Some((a, fields)) => {
                     self.add(module, index, a, Rc::new(Next::Tuple(fields, next.clone())))
                 }
             },
             Format::Record(fields) => match fields.split_first() {
-                None => self.add_next(module, index, next.clone()),
+                None => self.add_next(module, index, next),
                 Some(((_, a), fields)) => {
                     let next = Rc::new(Next::Record(fields, next.clone()));
                     self.add(module, index, a, next)
@@ -719,7 +719,7 @@ impl<'a> MatchTreeLevel<'a> {
             Format::WithRelativeOffset(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Map(_expr, a) => self.add(module, index, a, next),
+            Format::Compute(_expr) => self.add_next(module, index, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
                     self.add(module, index, f, next.clone())?;
@@ -896,10 +896,7 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
-            Format::Map(expr, a) => {
-                let da = Box::new(Decoder::compile_next(module, a, next)?);
-                Ok(Decoder::Map(expr.clone(), da))
-            }
+            Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
@@ -1058,11 +1055,8 @@ impl Decoder {
                     None
                 }
             }
-            Decoder::Map(expr, a) => {
-                let (va, input) = a.parse(stack, input)?;
-                stack.push(va);
+            Decoder::Compute(expr) => {
                 let v = expr.eval(stack);
-                stack.pop();
                 Some((v, input))
             }
             Decoder::Match(head, branches) => {

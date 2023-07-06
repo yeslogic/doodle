@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule};
+use doodle::{Format, FormatModule};
 
 use crate::format::base::*;
 
@@ -21,15 +21,12 @@ pub fn main(module: &mut FormatModule) -> Format {
 
     module.define_format(
         "main",
-        Format::Map(
-            Expr::RecordProj(Box::new(Expr::Var(0)), "data".to_string()),
-            Box::new(record([
-                (
-                    "data",
-                    alts([("gif", gif), ("jpeg", jpeg), ("png", png), ("riff", riff)]),
-                ),
-                ("end", Format::EndOfInput),
-            ])),
-        ),
+        record([
+            (
+                "data",
+                alts([("gif", gif), ("jpeg", jpeg), ("png", png), ("riff", riff)]),
+            ),
+            ("end", Format::EndOfInput),
+        ]),
     )
 }

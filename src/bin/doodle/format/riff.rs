@@ -16,25 +16,42 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         record([
             ("tag", tag),
             ("length", base.u32le()),
-            ("data", Format::Slice(Expr::Var(0), Box::new(data))),
+            (
+                "data",
+                Format::Slice(
+                    Expr::RecordProj(Box::new(Expr::Var(0)), "@value".to_string()),
+                    Box::new(data),
+                ),
+            ),
             (
                 "pad",
-                if_then_else(is_even(Expr::Var(1)), Format::EMPTY, is_byte(0x00)),
+                if_then_else(
+                    is_even(Expr::RecordProj(
+                        Box::new(Expr::Var(1)),
+                        "@value".to_string(),
+                    )),
+                    Format::EMPTY,
+                    is_byte(0x00),
+                ),
             ),
         ])
     };
 
     let any_tag = module.define_format(
-        "riff.any-tag",
-        tuple([base.u8(), base.u8(), base.u8(), base.u8()]), // FIXME: ASCII
+        "riff.tag",
+        tuple([
+            base.ascii_char(),
+            base.ascii_char(),
+            base.ascii_char(),
+            base.ascii_char(),
+        ]),
     );
+
+    let any_chunk = module.define_format("riff.chunk", chunk(any_tag.clone(), repeat(base.u8())));
 
     let subchunks = module.define_format(
         "riff.subchunks",
-        record([
-            ("tag", any_tag.clone()),
-            ("chunks", repeat(chunk(any_tag, repeat(base.u8())))),
-        ]),
+        record([("tag", any_tag.clone()), ("chunks", repeat(any_chunk))]),
     );
 
     module.define_format("riff.main", chunk(is_bytes(b"RIFF"), subchunks.clone()))
