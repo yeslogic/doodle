@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use doodle::{Decoder, FormatModule};
+use doodle::{Decoder, FormatModule, ReadCtxt};
 
 mod format;
 
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
             let input = fs::read(filename)?;
             let (value, _) = decoder
-                .parse(&mut Vec::new(), &input)
+                .parse(&mut Vec::new(), ReadCtxt::new(&input))
                 .ok_or("parse failure")?;
 
             match output {
