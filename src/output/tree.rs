@@ -76,6 +76,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             }
             Format::Fail => panic!("uninhabited format"),
             Format::EndOfInput => self.write_value(value),
+            Format::Align(_) => self.write_value(value),
             Format::Byte(_) => self.write_value(value),
             Format::Union(branches) => match value {
                 Value::Variant(label, value) => {
@@ -538,6 +539,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             }
             Format::Fail => write!(&mut self.writer, "fail"),
             Format::EndOfInput => write!(&mut self.writer, "end-of-input"),
+            Format::Align(n) => write!(&mut self.writer, "align {n}"),
 
             Format::Byte(bs) => {
                 if bs.len() < 128 {

@@ -211,6 +211,8 @@ pub enum Format {
     Fail,
     /// Matches if the end of the input has been reached
     EndOfInput,
+    /// Skips bytes if necessary to align the current offset to a multiple of N
+    Align(usize),
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Matches the union of the byte strings matched by all the formats
@@ -306,6 +308,7 @@ pub struct MatchTree {
 pub enum Decoder {
     Fail,
     EndOfInput,
+    Align(usize),
     Byte(ByteSet),
     Branch(MatchTree, Vec<(String, Decoder)>),
     Tuple(Vec<Decoder>),
@@ -556,12 +559,13 @@ impl Expr {
 }
 
 impl Format {
-    /// Returns `true` if the format matches the empty byte string
+    /// Returns `true` if the format could match the empty byte string
     fn is_nullable(&self, module: &FormatModule) -> bool {
         match self {
             Format::ItemVar(level) => module.get_format(*level).is_nullable(module),
             Format::Fail => false,
             Format::EndOfInput => true,
+            Format::Align(_) => true,
             Format::Byte(_) => false,
             Format::Union(branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
             Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable(module)),
@@ -650,6 +654,9 @@ impl<'a> MatchTreeLevel<'a> {
             Format::ItemVar(level) => self.add(module, index, module.get_format(*level), next),
             Format::Fail => Ok(()),
             Format::EndOfInput => self.accept(index),
+            Format::Align(_) => {
+                self.accept(index) // FIXME
+            }
             Format::Byte(bs) => {
                 let mut bs = *bs;
                 let mut new_branches = Vec::new();
@@ -791,7 +798,7 @@ impl MatchTree {
 #[derive(Copy, Clone)]
 pub struct ReadCtxt<'a> {
     input: &'a [u8],
-    offset: usize,
+    pub offset: usize,
 }
 
 impl<'a> ReadCtxt<'a> {
@@ -852,6 +859,7 @@ impl Decoder {
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
+            Format::Align(n) => Ok(Decoder::Align(*n)),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
             Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
@@ -974,6 +982,11 @@ impl Decoder {
                 None => Some((Value::UNIT, input)),
                 Some(_) => None,
             },
+            Decoder::Align(n) => {
+                let skip = (n - input.offset % n) % n;
+                let (_, input) = input.split_at(skip)?;
+                Some((Value::UNIT, input))
+            }
             Decoder::Byte(bs) => {
                 let (b, input) = input.read_byte()?;
                 if bs.contains(b) {
@@ -1641,6 +1654,32 @@ mod tests {
             &[0x00, 0x00],
             &[],
             Value::Seq(vec![Value::U8(0x00), Value::U8(0x00)]),
+        );
+    }
+
+    #[test]
+    fn compile_align1() {
+        let f = Format::Tuple(vec![is_byte(0x00), Format::Align(1), is_byte(0xFF)]);
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Tuple(vec![Value::U8(0x00), Value::UNIT, Value::U8(0xFF)]),
+        );
+    }
+
+    #[test]
+    fn compile_align2() {
+        let f = Format::Tuple(vec![is_byte(0x00), Format::Align(2), is_byte(0xFF)]);
+        let d = Decoder::compile(&FormatModule::new(), &f).unwrap();
+        rejects(&d, &[0x00, 0xFF]);
+        rejects(&d, &[0x00, 0x99, 0x99, 0xFF]);
+        accepts(
+            &d,
+            &[0x00, 0x99, 0xFF],
+            &[],
+            Value::Tuple(vec![Value::U8(0x00), Value::UNIT, Value::U8(0xFF)]),
         );
     }
 }
