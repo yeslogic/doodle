@@ -764,12 +764,12 @@ impl<'a> MatchTreeLevel<'a> {
 }
 
 impl MatchTree {
-    fn matches(&self, input: &[u8]) -> Option<usize> {
-        match input.split_first() {
+    fn matches<'a>(&self, input: ReadCtxt<'a>) -> Option<usize> {
+        match input.read_byte() {
             None => self.accept,
             Some((b, input)) => {
                 for (bs, s) in &self.branches {
-                    if bs.contains(*b) {
+                    if bs.contains(b) {
                         return s.matches(input);
                     }
                 }
@@ -785,6 +785,54 @@ impl MatchTree {
         }
         const MAX_DEPTH: usize = 32;
         MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct ReadCtxt<'a> {
+    input: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> ReadCtxt<'a> {
+    pub fn new(input: &'a [u8]) -> ReadCtxt<'a> {
+        let offset = 0;
+        ReadCtxt { input, offset }
+    }
+
+    pub fn remaining(&self) -> &'a [u8] {
+        &self.input[self.offset..]
+    }
+
+    pub fn read_byte(&self) -> Option<(u8, ReadCtxt<'a>)> {
+        if self.offset < self.input.len() {
+            let b = self.input[self.offset];
+            Some((
+                b,
+                ReadCtxt {
+                    input: self.input,
+                    offset: self.offset + 1,
+                },
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn split_at(&self, n: usize) -> Option<(ReadCtxt<'a>, ReadCtxt<'a>)> {
+        if self.offset + n <= self.input.len() {
+            let fst = ReadCtxt {
+                input: &self.input[..self.offset + n],
+                offset: self.offset,
+            };
+            let snd = ReadCtxt {
+                input: self.input,
+                offset: self.offset + n,
+            };
+            Some((fst, snd))
+        } else {
+            None
+        }
     }
 }
 
@@ -918,16 +966,16 @@ impl Decoder {
     pub fn parse<'input>(
         &self,
         stack: &mut Vec<Value>,
-        input: &'input [u8],
-    ) -> Option<(Value, &'input [u8])> {
+        input: ReadCtxt<'input>,
+    ) -> Option<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Fail => None,
-            Decoder::EndOfInput => match input {
-                [] => Some((Value::UNIT, &[])),
-                _ => None,
+            Decoder::EndOfInput => match input.read_byte() {
+                None => Some((Value::UNIT, input)),
+                Some(_) => None,
             },
             Decoder::Byte(bs) => {
-                let (&b, input) = input.split_first()?;
+                let (b, input) = input.read_byte()?;
                 if bs.contains(b) {
                     Some((Value::U8(b), input))
                 } else {
@@ -1040,23 +1088,15 @@ impl Decoder {
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_usize(stack);
-                if size <= input.len() {
-                    let (slice, input) = input.split_at(size);
-                    let (v, _) = a.parse(stack, slice)?;
-                    Some((v, input))
-                } else {
-                    None
-                }
+                let (slice, input) = input.split_at(size)?;
+                let (v, _) = a.parse(stack, slice)?;
+                Some((v, input))
             }
             Decoder::WithRelativeOffset(expr, a) => {
                 let offset = expr.eval_usize(stack);
-                if offset <= input.len() {
-                    let (_, slice) = input.split_at(offset);
-                    let (v, _) = a.parse(stack, slice)?;
-                    Some((v, input))
-                } else {
-                    None
-                }
+                let (_, slice) = input.split_at(offset)?;
+                let (v, _) = a.parse(stack, slice)?;
+                Some((v, input))
             }
             Decoder::Map(expr, a) => {
                 let (va, input) = a.parse(stack, input)?;
@@ -1123,14 +1163,14 @@ mod tests {
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let mut stack = Vec::new();
-        let (val, remain) = d.parse(&mut stack, input).unwrap();
+        let (val, remain) = d.parse(&mut stack, ReadCtxt::new(input)).unwrap();
         assert_eq!(val, expect);
-        assert_eq!(remain, tail);
+        assert_eq!(remain.remaining(), tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let mut stack = Vec::new();
-        assert!(d.parse(&mut stack, input).is_none());
+        assert!(d.parse(&mut stack, ReadCtxt::new(input)).is_none());
     }
 
     #[test]
