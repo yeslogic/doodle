@@ -6,7 +6,7 @@
 │       │   │   └── app0 <- jpeg.app0 :=
 │       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 16
-│       │   │       └── data <- slice (length.@value - 2) jpeg.app0-data :=
+│       │   │       └── data <- slice (length - 2) jpeg.app0-data :=
 │       │   │           ├── identifier <- base.asciiz-string := "JFIF"
 │       │   │           └── data <- match identifier.string { ... } :=
 │       │   │               ├── version-major <- base.u8 := 1
@@ -22,7 +22,7 @@
 │       │   │   │   └── dqt <- jpeg.dqt :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 67
-│       │   │   │       └── data <- slice (length.@value - 2) jpeg.dqt-data :=
+│       │   │   │       └── data <- slice (length - 2) jpeg.dqt-data :=
 │       │   │   │           ├── precision-table-id <- base.u8 := 0
 │       │   │   │           └── elements <- repeat base.u8 :=
 │       │   │   │               ├── 0 <- base.u8 := 8
@@ -41,7 +41,7 @@
 │       │   │       └── dqt <- jpeg.dqt :=
 │       │   │           ├── marker <- { ... }
 │       │   │           ├── length <- base.u16be := 67
-│       │   │           └── data <- slice (length.@value - 2) jpeg.dqt-data :=
+│       │   │           └── data <- slice (length - 2) jpeg.dqt-data :=
 │       │   │               ├── precision-table-id <- base.u8 := 1
 │       │   │               └── elements <- repeat base.u8 :=
 │       │   │                   ├── 0 <- base.u8 := 9
@@ -60,7 +60,7 @@
 │       │   │   └── sof0 <- jpeg.sof0 :=
 │       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 17
-│       │   │       └── data <- slice (length.@value - 2) jpeg.sof-data :=
+│       │   │       └── data <- slice (length - 2) jpeg.sof-data :=
 │       │   │           ├── sample-precision <- base.u8 := 8
 │       │   │           ├── num-lines <- base.u16be := 97
 │       │   │           ├── num-samples-per-line <- base.u16be := 105
@@ -76,7 +76,7 @@
 │       │   │   │   │   └── dht <- jpeg.dht :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 27
-│       │   │   │   │       └── data <- slice (length.@value - 2) jpeg.dht-data :=
+│       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
 │       │   │   │   │           ├── class-table-id <- base.u8 := 0
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │   │           │   ├── 0 <- base.u8 := 0
@@ -104,7 +104,7 @@
 │       │   │   │   │   └── dht <- jpeg.dht :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 58
-│       │   │   │   │       └── data <- slice (length.@value - 2) jpeg.dht-data :=
+│       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
 │       │   │   │   │           ├── class-table-id <- base.u8 := 16
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │   │           │   ├── 0 <- base.u8 := 0
@@ -136,7 +136,7 @@
 │       │   │   │   │   └── dht <- jpeg.dht :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 26
-│       │   │   │   │       └── data <- slice (length.@value - 2) jpeg.dht-data :=
+│       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
 │       │   │   │   │           ├── class-table-id <- base.u8 := 1
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │   │           │   ├── 0 <- base.u8 := 0
@@ -163,7 +163,7 @@
 │       │   │   │       └── dht <- jpeg.dht :=
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 38
-│       │   │   │           └── data <- slice (length.@value - 2) jpeg.dht-data :=
+│       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
 │       │   │   │               ├── class-table-id <- base.u8 := 17
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │               │   ├── 0 <- base.u8 := 0
@@ -194,7 +194,7 @@
 │       │   │   ├── sos <- jpeg.sos :=
 │       │   │   │   ├── marker <- { ... }
 │       │   │   │   ├── length <- base.u16be := 12
-│       │   │   │   └── data <- slice (length.@value - 2) jpeg.sos-data :=
+│       │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
 │       │   │   │       ├── num-image-components <- base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
 │       │   │   │       │   └──  component-selector entropy-coding-table-ids

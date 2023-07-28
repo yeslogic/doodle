@@ -6,7 +6,7 @@
 │       │   │   └── app1 <- jpeg.app1 :=
 │       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 5426
-│       │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
+│       │   │       └── data <- slice (length - 2) jpeg.app1-data :=
 │       │   │           ├── identifier <- base.asciiz-string := "Exif"
 │       │   │           └── data <- match identifier.string { ... } :=
 │       │   │               ├── padding <- [= 0]
@@ -15,9 +15,9 @@
 │       │   │                   │   └── be <- (...)
 │       │   │                   ├── magic <- match byte-order { ... } := 42
 │       │   │                   ├── offset <- match byte-order { ... } := 8
-│       │   │                   └── ifd <- with-relative-offset (offset.@value - 8) (match byte-order { ... }) :=
+│       │   │                   └── ifd <- with-relative-offset (offset - 8) (match byte-order { ... }) :=
 │       │   │                       ├── num-fields <- base.u16be := 7
-│       │   │                       ├── fields <- repeat-count (num-fields.@value) { ... } :=
+│       │   │                       ├── fields <- repeat-count num-fields { ... } :=
 │       │   │                       │   ├── 0 <- { ... } :=
 │       │   │                       │   │   ├── tag <- base.u16be := 274
 │       │   │                       │   │   ├── type <- base.u16be := 3
@@ -72,7 +72,7 @@
 │       │   │   │   └── app13 <- jpeg.app13 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 10600
-│       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
+│       │   │   │       └── data <- slice (length - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 80
 │       │   │   │           ├── 1 <- base.u8 := 104
 │       │   │   │           ├── 2 <- base.u8 := 111
@@ -89,7 +89,7 @@
 │       │   │   │   └── app1 <- jpeg.app1 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 4429
-│       │   │   │       └── data <- slice (length.@value - 2) jpeg.app1-data :=
+│       │   │   │       └── data <- slice (length - 2) jpeg.app1-data :=
 │       │   │   │           ├── identifier <- base.asciiz-string := "http://ns.adobe.com/xap/1.0/"
 │       │   │   │           └── data <- match identifier.string { ... } :=
 │       │   │   │               └── xmp <- repeat base.u8 :=
@@ -109,7 +109,7 @@
 │       │   │   │   └── app2 <- jpeg.app2 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 576
-│       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
+│       │   │   │       └── data <- slice (length - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 73
 │       │   │   │           ├── 1 <- base.u8 := 67
 │       │   │   │           ├── 2 <- base.u8 := 67
@@ -126,7 +126,7 @@
 │       │   │   │   └── app14 <- jpeg.app14 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 14
-│       │   │   │       └── data <- slice (length.@value - 2) (repeat base.u8) :=
+│       │   │   │       └── data <- slice (length - 2) (repeat base.u8) :=
 │       │   │   │           ├── 0 <- base.u8 := 65
 │       │   │   │           ├── 1 <- base.u8 := 100
 │       │   │   │           ├── 2 <- base.u8 := 111
@@ -143,7 +143,7 @@
 │       │   │       └── dqt <- jpeg.dqt :=
 │       │   │           ├── marker <- { ... }
 │       │   │           ├── length <- base.u16be := 132
-│       │   │           └── data <- slice (length.@value - 2) jpeg.dqt-data :=
+│       │   │           └── data <- slice (length - 2) jpeg.dqt-data :=
 │       │   │               ├── precision-table-id <- base.u8 := 0
 │       │   │               └── elements <- repeat base.u8 :=
 │       │   │                   ├── 0 <- base.u8 := 2
@@ -162,7 +162,7 @@
 │       │   │   └── sof0 <- jpeg.sof0 :=
 │       │   │       ├── marker <- { ... }
 │       │   │       ├── length <- base.u16be := 17
-│       │   │       └── data <- slice (length.@value - 2) jpeg.sof-data :=
+│       │   │       └── data <- slice (length - 2) jpeg.sof-data :=
 │       │   │           ├── sample-precision <- base.u8 := 8
 │       │   │           ├── num-lines <- base.u16be := 709
 │       │   │           ├── num-samples-per-line <- base.u16be := 709
@@ -178,13 +178,13 @@
 │       │   │   │   │   └── dri <- jpeg.dri :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 4
-│       │   │   │   │       └── data <- slice (length.@value - 2) jpeg.dri-data :=
+│       │   │   │   │       └── data <- slice (length - 2) jpeg.dri-data :=
 │       │   │   │   │           └── restart-interval <- base.u16be := 89
 │       │   │   │   └── 1 <- jpeg.table-or-misc :=
 │       │   │   │       └── dht <- jpeg.dht :=
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 418
-│       │   │   │           └── data <- slice (length.@value - 2) jpeg.dht-data :=
+│       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
 │       │   │   │               ├── class-table-id <- base.u8 := 0
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │               │   ├── 0 <- base.u8 := 0
@@ -215,7 +215,7 @@
 │       │   │   ├── sos <- jpeg.sos :=
 │       │   │   │   ├── marker <- { ... }
 │       │   │   │   ├── length <- base.u16be := 12
-│       │   │   │   └── data <- slice (length.@value - 2) jpeg.sos-data :=
+│       │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
 │       │   │   │       ├── num-image-components <- base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
 │       │   │   │       │   └──  component-selector entropy-coding-table-ids

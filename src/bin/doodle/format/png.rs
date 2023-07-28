@@ -8,13 +8,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         record([
             ("length", base.u32be()), // FIXME < 2^31
             ("tag", tag),
-            (
-                "data",
-                Format::Slice(
-                    Expr::RecordProj(Box::new(Expr::Var(1)), "@value".to_string()),
-                    Box::new(data),
-                ),
-            ),
+            ("data", Format::Slice(Expr::Var(1), Box::new(data))),
             ("crc", base.u32be()), // FIXME check this
         ])
     };

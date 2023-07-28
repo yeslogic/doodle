@@ -4,7 +4,7 @@
 │       ├── ihdr <- png.ihdr :=
 │       │   ├── length <- base.u32be := 13
 │       │   ├── tag <- png.ihdr-tag
-│       │   ├── data <- slice (length.@value) png.ihdr-data :=
+│       │   ├── data <- slice length png.ihdr-data :=
 │       │   │   ├── width <- base.u32be := 50
 │       │   │   ├── height <- base.u32be := 50
 │       │   │   ├── bit-depth <- base.u8 := 8
@@ -18,7 +18,7 @@
 │       │   │   └── PLTE <- png.plte :=
 │       │   │       ├── length <- base.u32be := 87
 │       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice (length.@value) (repeat1 { ... }) :=
+│       │   │       ├── data <- slice length (repeat1 { ... }) :=
 │       │   │       │   └──    r   g   b
 │       │   │       │        192 192 192
 │       │   │       │        162 161 162
@@ -54,7 +54,7 @@
 │       │   │   └── tRNS <- png.trns :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice (length.@value) (match ihdr.data.color-type { ... }) :=
+│       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └──  palette-index
 │       │   │       │                    0
 │       │   │       └── crc <- base.u32be := 1088870502
@@ -62,14 +62,14 @@
 │       │   │   └── bKGD <- png.bkgd :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice (length.@value) (match ihdr.data.color-type { ... }) :=
+│       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └── palette-index <- base.u8 := 0
 │       │   │       └── crc <- base.u32be := 2282036552
 │       │   ├── 3 <- png.chunk :=
 │       │   │   └── pHYs <- png.phys :=
 │       │   │       ├── length <- base.u32be := 9
 │       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice (length.@value) { ... } :=
+│       │   │       ├── data <- slice length { ... } :=
 │       │   │       │   ├── pixels-per-unit-x <- base.u32be := 2835
 │       │   │       │   ├── pixels-per-unit-y <- base.u32be := 2835
 │       │   │       │   └── unit-specifier <- base.u8 := 1
@@ -78,7 +78,7 @@
 │       │       └── tIME <- png.time :=
 │       │           ├── length <- base.u32be := 7
 │       │           ├── tag <- (...)
-│       │           ├── data <- slice (length.@value) { ... } :=
+│       │           ├── data <- slice length { ... } :=
 │       │           │   ├── year <- base.u16be := 2005
 │       │           │   ├── month <- base.u8 := 11
 │       │           │   ├── day <- base.u8 := 1
@@ -90,7 +90,7 @@
 │       │   └── 0 <- png.idat :=
 │       │       ├── length <- base.u32be := 1168
 │       │       ├── tag <- png.idat-tag
-│       │       ├── data <- slice (length.@value) png.idat-data :=
+│       │       ├── data <- slice length png.idat-data :=
 │       │       │   ├── 0 <- base.u8 := 72
 │       │       │   ├── 1 <- base.u8 := 199
 │       │       │   ├── 2 <- base.u8 := 165
@@ -108,6 +108,6 @@
 │       └── iend <- png.iend :=
 │           ├── length <- base.u32be := 0
 │           ├── tag <- png.iend-tag
-│           ├── data <- slice (length.@value) png.iend-data := ()
+│           ├── data <- slice length png.iend-data := ()
 │           └── crc <- base.u32be := 2923585666
 └── end <- end-of-input

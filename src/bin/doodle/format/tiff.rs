@@ -28,13 +28,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                 "num-fields",
                 if is_be { base.u16be() } else { base.u16le() },
             ),
-            (
-                "fields",
-                repeat_count(
-                    Expr::RecordProj(Box::new(Expr::Var(0)), "@value".to_string()),
-                    ifd_field(is_be),
-                ),
-            ),
+            ("fields", repeat_count(Expr::Var(0), ifd_field(is_be))),
             (
                 "next-ifd-offset",
                 if is_be { base.u32be() } else { base.u32le() },
@@ -76,13 +70,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                 "ifd",
                 Format::WithRelativeOffset(
                     // TODO: Offset from start of the TIFF header
-                    Expr::Sub(
-                        Box::new(Expr::RecordProj(
-                            Box::new(Expr::Var(0)),
-                            "@value".to_string(),
-                        )),
-                        Box::new(Expr::U32(8)),
-                    ),
+                    Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
                     Box::new(Format::Match(
                         Expr::Var(2), // byte-order
                         vec![
