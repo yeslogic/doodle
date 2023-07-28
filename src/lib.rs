@@ -334,7 +334,7 @@ impl Expr {
             Expr::U16(i) => Value::U16(*i),
             Expr::U32(i) => Value::U32(*i),
             Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
-            Expr::TupleProj(head, index) => match head.eval(stack) {
+            Expr::TupleProj(head, index) => match head.eval_value(stack) {
                 Value::Tuple(vs) => vs[*index].clone(),
                 _ => panic!("expected tuple"),
             },
@@ -343,7 +343,7 @@ impl Expr {
             }
             Expr::RecordProj(head, label) => head.eval(stack).record_proj(label),
             Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
-            Expr::UnwrapVariant(expr) => match expr.eval(stack) {
+            Expr::UnwrapVariant(expr) => match expr.eval_value(stack) {
                 Value::Variant(_label, value) => *value.clone(),
                 _ => panic!("expected variant"),
             },
@@ -360,86 +360,86 @@ impl Expr {
                 value
             }
 
-            Expr::BitAnd(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::BitAnd(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
                 (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
                 (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::BitOr(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::BitOr(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
                 (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
                 (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Eq(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Eq(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Ne(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Ne(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Lt(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Lt(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Gt(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Gt(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Lte(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Lte(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Gte(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Gte(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Rem(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Rem(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
             #[rustfmt::skip]
-            Expr::Shl(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Shl(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Add(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Add(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Sub(x, y) => match (x.eval(stack), y.eval(stack)) {
+            Expr::Sub(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
 
-            Expr::AsU16(x) => match x.eval(stack) {
+            Expr::AsU16(x) => match x.eval_value(stack) {
                 Value::U8(x) => Value::U16(u16::from(x)),
                 Value::U16(x) => Value::U16(x),
                 x => panic!("cannot convert {x:?} to U16"),
             },
-            Expr::AsU32(x) => match x.eval(stack) {
+            Expr::AsU32(x) => match x.eval_value(stack) {
                 Value::U8(x) => Value::U32(u32::from(x)),
                 Value::U16(x) => Value::U32(u32::from(x)),
                 Value::U32(x) => Value::U32(x),
@@ -534,15 +534,28 @@ impl Expr {
         }
     }
 
-    fn eval_bool(&self, stack: &mut Vec<Value>) -> bool {
+    fn eval_value(&self, stack: &mut Vec<Value>) -> Value {
         match self.eval(stack) {
+            Value::Record(fields) => {
+                if let Some((_l, v)) = fields.iter().find(|(l, _)| l == "@value") {
+                    return v.clone();
+                } else {
+                    Value::Record(fields)
+                }
+            }
+            v => v,
+        }
+    }
+
+    fn eval_bool(&self, stack: &mut Vec<Value>) -> bool {
+        match self.eval_value(stack) {
             Value::Bool(b) => b,
             _ => panic!("value is not a bool"),
         }
     }
 
     fn eval_usize(&self, stack: &mut Vec<Value>) -> usize {
-        match self.eval(stack) {
+        match self.eval_value(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
@@ -551,7 +564,7 @@ impl Expr {
     }
 
     fn eval_tuple(&self, stack: &mut Vec<Value>) -> Vec<Value> {
-        match self.eval(stack) {
+        match self.eval_value(stack) {
             Value::Tuple(values) => values,
             _ => panic!("value is not a tuple"),
         }

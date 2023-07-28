@@ -19,13 +19,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
             (
                 "data",
                 Format::Slice(
-                    Expr::Sub(
-                        Box::new(Expr::RecordProj(
-                            Box::new(Expr::Var(0)),
-                            "@value".to_string(),
-                        )), // length
-                        Box::new(Expr::U16(2)),
-                    ),
+                    Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U16(2))),
                     Box::new(data),
                 ),
             ),
@@ -412,10 +406,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &Format) -> Form
                         vec![
                             (
                                 Pattern::variant("mcu", Pattern::Binding),
-                                Expr::Seq(vec![Expr::RecordProj(
-                                    Box::new(Expr::Var(0)),
-                                    "@value".to_string(),
-                                )]),
+                                Expr::Seq(vec![Expr::Var(0)]),
                             ),
                             (
                                 Pattern::variant("rst0", Pattern::Wildcard),

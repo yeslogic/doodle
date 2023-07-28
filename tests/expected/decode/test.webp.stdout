@@ -2,13 +2,13 @@
 │   └── riff <- riff.main :=
 │       ├── tag <- (...)
 │       ├── length <- base.u32le := 1140
-│       ├── data <- slice (length.@value) riff.subchunks :=
+│       ├── data <- slice length riff.subchunks :=
 │       │   ├── tag <- riff.tag := "WEBP"
 │       │   └── chunks <- repeat riff.chunk :=
 │       │       ├── 0 <- riff.chunk :=
 │       │       │   ├── tag <- riff.tag := "VP8X"
 │       │       │   ├── length <- base.u32le := 10
-│       │       │   ├── data <- slice (length.@value) (repeat base.u8) :=
+│       │       │   ├── data <- slice length (repeat base.u8) :=
 │       │       │   │   ├── 0 <- base.u8 := 8
 │       │       │   │   ├── 1 <- base.u8 := 0
 │       │       │   │   ├── 2 <- base.u8 := 0
@@ -19,11 +19,11 @@
 │       │       │   │   ├── 7 <- base.u8 := 58
 │       │       │   │   ├── 8 <- base.u8 := 0
 │       │       │   │   └── 9 <- base.u8 := 0
-│       │       │   └── pad <- match ((length.@value % 2) == 0) { ... } := ()
+│       │       │   └── pad <- match ((length % 2) == 0) { ... } := ()
 │       │       ├── 1 <- riff.chunk :=
 │       │       │   ├── tag <- riff.tag := "VP8L"
 │       │       │   ├── length <- base.u32le := 963
-│       │       │   ├── data <- slice (length.@value) (repeat base.u8) :=
+│       │       │   ├── data <- slice length (repeat base.u8) :=
 │       │       │   │   ├── 0 <- base.u8 := 47
 │       │       │   │   ├── 1 <- base.u8 := 72
 │       │       │   │   ├── 2 <- base.u8 := 128
@@ -36,11 +36,11 @@
 │       │       │   │   ├── 9 <- base.u8 := 173
 │       │       │   │   ~
 │       │       │   │   └── 962 <- base.u8 := 13
-│       │       │   └── pad <- match ((length.@value % 2) == 0) { ... } := 0
+│       │       │   └── pad <- match ((length % 2) == 0) { ... } := 0
 │       │       └── 2 <- riff.chunk :=
 │       │           ├── tag <- riff.tag := "EXIF"
 │       │           ├── length <- base.u32le := 138
-│       │           ├── data <- slice (length.@value) (repeat base.u8) :=
+│       │           ├── data <- slice length (repeat base.u8) :=
 │       │           │   ├── 0 <- base.u8 := 69
 │       │           │   ├── 1 <- base.u8 := 120
 │       │           │   ├── 2 <- base.u8 := 105
@@ -53,6 +53,6 @@
 │       │           │   ├── 9 <- base.u8 := 42
 │       │           │   ~
 │       │           │   └── 137 <- base.u8 := 0
-│       │           └── pad <- match ((length.@value % 2) == 0) { ... } := ()
-│       └── pad <- match ((length.@value % 2) == 0) { ... } := ()
+│       │           └── pad <- match ((length % 2) == 0) { ... } := ()
+│       └── pad <- match ((length % 2) == 0) { ... } := ()
 └── end <- end-of-input
