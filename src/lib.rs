@@ -79,7 +79,7 @@ impl Value {
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the stack
     fn matches(&self, stack: &mut Vec<Value>, pattern: &Pattern) -> bool {
-        match (pattern, self) {
+        match (pattern, &self.coerce_record_to_value()) {
             (Pattern::Binding, head) => {
                 stack.push(head.clone());
                 true
@@ -105,6 +105,19 @@ impl Value {
                 v.matches(stack, p)
             }
             _ => false,
+        }
+    }
+
+    fn coerce_record_to_value(&self) -> Value {
+        match self {
+            Value::Record(fields) => {
+                if let Some((_l, v)) = fields.iter().find(|(l, _)| l == "@value") {
+                    return v.clone();
+                } else {
+                    Value::Record(fields.clone())
+                }
+            }
+            v => v.clone(),
         }
     }
 }
@@ -535,16 +548,7 @@ impl Expr {
     }
 
     fn eval_value(&self, stack: &mut Vec<Value>) -> Value {
-        match self.eval(stack) {
-            Value::Record(fields) => {
-                if let Some((_l, v)) = fields.iter().find(|(l, _)| l == "@value") {
-                    return v.clone();
-                } else {
-                    Value::Record(fields)
-                }
-            }
-            v => v,
-        }
+        self.eval(stack).coerce_record_to_value()
     }
 
     fn eval_bool(&self, stack: &mut Vec<Value>) -> bool {
