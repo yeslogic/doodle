@@ -1003,7 +1003,7 @@ impl Decoder {
                 Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
             }
             Format::Peek(a) => {
-                let da = Box::new(Decoder::compile_next(module, a, next)?);
+                let da = Box::new(Decoder::compile_next(module, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Peek(da))
             }
             Format::Slice(expr, a) => {
