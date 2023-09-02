@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use doodle::{Decoder, FormatModule, ReadCtxt};
+use doodle::{Compiler, FormatModule, ReadCtxt};
 
 mod format;
 
@@ -63,12 +63,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         Command::File { output, filename } => {
             let mut module = FormatModule::new();
             let format = format::main(&mut module);
-            let decoder = Decoder::compile(&module, &format)?;
+            let program = Compiler::compile(&module, &format)?;
 
             let input = fs::read(filename)?;
-            let (value, _) = decoder
-                .parse(&mut Vec::new(), ReadCtxt::new(&input))
-                .ok_or("parse failure")?;
+            let (value, _) = program.run(ReadCtxt::new(&input)).ok_or("parse failure")?;
 
             match output {
                 FileOutput::Debug => println!("{value:?}"),
