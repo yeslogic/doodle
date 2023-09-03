@@ -639,6 +639,43 @@ impl Format {
             Format::Dynamic(DynFormat::Huffman(_, _)) => false,
         }
     }
+
+    /// True if the compilation of this format depends on the format that follows it
+    fn depends_on_next(&self, module: &FormatModule) -> bool {
+        match self {
+            Format::ItemVar(level) => module.get_format(*level).depends_on_next(module),
+            Format::Fail => false,
+            Format::EndOfInput => false,
+            Format::Align(_) => false,
+            Format::Byte(_) => false,
+            Format::Union(branches) => Format::union_depends_on_next(&branches, module),
+            Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
+            Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
+            Format::Repeat(_) => true,
+            Format::Repeat1(_) => true,
+            Format::RepeatCount(_, _f) => false,
+            Format::RepeatUntilLast(_, _f) => false,
+            Format::RepeatUntilSeq(_, _f) => false,
+            Format::Peek(_) => false,
+            Format::Slice(_, _) => false,
+            Format::Bits(_) => false,
+            Format::WithRelativeOffset(_, _) => false,
+            Format::Compute(_) => false,
+            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
+            Format::Dynamic(_) => false,
+        }
+    }
+
+    fn union_depends_on_next(branches: &[(String, Format)], module: &FormatModule) -> bool {
+        let mut fs = Vec::with_capacity(branches.len());
+        for (_label, f) in branches {
+            if f.depends_on_next(module) {
+                return true;
+            }
+            fs.push(f.clone());
+        }
+        MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
+    }
 }
 
 impl<'a> Nexts<'a> {
@@ -967,6 +1004,15 @@ impl Decoder {
     ) -> Result<Decoder, String> {
         match format {
             Format::ItemVar(level) => {
+                let next = if compiler
+                    .module
+                    .get_format(*level)
+                    .depends_on_next(compiler.module)
+                {
+                    next
+                } else {
+                    Rc::new(Next::Empty)
+                };
                 let n = if let Some(n) = compiler.map.get(&(*level, next.clone())) {
                     *n
                 } else {
