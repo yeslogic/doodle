@@ -1,4 +1,4 @@
-use doodle::{DynFormat, Expr, Format, FormatModule, Pattern};
+use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern};
 
 use crate::format::base::*;
 
@@ -215,7 +215,7 @@ fn fixed_code_lengths() -> Expr {
 /// Deflate
 ///
 #[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
+pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let bits2 = bits(2, base);
     let bits3 = bits(3, base);
     let bits4 = bits(4, base);
@@ -720,9 +720,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                 Format::Match(
                     Expr::Var(0),
                     vec![
-                        (Pattern::U8(0), uncompressed),
-                        (Pattern::U8(1), fixed_huffman),
-                        (Pattern::U8(2), dynamic_huffman),
+                        (Pattern::U8(0), uncompressed.call()),
+                        (Pattern::U8(1), fixed_huffman.call()),
+                        (Pattern::U8(2), dynamic_huffman.call()),
                         (Pattern::U8(3), Format::Fail),
                         (Pattern::Wildcard, Format::Fail),
                     ],
@@ -744,7 +744,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
                         )),
                         Box::new(Expr::U8(1)),
                     ),
-                    block,
+                    block.call(),
                 ),
             ),
             (

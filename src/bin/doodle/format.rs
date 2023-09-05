@@ -1,4 +1,4 @@
-use doodle::{Format, FormatModule};
+use doodle::{Format, FormatModule, FormatRef};
 
 use crate::format::base::*;
 
@@ -12,7 +12,7 @@ mod png;
 mod riff;
 mod tiff;
 
-pub fn main(module: &mut FormatModule) -> Format {
+pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
 
     let deflate = deflate::main(module, &base);
@@ -29,11 +29,11 @@ pub fn main(module: &mut FormatModule) -> Format {
             (
                 "data",
                 alts([
-                    ("gif", gif),
-                    ("gzip", gzip),
-                    ("jpeg", jpeg),
-                    ("png", png),
-                    ("riff", riff),
+                    ("gif", gif.call()),
+                    ("gzip", gzip.call()),
+                    ("jpeg", jpeg.call()),
+                    ("png", png.call()),
+                    ("riff", riff.call()),
                 ]),
             ),
             ("end", Format::EndOfInput),

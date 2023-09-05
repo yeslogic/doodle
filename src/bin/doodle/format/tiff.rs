@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule, Pattern};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 use crate::format::base::*;
 
@@ -6,7 +6,7 @@ use crate::format::base::*;
 ///
 /// - [TIFF 6.0 Specification, Section 4.5](https://developer.adobe.com/content/dam/udp/en/open/standards/tiff/TIFF6.pdf#page=13)
 /// - [Exif Version 2.32, Section 4.5.2](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf#page=23)
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
+pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // Image file directory field
     let ifd_field = |is_be: bool| {
         record([

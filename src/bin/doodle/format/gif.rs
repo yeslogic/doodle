@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule};
+use doodle::{Expr, Format, FormatModule, FormatRef};
 
 use crate::format::base::*;
 
@@ -6,7 +6,7 @@ use crate::format::base::*;
 ///
 /// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
 #[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
+pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags & 0b10000000) != 0
         Expr::Ne(
@@ -34,7 +34,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
     let color_table = |flags: Expr| {
         if_then_else(
             has_color_table(flags.clone()),
-            repeat_count(color_table_len(flags), color_table_entry),
+            repeat_count(color_table_len(flags), color_table_entry.call()),
             Format::EMPTY,
         )
     };
@@ -107,8 +107,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         "gif.table-based-image-data",
         record([
             ("lzw-min-code-size", base.u8()),
-            ("image-data", repeat(subblock.clone())),
-            ("terminator", block_terminator.clone()),
+            ("image-data", repeat(subblock.call())),
+            ("terminator", block_terminator.call()),
         ]),
     );
 
@@ -127,7 +127,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
             //                        Transparent Color Flag        1 Bit
             ("delay-time", base.u16le()),
             ("transparent-color-index", base.u8()),
-            ("terminator", block_terminator.clone()),
+            ("terminator", block_terminator.call()),
         ]),
     );
 
@@ -137,8 +137,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         record([
             ("separator", is_byte(0x21)),
             ("label", is_byte(0xFE)),
-            ("comment-data", repeat(subblock.clone())),
-            ("terminator", block_terminator.clone()),
+            ("comment-data", repeat(subblock.call())),
+            ("terminator", block_terminator.call()),
         ]),
     );
 
@@ -157,8 +157,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
             ("character-cell-height", base.u8()),
             ("text-foreground-color-index", base.u8()),
             ("text-background-color-index", base.u8()),
-            ("plain-text-data", repeat(subblock.clone())),
-            ("terminator", block_terminator.clone()),
+            ("plain-text-data", repeat(subblock.call())),
+            ("terminator", block_terminator.call()),
         ]),
     );
 
@@ -171,8 +171,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
             ("block-size", is_byte(11)),
             ("identifier", repeat_count(Expr::U8(8), base.u8())),
             ("authentication-code", repeat_count(Expr::U8(3), base.u8())),
-            ("application-data", repeat(subblock.clone())),
-            ("terminator", block_terminator.clone()),
+            ("application-data", repeat(subblock.call())),
+            ("terminator", block_terminator.call()),
         ]),
     );
 
@@ -184,7 +184,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
     let logical_screen = module.define_format(
         "gif.logical-screen",
         record([
-            ("descriptor", logical_screen_descriptor),
+            ("descriptor", logical_screen_descriptor.call()),
             (
                 "global-color-table",
                 global_color_table(Expr::record_proj(Expr::Var(0), "flags")),
@@ -195,20 +195,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
     let table_based_image = module.define_format(
         "gif.table-based-image",
         record([
-            ("descriptor", image_descriptor),
+            ("descriptor", image_descriptor.call()),
             (
                 "local-color-table",
                 local_color_table(Expr::record_proj(Expr::Var(0), "flags")),
             ),
-            ("data", table_based_image_data),
+            ("data", table_based_image_data.call()),
         ]),
     );
 
     let graphic_rendering_block = module.define_format(
         "gif.graphic-rendering-block",
         alts([
-            ("table-based-image", table_based_image),
-            ("plain-text-extension", plain_text_extension),
+            ("table-based-image", table_based_image.call()),
+            ("plain-text-extension", plain_text_extension.call()),
         ]),
     );
 
@@ -217,35 +217,35 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         record([
             (
                 "graphic-control-extension",
-                optional(graphic_control_extension),
+                optional(graphic_control_extension.call()),
             ),
-            ("graphic-rendering-block", graphic_rendering_block),
+            ("graphic-rendering-block", graphic_rendering_block.call()),
         ]),
     );
 
     let special_purpose_block = module.define_format(
         "gif.special-purpose-block",
         alts([
-            ("application-extension", application_extension),
-            ("comment-extension", comment_extension),
+            ("application-extension", application_extension.call()),
+            ("comment-extension", comment_extension.call()),
         ]),
     );
 
     let block = module.define_format(
         "gif.block",
         alts([
-            ("graphic-block", graphic_block),
-            ("special-purpose-block", special_purpose_block),
+            ("graphic-block", graphic_block.call()),
+            ("special-purpose-block", special_purpose_block.call()),
         ]),
     );
 
     module.define_format(
         "gif.main",
         record([
-            ("header", header),
-            ("logical-screen", logical_screen),
-            ("blocks", repeat(block)),
-            ("trailer", trailer),
+            ("header", header.call()),
+            ("logical-screen", logical_screen.call()),
+            ("blocks", repeat(block.call())),
+            ("trailer", trailer.call()),
         ]),
     )
 }
