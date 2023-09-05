@@ -220,7 +220,7 @@ impl Expr {
 #[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
-    ItemVar(usize),
+    ItemVar(usize, Vec<Expr>),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -294,7 +294,11 @@ pub struct FormatRef(usize);
 
 impl FormatRef {
     pub fn call(&self) -> Format {
-        Format::ItemVar(self.0)
+        Format::ItemVar(self.0, vec![])
+    }
+
+    pub fn call_args(&self, args: Vec<Expr>) -> Format {
+        Format::ItemVar(self.0, args)
     }
 }
 
@@ -356,7 +360,7 @@ pub struct MatchTree {
 
 /// Decoders with a fixed amount of lookahead
 enum Decoder {
-    Call(usize),
+    Call(usize, Vec<Expr>),
     Fail,
     EndOfInput,
     Align(usize),
@@ -626,7 +630,7 @@ impl Format {
     /// Returns `true` if the format could match the empty byte string
     fn is_nullable(&self, module: &FormatModule) -> bool {
         match self {
-            Format::ItemVar(level) => module.get_format(*level).is_nullable(module),
+            Format::ItemVar(level, _args) => module.get_format(*level).is_nullable(module),
             Format::Fail => false,
             Format::EndOfInput => true,
             Format::Align(_) => true,
@@ -652,7 +656,7 @@ impl Format {
     /// True if the compilation of this format depends on the format that follows it
     fn depends_on_next(&self, module: &FormatModule) -> bool {
         match self {
-            Format::ItemVar(level) => module.get_format(*level).depends_on_next(module),
+            Format::ItemVar(level, _args) => module.get_format(*level).depends_on_next(module),
             Format::Fail => false,
             Format::EndOfInput => false,
             Format::Align(_) => false,
@@ -754,7 +758,9 @@ impl<'a> MatchTreeLevel<'a> {
         next: Rc<Next<'a>>,
     ) -> Result<(), ()> {
         match f {
-            Format::ItemVar(level) => self.add(module, index, module.get_format(*level), next),
+            Format::ItemVar(level, _args) => {
+                self.add(module, index, module.get_format(*level), next)
+            }
             Format::Fail => Ok(()),
             Format::EndOfInput => self.accept(index),
             Format::Align(_) => {
@@ -1012,7 +1018,7 @@ impl Decoder {
         next: Rc<Next<'a>>,
     ) -> Result<Decoder, String> {
         match format {
-            Format::ItemVar(level) => {
+            Format::ItemVar(level, args) => {
                 let next = if compiler
                     .module
                     .get_format(*level)
@@ -1035,7 +1041,7 @@ impl Decoder {
                     compiler.map.insert((*level, next.clone()), n);
                     n
                 };
-                Ok(Decoder::Call(n))
+                Ok(Decoder::Call(n, args.clone()))
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
@@ -1162,7 +1168,14 @@ impl Decoder {
         input: ReadCtxt<'input>,
     ) -> Option<(Value, ReadCtxt<'input>)> {
         match self {
-            Decoder::Call(n) => program.decoders[*n].parse(program, stack, input),
+            Decoder::Call(n, es) => {
+                let mut vs = Vec::new();
+                for e in es {
+                    let v = e.eval(stack);
+                    vs.push(v);
+                }
+                program.decoders[*n].parse(program, &mut vs, input)
+            }
             Decoder::Fail => None,
             Decoder::EndOfInput => match input.read_byte() {
                 None => Some((Value::UNIT, input)),

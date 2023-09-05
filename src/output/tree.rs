@@ -58,7 +58,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     pub fn write_decoded_value(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
-            Format::ItemVar(level) => {
+            Format::ItemVar(level, _args) => {
                 if self.flags.pretty_ascii_strings
                     && self.module.get_name(*level) == "base.asciiz-string"
                 {
@@ -283,7 +283,9 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn is_implied_value_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level) => self.is_implied_value_format(self.module.get_format(*level)),
+            Format::ItemVar(level, _args) => {
+                self.is_implied_value_format(self.module.get_format(*level))
+            }
             Format::EndOfInput => true,
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
@@ -294,7 +296,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn is_ascii_string_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level) => {
+            Format::ItemVar(level, _args) => {
                 self.module.get_name(*level) == "base.asciiz-string"
                     || self.is_ascii_string_format(self.module.get_format(*level))
             }
@@ -314,14 +316,14 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn is_ascii_char_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level) => self.module.get_name(*level) == "base.ascii-char",
+            Format::ItemVar(level, _args) => self.module.get_name(*level) == "base.ascii-char",
             _ => false,
         }
     }
 
     fn is_atomic_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level) => self.is_atomic_format(self.module.get_format(*level)),
+            Format::ItemVar(level, _args) => self.is_atomic_format(self.module.get_format(*level)),
             Format::Byte(_) => true,
             _ => false,
         }
@@ -332,7 +334,7 @@ impl<'module, W: io::Write> Context<'module, W> {
         format: &'a Format,
     ) -> Option<&'a [(String, Format)]> {
         match format {
-            Format::ItemVar(level) => {
+            Format::ItemVar(level, _args) => {
                 self.is_record_with_atomic_fields(self.module.get_format(*level))
             }
             Format::Record(fields) => {
@@ -740,8 +742,12 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn write_atomic_format(&mut self, format: &Format) -> io::Result<()> {
         match format {
-            Format::ItemVar(var) => {
-                write!(&mut self.writer, "{}", self.module.get_name(*var))
+            Format::ItemVar(var, args) => {
+                write!(&mut self.writer, "{}", self.module.get_name(*var))?;
+                if !args.is_empty() {
+                    write!(&mut self.writer, "(...)")?;
+                }
+                Ok(())
             }
             Format::Fail => write!(&mut self.writer, "fail"),
             Format::EndOfInput => write!(&mut self.writer, "end-of-input"),
