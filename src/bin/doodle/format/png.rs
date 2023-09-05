@@ -116,11 +116,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let png_chunk = module.define_format(
         "png.chunk",
         alts([
-            ("bKGD", bkgd.call()),
+            ("bKGD", bkgd.call_args(vec![Expr::Var(0)])),
             ("pHYs", phys.call()),
             ("PLTE", plte.call()),
             ("tIME", time.call()),
-            ("tRNS", trns.call()),
+            ("tRNS", trns.call_args(vec![Expr::Var(0)])),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
     );
@@ -132,7 +132,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("signature", png_signature.call()),
             ("ihdr", ihdr.call()),
-            ("chunks", repeat(png_chunk.call())),
+            ("chunks", repeat(png_chunk.call_args(vec![Expr::Var(0)]))),
             ("idat", repeat1(idat.call())),
             ("more-chunks", repeat(png_chunk.call())),
             ("iend", iend.call()),

@@ -13,8 +13,8 @@
 │       │   │   ├── filter-method <- base.u8 := 0
 │       │   │   └── interlace-method <- base.u8 := 1
 │       │   └── crc <- base.u32be := 1592150037
-│       ├── chunks <- repeat png.chunk :=
-│       │   ├── 0 <- png.chunk :=
+│       ├── chunks <- repeat png.chunk(...) :=
+│       │   ├── 0 <- png.chunk(...) :=
 │       │   │   └── PLTE <- png.plte :=
 │       │   │       ├── length <- base.u32be := 87
 │       │   │       ├── tag <- (...)
@@ -50,22 +50,22 @@
 │       │   │       │        201 201 201
 │       │   │       │        138 138 138
 │       │   │       └── crc <- base.u32be := 1943707985
-│       │   ├── 1 <- png.chunk :=
-│       │   │   └── tRNS <- png.trns :=
+│       │   ├── 1 <- png.chunk(...) :=
+│       │   │   └── tRNS <- png.trns(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └──  palette-index
 │       │   │       │                    0
 │       │   │       └── crc <- base.u32be := 1088870502
-│       │   ├── 2 <- png.chunk :=
-│       │   │   └── bKGD <- png.bkgd :=
+│       │   ├── 2 <- png.chunk(...) :=
+│       │   │   └── bKGD <- png.bkgd(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └── palette-index <- base.u8 := 0
 │       │   │       └── crc <- base.u32be := 2282036552
-│       │   ├── 3 <- png.chunk :=
+│       │   ├── 3 <- png.chunk(...) :=
 │       │   │   └── pHYs <- png.phys :=
 │       │   │       ├── length <- base.u32be := 9
 │       │   │       ├── tag <- (...)
@@ -74,7 +74,7 @@
 │       │   │       │   ├── pixels-per-unit-y <- base.u32be := 2835
 │       │   │       │   └── unit-specifier <- base.u8 := 1
 │       │   │       └── crc <- base.u32be := 10132504
-│       │   └── 4 <- png.chunk :=
+│       │   └── 4 <- png.chunk(...) :=
 │       │       └── tIME <- png.time :=
 │       │           ├── length <- base.u32be := 7
 │       │           ├── tag <- (...)
