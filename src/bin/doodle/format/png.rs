@@ -1,9 +1,8 @@
-use doodle::{Expr, Format, FormatModule, Pattern};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 use crate::format::base::*;
 
-#[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
+pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
             ("length", base.u32be()), // FIXME < 2^31
@@ -31,15 +30,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
             ("interlace-method", base.u8()),
         ]),
     );
-    let ihdr = module.define_format("png.ihdr", chunk(ihdr_tag, ihdr_data));
+    let ihdr = module.define_format("png.ihdr", chunk(ihdr_tag.call(), ihdr_data.call()));
 
     let idat_tag = module.define_format("png.idat-tag", is_bytes(b"IDAT"));
     let idat_data = module.define_format("png.idat-data", repeat(base.u8()));
-    let idat = module.define_format("png.idat", chunk(idat_tag, idat_data));
+    let idat = module.define_format("png.idat", chunk(idat_tag.call(), idat_data.call()));
 
     let iend_tag = module.define_format("png.iend-tag", is_bytes(b"IEND"));
     let iend_data = module.define_format("png.iend-data", Format::EMPTY); // FIXME ensure IEND length = 0
-    let iend = module.define_format("png.iend", chunk(iend_tag, iend_data));
+    let iend = module.define_format("png.iend", chunk(iend_tag.call(), iend_data.call()));
 
     let bkgd_data = Format::Match(
         Expr::RecordProj(
@@ -117,11 +116,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
     let png_chunk = module.define_format(
         "png.chunk",
         alts([
-            ("bKGD", bkgd),
-            ("pHYs", phys),
-            ("PLTE", plte),
-            ("tIME", time),
-            ("tRNS", trns),
+            ("bKGD", bkgd.call()),
+            ("pHYs", phys.call()),
+            ("PLTE", plte.call()),
+            ("tIME", time.call()),
+            ("tRNS", trns.call()),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
     );
@@ -131,12 +130,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
     module.define_format(
         "png.main",
         record([
-            ("signature", png_signature),
-            ("ihdr", ihdr),
-            ("chunks", repeat(png_chunk.clone())),
-            ("idat", repeat1(idat)),
-            ("more-chunks", repeat(png_chunk.clone())),
-            ("iend", iend),
+            ("signature", png_signature.call()),
+            ("ihdr", ihdr.call()),
+            ("chunks", repeat(png_chunk.call())),
+            ("idat", repeat1(idat.call())),
+            ("more-chunks", repeat(png_chunk.call())),
+            ("iend", iend.call()),
         ]),
     )
 }

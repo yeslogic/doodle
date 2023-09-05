@@ -1,9 +1,8 @@
-use doodle::{Expr, Format, FormatModule};
+use doodle::{Expr, Format, FormatModule, FormatRef};
 
 use crate::format::base::*;
 
-#[allow(clippy::redundant_clone)]
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
+pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn is_even(num: Expr) -> Expr {
         // (num % 2) == 0
         Expr::Eq(
@@ -34,12 +33,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> Format {
         ]),
     );
 
-    let any_chunk = module.define_format("riff.chunk", chunk(any_tag.clone(), repeat(base.u8())));
+    let any_chunk = module.define_format("riff.chunk", chunk(any_tag.call(), repeat(base.u8())));
 
     let subchunks = module.define_format(
         "riff.subchunks",
-        record([("tag", any_tag.clone()), ("chunks", repeat(any_chunk))]),
+        record([
+            ("tag", any_tag.call()),
+            ("chunks", repeat(any_chunk.call())),
+        ]),
     );
 
-    module.define_format("riff.main", chunk(is_bytes(b"RIFF"), subchunks.clone()))
+    module.define_format("riff.main", chunk(is_bytes(b"RIFF"), subchunks.call()))
 }

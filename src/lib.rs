@@ -289,6 +289,15 @@ impl Format {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct FormatRef(usize);
+
+impl FormatRef {
+    pub fn call(&self) -> Format {
+        Format::ItemVar(self.0)
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct FormatModule {
     names: Vec<String>,
@@ -303,11 +312,11 @@ impl FormatModule {
         }
     }
 
-    pub fn define_format(&mut self, name: impl Into<String>, format: Format) -> Format {
+    pub fn define_format(&mut self, name: impl Into<String>, format: Format) -> FormatRef {
         let level = self.names.len();
         self.names.push(name.into());
         self.formats.push(format);
-        Format::ItemVar(level)
+        FormatRef(level)
     }
 
     fn get_name(&self, level: usize) -> &str {

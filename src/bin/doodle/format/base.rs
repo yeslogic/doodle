@@ -1,5 +1,5 @@
 use doodle::byte_set::ByteSet;
-use doodle::{Expr, Format, FormatModule, Pattern};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
@@ -70,26 +70,26 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
 }
 
 pub struct BaseModule {
-    bit: Format,
-    u8: Format,
-    u16be: Format,
-    u16le: Format,
-    u32be: Format,
-    u32le: Format,
-    ascii_char: Format,
-    asciiz_string: Format,
+    bit: FormatRef,
+    u8: FormatRef,
+    u16be: FormatRef,
+    u16le: FormatRef,
+    u32be: FormatRef,
+    u32le: FormatRef,
+    ascii_char: FormatRef,
+    asciiz_string: FormatRef,
 }
 
 #[rustfmt::skip]
 impl BaseModule {
-    pub fn bit(&self) -> Format { self.bit.clone() }
-    pub fn u8(&self) -> Format { self.u8.clone() }
-    pub fn u16be(&self) -> Format { self.u16be.clone() }
-    pub fn u16le(&self) -> Format { self.u16le.clone() }
-    pub fn u32be(&self) -> Format { self.u32be.clone() }
-    pub fn u32le(&self) -> Format { self.u32le.clone() }
-    pub fn ascii_char(&self) -> Format { self.ascii_char.clone() }
-    pub fn asciiz_string(&self) -> Format { self.asciiz_string.clone() }
+    pub fn bit(&self) -> Format { self.bit.call() }
+    pub fn u8(&self) -> Format { self.u8.call() }
+    pub fn u16be(&self) -> Format { self.u16be.call() }
+    pub fn u16le(&self) -> Format { self.u16le.call() }
+    pub fn u32be(&self) -> Format { self.u32be.call() }
+    pub fn u32le(&self) -> Format { self.u32le.call() }
+    pub fn ascii_char(&self) -> Format { self.ascii_char.call() }
+    pub fn asciiz_string(&self) -> Format { self.asciiz_string.call() }
 }
 
 pub fn main(module: &mut FormatModule) -> BaseModule {
@@ -100,7 +100,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u16be = module.define_format(
         "base.u16be",
         record([
-            ("bytes", tuple([u8.clone(), u8.clone()])),
+            ("bytes", tuple([u8.call(), u8.call()])),
             (
                 "@value",
                 Format::Compute(Expr::U16Be(Box::new(Expr::Var(0)))),
@@ -111,7 +111,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u16le = module.define_format(
         "base.u16le",
         record([
-            ("bytes", tuple([u8.clone(), u8.clone()])),
+            ("bytes", tuple([u8.call(), u8.call()])),
             (
                 "@value",
                 Format::Compute(Expr::U16Le(Box::new(Expr::Var(0)))),
@@ -122,10 +122,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u32be = module.define_format(
         "base.u32be",
         record([
-            (
-                "bytes",
-                tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()]),
-            ),
+            ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
             (
                 "@value",
                 Format::Compute(Expr::U32Be(Box::new(Expr::Var(0)))),
@@ -136,10 +133,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u32le = module.define_format(
         "base.u32le",
         record([
-            (
-                "bytes",
-                tuple([u8.clone(), u8.clone(), u8.clone(), u8.clone()]),
-            ),
+            ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
             (
                 "@value",
                 Format::Compute(Expr::U32Le(Box::new(Expr::Var(0)))),
