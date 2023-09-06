@@ -28,7 +28,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "num-fields",
                 if is_be { base.u16be() } else { base.u16le() },
             ),
-            ("fields", repeat_count(Expr::Var(0), ifd_field(is_be))),
+            (
+                "fields",
+                repeat_count(Expr::VarName("num-fields".to_string()), ifd_field(is_be)),
+            ),
             (
                 "next-ifd-offset",
                 if is_be { base.u32be() } else { base.u32le() },
@@ -49,7 +52,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "magic",
                 Format::Match(
-                    Expr::Var(0), // byte-order
+                    Expr::VarName("byte-order".to_string()),
                     vec![
                         (Pattern::variant("le", Pattern::Wildcard), base.u16le()), // 42
                         (Pattern::variant("be", Pattern::Wildcard), base.u16be()), // 42
@@ -59,7 +62,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "offset",
                 Format::Match(
-                    Expr::Var(1), // byte-order
+                    Expr::VarName("byte-order".to_string()),
                     vec![
                         (Pattern::variant("le", Pattern::Wildcard), base.u32le()),
                         (Pattern::variant("be", Pattern::Wildcard), base.u32be()),
@@ -70,9 +73,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "ifd",
                 Format::WithRelativeOffset(
                     // TODO: Offset from start of the TIFF header
-                    Expr::Sub(Box::new(Expr::Var(0)), Box::new(Expr::U32(8))),
+                    Expr::Sub(
+                        Box::new(Expr::VarName("offset".to_string())),
+                        Box::new(Expr::U32(8)),
+                    ),
                     Box::new(Format::Match(
-                        Expr::Var(2), // byte-order
+                        Expr::VarName("byte-order".to_string()),
                         vec![
                             (Pattern::variant("le", Pattern::Wildcard), ifd(false)),
                             (Pattern::variant("be", Pattern::Wildcard), ifd(true)),
