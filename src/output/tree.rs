@@ -644,6 +644,9 @@ impl<'module, W: io::Write> Context<'module, W> {
                     write!(&mut self.writer, "_")
                 }
             }
+            Expr::VarName(name) => {
+                write!(&mut self.writer, "{name}")
+            }
             Expr::Bool(b) => write!(&mut self.writer, "{b}"),
             Expr::U8(i) => write!(&mut self.writer, "{i}"),
             Expr::U16(i) => write!(&mut self.writer, "{i}"),

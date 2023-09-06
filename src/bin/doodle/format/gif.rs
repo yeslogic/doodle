@@ -44,7 +44,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "gif.subblock",
         record([
             ("len-bytes", not_byte(0x00)),
-            ("data", repeat_count(Expr::Var(0), base.u8())),
+            (
+                "data",
+                repeat_count(Expr::VarName("len-bytes".to_string()), base.u8()),
+            ),
         ]),
     );
 
@@ -187,7 +190,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("descriptor", logical_screen_descriptor.call()),
             (
                 "global-color-table",
-                global_color_table(Expr::record_proj(Expr::Var(0), "flags")),
+                global_color_table(Expr::record_proj(
+                    Expr::VarName("descriptor".to_string()),
+                    "flags",
+                )),
             ),
         ]),
     );
@@ -198,7 +204,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("descriptor", image_descriptor.call()),
             (
                 "local-color-table",
-                local_color_table(Expr::record_proj(Expr::Var(0), "flags")),
+                local_color_table(Expr::record_proj(
+                    Expr::VarName("descriptor".to_string()),
+                    "flags",
+                )),
             ),
             ("data", table_based_image_data.call()),
         ]),

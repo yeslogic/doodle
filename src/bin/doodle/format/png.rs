@@ -7,7 +7,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("length", base.u32be()), // FIXME < 2^31
             ("tag", tag),
-            ("data", Format::Slice(Expr::Var(1), Box::new(data))),
+            (
+                "data",
+                Format::Slice(Expr::VarName("length".to_string()), Box::new(data)),
+            ),
             ("crc", base.u32be()), // FIXME check this
         ])
     };
@@ -132,7 +135,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("signature", png_signature.call()),
             ("ihdr", ihdr.call()),
-            ("chunks", repeat(png_chunk.call_args(vec![Expr::Var(0)]))),
+            (
+                "chunks",
+                repeat(png_chunk.call_args(vec![Expr::VarName("ihdr".to_string())])),
+            ),
             ("idat", repeat1(idat.call())),
             ("more-chunks", repeat(png_chunk.call())),
             ("iend", iend.call()),

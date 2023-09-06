@@ -15,10 +15,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("tag", tag),
             ("length", base.u32le()),
-            ("data", Format::Slice(Expr::Var(0), Box::new(data))),
+            (
+                "data",
+                Format::Slice(Expr::VarName("length".to_string()), Box::new(data)),
+            ),
             (
                 "pad",
-                if_then_else(is_even(Expr::Var(1)), Format::EMPTY, is_byte(0x00)),
+                if_then_else(
+                    is_even(Expr::VarName("length".to_string())),
+                    Format::EMPTY,
+                    is_byte(0x00),
+                ),
             ),
         ])
     };

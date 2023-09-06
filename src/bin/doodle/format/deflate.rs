@@ -133,7 +133,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
             "length",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(Expr::Var(0))),
+                Expr::AsU16(Box::new(Expr::VarName("length-extra-bits".to_string()))),
             )),
         ),
         (
@@ -142,7 +142,9 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
         ),
         (
             "distance-code-value",
-            Format::Compute(Expr::UnwrapVariant(Box::new(Expr::Var(0)))),
+            Format::Compute(Expr::UnwrapVariant(Box::new(Expr::VarName(
+                "distance-code".to_string(),
+            )))),
         ),
         ("distance-record", distance_record(base)),
     ])
@@ -155,11 +157,14 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
             "length",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(Expr::Var(0))),
+                Expr::AsU16(Box::new(Expr::VarName("length-extra-bits".to_string()))),
             )),
         ),
         ("distance-code", bits(5, base)),
-        ("distance-code-value", Format::Compute(Expr::Var(0))),
+        (
+            "distance-code-value",
+            Format::Compute(Expr::VarName("distance-code".to_string())),
+        ),
         ("distance-record", distance_record(base)),
     ])
 }
