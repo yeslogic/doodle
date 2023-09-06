@@ -1,6 +1,6 @@
 use std::{fmt, io};
 
-use crate::{Expr, Format, FormatModule, Value};
+use crate::{Expr, Format, FormatModule, Stack, Value};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     Context::new(io::stdout(), module)
@@ -27,7 +27,7 @@ pub struct Context<'module, W: io::Write> {
     flags: Flags,
     module: &'module FormatModule,
     names: Vec<String>,
-    values: Vec<Value>,
+    stack: Stack,
 }
 
 pub struct Flags {
@@ -52,7 +52,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             flags,
             module,
             names: Vec::new(),
-            values: Vec::new(),
+            stack: Stack::new(),
         }
     }
 
@@ -122,18 +122,18 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
             Format::Compute(_expr) => self.write_value(value),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.values);
-                let initial_len = self.values.len();
+                let head = head.eval(&mut self.stack);
+                let initial_len = self.stack.len();
                 let (_, format) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(&mut self.values, pattern))
+                    .find(|(pattern, _)| head.matches(&mut self.stack, pattern))
                     .expect("exhaustive patterns");
-                for i in 0..(self.values.len() - initial_len) {
+                for i in 0..(self.stack.len() - initial_len) {
                     self.names.push(format!("x{i}")); // TODO: use better names
                 }
                 self.write_decoded_value(value, format)?;
                 self.names.truncate(initial_len);
-                self.values.truncate(initial_len);
+                self.stack.truncate(initial_len);
                 Ok(())
             }
             Format::Dynamic(_) => self.write_value(value),
@@ -364,13 +364,13 @@ impl<'module, W: io::Write> Context<'module, W> {
                 let format = format_fields.map(|fs| &fs[index].1);
                 self.write_field_value_continue(label, value, format)?;
                 self.names.push(label.clone());
-                self.values.push(value.clone());
+                self.stack.push(value.clone());
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
             self.write_field_value_last(label, value, format)?;
             self.names.truncate(initial_len);
-            self.values.truncate(initial_len);
+            self.stack.truncate(initial_len);
             Ok(())
         }
     }

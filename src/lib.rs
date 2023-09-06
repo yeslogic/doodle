@@ -78,7 +78,7 @@ impl Value {
 
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the stack
-    fn matches(&self, stack: &mut Vec<Value>, pattern: &Pattern) -> bool {
+    fn matches(&self, stack: &mut Stack, pattern: &Pattern) -> bool {
         match (pattern, &self.coerce_record_to_value()) {
             (Pattern::Binding, head) => {
                 stack.push(head.clone());
@@ -383,9 +383,9 @@ enum Decoder {
 }
 
 impl Expr {
-    fn eval(&self, stack: &mut Vec<Value>) -> Value {
+    fn eval(&self, stack: &mut Stack) -> Value {
         match self {
-            Expr::Var(index) => stack[stack.len() - index - 1].clone(),
+            Expr::Var(index) => stack.get(*index).clone(),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::U8(i) => Value::U8(*i),
             Expr::U16(i) => Value::U16(*i),
@@ -598,18 +598,18 @@ impl Expr {
         }
     }
 
-    fn eval_value(&self, stack: &mut Vec<Value>) -> Value {
+    fn eval_value(&self, stack: &mut Stack) -> Value {
         self.eval(stack).coerce_record_to_value()
     }
 
-    fn eval_bool(&self, stack: &mut Vec<Value>) -> bool {
+    fn eval_bool(&self, stack: &mut Stack) -> bool {
         match self.eval_value(stack) {
             Value::Bool(b) => b,
             _ => panic!("value is not a bool"),
         }
     }
 
-    fn eval_usize(&self, stack: &mut Vec<Value>) -> usize {
+    fn eval_usize(&self, stack: &mut Stack) -> usize {
         match self.eval_value(stack) {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
@@ -618,7 +618,7 @@ impl Expr {
         }
     }
 
-    fn eval_tuple(&self, stack: &mut Vec<Value>) -> Vec<Value> {
+    fn eval_tuple(&self, stack: &mut Stack) -> Vec<Value> {
         match self.eval_value(stack) {
             Value::Tuple(values) => values,
             _ => panic!("value is not a tuple"),
@@ -969,7 +969,7 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> Option<(Value, ReadCtxt<'input>)> {
-        let mut stack = Vec::new();
+        let mut stack = Stack::new();
         self.decoders[0].parse(self, &mut stack, input)
     }
 }
@@ -998,6 +998,37 @@ impl<'a> Compiler<'a> {
         let d = Decoder::compile(&mut compiler, format)?;
         compiler.program.decoders[n] = d;
         Ok(compiler.program)
+    }
+}
+
+pub struct Stack {
+    values: Vec<Value>,
+}
+
+impl Stack {
+    fn new() -> Self {
+        let values = Vec::new();
+        Stack { values }
+    }
+
+    fn push(&mut self, v: Value) {
+        self.values.push(v);
+    }
+
+    fn pop(&mut self) -> Value {
+        self.values.pop().unwrap()
+    }
+
+    fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    fn truncate(&mut self, len: usize) {
+        self.values.truncate(len);
+    }
+
+    fn get(&self, index: usize) -> &Value {
+        &self.values[self.values.len() - index - 1]
     }
 }
 
@@ -1164,17 +1195,17 @@ impl Decoder {
     pub fn parse<'input>(
         &self,
         program: &Program,
-        stack: &mut Vec<Value>,
+        stack: &mut Stack,
         input: ReadCtxt<'input>,
     ) -> Option<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es) => {
-                let mut vs = Vec::new();
+                let mut new_stack = Stack::new();
                 for e in es {
                     let v = e.eval(stack);
-                    vs.push(v);
+                    new_stack.push(v);
                 }
-                program.decoders[*n].parse(program, &mut vs, input)
+                program.decoders[*n].parse(program, &mut new_stack, input)
             }
             Decoder::Fail => None,
             Decoder::EndOfInput => match input.read_byte() {
@@ -1266,7 +1297,7 @@ impl Decoder {
                     input = next_input;
                     stack.push(va);
                     let done = expr.eval_bool(stack);
-                    let va = stack.pop()?;
+                    let va = stack.pop();
                     v.push(va);
                     if done {
                         break;
@@ -1283,7 +1314,7 @@ impl Decoder {
                     v.push(va);
                     stack.push(Value::Seq(v));
                     let done = expr.eval_bool(stack);
-                    v = if let Value::Seq(v) = stack.pop().unwrap() {
+                    v = if let Value::Seq(v) = stack.pop() {
                         v
                     } else {
                         panic!("expected Seq")
@@ -1520,7 +1551,7 @@ mod tests {
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
-        let mut stack = Vec::new();
+        let mut stack = Stack::new();
         let (val, remain) = d.parse(&program, &mut stack, ReadCtxt::new(input)).unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
@@ -1528,7 +1559,7 @@ mod tests {
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
-        let mut stack = Vec::new();
+        let mut stack = Stack::new();
         assert!(d
             .parse(&program, &mut stack, ReadCtxt::new(input))
             .is_none());

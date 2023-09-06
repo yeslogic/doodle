@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{Format, FormatModule, Value};
+use crate::{Format, FormatModule, Stack, Value};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();
@@ -14,7 +14,7 @@ pub struct Context<'module, W: io::Write> {
     writer: W,
     module: &'module FormatModule,
     names: Vec<String>,
-    values: Vec<Value>,
+    stack: Stack,
 }
 
 fn is_show_format(name: &str) -> Option<&'static str> {
@@ -166,7 +166,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             writer,
             module,
             names: Vec::new(),
-            values: Vec::new(),
+            stack: Stack::new(),
         }
     }
 
@@ -208,10 +208,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                         let format = &format_fields[index].1;
                         self.write_flat(value, format)?;
                         self.names.push(label.clone());
-                        self.values.push(value.clone());
+                        self.stack.push(value.clone());
                     }
                     self.names.truncate(initial_len);
-                    self.values.truncate(initial_len);
+                    self.stack.truncate(initial_len);
                     Ok(())
                 }
                 _ => panic!("expected record"),
@@ -235,18 +235,18 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Compute(_expr) => Ok(()),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.values);
-                let initial_len = self.values.len();
+                let head = head.eval(&mut self.stack);
+                let initial_len = self.stack.len();
                 let (_, format) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(&mut self.values, pattern))
+                    .find(|(pattern, _)| head.matches(&mut self.stack, pattern))
                     .expect("exhaustive patterns");
-                for i in 0..(self.values.len() - initial_len) {
+                for i in 0..(self.stack.len() - initial_len) {
                     self.names.push(format!("x{i}")); // TODO: use better names
                 }
                 self.write_flat(value, format)?;
                 self.names.truncate(initial_len);
-                self.values.truncate(initial_len);
+                self.stack.truncate(initial_len);
                 Ok(())
             }
             Format::Dynamic(_) => Ok(()), // FIXME
