@@ -26,7 +26,6 @@ pub struct Context<'module, W: io::Write> {
     preview_len: Option<usize>,
     flags: Flags,
     module: &'module FormatModule,
-    names: Vec<String>,
     stack: Stack,
 }
 
@@ -51,7 +50,6 @@ impl<'module, W: io::Write> Context<'module, W> {
             preview_len: Some(10),
             flags,
             module,
-            names: Vec::new(),
             stack: Stack::new(),
         }
     }
@@ -128,11 +126,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     .iter()
                     .find(|(pattern, _)| head.matches(&mut self.stack, pattern))
                     .expect("exhaustive patterns");
-                for i in 0..(self.stack.len() - initial_len) {
-                    self.names.push(format!("x{i}")); // TODO: use better names
-                }
                 self.write_decoded_value(value, format)?;
-                self.names.truncate(initial_len);
                 self.stack.truncate(initial_len);
                 Ok(())
             }
@@ -358,18 +352,16 @@ impl<'module, W: io::Write> Context<'module, W> {
         } else if let Some((_, v)) = value_fields.iter().find(|(label, _)| label == "@value") {
             self.write_value(v)
         } else {
-            let initial_len = self.names.len();
+            let initial_len = self.stack.len();
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
                 self.write_field_value_continue(label, value, format)?;
-                self.names.push(label.clone());
-                self.stack.push(value.clone());
+                self.stack.push(Some(label.clone()), value.clone());
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
             self.write_field_value_last(label, value, format)?;
-            self.names.truncate(initial_len);
             self.stack.truncate(initial_len);
             Ok(())
         }
@@ -646,8 +638,11 @@ impl<'module, W: io::Write> Context<'module, W> {
     fn write_atomic_expr(&mut self, expr: &Expr) -> io::Result<()> {
         match expr {
             Expr::Var(index) => {
-                let name = &self.names[self.names.len() - index - 1];
-                write!(&mut self.writer, "{name}")
+                if let Some(name) = self.stack.get_name(*index) {
+                    write!(&mut self.writer, "{name}")
+                } else {
+                    write!(&mut self.writer, "_")
+                }
             }
             Expr::Bool(b) => write!(&mut self.writer, "{b}"),
             Expr::U8(i) => write!(&mut self.writer, "{i}"),

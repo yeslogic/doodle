@@ -81,7 +81,7 @@ impl Value {
     fn matches(&self, stack: &mut Stack, pattern: &Pattern) -> bool {
         match (pattern, &self.coerce_record_to_value()) {
             (Pattern::Binding, head) => {
-                stack.push(head.clone());
+                stack.push(None, head.clone());
                 true
             }
             (Pattern::Wildcard, _) => true,
@@ -385,7 +385,7 @@ enum Decoder {
 impl Expr {
     fn eval(&self, stack: &mut Stack) -> Value {
         match self {
-            Expr::Var(index) => stack.get(*index).clone(),
+            Expr::Var(index) => stack.get_value(*index).clone(),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::U8(i) => Value::U8(*i),
             Expr::U16(i) => Value::U16(*i),
@@ -548,7 +548,7 @@ impl Expr {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
-                        stack.push(v);
+                        stack.push(None, v);
                         if let Value::Seq(vn) = expr.eval(stack) {
                             vs.extend(vn);
                         } else {
@@ -565,7 +565,7 @@ impl Expr {
                     let mut accum = accum.eval(stack);
                     let mut vs = Vec::new();
                     for v in values {
-                        stack.push(Value::Tuple(vec![accum, v]));
+                        stack.push(None, Value::Tuple(vec![accum, v]));
                         accum = match expr.eval_tuple(stack).as_mut_slice() {
                             [accum, Value::Seq(vn)] => {
                                 vs.extend_from_slice(&vn);
@@ -1002,20 +1002,24 @@ impl<'a> Compiler<'a> {
 }
 
 pub struct Stack {
+    names: Vec<Option<String>>,
     values: Vec<Value>,
 }
 
 impl Stack {
     fn new() -> Self {
+        let names = Vec::new();
         let values = Vec::new();
-        Stack { values }
+        Stack { names, values }
     }
 
-    fn push(&mut self, v: Value) {
+    fn push(&mut self, name: Option<String>, v: Value) {
+        self.names.push(name);
         self.values.push(v);
     }
 
     fn pop(&mut self) -> Value {
+        self.names.pop();
         self.values.pop().unwrap()
     }
 
@@ -1024,10 +1028,15 @@ impl Stack {
     }
 
     fn truncate(&mut self, len: usize) {
+        self.names.truncate(len);
         self.values.truncate(len);
     }
 
-    fn get(&self, index: usize) -> &Value {
+    fn get_name(&self, index: usize) -> &Option<String> {
+        &self.names[self.names.len() - index - 1]
+    }
+
+    fn get_value(&self, index: usize) -> &Value {
         &self.values[self.values.len() - index - 1]
     }
 }
@@ -1203,7 +1212,7 @@ impl Decoder {
                 let mut new_stack = Stack::new();
                 for e in es {
                     let v = e.eval(stack);
-                    new_stack.push(v);
+                    new_stack.push(None, v);
                 }
                 program.decoders[*n].parse(program, &mut new_stack, input)
             }
@@ -1248,7 +1257,7 @@ impl Decoder {
                     let (vf, next_input) = f.parse(program, stack, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
-                    stack.push(vf);
+                    stack.push(Some(name.clone()), vf);
                 }
                 for _ in fields {
                     stack.pop();
@@ -1295,7 +1304,7 @@ impl Decoder {
                 loop {
                     let (va, next_input) = a.parse(program, stack, input)?;
                     input = next_input;
-                    stack.push(va);
+                    stack.push(None, va);
                     let done = expr.eval_bool(stack);
                     let va = stack.pop();
                     v.push(va);
@@ -1312,7 +1321,7 @@ impl Decoder {
                     let (va, next_input) = a.parse(program, stack, input)?;
                     input = next_input;
                     v.push(va);
-                    stack.push(Value::Seq(v));
+                    stack.push(None, Value::Seq(v));
                     let done = expr.eval_bool(stack);
                     v = if let Value::Seq(v) = stack.pop() {
                         v
