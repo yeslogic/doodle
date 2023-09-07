@@ -18,10 +18,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 Format::Slice(
-                    Expr::Sub(
-                        Box::new(Expr::VarName("length".to_string())),
-                        Box::new(Expr::U16(2)),
-                    ),
+                    Expr::Sub(Box::new(var("length")), Box::new(Expr::U16(2))),
                     Box::new(data),
                 ),
             ),
@@ -48,10 +45,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 ("num-image-components", base.u8()),
                 (
                     "image-components",
-                    repeat_count(
-                        Expr::VarName("num-image-components".to_string()),
-                        sof_image_component.call(),
-                    ),
+                    repeat_count(var("num-image-components"), sof_image_component.call()),
                 ),
             ]),
         )
@@ -99,10 +93,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 ("num-image-components", base.u8()), // 1 |..| 4
                 (
                     "image-components",
-                    repeat_count(
-                        Expr::VarName("num-image-components".to_string()),
-                        sos_image_component.call(),
-                    ),
+                    repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
                 ("start-spectral-selection", base.u8()), // ???
                 ("end-spectral-selection", base.u8()),   // ???
@@ -156,10 +147,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 ("num-image-components", base.u8()),
                 (
                     "image-components",
-                    repeat_count(
-                        Expr::VarName("num-image-components".to_string()),
-                        dhp_image_component.call(),
-                    ),
+                    repeat_count(var("num-image-components"), dhp_image_component.call()),
                 ),
             ]),
         )
@@ -196,11 +184,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 (
                     "thumbnail-pixels",
                     repeat_count(
-                        Expr::VarName("thumbnail-height".to_string()),
-                        repeat_count(
-                            Expr::VarName("thumbnail-width".to_string()),
-                            thumbnail_pixel.call(),
-                        ),
+                        var("thumbnail-height"),
+                        repeat_count(var("thumbnail-width"), thumbnail_pixel.call()),
                     ),
                 ),
             ]),
@@ -214,10 +199,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 Format::Match(
-                    Expr::RecordProj(
-                        Box::new(Expr::VarName("identifier".to_string())),
-                        "string".to_string(),
-                    ),
+                    Expr::RecordProj(Box::new(var("identifier")), "string".to_string()),
                     vec![
                         (Pattern::from_bytes(b"JFIF"), app0_jfif.call()),
                         // FIXME: there are other APP0 formats
@@ -247,10 +229,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 Format::Match(
-                    Expr::RecordProj(
-                        Box::new(Expr::VarName("identifier".to_string())),
-                        "string".to_string(),
-                    ),
+                    Expr::RecordProj(Box::new(var("identifier")), "string".to_string()),
                     vec![
                         (Pattern::from_bytes(b"Exif"), app1_exif.call()),
                         (
@@ -376,11 +355,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "@value",
                 Format::Compute(Expr::Match(
-                    Box::new(Expr::VarName("mcu".to_string())),
+                    Box::new(var("mcu")),
                     vec![
                         (
                             Pattern::variant("byte", Pattern::Binding("v".to_string())),
-                            Expr::VarName("v".to_string()),
+                            var("v"),
                         ),
                         (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
                     ],
@@ -415,11 +394,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     Box::new(Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::VarName("x".to_string())),
+                            Box::new(var("x")),
                             vec![
                                 (
                                     Pattern::variant("mcu", Pattern::Binding("v".to_string())),
-                                    Expr::Seq(vec![Expr::VarName("v".to_string())]),
+                                    Expr::Seq(vec![var("v")]),
                                 ),
                                 (
                                     Pattern::variant("rst0", Pattern::Wildcard),
@@ -456,7 +435,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                             ],
                         )),
                     )),
-                    Box::new(Expr::VarName("scan-data".to_string())),
+                    Box::new(var("scan-data")),
                 )),
             ),
         ]),

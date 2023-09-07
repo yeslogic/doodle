@@ -641,11 +641,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn write_atomic_expr(&mut self, expr: &Expr) -> io::Result<()> {
         match expr {
-            Expr::Var(index) => {
-                let name = self.stack.get_name(*index);
-                write!(&mut self.writer, "{name}")
-            }
-            Expr::VarName(name) => {
+            Expr::Var(name) => {
                 write!(&mut self.writer, "{name}")
             }
             Expr::Bool(b) => write!(&mut self.writer, "{b}"),

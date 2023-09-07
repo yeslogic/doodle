@@ -32,28 +32,22 @@ fn bit_or_u16(x: Expr, y: Expr) -> Expr {
 fn bits_value_u8(n: usize) -> Expr {
     if n > 1 {
         bit_or_u8(
-            shl_u8(
-                tuple_proj(Expr::VarName("bits".to_string()), n - 1),
-                (n - 1).try_into().unwrap(),
-            ),
+            shl_u8(tuple_proj(var("bits"), n - 1), (n - 1).try_into().unwrap()),
             bits_value_u8(n - 1),
         )
     } else {
-        tuple_proj(Expr::VarName("bits".to_string()), 0)
+        tuple_proj(var("bits"), 0)
     }
 }
 
 fn bits_value_u16(n: usize) -> Expr {
     if n > 1 {
         bit_or_u16(
-            shl_u16(
-                tuple_proj(Expr::VarName("bits".to_string()), n - 1),
-                (n - 1).try_into().unwrap(),
-            ),
+            shl_u16(tuple_proj(var("bits"), n - 1), (n - 1).try_into().unwrap()),
             bits_value_u16(n - 1),
         )
     } else {
-        tuple_proj(Expr::VarName("bits".to_string()), 0)
+        tuple_proj(var("bits"), 0)
     }
 }
 
@@ -88,7 +82,7 @@ fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Forma
             "distance",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(Expr::VarName("distance-extra-bits".to_string()))),
+                Expr::AsU16(Box::new(var("distance-extra-bits"))),
             )),
         ),
     ])
@@ -96,7 +90,7 @@ fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Forma
 
 fn distance_record(base: &BaseModule) -> Format {
     Format::Match(
-        Expr::VarName("distance-code-value".to_string()),
+        var("distance-code-value"),
         vec![
             (Pattern::U8(0), distance_record0(1, base, 0)),
             (Pattern::U8(1), distance_record0(2, base, 0)),
@@ -139,21 +133,19 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
             "length",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(Expr::VarName("length-extra-bits".to_string()))),
+                Expr::AsU16(Box::new(var("length-extra-bits"))),
             )),
         ),
         (
             "distance-code",
             Format::Dynamic(DynFormat::Huffman(
-                Expr::VarName("distance-alphabet-code-lengths-value".to_string()),
+                var("distance-alphabet-code-lengths-value"),
                 None,
             )),
         ),
         (
             "distance-code-value",
-            Format::Compute(Expr::UnwrapVariant(Box::new(Expr::VarName(
-                "distance-code".to_string(),
-            )))),
+            Format::Compute(Expr::UnwrapVariant(Box::new(var("distance-code")))),
         ),
         ("distance-record", distance_record(base)),
     ])
@@ -166,14 +158,11 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
             "length",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(Expr::VarName("length-extra-bits".to_string()))),
+                Expr::AsU16(Box::new(var("length-extra-bits"))),
             )),
         ),
         ("distance-code", bits(5, base)),
-        (
-            "distance-code-value",
-            Format::Compute(Expr::VarName("distance-code".to_string())),
-        ),
+        ("distance-code-value", Format::Compute(var("distance-code"))),
         ("distance-record", distance_record(base)),
     ])
 }
@@ -185,10 +174,7 @@ fn reference_record() -> Expr {
             (
                 "length".to_string(),
                 Expr::RecordProj(
-                    Box::new(Expr::RecordProj(
-                        Box::new(Expr::VarName("x".to_string())),
-                        "extra".to_string(),
-                    )),
+                    Box::new(Expr::RecordProj(Box::new(var("x")), "extra".to_string())),
                     "length".to_string(),
                 ),
             ),
@@ -196,10 +182,7 @@ fn reference_record() -> Expr {
                 "distance".to_string(),
                 Expr::RecordProj(
                     Box::new(Expr::RecordProj(
-                        Box::new(Expr::RecordProj(
-                            Box::new(Expr::VarName("x".to_string())),
-                            "extra".to_string(),
-                        )),
+                        Box::new(Expr::RecordProj(Box::new(var("x")), "extra".to_string())),
                         "distance-record".to_string(),
                     )),
                     "distance".to_string(),
@@ -242,10 +225,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("align", Format::Align(8)),
             ("len", bits(16, base)),
             ("nlen", bits(16, base)),
-            (
-                "bytes",
-                repeat_count(Expr::VarName("len".to_string()), bits(8, base)),
-            ),
+            ("bytes", repeat_count(var("len"), bits(8, base))),
             (
                 "codes-values",
                 Format::Compute(Expr::FlatMap(
@@ -253,10 +233,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x".to_string(),
                         Box::new(Expr::Seq(vec![Expr::Variant(
                             "literal".to_string(),
-                            Box::new(Expr::VarName("x".to_string())),
+                            Box::new(var("x")),
                         )])),
                     )),
-                    Box::new(Expr::VarName("bytes".to_string())),
+                    Box::new(var("bytes")),
                 )),
             ),
         ]),
@@ -272,10 +252,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x".to_string(),
                         Box::new(Expr::Eq(
                             Box::new(Expr::AsU16(Box::new(Expr::UnwrapVariant(Box::new(
-                                Expr::RecordProj(
-                                    Box::new(Expr::VarName("x".to_string())),
-                                    "code".to_string(),
-                                ),
+                                Expr::RecordProj(Box::new(var("x")), "code".to_string()),
                             ))))),
                             Box::new(Expr::U16(256)),
                         )),
@@ -288,7 +265,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra",
                             Format::Match(
-                                Expr::UnwrapVariant(Box::new(Expr::VarName("code".to_string()))),
+                                Expr::UnwrapVariant(Box::new(var("code"))),
                                 vec![
                                     (Pattern::U16(257), length_record_fixed(3, base, 0)),
                                     (Pattern::U16(258), length_record_fixed(4, base, 0)),
@@ -333,7 +310,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x".to_string(),
                         Box::new(Expr::Match(
                             Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                Box::new(Expr::VarName("x".to_string())),
+                                Box::new(var("x")),
                                 "code".to_string(),
                             )))),
                             vec![
@@ -372,7 +349,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Expr::Seq(vec![Expr::Variant(
                                         "literal".to_string(),
                                         Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                            Box::new(Expr::VarName("x".to_string())),
+                                            Box::new(var("x")),
                                             "code".to_string(),
                                         )))),
                                     )]),
@@ -380,7 +357,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ],
                         )),
                     )),
-                    Box::new(Expr::VarName("codes".to_string())),
+                    Box::new(var("codes")),
                 )),
             ),
         ]),
@@ -394,10 +371,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("hclen", bits4.clone()),
             (
                 "code-length-alphabet-code-lengths",
-                repeat_count(
-                    add(Expr::VarName("hclen".to_string()), Expr::U8(4)),
-                    bits3.clone(),
-                ),
+                repeat_count(add(var("hclen"), Expr::U8(4)), bits3.clone()),
             ),
             (
                 "literal-length-distance-alphabet-code-lengths",
@@ -410,27 +384,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     "x".to_string(),
                                     Box::new(Expr::Match(
                                         Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                            Box::new(Expr::TupleProj(
-                                                Box::new(Expr::VarName("x".to_string())),
-                                                1,
-                                            )),
+                                            Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
                                             "code".to_string(),
                                         )))),
                                         vec![
                                             (
                                                 Pattern::U8(16),
                                                 Expr::Tuple(vec![
-                                                    Expr::TupleProj(
-                                                        Box::new(Expr::VarName("x".to_string())),
-                                                        0,
-                                                    ),
+                                                    Expr::TupleProj(Box::new(var("x")), 0),
                                                     Expr::Dup(
                                                         Box::new(add(
                                                             Expr::RecordProj(
                                                                 Box::new(Expr::TupleProj(
-                                                                    Box::new(Expr::VarName(
-                                                                        "x".to_string(),
-                                                                    )),
+                                                                    Box::new(var("x")),
                                                                     1,
                                                                 )),
                                                                 "extra".to_string(),
@@ -438,12 +404,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                             Expr::U8(3),
                                                         )),
                                                         Box::new(Expr::UnwrapVariant(Box::new(
-                                                            Expr::TupleProj(
-                                                                Box::new(Expr::VarName(
-                                                                    "x".to_string(),
-                                                                )),
-                                                                0,
-                                                            ),
+                                                            Expr::TupleProj(Box::new(var("x")), 0),
                                                         ))),
                                                     ),
                                                 ]),
@@ -451,17 +412,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             (
                                                 Pattern::U8(17),
                                                 Expr::Tuple(vec![
-                                                    Expr::TupleProj(
-                                                        Box::new(Expr::VarName("x".to_string())),
-                                                        0,
-                                                    ),
+                                                    Expr::TupleProj(Box::new(var("x")), 0),
                                                     Expr::Dup(
                                                         Box::new(add(
                                                             Expr::RecordProj(
                                                                 Box::new(Expr::TupleProj(
-                                                                    Box::new(Expr::VarName(
-                                                                        "x".to_string(),
-                                                                    )),
+                                                                    Box::new(var("x")),
                                                                     1,
                                                                 )),
                                                                 "extra".to_string(),
@@ -475,17 +431,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             (
                                                 Pattern::U8(18),
                                                 Expr::Tuple(vec![
-                                                    Expr::TupleProj(
-                                                        Box::new(Expr::VarName("x".to_string())),
-                                                        0,
-                                                    ),
+                                                    Expr::TupleProj(Box::new(var("x")), 0),
                                                     Expr::Dup(
                                                         Box::new(add(
                                                             Expr::RecordProj(
                                                                 Box::new(Expr::TupleProj(
-                                                                    Box::new(Expr::VarName(
-                                                                        "x".to_string(),
-                                                                    )),
+                                                                    Box::new(var("x")),
                                                                     1,
                                                                 )),
                                                                 "extra".to_string(),
@@ -501,22 +452,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 Expr::Tuple(vec![
                                                     Expr::Variant(
                                                         "some".to_string(),
-                                                        Box::new(Expr::VarName("v".to_string())),
+                                                        Box::new(var("v")),
                                                     ),
-                                                    Expr::Seq(vec![Expr::VarName("v".to_string())]),
+                                                    Expr::Seq(vec![var("v")]),
                                                 ]),
                                             ),
                                         ],
                                     )),
                                 )),
                                 Box::new(Expr::Variant("none".to_string(), Box::new(Expr::UNIT))),
-                                Box::new(Expr::VarName("y".to_string())),
+                                Box::new(var("y")),
                             )))),
                             Box::new(add(
-                                Expr::AsU16(Box::new(add(
-                                    Expr::VarName("hlit".to_string()),
-                                    Expr::VarName("hdist".to_string()),
-                                ))),
+                                Expr::AsU16(Box::new(add(var("hlit"), var("hdist")))),
                                 Expr::U16(258),
                             )),
                         )),
@@ -525,7 +473,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "code",
                             Format::Dynamic(DynFormat::Huffman(
-                                Expr::VarName("code-length-alphabet-code-lengths".to_string()),
+                                var("code-length-alphabet-code-lengths"),
                                 Some(Expr::Seq(vec![
                                     Expr::U8(16),
                                     Expr::U8(17),
@@ -552,7 +500,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra",
                             Format::Match(
-                                Expr::UnwrapVariant(Box::new(Expr::VarName("code".to_string()))),
+                                Expr::UnwrapVariant(Box::new(var("code"))),
                                 vec![
                                     (Pattern::U8(16), bits2.clone()),
                                     (Pattern::U8(17), bits3.clone()),
@@ -571,25 +519,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x".to_string(),
                         Box::new(Expr::Match(
                             Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                Box::new(Expr::TupleProj(
-                                    Box::new(Expr::VarName("x".to_string())),
-                                    1,
-                                )),
+                                Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
                                 "code".to_string(),
                             )))),
                             vec![
                                 (
                                     Pattern::U8(16),
                                     Expr::Tuple(vec![
-                                        Expr::TupleProj(
-                                            Box::new(Expr::VarName("x".to_string())),
-                                            0,
-                                        ),
+                                        Expr::TupleProj(Box::new(var("x")), 0),
                                         Expr::Dup(
                                             Box::new(add(
                                                 Expr::RecordProj(
                                                     Box::new(Expr::TupleProj(
-                                                        Box::new(Expr::VarName("x".to_string())),
+                                                        Box::new(var("x")),
                                                         1,
                                                     )),
                                                     "extra".to_string(),
@@ -597,10 +539,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 Expr::U8(3),
                                             )),
                                             Box::new(Expr::UnwrapVariant(Box::new(
-                                                Expr::TupleProj(
-                                                    Box::new(Expr::VarName("x".to_string())),
-                                                    0,
-                                                ),
+                                                Expr::TupleProj(Box::new(var("x")), 0),
                                             ))),
                                         ),
                                     ]),
@@ -608,15 +547,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::U8(17),
                                     Expr::Tuple(vec![
-                                        Expr::TupleProj(
-                                            Box::new(Expr::VarName("x".to_string())),
-                                            0,
-                                        ),
+                                        Expr::TupleProj(Box::new(var("x")), 0),
                                         Expr::Dup(
                                             Box::new(add(
                                                 Expr::RecordProj(
                                                     Box::new(Expr::TupleProj(
-                                                        Box::new(Expr::VarName("x".to_string())),
+                                                        Box::new(var("x")),
                                                         1,
                                                     )),
                                                     "extra".to_string(),
@@ -630,15 +566,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::U8(18),
                                     Expr::Tuple(vec![
-                                        Expr::TupleProj(
-                                            Box::new(Expr::VarName("x".to_string())),
-                                            0,
-                                        ),
+                                        Expr::TupleProj(Box::new(var("x")), 0),
                                         Expr::Dup(
                                             Box::new(add(
                                                 Expr::RecordProj(
                                                     Box::new(Expr::TupleProj(
-                                                        Box::new(Expr::VarName("x".to_string())),
+                                                        Box::new(var("x")),
                                                         1,
                                                     )),
                                                     "extra".to_string(),
@@ -652,49 +585,31 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::Binding("v".to_string()),
                                     Expr::Tuple(vec![
-                                        Expr::Variant(
-                                            "some".to_string(),
-                                            Box::new(Expr::VarName("v".to_string())),
-                                        ),
-                                        Expr::Seq(vec![Expr::VarName("v".to_string())]),
+                                        Expr::Variant("some".to_string(), Box::new(var("v"))),
+                                        Expr::Seq(vec![var("v")]),
                                     ]),
                                 ),
                             ],
                         )),
                     )),
                     Box::new(Expr::Variant("none".to_string(), Box::new(Expr::UNIT))),
-                    Box::new(Expr::VarName(
-                        "literal-length-distance-alphabet-code-lengths".to_string(),
-                    )),
+                    Box::new(var("literal-length-distance-alphabet-code-lengths")),
                 )),
             ),
             (
                 "literal-length-alphabet-code-lengths-value",
                 Format::Compute(Expr::SubSeq(
-                    Box::new(Expr::VarName(
-                        "literal-length-distance-alphabet-code-lengths-value".to_string(),
-                    )),
+                    Box::new(var("literal-length-distance-alphabet-code-lengths-value")),
                     Box::new(Expr::U8(0)),
-                    Box::new(add(
-                        Expr::AsU16(Box::new(Expr::VarName("hlit".to_string()))),
-                        Expr::U16(257),
-                    )),
+                    Box::new(add(Expr::AsU16(Box::new(var("hlit"))), Expr::U16(257))),
                 )),
             ),
             (
                 "distance-alphabet-code-lengths-value",
                 Format::Compute(Expr::SubSeq(
-                    Box::new(Expr::VarName(
-                        "literal-length-distance-alphabet-code-lengths-value".to_string(),
-                    )),
-                    Box::new(add(
-                        Expr::AsU16(Box::new(Expr::VarName("hlit".to_string()))),
-                        Expr::U16(257),
-                    )),
-                    Box::new(add(
-                        Expr::AsU16(Box::new(Expr::VarName("hdist".to_string()))),
-                        Expr::U16(1),
-                    )),
+                    Box::new(var("literal-length-distance-alphabet-code-lengths-value")),
+                    Box::new(add(Expr::AsU16(Box::new(var("hlit"))), Expr::U16(257))),
+                    Box::new(add(Expr::AsU16(Box::new(var("hdist"))), Expr::U16(1))),
                 )),
             ),
             (
@@ -704,10 +619,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x".to_string(),
                         Box::new(Expr::Eq(
                             Box::new(Expr::AsU16(Box::new(Expr::UnwrapVariant(Box::new(
-                                Expr::RecordProj(
-                                    Box::new(Expr::VarName("x".to_string())),
-                                    "code".to_string(),
-                                ),
+                                Expr::RecordProj(Box::new(var("x")), "code".to_string()),
                             ))))),
                             Box::new(Expr::U16(256)),
                         )),
@@ -716,16 +628,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "code",
                             Format::Dynamic(DynFormat::Huffman(
-                                Expr::VarName(
-                                    "literal-length-alphabet-code-lengths-value".to_string(),
-                                ),
+                                var("literal-length-alphabet-code-lengths-value"),
                                 None,
                             )),
                         ),
                         (
                             "extra",
                             Format::Match(
-                                Expr::UnwrapVariant(Box::new(Expr::VarName("code".to_string()))),
+                                Expr::UnwrapVariant(Box::new(var("code"))),
                                 vec![
                                     (Pattern::U16(257), length_record(3, base, 0)),
                                     (Pattern::U16(258), length_record(4, base, 0)),
@@ -770,7 +680,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x".to_string(),
                         Box::new(Expr::Match(
                             Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                Box::new(Expr::VarName("x".to_string())),
+                                Box::new(var("x")),
                                 "code".to_string(),
                             )))),
                             vec![
@@ -809,7 +719,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Expr::Seq(vec![Expr::Variant(
                                         "literal".to_string(),
                                         Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                            Box::new(Expr::VarName("x".to_string())),
+                                            Box::new(var("x")),
                                             "code".to_string(),
                                         )))),
                                     )]),
@@ -817,7 +727,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ],
                         )),
                     )),
-                    Box::new(Expr::VarName("codes".to_string())),
+                    Box::new(var("codes")),
                 )),
             ),
         ]),
@@ -831,7 +741,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "data",
                 Format::Match(
-                    Expr::VarName("type".to_string()),
+                    var("type"),
                     vec![
                         (Pattern::U8(0), uncompressed.call()),
                         (Pattern::U8(1), fixed_huffman.call()),
@@ -853,10 +763,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Eq(
-                            Box::new(Expr::RecordProj(
-                                Box::new(Expr::VarName("x".to_string())),
-                                "final".to_string(),
-                            )),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "final".to_string())),
                             Box::new(Expr::U8(1)),
                         )),
                     ),
@@ -869,19 +776,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Box::new(Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::RecordProj(
-                            Box::new(Expr::RecordProj(
-                                Box::new(Expr::VarName("x".to_string())),
-                                "data".to_string(),
-                            )),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "data".to_string())),
                             "codes-values".to_string(),
                         )),
                     )),
-                    Box::new(Expr::VarName("blocks".to_string())),
+                    Box::new(var("blocks")),
                 )),
             ),
             (
                 "inflate",
-                Format::Compute(Expr::Inflate(Box::new(Expr::VarName("codes".to_string())))),
+                Format::Compute(Expr::Inflate(Box::new(var("codes")))),
             ),
         ]),
     )
