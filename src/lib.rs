@@ -81,7 +81,7 @@ impl Value {
     fn matches(&self, stack: &mut Stack, pattern: &Pattern) -> bool {
         match (pattern, &self.coerce_record_to_value()) {
             (Pattern::Binding(name), head) => {
-                stack.push(Some(name.clone()), head.clone());
+                stack.push(name.clone(), head.clone());
                 true
             }
             (Pattern::Wildcard, _) => true,
@@ -577,7 +577,7 @@ impl Expr {
                     Value::Seq(values) => {
                         let mut vs = Vec::new();
                         for v in values {
-                            stack.push(Some(name.clone()), v);
+                            stack.push(name.clone(), v);
                             if let Value::Seq(vn) = expr.eval(stack) {
                                 vs.extend(vn);
                             } else {
@@ -597,7 +597,7 @@ impl Expr {
                         let mut accum = accum.eval(stack);
                         let mut vs = Vec::new();
                         for v in values {
-                            stack.push(Some(name.clone()), Value::Tuple(vec![accum, v]));
+                            stack.push(name.clone(), Value::Tuple(vec![accum, v]));
                             accum = match expr.eval(stack).unwrap_tuple().as_mut_slice() {
                                 [accum, Value::Seq(vn)] => {
                                     vs.extend_from_slice(&vn);
@@ -639,7 +639,7 @@ impl Expr {
     fn eval_lambda(&self, stack: &mut Stack, arg: Value) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
-                stack.push(Some(name.clone()), arg);
+                stack.push(name.clone(), arg);
                 let v = expr.eval_value(stack);
                 stack.pop();
                 v
@@ -1025,7 +1025,7 @@ impl<'a> Compiler<'a> {
 }
 
 pub struct Stack {
-    names: Vec<Option<String>>,
+    names: Vec<String>,
     values: Vec<Value>,
 }
 
@@ -1036,7 +1036,7 @@ impl Stack {
         Stack { names, values }
     }
 
-    fn push(&mut self, name: Option<String>, v: Value) {
+    fn push(&mut self, name: String, v: Value) {
         self.names.push(name);
         self.values.push(v);
     }
@@ -1055,7 +1055,7 @@ impl Stack {
         self.values.truncate(len);
     }
 
-    fn get_name(&self, index: usize) -> &Option<String> {
+    fn get_name(&self, index: usize) -> &String {
         &self.names[self.names.len() - index - 1]
     }
 
@@ -1064,11 +1064,9 @@ impl Stack {
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {
-        for (i, opt_n) in self.names.iter().enumerate().rev() {
-            if let Some(n) = opt_n {
-                if n == name {
-                    return &self.values[i];
-                }
+        for (i, n) in self.names.iter().enumerate().rev() {
+            if n == name {
+                return &self.values[i];
             }
         }
         panic!("stack slot not found: {name}");
@@ -1246,7 +1244,7 @@ impl Decoder {
                 let mut new_stack = Stack::new();
                 for (name, e) in es {
                     let v = e.eval(stack);
-                    new_stack.push(Some(name.clone()), v);
+                    new_stack.push(name.clone(), v);
                 }
                 program.decoders[*n].parse(program, &mut new_stack, input)
             }
@@ -1291,7 +1289,7 @@ impl Decoder {
                     let (vf, next_input) = f.parse(program, stack, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
-                    stack.push(Some(name.clone()), vf);
+                    stack.push(name.clone(), vf);
                 }
                 for _ in fields {
                     stack.pop();

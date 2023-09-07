@@ -205,7 +205,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     for (index, (label, value)) in value_fields.iter().enumerate() {
                         let format = &format_fields[index].1;
                         self.write_flat(value, format)?;
-                        self.stack.push(Some(label.clone()), value.clone());
+                        self.stack.push(label.clone(), value.clone());
                     }
                     self.stack.truncate(initial_len);
                     Ok(())
