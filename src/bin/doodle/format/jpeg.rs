@@ -378,7 +378,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 Format::Compute(Expr::Match(
                     Box::new(Expr::VarName("mcu".to_string())),
                     vec![
-                        (Pattern::variant("byte", Pattern::Binding), Expr::Var(0)),
+                        (
+                            Pattern::variant("byte", Pattern::Binding("v".to_string())),
+                            Expr::VarName("v".to_string()),
+                        ),
                         (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
                     ],
                 )),
@@ -413,8 +416,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                         Box::new(Expr::Var(0)),
                         vec![
                             (
-                                Pattern::variant("mcu", Pattern::Binding),
-                                Expr::Seq(vec![Expr::Var(0)]),
+                                Pattern::variant("mcu", Pattern::Binding("v".to_string())),
+                                Expr::Seq(vec![Expr::VarName("v".to_string())]),
                             ),
                             (
                                 Pattern::variant("rst0", Pattern::Wildcard),
