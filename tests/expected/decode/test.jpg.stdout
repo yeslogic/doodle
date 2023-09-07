@@ -218,7 +218,7 @@
 │       │   │       │   ├── 9 <- _ |...| _ := { mcu := 0 }
 │       │   │       │   ~
 │       │   │       │   └── 3636 <- _ |...| _ := { mcu := 15 }
-│       │   │       └── scan-data-stream <- compute flat-map (match scan-data { ... }) scan-data :=
+│       │   │       └── scan-data-stream <- compute flat-map (x -> match x { ... }) scan-data :=
 │       │   │           ├── 0 := 191
 │       │   │           ├── 1 := 244
 │       │   │           ├── 2 := 104

@@ -494,6 +494,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_proj_expr(head)?;
                 write!(&mut self.writer, " {{ ... }}")
             }
+            Expr::Lambda(name, expr) => {
+                write!(&mut self.writer, "{name} -> ")?;
+                self.write_expr(expr)
+            }
 
             Expr::BitAnd(expr0, expr1) => {
                 self.write_proj_expr(expr0)?;

@@ -162,6 +162,7 @@ pub enum Expr {
     UnwrapVariant(Box<Expr>),
     Seq(Vec<Expr>),
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
+    Lambda(String, Box<Expr>),
 
     BitAnd(Box<Expr>, Box<Expr>),
     BitOr(Box<Expr>, Box<Expr>),
@@ -442,6 +443,7 @@ impl Expr {
                 stack.truncate(initial_len);
                 value
             }
+            Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
             Expr::BitAnd(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
@@ -570,40 +572,46 @@ impl Expr {
                 }
                 _ => panic!("SubSeq: expected Seq"),
             },
-            Expr::FlatMap(expr, seq) => match seq.eval(stack) {
-                Value::Seq(values) => {
-                    let mut vs = Vec::new();
-                    for v in values {
-                        stack.push(None, v);
-                        if let Value::Seq(vn) = expr.eval(stack) {
-                            vs.extend(vn);
-                        } else {
-                            panic!("FlatMap: expected Seq");
-                        }
-                        stack.pop();
-                    }
-                    Value::Seq(vs)
-                }
-                _ => panic!("FlatMap: expected Seq"),
-            },
-            Expr::FlatMapAccum(expr, accum, seq) => match seq.eval(stack) {
-                Value::Seq(values) => {
-                    let mut accum = accum.eval(stack);
-                    let mut vs = Vec::new();
-                    for v in values {
-                        stack.push(None, Value::Tuple(vec![accum, v]));
-                        accum = match expr.eval_value(stack).unwrap_tuple().as_mut_slice() {
-                            [accum, Value::Seq(vn)] => {
-                                vs.extend_from_slice(&vn);
-                                accum.clone()
+            Expr::FlatMap(expr, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.eval(stack) {
+                    Value::Seq(values) => {
+                        let mut vs = Vec::new();
+                        for v in values {
+                            stack.push(Some(name.clone()), v);
+                            if let Value::Seq(vn) = expr.eval(stack) {
+                                vs.extend(vn);
+                            } else {
+                                panic!("FlatMap: expected Seq");
                             }
-                            _ => panic!("FlatMapAccum: expected two values"),
-                        };
-                        stack.pop();
+                            stack.pop();
+                        }
+                        Value::Seq(vs)
                     }
-                    Value::Seq(vs)
-                }
-                _ => panic!("FlatMapAccum: expected Seq"),
+                    _ => panic!("FlatMap: expected Seq"),
+                },
+                _ => panic!("FlatMap: expected Lambda"),
+            },
+            Expr::FlatMapAccum(expr, accum, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.eval(stack) {
+                    Value::Seq(values) => {
+                        let mut accum = accum.eval(stack);
+                        let mut vs = Vec::new();
+                        for v in values {
+                            stack.push(Some(name.clone()), Value::Tuple(vec![accum, v]));
+                            accum = match expr.eval(stack).unwrap_tuple().as_mut_slice() {
+                                [accum, Value::Seq(vn)] => {
+                                    vs.extend_from_slice(&vn);
+                                    accum.clone()
+                                }
+                                _ => panic!("FlatMapAccum: expected two values"),
+                            };
+                            stack.pop();
+                        }
+                        Value::Seq(vs)
+                    }
+                    _ => panic!("FlatMapAccum: expected Seq"),
+                },
+                _ => panic!("FlatMapAccum: expected Lambda"),
             },
             Expr::Dup(count, expr) => {
                 let count = count.eval_value(stack).unwrap_usize();
@@ -626,6 +634,18 @@ impl Expr {
 
     fn eval_value(&self, stack: &mut Stack) -> Value {
         self.eval(stack).coerce_record_to_value()
+    }
+
+    fn eval_lambda(&self, stack: &mut Stack, arg: Value) -> Value {
+        match self {
+            Expr::Lambda(name, expr) => {
+                stack.push(Some(name.clone()), arg);
+                let v = expr.eval_value(stack);
+                stack.pop();
+                v
+            }
+            _ => panic!("expected Lambda"),
+        }
     }
 }
 
@@ -1318,9 +1338,7 @@ impl Decoder {
                 loop {
                     let (va, next_input) = a.parse(program, stack, input)?;
                     input = next_input;
-                    stack.push(None, va);
-                    let done = expr.eval_value(stack).unwrap_bool();
-                    let va = stack.pop();
+                    let done = expr.eval_lambda(stack, va.clone()).unwrap_bool();
                     v.push(va);
                     if done {
                         break;
@@ -1335,13 +1353,8 @@ impl Decoder {
                     let (va, next_input) = a.parse(program, stack, input)?;
                     input = next_input;
                     v.push(va);
-                    stack.push(None, Value::Seq(v));
-                    let done = expr.eval_value(stack).unwrap_bool();
-                    v = if let Value::Seq(v) = stack.pop() {
-                        v
-                    } else {
-                        panic!("expected Seq")
-                    };
+                    let vs = Value::Seq(v.clone());
+                    let done = expr.eval_lambda(stack, vs).unwrap_bool();
                     if done {
                         break;
                     }
