@@ -120,6 +120,29 @@ impl Value {
             v => v.clone(),
         }
     }
+
+    fn unwrap_usize(self) -> usize {
+        match self {
+            Value::U8(n) => usize::from(n),
+            Value::U16(n) => usize::from(n),
+            Value::U32(n) => usize::try_from(n).unwrap(),
+            _ => panic!("value is not a number"),
+        }
+    }
+
+    fn unwrap_tuple(self) -> Vec<Value> {
+        match self {
+            Value::Tuple(values) => values,
+            _ => panic!("value is not a tuple"),
+        }
+    }
+
+    fn unwrap_bool(self) -> bool {
+        match self {
+            Value::Bool(b) => b,
+            _ => panic!("value is not a bool"),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -506,21 +529,21 @@ impl Expr {
                 x => panic!("cannot convert {x:?} to U32"),
             },
 
-            Expr::U16Be(bytes) => match bytes.eval_tuple(stack).as_slice() {
+            Expr::U16Be(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
                 [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
                 _ => panic!("U16Be: expected (U8, U8)"),
             },
-            Expr::U16Le(bytes) => match bytes.eval_tuple(stack).as_slice() {
+            Expr::U16Le(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
                 [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
                 _ => panic!("U16Le: expected (U8, U8)"),
             },
-            Expr::U32Be(bytes) => match bytes.eval_tuple(stack).as_slice() {
+            Expr::U32Be(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
                 [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                     Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
                 }
                 _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
             },
-            Expr::U32Le(bytes) => match bytes.eval_tuple(stack).as_slice() {
+            Expr::U32Le(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
                 [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                     Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
                 }
@@ -539,8 +562,8 @@ impl Expr {
             },
             Expr::SubSeq(seq, start, length) => match seq.eval(stack) {
                 Value::Seq(values) => {
-                    let start = start.eval_usize(stack);
-                    let length = length.eval_usize(stack);
+                    let start = start.eval_value(stack).unwrap_usize();
+                    let length = length.eval_value(stack).unwrap_usize();
                     let values = &values[start..];
                     let values = &values[..length];
                     Value::Seq(values.to_vec())
@@ -569,7 +592,7 @@ impl Expr {
                     let mut vs = Vec::new();
                     for v in values {
                         stack.push(None, Value::Tuple(vec![accum, v]));
-                        accum = match expr.eval_tuple(stack).as_mut_slice() {
+                        accum = match expr.eval_value(stack).unwrap_tuple().as_mut_slice() {
                             [accum, Value::Seq(vn)] => {
                                 vs.extend_from_slice(&vn);
                                 accum.clone()
@@ -583,7 +606,7 @@ impl Expr {
                 _ => panic!("FlatMapAccum: expected Seq"),
             },
             Expr::Dup(count, expr) => {
-                let count = count.eval_usize(stack);
+                let count = count.eval_value(stack).unwrap_usize();
                 let v = expr.eval(stack);
                 let mut vs = Vec::new();
                 for _ in 0..count {
@@ -603,29 +626,6 @@ impl Expr {
 
     fn eval_value(&self, stack: &mut Stack) -> Value {
         self.eval(stack).coerce_record_to_value()
-    }
-
-    fn eval_bool(&self, stack: &mut Stack) -> bool {
-        match self.eval_value(stack) {
-            Value::Bool(b) => b,
-            _ => panic!("value is not a bool"),
-        }
-    }
-
-    fn eval_usize(&self, stack: &mut Stack) -> usize {
-        match self.eval_value(stack) {
-            Value::U8(n) => usize::from(n),
-            Value::U16(n) => usize::from(n),
-            Value::U32(n) => usize::try_from(n).unwrap(),
-            _ => panic!("value is not a number"),
-        }
-    }
-
-    fn eval_tuple(&self, stack: &mut Stack) -> Vec<Value> {
-        match self.eval_value(stack) {
-            Value::Tuple(values) => values,
-            _ => panic!("value is not a tuple"),
-        }
     }
 }
 
@@ -1303,7 +1303,7 @@ impl Decoder {
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
-                let count = expr.eval_usize(stack);
+                let count = expr.eval_value(stack).unwrap_usize();
                 let mut v = Vec::with_capacity(count);
                 for _ in 0..count {
                     let (va, next_input) = a.parse(program, stack, input)?;
@@ -1319,7 +1319,7 @@ impl Decoder {
                     let (va, next_input) = a.parse(program, stack, input)?;
                     input = next_input;
                     stack.push(None, va);
-                    let done = expr.eval_bool(stack);
+                    let done = expr.eval_value(stack).unwrap_bool();
                     let va = stack.pop();
                     v.push(va);
                     if done {
@@ -1336,7 +1336,7 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                     stack.push(None, Value::Seq(v));
-                    let done = expr.eval_bool(stack);
+                    let done = expr.eval_value(stack).unwrap_bool();
                     v = if let Value::Seq(v) = stack.pop() {
                         v
                     } else {
@@ -1353,7 +1353,7 @@ impl Decoder {
                 Some((v, input))
             }
             Decoder::Slice(expr, a) => {
-                let size = expr.eval_usize(stack);
+                let size = expr.eval_value(stack).unwrap_usize();
                 let (slice, input) = input.split_at(size)?;
                 let (v, _) = a.parse(program, stack, slice)?;
                 Some((v, input))
@@ -1372,7 +1372,7 @@ impl Decoder {
                 Some((v, input))
             }
             Decoder::WithRelativeOffset(expr, a) => {
-                let offset = expr.eval_usize(stack);
+                let offset = expr.eval_value(stack).unwrap_usize();
                 let (_, slice) = input.split_at(offset)?;
                 let (v, _) = a.parse(program, stack, slice)?;
                 Some((v, input))
