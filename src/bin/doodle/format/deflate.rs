@@ -443,13 +443,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ]),
                                     ),
                                     (
-                                        Pattern::Binding,
+                                        Pattern::Binding("v".to_string()),
                                         Expr::Tuple(vec![
                                             Expr::Variant(
                                                 "some".to_string(),
-                                                Box::new(Expr::Var(0)),
+                                                Box::new(Expr::VarName("v".to_string())),
                                             ),
-                                            Expr::Seq(vec![Expr::Var(0)]),
+                                            Expr::Seq(vec![Expr::VarName("v".to_string())]),
                                         ]),
                                     ),
                                 ],
@@ -575,10 +575,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ]),
                             ),
                             (
-                                Pattern::Binding,
+                                Pattern::Binding("v".to_string()),
                                 Expr::Tuple(vec![
                                     Expr::Variant("some".to_string(), Box::new(Expr::Var(0))),
-                                    Expr::Seq(vec![Expr::Var(0)]),
+                                    Expr::Seq(vec![Expr::VarName("v".to_string())]),
                                 ]),
                             ),
                         ],

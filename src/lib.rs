@@ -14,7 +14,7 @@ pub mod output;
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Pattern {
-    Binding,
+    Binding(String),
     Wildcard,
     Bool(bool),
     U8(u8),
@@ -80,8 +80,8 @@ impl Value {
     /// any values bound by the pattern onto the stack
     fn matches(&self, stack: &mut Stack, pattern: &Pattern) -> bool {
         match (pattern, &self.coerce_record_to_value()) {
-            (Pattern::Binding, head) => {
-                stack.push(None, head.clone());
+            (Pattern::Binding(name), head) => {
+                stack.push(Some(name.clone()), head.clone());
                 true
             }
             (Pattern::Wildcard, _) => true,
