@@ -77,11 +77,11 @@ impl Value {
     }
 
     /// Returns `true` if the pattern successfully matches the value, pushing
-    /// any values bound by the pattern onto the stack
-    fn matches(&self, stack: &mut Stack, pattern: &Pattern) -> bool {
+    /// any values bound by the pattern onto the scope
+    fn matches(&self, scope: &mut Scope, pattern: &Pattern) -> bool {
         match (pattern, &self.coerce_record_to_value()) {
             (Pattern::Binding(name), head) => {
-                stack.push(name.clone(), head.clone());
+                scope.push(name.clone(), head.clone());
                 true
             }
             (Pattern::Wildcard, _) => true,
@@ -92,17 +92,17 @@ impl Value {
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
             {
-                let initial_len = stack.len();
+                let initial_len = scope.len();
                 for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches(stack, p) {
-                        stack.truncate(initial_len);
+                    if !v.matches(scope, p) {
+                        scope.truncate(initial_len);
                         return false;
                     }
                 }
                 true
             }
             (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
-                v.matches(stack, p)
+                v.matches(scope, p)
             }
             _ => false,
         }
@@ -408,148 +408,148 @@ enum Decoder {
 }
 
 impl Expr {
-    fn eval(&self, stack: &mut Stack) -> Value {
+    fn eval(&self, scope: &mut Scope) -> Value {
         match self {
-            Expr::Var(name) => stack.get_value_by_name(name).clone(),
+            Expr::Var(name) => scope.get_value_by_name(name).clone(),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::U8(i) => Value::U8(*i),
             Expr::U16(i) => Value::U16(*i),
             Expr::U32(i) => Value::U32(*i),
-            Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(stack)).collect()),
-            Expr::TupleProj(head, index) => match head.eval_value(stack) {
+            Expr::Tuple(exprs) => Value::Tuple(exprs.iter().map(|expr| expr.eval(scope)).collect()),
+            Expr::TupleProj(head, index) => match head.eval_value(scope) {
                 Value::Tuple(vs) => vs[*index].clone(),
                 _ => panic!("expected tuple"),
             },
             Expr::Record(fields) => {
-                Value::record(fields.iter().map(|(label, expr)| (label, expr.eval(stack))))
+                Value::record(fields.iter().map(|(label, expr)| (label, expr.eval(scope))))
             }
-            Expr::RecordProj(head, label) => head.eval(stack).record_proj(label),
-            Expr::Variant(label, expr) => Value::variant(label, expr.eval(stack)),
-            Expr::UnwrapVariant(expr) => match expr.eval_value(stack) {
+            Expr::RecordProj(head, label) => head.eval(scope).record_proj(label),
+            Expr::Variant(label, expr) => Value::variant(label, expr.eval(scope)),
+            Expr::UnwrapVariant(expr) => match expr.eval_value(scope) {
                 Value::Variant(_label, value) => *value.clone(),
                 _ => panic!("expected variant"),
             },
-            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(stack)).collect()),
+            Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(scope)).collect()),
             Expr::Match(head, branches) => {
-                let head = head.eval(stack);
-                let initial_len = stack.len();
+                let head = head.eval(scope);
+                let initial_len = scope.len();
                 let (_, expr) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(stack, pattern))
+                    .find(|(pattern, _)| head.matches(scope, pattern))
                     .expect("exhaustive patterns");
-                let value = expr.eval(stack);
-                stack.truncate(initial_len);
+                let value = expr.eval(scope);
+                scope.truncate(initial_len);
                 value
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::BitAnd(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::BitAnd(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
                 (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
                 (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::BitOr(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::BitOr(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
                 (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
                 (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Eq(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Eq(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Ne(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Ne(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Lt(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Lt(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Gt(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Gt(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Lte(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Lte(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Gte(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Gte(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
                 (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Rem(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Rem(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
             #[rustfmt::skip]
-            Expr::Shl(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Shl(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Add(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Add(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
-            Expr::Sub(x, y) => match (x.eval_value(stack), y.eval_value(stack)) {
+            Expr::Sub(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
 
-            Expr::AsU16(x) => match x.eval_value(stack) {
+            Expr::AsU16(x) => match x.eval_value(scope) {
                 Value::U8(x) => Value::U16(u16::from(x)),
                 Value::U16(x) => Value::U16(x),
                 x => panic!("cannot convert {x:?} to U16"),
             },
-            Expr::AsU32(x) => match x.eval_value(stack) {
+            Expr::AsU32(x) => match x.eval_value(scope) {
                 Value::U8(x) => Value::U32(u32::from(x)),
                 Value::U16(x) => Value::U32(u32::from(x)),
                 Value::U32(x) => Value::U32(x),
                 x => panic!("cannot convert {x:?} to U32"),
             },
 
-            Expr::U16Be(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
+            Expr::U16Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(hi), Value::U8(lo)] => Value::U16(u16::from_be_bytes([*hi, *lo])),
                 _ => panic!("U16Be: expected (U8, U8)"),
             },
-            Expr::U16Le(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
+            Expr::U16Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(lo), Value::U8(hi)] => Value::U16(u16::from_le_bytes([*lo, *hi])),
                 _ => panic!("U16Le: expected (U8, U8)"),
             },
-            Expr::U32Be(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
+            Expr::U32Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                     Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))
                 }
                 _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
             },
-            Expr::U32Le(bytes) => match bytes.eval_value(stack).unwrap_tuple().as_slice() {
+            Expr::U32Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
                     Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))
                 }
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
-            Expr::SeqLength(seq) => match seq.eval(stack) {
+            Expr::SeqLength(seq) => match seq.eval(scope) {
                 Value::Seq(values) => {
                     let len = values.len();
                     if len < 65536 {
@@ -560,10 +560,10 @@ impl Expr {
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
-            Expr::SubSeq(seq, start, length) => match seq.eval(stack) {
+            Expr::SubSeq(seq, start, length) => match seq.eval(scope) {
                 Value::Seq(values) => {
-                    let start = start.eval_value(stack).unwrap_usize();
-                    let length = length.eval_value(stack).unwrap_usize();
+                    let start = start.eval_value(scope).unwrap_usize();
+                    let length = length.eval_value(scope).unwrap_usize();
                     let values = &values[start..];
                     let values = &values[..length];
                     Value::Seq(values.to_vec())
@@ -571,17 +571,17 @@ impl Expr {
                 _ => panic!("SubSeq: expected Seq"),
             },
             Expr::FlatMap(expr, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.eval(stack) {
+                Expr::Lambda(name, expr) => match seq.eval(scope) {
                     Value::Seq(values) => {
                         let mut vs = Vec::new();
                         for v in values {
-                            stack.push(name.clone(), v);
-                            if let Value::Seq(vn) = expr.eval(stack) {
+                            scope.push(name.clone(), v);
+                            if let Value::Seq(vn) = expr.eval(scope) {
                                 vs.extend(vn);
                             } else {
                                 panic!("FlatMap: expected Seq");
                             }
-                            stack.pop();
+                            scope.pop();
                         }
                         Value::Seq(vs)
                     }
@@ -590,20 +590,20 @@ impl Expr {
                 _ => panic!("FlatMap: expected Lambda"),
             },
             Expr::FlatMapAccum(expr, accum, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.eval(stack) {
+                Expr::Lambda(name, expr) => match seq.eval(scope) {
                     Value::Seq(values) => {
-                        let mut accum = accum.eval(stack);
+                        let mut accum = accum.eval(scope);
                         let mut vs = Vec::new();
                         for v in values {
-                            stack.push(name.clone(), Value::Tuple(vec![accum, v]));
-                            accum = match expr.eval(stack).unwrap_tuple().as_mut_slice() {
+                            scope.push(name.clone(), Value::Tuple(vec![accum, v]));
+                            accum = match expr.eval(scope).unwrap_tuple().as_mut_slice() {
                                 [accum, Value::Seq(vn)] => {
                                     vs.extend_from_slice(&vn);
                                     accum.clone()
                                 }
                                 _ => panic!("FlatMapAccum: expected two values"),
                             };
-                            stack.pop();
+                            scope.pop();
                         }
                         Value::Seq(vs)
                     }
@@ -612,15 +612,15 @@ impl Expr {
                 _ => panic!("FlatMapAccum: expected Lambda"),
             },
             Expr::Dup(count, expr) => {
-                let count = count.eval_value(stack).unwrap_usize();
-                let v = expr.eval(stack);
+                let count = count.eval_value(scope).unwrap_usize();
+                let v = expr.eval(scope);
                 let mut vs = Vec::new();
                 for _ in 0..count {
                     vs.push(v.clone());
                 }
                 Value::Seq(vs)
             }
-            Expr::Inflate(seq) => match seq.eval(stack) {
+            Expr::Inflate(seq) => match seq.eval(scope) {
                 Value::Seq(values) => {
                     let vs = inflate(&values);
                     Value::Seq(vs)
@@ -630,16 +630,16 @@ impl Expr {
         }
     }
 
-    fn eval_value(&self, stack: &mut Stack) -> Value {
-        self.eval(stack).coerce_record_to_value()
+    fn eval_value(&self, scope: &mut Scope) -> Value {
+        self.eval(scope).coerce_record_to_value()
     }
 
-    fn eval_lambda(&self, stack: &mut Stack, arg: Value) -> Value {
+    fn eval_lambda(&self, scope: &mut Scope, arg: Value) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
-                stack.push(name.clone(), arg);
-                let v = expr.eval_value(stack);
-                stack.pop();
+                scope.push(name.clone(), arg);
+                let v = expr.eval_value(scope);
+                scope.pop();
                 v
             }
             _ => panic!("expected Lambda"),
@@ -990,8 +990,8 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> Option<(Value, ReadCtxt<'input>)> {
-        let mut stack = Stack::new();
-        self.decoders[0].parse(self, &mut stack, input)
+        let mut scope = Scope::new();
+        self.decoders[0].parse(self, &mut scope, input)
     }
 }
 
@@ -1022,16 +1022,16 @@ impl<'a> Compiler<'a> {
     }
 }
 
-pub struct Stack {
+pub struct Scope {
     names: Vec<String>,
     values: Vec<Value>,
 }
 
-impl Stack {
+impl Scope {
     fn new() -> Self {
         let names = Vec::new();
         let values = Vec::new();
-        Stack { names, values }
+        Scope { names, values }
     }
 
     fn push(&mut self, name: String, v: Value) {
@@ -1059,7 +1059,7 @@ impl Stack {
                 return &self.values[i];
             }
         }
-        panic!("stack slot not found: {name}");
+        panic!("variable not found: {name}");
     }
 }
 
@@ -1226,17 +1226,17 @@ impl Decoder {
     pub fn parse<'input>(
         &self,
         program: &Program,
-        stack: &mut Stack,
+        scope: &mut Scope,
         input: ReadCtxt<'input>,
     ) -> Option<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es) => {
-                let mut new_stack = Stack::new();
+                let mut new_scope = Scope::new();
                 for (name, e) in es {
-                    let v = e.eval(stack);
-                    new_stack.push(name.clone(), v);
+                    let v = e.eval(scope);
+                    new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n].parse(program, &mut new_stack, input)
+                program.decoders[*n].parse(program, &mut new_scope, input)
             }
             Decoder::Fail => None,
             Decoder::EndOfInput => match input.read_byte() {
@@ -1259,14 +1259,14 @@ impl Decoder {
             Decoder::Branch(tree, branches) => {
                 let index = tree.matches(input)?;
                 let (label, d) = &branches[index];
-                let (v, input) = d.parse(program, stack, input)?;
+                let (v, input) = d.parse(program, scope, input)?;
                 Some((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for f in fields {
-                    let (vf, next_input) = f.parse(program, stack, input)?;
+                    let (vf, next_input) = f.parse(program, scope, input)?;
                     input = next_input;
                     v.push(vf.clone());
                 }
@@ -1276,13 +1276,13 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for (name, f) in fields {
-                    let (vf, next_input) = f.parse(program, stack, input)?;
+                    let (vf, next_input) = f.parse(program, scope, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
-                    stack.push(name.clone(), vf);
+                    scope.push(name.clone(), vf);
                 }
                 for _ in fields {
-                    stack.pop();
+                    scope.pop();
                 }
                 Some((Value::Record(v), input))
             }
@@ -1290,7 +1290,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 while tree.matches(input)? == 0 {
-                    let (va, next_input) = a.parse(program, stack, input)?;
+                    let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
                 }
@@ -1300,7 +1300,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(program, stack, input)?;
+                    let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
                     if tree.matches(input)? == 0 {
@@ -1311,10 +1311,10 @@ impl Decoder {
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
-                let count = expr.eval_value(stack).unwrap_usize();
+                let count = expr.eval_value(scope).unwrap_usize();
                 let mut v = Vec::with_capacity(count);
                 for _ in 0..count {
-                    let (va, next_input) = a.parse(program, stack, input)?;
+                    let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
                 }
@@ -1324,9 +1324,9 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(program, stack, input)?;
+                    let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
-                    let done = expr.eval_lambda(stack, va.clone()).unwrap_bool();
+                    let done = expr.eval_lambda(scope, va.clone()).unwrap_bool();
                     v.push(va);
                     if done {
                         break;
@@ -1338,11 +1338,11 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(program, stack, input)?;
+                    let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
                     let vs = Value::Seq(v.clone());
-                    let done = expr.eval_lambda(stack, vs).unwrap_bool();
+                    let done = expr.eval_lambda(scope, vs).unwrap_bool();
                     if done {
                         break;
                     }
@@ -1350,13 +1350,13 @@ impl Decoder {
                 Some((Value::Seq(v), input))
             }
             Decoder::Peek(a) => {
-                let (v, _next_input) = a.parse(program, stack, input)?;
+                let (v, _next_input) = a.parse(program, scope, input)?;
                 Some((v, input))
             }
             Decoder::Slice(expr, a) => {
-                let size = expr.eval_value(stack).unwrap_usize();
+                let size = expr.eval_value(scope).unwrap_usize();
                 let (slice, input) = input.split_at(size)?;
-                let (v, _) = a.parse(program, stack, slice)?;
+                let (v, _) = a.parse(program, scope, slice)?;
                 Some((v, input))
             }
             Decoder::Bits(a) => {
@@ -1366,40 +1366,40 @@ impl Decoder {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                let (v, bits) = a.parse(program, stack, ReadCtxt::new(&bits))?;
+                let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
                 let bytes_remain = bits.remaining().len() >> 3;
                 let bytes_read = input.remaining().len() - bytes_remain;
                 let (_, input) = input.split_at(bytes_read)?;
                 Some((v, input))
             }
             Decoder::WithRelativeOffset(expr, a) => {
-                let offset = expr.eval_value(stack).unwrap_usize();
+                let offset = expr.eval_value(scope).unwrap_usize();
                 let (_, slice) = input.split_at(offset)?;
-                let (v, _) = a.parse(program, stack, slice)?;
+                let (v, _) = a.parse(program, scope, slice)?;
                 Some((v, input))
             }
             Decoder::Compute(expr) => {
-                let v = expr.eval(stack);
+                let v = expr.eval(scope);
                 Some((v, input))
             }
             Decoder::Match(head, branches) => {
-                let head = head.eval(stack);
-                let initial_len = stack.len();
+                let head = head.eval(scope);
+                let initial_len = scope.len();
                 let (_, decoder) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(stack, pattern))
+                    .find(|(pattern, _)| head.matches(scope, pattern))
                     .expect("exhaustive patterns");
-                let value = decoder.parse(program, stack, input);
-                stack.truncate(initial_len);
+                let value = decoder.parse(program, scope, input);
+                scope.truncate(initial_len);
                 value
             }
             Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
-                let lengths_val = lengths_expr.eval(stack);
+                let lengths_val = lengths_expr.eval(scope);
                 let lengths = value_to_vec_usize(&lengths_val);
                 let lengths = match opt_values_expr {
                     None => lengths,
                     Some(e) => {
-                        let values = value_to_vec_usize(&e.eval(stack));
+                        let values = value_to_vec_usize(&e.eval(scope));
                         let mut new_lengths = [0].repeat(values.len());
                         for i in 0..lengths.len() {
                             new_lengths[values[i]] = lengths[i];
@@ -1409,7 +1409,7 @@ impl Decoder {
                 };
                 let f = make_huffman_codes(&lengths);
                 let d = Decoder::compile_one(&f).unwrap();
-                d.parse(program, stack, input)
+                d.parse(program, scope, input)
             }
         }
     }
@@ -1575,17 +1575,17 @@ mod tests {
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
-        let mut stack = Stack::new();
-        let (val, remain) = d.parse(&program, &mut stack, ReadCtxt::new(input)).unwrap();
+        let mut scope = Scope::new();
+        let (val, remain) = d.parse(&program, &mut scope, ReadCtxt::new(input)).unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
-        let mut stack = Stack::new();
+        let mut scope = Scope::new();
         assert!(d
-            .parse(&program, &mut stack, ReadCtxt::new(input))
+            .parse(&program, &mut scope, ReadCtxt::new(input))
             .is_none());
     }
 

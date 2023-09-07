@@ -1,6 +1,6 @@
 use std::{fmt, io};
 
-use crate::{Expr, Format, FormatModule, Stack, Value};
+use crate::{Expr, Format, FormatModule, Scope, Value};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     Context::new(io::stdout(), module)
@@ -26,7 +26,7 @@ pub struct Context<'module, W: io::Write> {
     preview_len: Option<usize>,
     flags: Flags,
     module: &'module FormatModule,
-    stack: Stack,
+    scope: Scope,
 }
 
 pub struct Flags {
@@ -50,7 +50,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             preview_len: Some(10),
             flags,
             module,
-            stack: Stack::new(),
+            scope: Scope::new(),
         }
     }
 
@@ -120,14 +120,14 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
             Format::Compute(_expr) => self.write_value(value),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.stack);
-                let initial_len = self.stack.len();
+                let head = head.eval(&mut self.scope);
+                let initial_len = self.scope.len();
                 let (_, format) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(&mut self.stack, pattern))
+                    .find(|(pattern, _)| head.matches(&mut self.scope, pattern))
                     .expect("exhaustive patterns");
                 self.write_decoded_value(value, format)?;
-                self.stack.truncate(initial_len);
+                self.scope.truncate(initial_len);
                 Ok(())
             }
             Format::Dynamic(_) => self.write_value(value),
@@ -352,17 +352,17 @@ impl<'module, W: io::Write> Context<'module, W> {
         } else if let Some((_, v)) = value_fields.iter().find(|(label, _)| label == "@value") {
             self.write_value(v)
         } else {
-            let initial_len = self.stack.len();
+            let initial_len = self.scope.len();
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
                 self.write_field_value_continue(label, value, format)?;
-                self.stack.push(label.clone(), value.clone());
+                self.scope.push(label.clone(), value.clone());
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
             self.write_field_value_last(label, value, format)?;
-            self.stack.truncate(initial_len);
+            self.scope.truncate(initial_len);
             Ok(())
         }
     }
