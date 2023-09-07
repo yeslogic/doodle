@@ -357,7 +357,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
                 self.write_field_value_continue(label, value, format)?;
-                self.stack.push(Some(label.clone()), value.clone());
+                self.stack.push(label.clone(), value.clone());
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
@@ -642,11 +642,8 @@ impl<'module, W: io::Write> Context<'module, W> {
     fn write_atomic_expr(&mut self, expr: &Expr) -> io::Result<()> {
         match expr {
             Expr::Var(index) => {
-                if let Some(name) = self.stack.get_name(*index) {
-                    write!(&mut self.writer, "{name}")
-                } else {
-                    write!(&mut self.writer, "_")
-                }
+                let name = self.stack.get_name(*index);
+                write!(&mut self.writer, "{name}")
             }
             Expr::VarName(name) => {
                 write!(&mut self.writer, "{name}")
