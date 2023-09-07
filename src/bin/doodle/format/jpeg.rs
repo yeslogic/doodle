@@ -412,46 +412,49 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "scan-data-stream",
                 Format::Compute(Expr::FlatMap(
-                    Box::new(Expr::Match(
-                        Box::new(Expr::Var(0)),
-                        vec![
-                            (
-                                Pattern::variant("mcu", Pattern::Binding("v".to_string())),
-                                Expr::Seq(vec![Expr::VarName("v".to_string())]),
-                            ),
-                            (
-                                Pattern::variant("rst0", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst1", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst2", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst3", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst4", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst5", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst6", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                            (
-                                Pattern::variant("rst7", Pattern::Wildcard),
-                                Expr::Seq(vec![]),
-                            ),
-                        ],
+                    Box::new(Expr::Lambda(
+                        "x".to_string(),
+                        Box::new(Expr::Match(
+                            Box::new(Expr::VarName("x".to_string())),
+                            vec![
+                                (
+                                    Pattern::variant("mcu", Pattern::Binding("v".to_string())),
+                                    Expr::Seq(vec![Expr::VarName("v".to_string())]),
+                                ),
+                                (
+                                    Pattern::variant("rst0", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst1", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst2", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst3", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst4", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst5", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst6", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                                (
+                                    Pattern::variant("rst7", Pattern::Wildcard),
+                                    Expr::Seq(vec![]),
+                                ),
+                            ],
+                        )),
                     )),
                     Box::new(Expr::VarName("scan-data".to_string())),
                 )),
