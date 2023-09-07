@@ -24,7 +24,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
     let fname_flag = Expr::Ne(
         Box::new(Expr::BitAnd(
             Box::new(Expr::RecordProj(
-                Box::new(Expr::VarName("header".to_string())),
+                Box::new(var("header")),
                 "file-flags".to_string(),
             )),
             Box::new(Expr::U8(0x08)),

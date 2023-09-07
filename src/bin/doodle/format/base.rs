@@ -1,6 +1,10 @@
 use doodle::byte_set::ByteSet;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
+pub fn var(name: &str) -> Expr {
+    Expr::Var(name.to_string())
+}
+
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
@@ -103,7 +107,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U16Be(Box::new(Expr::VarName("bytes".to_string())))),
+                Format::Compute(Expr::U16Be(Box::new(var("bytes")))),
             ),
         ]),
     );
@@ -114,7 +118,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U16Le(Box::new(Expr::VarName("bytes".to_string())))),
+                Format::Compute(Expr::U16Le(Box::new(var("bytes")))),
             ),
         ]),
     );
@@ -125,7 +129,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U32Be(Box::new(Expr::VarName("bytes".to_string())))),
+                Format::Compute(Expr::U32Be(Box::new(var("bytes")))),
             ),
         ]),
     );
@@ -136,7 +140,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U32Le(Box::new(Expr::VarName("bytes".to_string())))),
+                Format::Compute(Expr::U32Le(Box::new(var("bytes")))),
             ),
         ]),
     );

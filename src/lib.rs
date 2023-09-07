@@ -148,8 +148,7 @@ impl Value {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
-    Var(usize),
-    VarName(String),
+    Var(String),
     Bool(bool),
     U8(u8),
     U16(u16),
@@ -411,8 +410,7 @@ enum Decoder {
 impl Expr {
     fn eval(&self, stack: &mut Stack) -> Value {
         match self {
-            Expr::Var(index) => stack.get_value(*index).clone(),
-            Expr::VarName(name) => stack.get_value_by_name(name).clone(),
+            Expr::Var(name) => stack.get_value_by_name(name).clone(),
             Expr::Bool(b) => Value::Bool(*b),
             Expr::U8(i) => Value::U8(*i),
             Expr::U16(i) => Value::U16(*i),
@@ -1053,14 +1051,6 @@ impl Stack {
     fn truncate(&mut self, len: usize) {
         self.names.truncate(len);
         self.values.truncate(len);
-    }
-
-    fn get_name(&self, index: usize) -> &String {
-        &self.names[self.names.len() - index - 1]
-    }
-
-    fn get_value(&self, index: usize) -> &Value {
-        &self.values[self.values.len() - index - 1]
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {

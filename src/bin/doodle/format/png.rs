@@ -7,10 +7,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("length", base.u32be()), // FIXME < 2^31
             ("tag", tag),
-            (
-                "data",
-                Format::Slice(Expr::VarName("length".to_string()), Box::new(data)),
-            ),
+            ("data", Format::Slice(var("length"), Box::new(data))),
             ("crc", base.u32be()), // FIXME check this
         ])
     };
@@ -45,10 +42,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let bkgd_data = Format::Match(
         Expr::RecordProj(
-            Box::new(Expr::RecordProj(
-                Box::new(Expr::VarName("ihdr".to_string())),
-                "data".to_string(),
-            )),
+            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".to_string())),
             "color-type".to_string(),
         ),
         vec![
@@ -98,10 +92,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let trns_data = Format::Match(
         Expr::RecordProj(
-            Box::new(Expr::RecordProj(
-                Box::new(Expr::VarName("ihdr".to_string())),
-                "data".to_string(),
-            )),
+            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".to_string())),
             "color-type".to_string(),
         ),
         vec![
@@ -127,20 +118,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         alts([
             (
                 "bKGD",
-                bkgd.call_args(vec![(
-                    "ihdr".to_string(),
-                    Expr::VarName("ihdr".to_string()),
-                )]),
+                bkgd.call_args(vec![("ihdr".to_string(), var("ihdr"))]),
             ),
             ("pHYs", phys.call()),
             ("PLTE", plte.call()),
             ("tIME", time.call()),
             (
                 "tRNS",
-                trns.call_args(vec![(
-                    "ihdr".to_string(),
-                    Expr::VarName("ihdr".to_string()),
-                )]),
+                trns.call_args(vec![("ihdr".to_string(), var("ihdr"))]),
             ),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
@@ -155,10 +140,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("ihdr", ihdr.call()),
             (
                 "chunks",
-                repeat(png_chunk.call_args(vec![(
-                    "ihdr".to_string(),
-                    Expr::VarName("ihdr".to_string()),
-                )])),
+                repeat(png_chunk.call_args(vec![("ihdr".to_string(), var("ihdr"))])),
             ),
             ("idat", repeat1(idat.call())),
             ("more-chunks", repeat(png_chunk.call())),
