@@ -221,7 +221,7 @@ impl Expr {
 #[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>),
+    ItemVar(usize, Vec<(String, Expr)>),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -298,7 +298,8 @@ impl FormatRef {
         Format::ItemVar(self.0, vec![])
     }
 
-    pub fn call_args(&self, args: Vec<Expr>) -> Format {
+    pub fn call_args(&self, args: Vec<(String, Expr)>) -> Format {
+        // FIXME arg names should really come from FormatRef
         Format::ItemVar(self.0, args)
     }
 }
@@ -361,7 +362,7 @@ pub struct MatchTree {
 
 /// Decoders with a fixed amount of lookahead
 enum Decoder {
-    Call(usize, Vec<Expr>),
+    Call(usize, Vec<(String, Expr)>),
     Fail,
     EndOfInput,
     Align(usize),
@@ -1223,9 +1224,9 @@ impl Decoder {
         match self {
             Decoder::Call(n, es) => {
                 let mut new_stack = Stack::new();
-                for e in es {
+                for (name, e) in es {
                     let v = e.eval(stack);
-                    new_stack.push(None, v);
+                    new_stack.push(Some(name.clone()), v);
                 }
                 program.decoders[*n].parse(program, &mut new_stack, input)
             }
