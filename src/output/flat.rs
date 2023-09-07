@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{Format, FormatModule, Stack, Value};
+use crate::{Format, FormatModule, Scope, Value};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();
@@ -13,7 +13,7 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
 pub struct Context<'module, W: io::Write> {
     writer: W,
     module: &'module FormatModule,
-    stack: Stack,
+    scope: Scope,
 }
 
 fn is_show_format(name: &str) -> Option<&'static str> {
@@ -164,7 +164,7 @@ impl<'module, W: io::Write> Context<'module, W> {
         Context {
             writer,
             module,
-            stack: Stack::new(),
+            scope: Scope::new(),
         }
     }
 
@@ -201,13 +201,13 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
-                    let initial_len = self.stack.len();
+                    let initial_len = self.scope.len();
                     for (index, (label, value)) in value_fields.iter().enumerate() {
                         let format = &format_fields[index].1;
                         self.write_flat(value, format)?;
-                        self.stack.push(label.clone(), value.clone());
+                        self.scope.push(label.clone(), value.clone());
                     }
-                    self.stack.truncate(initial_len);
+                    self.scope.truncate(initial_len);
                     Ok(())
                 }
                 _ => panic!("expected record"),
@@ -231,14 +231,14 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Compute(_expr) => Ok(()),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.stack);
-                let initial_len = self.stack.len();
+                let head = head.eval(&mut self.scope);
+                let initial_len = self.scope.len();
                 let (_, format) = branches
                     .iter()
-                    .find(|(pattern, _)| head.matches(&mut self.stack, pattern))
+                    .find(|(pattern, _)| head.matches(&mut self.scope, pattern))
                     .expect("exhaustive patterns");
                 self.write_flat(value, format)?;
-                self.stack.truncate(initial_len);
+                self.scope.truncate(initial_len);
                 Ok(())
             }
             Format::Dynamic(_) => Ok(()), // FIXME
