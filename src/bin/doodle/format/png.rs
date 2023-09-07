@@ -45,7 +45,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let bkgd_data = Format::Match(
         Expr::RecordProj(
-            Box::new(Expr::RecordProj(Box::new(Expr::Var(2)), "data".to_string())),
+            Box::new(Expr::RecordProj(
+                Box::new(Expr::VarName("ihdr".to_string())),
+                "data".to_string(),
+            )),
             "color-type".to_string(),
         ),
         vec![
@@ -95,7 +98,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let trns_data = Format::Match(
         Expr::RecordProj(
-            Box::new(Expr::RecordProj(Box::new(Expr::Var(2)), "data".to_string())),
+            Box::new(Expr::RecordProj(
+                Box::new(Expr::VarName("ihdr".to_string())),
+                "data".to_string(),
+            )),
             "color-type".to_string(),
         ),
         vec![
@@ -119,11 +125,23 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let png_chunk = module.define_format(
         "png.chunk",
         alts([
-            ("bKGD", bkgd.call_args(vec![Expr::Var(0)])),
+            (
+                "bKGD",
+                bkgd.call_args(vec![(
+                    "ihdr".to_string(),
+                    Expr::VarName("ihdr".to_string()),
+                )]),
+            ),
             ("pHYs", phys.call()),
             ("PLTE", plte.call()),
             ("tIME", time.call()),
-            ("tRNS", trns.call_args(vec![Expr::Var(0)])),
+            (
+                "tRNS",
+                trns.call_args(vec![(
+                    "ihdr".to_string(),
+                    Expr::VarName("ihdr".to_string()),
+                )]),
+            ),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
     );
@@ -137,7 +155,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("ihdr", ihdr.call()),
             (
                 "chunks",
-                repeat(png_chunk.call_args(vec![Expr::VarName("ihdr".to_string())])),
+                repeat(png_chunk.call_args(vec![(
+                    "ihdr".to_string(),
+                    Expr::VarName("ihdr".to_string()),
+                )])),
             ),
             ("idat", repeat1(idat.call())),
             ("more-chunks", repeat(png_chunk.call())),
