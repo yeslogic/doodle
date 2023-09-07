@@ -103,7 +103,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U16Be(Box::new(Expr::Var(0)))),
+                Format::Compute(Expr::U16Be(Box::new(Expr::VarName("bytes".to_string())))),
             ),
         ]),
     );
@@ -114,7 +114,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U16Le(Box::new(Expr::Var(0)))),
+                Format::Compute(Expr::U16Le(Box::new(Expr::VarName("bytes".to_string())))),
             ),
         ]),
     );
@@ -125,7 +125,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U32Be(Box::new(Expr::Var(0)))),
+                Format::Compute(Expr::U32Be(Box::new(Expr::VarName("bytes".to_string())))),
             ),
         ]),
     );
@@ -136,7 +136,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
             ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
             (
                 "@value",
-                Format::Compute(Expr::U32Le(Box::new(Expr::Var(0)))),
+                Format::Compute(Expr::U32Le(Box::new(Expr::VarName("bytes".to_string())))),
             ),
         ]),
     );
