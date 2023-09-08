@@ -67,7 +67,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (Pattern::U8(3), record([("palette-index", base.u8())])),
         ],
     );
-    let bkgd = module.define_format("png.bkgd", chunk(is_bytes(b"bKGD"), bkgd_data));
+    let bkgd = module.define_format_args(
+        "png.bkgd",
+        vec!["ihdr".to_string()],
+        chunk(is_bytes(b"bKGD"), bkgd_data),
+    );
 
     let phys_data = record([
         ("pixels-per-unit-x", base.u32be()),
@@ -111,22 +115,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
         ],
     );
-    let trns = module.define_format("png.trns", chunk(is_bytes(b"tRNS"), trns_data));
+    let trns = module.define_format_args(
+        "png.trns",
+        vec!["ihdr".to_string()],
+        chunk(is_bytes(b"tRNS"), trns_data),
+    );
 
-    let png_chunk = module.define_format(
+    let png_chunk = module.define_format_args(
         "png.chunk",
+        vec!["ihdr".to_string()],
         alts([
-            (
-                "bKGD",
-                bkgd.call_args(vec![("ihdr".to_string(), var("ihdr"))]),
-            ),
+            ("bKGD", bkgd.call_args(vec![var("ihdr")])),
             ("pHYs", phys.call()),
             ("PLTE", plte.call()),
             ("tIME", time.call()),
-            (
-                "tRNS",
-                trns.call_args(vec![("ihdr".to_string(), var("ihdr"))]),
-            ),
+            ("tRNS", trns.call_args(vec![var("ihdr")])),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
     );
@@ -138,10 +141,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("signature", png_signature.call()),
             ("ihdr", ihdr.call()),
-            (
-                "chunks",
-                repeat(png_chunk.call_args(vec![("ihdr".to_string(), var("ihdr"))])),
-            ),
+            ("chunks", repeat(png_chunk.call_args(vec![var("ihdr")]))),
             ("idat", repeat1(idat.call())),
             ("more-chunks", repeat(png_chunk.call())),
             ("iend", iend.call()),
