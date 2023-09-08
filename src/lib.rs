@@ -244,7 +244,7 @@ impl Expr {
 #[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
-    ItemVar(usize, Vec<(String, Expr)>),
+    ItemVar(usize, Vec<Expr>),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -321,8 +321,7 @@ impl FormatRef {
         Format::ItemVar(self.0, vec![])
     }
 
-    pub fn call_args(&self, args: Vec<(String, Expr)>) -> Format {
-        // FIXME arg names should really come from FormatRef
+    pub fn call_args(&self, args: Vec<Expr>) -> Format {
         Format::ItemVar(self.0, args)
     }
 }
@@ -330,6 +329,7 @@ impl FormatRef {
 #[derive(Debug, Serialize)]
 pub struct FormatModule {
     names: Vec<String>,
+    args: Vec<Vec<String>>,
     formats: Vec<Format>,
 }
 
@@ -337,19 +337,34 @@ impl FormatModule {
     pub fn new() -> FormatModule {
         FormatModule {
             names: Vec::new(),
+            args: Vec::new(),
             formats: Vec::new(),
         }
     }
 
     pub fn define_format(&mut self, name: impl Into<String>, format: Format) -> FormatRef {
+        self.define_format_args(name, vec![], format)
+    }
+
+    pub fn define_format_args(
+        &mut self,
+        name: impl Into<String>,
+        args: Vec<String>,
+        format: Format,
+    ) -> FormatRef {
         let level = self.names.len();
         self.names.push(name.into());
+        self.args.push(args);
         self.formats.push(format);
         FormatRef(level)
     }
 
     fn get_name(&self, level: usize) -> &str {
         &self.names[level]
+    }
+
+    fn get_args(&self, level: usize) -> &[String] {
+        &self.args[level]
     }
 
     fn get_format(&self, level: usize) -> &Format {
@@ -1080,7 +1095,7 @@ impl Decoder {
         next: Rc<Next<'a>>,
     ) -> Result<Decoder, String> {
         match format {
-            Format::ItemVar(level, args) => {
+            Format::ItemVar(level, arg_exprs) => {
                 let next = if compiler
                     .module
                     .get_format(*level)
@@ -1103,7 +1118,12 @@ impl Decoder {
                     compiler.map.insert((*level, next.clone()), n);
                     n
                 };
-                Ok(Decoder::Call(n, args.clone()))
+                let arg_names = compiler.module.get_args(*level);
+                let mut args = Vec::new();
+                for (name, expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
+                    args.push((name.clone(), expr.clone()));
+                }
+                Ok(Decoder::Call(n, args))
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
