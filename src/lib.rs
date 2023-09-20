@@ -570,11 +570,7 @@ impl Expr {
             Expr::SeqLength(seq) => match seq.eval(scope) {
                 Value::Seq(values) => {
                     let len = values.len();
-                    if len < 65536 {
-                        Value::U16(len as u16)
-                    } else {
-                        Value::U32(len as u32)
-                    }
+                    Value::U32(len as u32)
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
