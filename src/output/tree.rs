@@ -606,7 +606,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, ") ")?;
                 self.write_proj_expr(seq)
             }
-            Expr::FlatMapAccum(expr, accum, seq) => {
+            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => {
                 write!(&mut self.writer, "flat-map-accum (")?;
                 self.write_expr(expr)?;
                 write!(&mut self.writer, ", ")?;

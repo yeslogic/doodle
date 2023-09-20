@@ -35,6 +35,78 @@ impl Pattern {
     pub fn variant(label: impl Into<String>, value: impl Into<Box<Pattern>>) -> Pattern {
         Pattern::Variant(label.into(), value.into())
     }
+
+    fn build_scope(&self, scope: &mut TypeScope, t: &ValueType) {
+        match (self, t) {
+            (Pattern::Binding(name), t) => {
+                scope.push(name.clone(), t.clone());
+            }
+            (Pattern::Wildcard, _) => {}
+            (Pattern::Bool(_b0), ValueType::Bool) => {}
+            (Pattern::U8(_i0), ValueType::U8) => {}
+            (Pattern::U16(_i0), ValueType::U16) => {}
+            (Pattern::U32(_i0), ValueType::U32) => {}
+            (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
+                for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
+                    p.build_scope(scope, t);
+                }
+            }
+            (Pattern::Seq(ps), ValueType::Seq(t)) => {
+                for p in ps {
+                    p.build_scope(scope, t);
+                }
+            }
+            (Pattern::Variant(label, p), ValueType::Union(branches)) => {
+                if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
+                    p.build_scope(scope, t);
+                } else {
+                    panic!("no {label} in {branches:?}");
+                }
+            }
+            _ => panic!("pattern build_scope failed"),
+        }
+    }
+
+    fn infer_expr_branch_type(
+        &self,
+        scope: &mut TypeScope,
+        head_type: &ValueType,
+        expr: &Expr,
+    ) -> Result<ValueType, String> {
+        let initial_len = scope.len();
+        self.build_scope(scope, head_type);
+        let t = expr.infer_type(scope)?;
+        scope.truncate(initial_len);
+        Ok(t)
+    }
+
+    fn infer_format_branch_type(
+        &self,
+        scope: &mut TypeScope,
+        head_type: &ValueType,
+        module: &FormatModule,
+        format: &Format,
+    ) -> Result<ValueType, String> {
+        let initial_len = scope.len();
+        self.build_scope(scope, head_type);
+        let t = module.infer_format_type(scope, format)?;
+        scope.truncate(initial_len);
+        Ok(t)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum ValueType {
+    Any,
+    Empty,
+    Bool,
+    U8,
+    U16,
+    U32,
+    Tuple(Vec<ValueType>),
+    Record(Vec<(String, ValueType)>),
+    Union(Vec<(String, ValueType)>),
+    Seq(Box<ValueType>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -145,6 +217,87 @@ impl Value {
     }
 }
 
+impl ValueType {
+    fn record_proj(&self, label: &str) -> ValueType {
+        match self {
+            ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
+                Some((_, t)) => t.clone(),
+                None => panic!("{label} not found in record type"),
+            },
+            _ => panic!("expected record type"),
+        }
+    }
+
+    fn unwrap_tuple_type(self) -> Vec<ValueType> {
+        match self {
+            ValueType::Tuple(ts) => ts,
+            _ => panic!("type is not a tuple"),
+        }
+    }
+
+    fn is_numeric_type(&self) -> bool {
+        match self {
+            ValueType::U8 | ValueType::U16 | ValueType::U32 => true,
+            _ => false,
+        }
+    }
+
+    fn unify(&self, other: &ValueType) -> Result<ValueType, String> {
+        match (self, other) {
+            (ValueType::Any, rhs) => Ok(rhs.clone()),
+            (lhs, ValueType::Any) => Ok(lhs.clone()),
+            (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
+            (ValueType::Bool, ValueType::Bool) => Ok(ValueType::Bool),
+            (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
+            (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
+            (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+            (ValueType::Tuple(ts1), ValueType::Tuple(ts2)) => {
+                if ts1.len() != ts2.len() {
+                    return Err(format!("tuples must have same length"));
+                }
+                let mut ts = Vec::new();
+                for (t1, t2) in Iterator::zip(ts1.iter(), ts2.iter()) {
+                    ts.push(t1.unify(t2)?);
+                }
+                Ok(ValueType::Tuple(ts))
+            }
+            (ValueType::Record(fs1), ValueType::Record(fs2)) => {
+                if fs1.len() != fs2.len() {
+                    return Err(format!("records must have same number of fields"));
+                }
+                // FIXME field order
+                let mut fs = Vec::new();
+                for ((l1, t1), (l2, t2)) in Iterator::zip(fs1.iter(), fs2.iter()) {
+                    if l1 != l2 {
+                        return Err(format!("record fields do not match"));
+                    }
+                    fs.push((l1.clone(), t1.unify(t2)?));
+                }
+                Ok(ValueType::Record(fs))
+            }
+            (ValueType::Union(bs1), ValueType::Union(bs2)) => {
+                let mut bs: Vec<(String, ValueType)> = Vec::new();
+                for (label, t2) in bs2 {
+                    let t = if let Some((_l, t1)) = bs.iter().find(|(l, _)| label == l) {
+                        t1.unify(t2)?
+                    } else {
+                        t2.clone()
+                    };
+                    bs.push((label.clone(), t));
+                }
+                for (label, t1) in bs1 {
+                    if bs.iter().find(|(l, _)| label == l).is_none() {
+                        bs.push((label.clone(), t1.clone()));
+                    }
+                }
+                Ok(ValueType::Union(bs))
+            }
+            (ValueType::Seq(t1), ValueType::Seq(t2)) => Ok(ValueType::Seq(Box::new(t1.unify(t2)?))),
+            (t1, t2) => Err(format!("failed to unify types {t1:?} and {t2:?}")),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
@@ -187,7 +340,7 @@ pub enum Expr {
     SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
     FlatMap(Box<Expr>, Box<Expr>),
-    FlatMapAccum(Box<Expr>, Box<Expr>, Box<Expr>),
+    FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
     Dup(Box<Expr>, Box<Expr>),
     Inflate(Box<Expr>),
 }
@@ -317,6 +470,10 @@ impl Format {
 pub struct FormatRef(usize);
 
 impl FormatRef {
+    pub fn get_level(&self) -> usize {
+        self.0
+    }
+
     pub fn call(&self) -> Format {
         Format::ItemVar(self.0, vec![])
     }
@@ -329,8 +486,9 @@ impl FormatRef {
 #[derive(Debug, Serialize)]
 pub struct FormatModule {
     names: Vec<String>,
-    args: Vec<Vec<String>>,
+    args: Vec<Vec<(String, ValueType)>>,
     formats: Vec<Format>,
+    format_types: Vec<ValueType>,
 }
 
 impl FormatModule {
@@ -339,6 +497,7 @@ impl FormatModule {
             names: Vec::new(),
             args: Vec::new(),
             formats: Vec::new(),
+            format_types: Vec::new(),
         }
     }
 
@@ -349,13 +508,22 @@ impl FormatModule {
     pub fn define_format_args(
         &mut self,
         name: impl Into<String>,
-        args: Vec<String>,
+        args: Vec<(String, ValueType)>,
         format: Format,
     ) -> FormatRef {
+        let mut scope = TypeScope::new();
+        for (arg_name, arg_type) in &args {
+            scope.push(arg_name.clone(), arg_type.clone());
+        }
+        let format_type = match self.infer_format_type(&mut scope, &format) {
+            Ok(t) => t,
+            Err(msg) => panic!("{msg}"),
+        };
         let level = self.names.len();
         self.names.push(name.into());
         self.args.push(args);
         self.formats.push(format);
+        self.format_types.push(format_type);
         FormatRef(level)
     }
 
@@ -363,12 +531,100 @@ impl FormatModule {
         &self.names[level]
     }
 
-    fn get_args(&self, level: usize) -> &[String] {
+    fn get_args(&self, level: usize) -> &[(String, ValueType)] {
         &self.args[level]
     }
 
     fn get_format(&self, level: usize) -> &Format {
         &self.formats[level]
+    }
+
+    pub fn get_format_type(&self, level: usize) -> &ValueType {
+        &self.format_types[level]
+    }
+
+    fn infer_format_type(&self, scope: &mut TypeScope, f: &Format) -> Result<ValueType, String> {
+        match f {
+            Format::ItemVar(level, arg_exprs) => {
+                let arg_names = self.get_args(*level);
+                for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
+                    let t = expr.infer_type(scope)?;
+                    let _t = arg_type.unify(&t)?;
+                }
+                Ok(self.get_format_type(*level).clone())
+            }
+            Format::Fail => Ok(ValueType::Empty),
+            Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
+            Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
+            Format::Byte(_bs) => Ok(ValueType::U8),
+            Format::Union(branches) => {
+                let mut ts = Vec::with_capacity(branches.len());
+                for (label, f) in branches {
+                    ts.push((label.clone(), self.infer_format_type(scope, f)?));
+                }
+                Ok(ValueType::Union(ts))
+            }
+            Format::Tuple(fields) => {
+                let mut ts = Vec::with_capacity(fields.len());
+                for f in fields {
+                    ts.push(self.infer_format_type(scope, f)?);
+                }
+                Ok(ValueType::Tuple(ts))
+            }
+            Format::Record(fields) => {
+                let mut ts = Vec::with_capacity(fields.len());
+                let initial_len = scope.len();
+                for (label, f) in fields {
+                    let t = self.infer_format_type(scope, f)?;
+                    ts.push((label.clone(), t.clone()));
+                    scope.push(label.clone(), t);
+                }
+                scope.truncate(initial_len);
+                Ok(ValueType::Record(ts))
+            }
+            Format::Repeat(a) | Format::Repeat1(a) => {
+                let t = self.infer_format_type(scope, a)?;
+                Ok(ValueType::Seq(Box::new(t)))
+            }
+            Format::RepeatCount(_expr, a)
+            | Format::RepeatUntilLast(_expr, a)
+            | Format::RepeatUntilSeq(_expr, a) => {
+                let t = self.infer_format_type(scope, a)?;
+                Ok(ValueType::Seq(Box::new(t)))
+            }
+            Format::Peek(a) => self.infer_format_type(scope, a),
+            Format::Slice(_expr, a) => self.infer_format_type(scope, a),
+            Format::Bits(a) => self.infer_format_type(scope, a),
+            Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
+            Format::Compute(expr) => expr.infer_type(scope),
+            Format::Match(head, branches) => {
+                if branches.is_empty() {
+                    return Err(format!("infer_format_type: empty Match"));
+                }
+                let head_type = head.infer_type_coerce_value(scope)?;
+                let mut t = ValueType::Any;
+                for (pattern, branch) in branches {
+                    // FIXME bails out early if type checking fails
+                    t = match (|| {
+                        Ok::<ValueType, String>(t.unify(
+                            &pattern.infer_format_branch_type(scope, &head_type, self, branch)?,
+                        )?)
+                    })() {
+                        Ok(t) => t,
+                        Err(_msg) => return Ok(t), // FIXME
+                    };
+                }
+                Ok(t)
+            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => {
+                // FIXME check expr type
+                let ts = vec![
+                    // FIXME ("bits", alt???)
+                    ("@value".to_string(), ValueType::U16),
+                ];
+                Ok(ValueType::Record(ts))
+            }
+        }
     }
 }
 
@@ -603,7 +859,7 @@ impl Expr {
                 },
                 _ => panic!("FlatMap: expected Lambda"),
             },
-            Expr::FlatMapAccum(expr, accum, seq) => match expr.as_ref() {
+            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.eval(scope) {
                     Value::Seq(values) => {
                         let mut accum = accum.eval(scope);
@@ -657,6 +913,205 @@ impl Expr {
                 v
             }
             _ => panic!("expected Lambda"),
+        }
+    }
+
+    fn infer_type(&self, scope: &mut TypeScope) -> Result<ValueType, String> {
+        match self {
+            Expr::Var(name) => Ok(scope.get_type_by_name(name).clone()),
+            Expr::Bool(_b) => Ok(ValueType::Bool),
+            Expr::U8(_i) => Ok(ValueType::U8),
+            Expr::U16(_i) => Ok(ValueType::U16),
+            Expr::U32(_i) => Ok(ValueType::U32),
+            Expr::Tuple(exprs) => {
+                let mut ts = Vec::new();
+                for expr in exprs {
+                    ts.push(expr.infer_type(scope)?);
+                }
+                Ok(ValueType::Tuple(ts))
+            }
+            Expr::TupleProj(head, index) => match head.infer_type(scope)? {
+                ValueType::Tuple(vs) => Ok(vs[*index].clone()),
+                _ => Err(format!("expected tuple type")),
+            },
+            Expr::Record(fields) => {
+                let mut fs = Vec::new();
+                for (label, expr) in fields {
+                    fs.push((label.clone(), expr.infer_type(scope)?));
+                }
+                Ok(ValueType::Record(fs))
+            }
+            Expr::RecordProj(head, label) => Ok(head.infer_type(scope)?.record_proj(label)),
+            Expr::Variant(label, expr) => Ok(ValueType::Union(vec![(
+                label.clone(),
+                expr.infer_type(scope)?,
+            )])),
+            Expr::Seq(exprs) => {
+                let mut t = ValueType::Any;
+                for e in exprs {
+                    t = t.unify(&e.infer_type(scope)?)?;
+                }
+                Ok(ValueType::Seq(Box::new(t)))
+            }
+            Expr::Match(head, branches) => {
+                if branches.is_empty() {
+                    return Err(format!("infer_type: empty Match"));
+                }
+                let head_type = head.infer_type_coerce_value(scope)?;
+                let mut t = ValueType::Any;
+                for (pattern, branch) in branches {
+                    t = t.unify(&pattern.infer_expr_branch_type(scope, &head_type, branch)?)?;
+                }
+                Ok(t)
+            }
+            Expr::Lambda(_, _) => Err(format!("cannot infer_type lambda")),
+
+            Expr::BitAnd(x, y) | Expr::BitOr(x, y) => match (
+                x.infer_type_coerce_value(scope)?,
+                y.infer_type_coerce_value(scope)?,
+            ) {
+                (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
+                (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
+                (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+                (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
+            },
+            Expr::Eq(x, y)
+            | Expr::Ne(x, y)
+            | Expr::Lt(x, y)
+            | Expr::Gt(x, y)
+            | Expr::Lte(x, y)
+            | Expr::Gte(x, y) => match (
+                x.infer_type_coerce_value(scope)?,
+                y.infer_type_coerce_value(scope)?,
+            ) {
+                (ValueType::U8, ValueType::U8) => Ok(ValueType::Bool),
+                (ValueType::U16, ValueType::U16) => Ok(ValueType::Bool),
+                (ValueType::U32, ValueType::U32) => Ok(ValueType::Bool),
+                (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
+            },
+            Expr::Rem(x, y) | Expr::Shl(x, y) | Expr::Add(x, y) | Expr::Sub(x, y) => match (
+                x.infer_type_coerce_value(scope)?,
+                y.infer_type_coerce_value(scope)?,
+            ) {
+                (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
+                (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
+                (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+                (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
+            },
+
+            Expr::AsU8(x) => match x.infer_type_coerce_value(scope)? {
+                ValueType::U8 => Ok(ValueType::U8),
+                ValueType::U16 => Ok(ValueType::U8),
+                ValueType::U32 => Ok(ValueType::U8),
+                x => Err(format!("cannot convert {x:?} to U8")),
+            },
+            Expr::AsU16(x) => match x.infer_type_coerce_value(scope)? {
+                ValueType::U8 => Ok(ValueType::U16),
+                ValueType::U16 => Ok(ValueType::U16),
+                ValueType::U32 => Ok(ValueType::U16),
+                x => Err(format!("cannot convert {x:?} to U16")),
+            },
+            Expr::AsU32(x) => match x.infer_type_coerce_value(scope)? {
+                ValueType::U8 => Ok(ValueType::U32),
+                ValueType::U16 => Ok(ValueType::U32),
+                ValueType::U32 => Ok(ValueType::U32),
+                x => Err(format!("cannot convert {x:?} to U32")),
+            },
+
+            Expr::U16Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+                [ValueType::U8, ValueType::U8] => Ok(ValueType::U16),
+                _ => Err(format!("U16Be: expected (U8, U8)")),
+            },
+            Expr::U16Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+                [ValueType::U8, ValueType::U8] => Ok(ValueType::U16),
+                _ => Err(format!("U16Le: expected (U8, U8)")),
+            },
+            Expr::U32Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+                [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(ValueType::U32),
+                _ => Err(format!("U32Be: expected (U8, U8, U8, U8)")),
+            },
+            Expr::U32Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+                [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(ValueType::U32),
+                _ => Err(format!("U32Le: expected (U8, U8, U8, U8)")),
+            },
+            Expr::SeqLength(seq) => match seq.infer_type(scope)? {
+                ValueType::Seq(_t) => Ok(ValueType::U32),
+                _ => Err(format!("SeqLength: expected Seq")),
+            },
+            Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
+                ValueType::Seq(t) => {
+                    let start_type = start.infer_type_coerce_value(scope)?;
+                    let length_type = length.infer_type_coerce_value(scope)?;
+                    if !start_type.is_numeric_type() {
+                        return Err(format!("SubSeq start must be numeric"));
+                    }
+                    if !length_type.is_numeric_type() {
+                        return Err(format!("SubSeq length must be numeric"));
+                    }
+                    Ok(ValueType::Seq(t))
+                }
+                _ => Err(format!("SubSeq: expected Seq")),
+            },
+            Expr::FlatMap(expr, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        scope.push(name.clone(), *t);
+                        let t2 = if let ValueType::Seq(t2) = expr.infer_type(scope)? {
+                            t2
+                        } else {
+                            return Err(format!("FlatMap: expected Seq"));
+                        };
+                        scope.pop();
+                        Ok(ValueType::Seq(t2))
+                    }
+                    _ => Err(format!("FlatMap: expected Seq")),
+                },
+                _ => Err(format!("FlatMap: expected Lambda")),
+            },
+            Expr::FlatMapAccum(expr, accum, accum_type, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        let accum_type = accum.infer_type(scope)?.unify(&accum_type)?;
+                        scope.push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
+                        let t2 = match expr.infer_type(scope)?.unwrap_tuple_type().as_mut_slice() {
+                            [accum_result, ValueType::Seq(t2)] => {
+                                accum_result.unify(&accum_type)?;
+                                t2.clone()
+                            }
+                            _ => panic!("FlatMapAccum: expected two values"),
+                        };
+                        scope.pop();
+                        Ok(ValueType::Seq(t2))
+                    }
+                    _ => Err(format!("FlatMapAccum: expected Seq")),
+                },
+                _ => Err(format!("FlatMapAccum: expected Lambda")),
+            },
+            Expr::Dup(count, expr) => {
+                if !count.infer_type_coerce_value(scope)?.is_numeric_type() {
+                    return Err(format!("Dup count must be numeric"));
+                }
+                let t = expr.infer_type(scope)?;
+                Ok(ValueType::Seq(Box::new(t)))
+            }
+            Expr::Inflate(seq) => match seq.infer_type(scope)? {
+                // FIXME should check values are appropriate variants
+                ValueType::Seq(_values) => Ok(ValueType::Seq(Box::new(ValueType::U8))),
+                _ => Err(format!("Inflate: expected Seq")),
+            },
+        }
+    }
+
+    fn infer_type_coerce_value(&self, scope: &mut TypeScope) -> Result<ValueType, String> {
+        match self.infer_type(scope)? {
+            ValueType::Record(fields) => {
+                if let Some((_l, t)) = fields.iter().find(|(l, _)| l == "@value") {
+                    return Ok(t.clone());
+                } else {
+                    Ok(ValueType::Record(fields))
+                }
+            }
+            t => Ok(t),
         }
     }
 }
@@ -993,14 +1448,34 @@ impl<'a> ReadCtxt<'a> {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum TypeRef {
+    Var(usize),
+    Empty,
+    Bool,
+    U8,
+    U16,
+    U32,
+    Tuple(Vec<TypeRef>),
+    Seq(Box<TypeRef>),
+}
+
+pub enum TypeDef {
+    //Equiv(TypeRef),
+    Union(Vec<(String, TypeRef)>),
+    Record(Vec<(String, TypeRef)>),
+}
+
 pub struct Program {
+    typedefs: Vec<TypeDef>,
     decoders: Vec<Decoder>,
 }
 
 impl Program {
     fn new() -> Self {
+        let typedefs = Vec::new();
         let decoders = Vec::new();
-        Program { decoders }
+        Program { typedefs, decoders }
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> Option<(Value, ReadCtxt<'input>)> {
@@ -1012,33 +1487,95 @@ impl Program {
 pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
-    map: HashMap<(usize, Rc<Next<'a>>), usize>,
+    record_map: HashMap<Vec<(String, TypeRef)>, usize>,
+    union_map: HashMap<Vec<(String, TypeRef)>, usize>,
+    decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
 }
 
 impl<'a> Compiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
         let program = Program::new();
-        let map = HashMap::new();
+        let record_map = HashMap::new();
+        let union_map = HashMap::new();
+        let decoder_map = HashMap::new();
         Compiler {
             module,
             program,
-            map,
+            record_map,
+            union_map,
+            decoder_map,
         }
     }
 
     pub fn compile(module: &FormatModule, format: &Format) -> Result<Program, String> {
         let mut compiler = Compiler::new(module);
+        // type
+        /*
+        let mut scope = TypeScope::new();
+        let t = TypeRef::from_value_type(
+            &mut compiler,
+            &module.infer_format_type(&mut scope, format)?,
+        );
+        */
+        // decoder
         let n = compiler.program.decoders.len();
         compiler.program.decoders.push(Decoder::Fail);
         let d = Decoder::compile(&mut compiler, format)?;
         compiler.program.decoders[n] = d;
         Ok(compiler.program)
     }
+
+    pub fn add_typedef(&mut self, t: TypeDef) -> TypeRef {
+        let n = self.program.typedefs.len();
+        self.program.typedefs.push(t);
+        TypeRef::Var(n)
+    }
+}
+
+pub struct TypeScope {
+    names: Vec<String>,
+    types: Vec<ValueType>,
 }
 
 pub struct Scope {
     names: Vec<String>,
     values: Vec<Value>,
+}
+
+impl TypeScope {
+    fn new() -> Self {
+        let names = Vec::new();
+        let types = Vec::new();
+        TypeScope { names, types }
+    }
+
+    fn push(&mut self, name: String, t: ValueType) {
+        self.names.push(name);
+        self.types.push(t);
+    }
+
+    fn pop(&mut self) -> ValueType {
+        self.names.pop();
+        self.types.pop().unwrap()
+    }
+
+    fn len(&self) -> usize {
+        self.types.len()
+    }
+
+    fn truncate(&mut self, len: usize) {
+        self.names.truncate(len);
+        self.types.truncate(len);
+    }
+
+    fn get_type_by_name(&self, name: &str) -> &ValueType {
+        for (i, n) in self.names.iter().enumerate().rev() {
+            if n == name {
+                return &self.types[i];
+            }
+        }
+        panic!("variable not found: {name}");
+    }
 }
 
 impl Scope {
@@ -1077,6 +1614,84 @@ impl Scope {
     }
 }
 
+impl TypeRef {
+    fn from_value_type<'a>(compiler: &mut Compiler<'a>, t: &ValueType) -> Self {
+        match t {
+            ValueType::Any => panic!("ValueType::Any"),
+            ValueType::Empty => TypeRef::Empty,
+            ValueType::Bool => TypeRef::Bool,
+            ValueType::U8 => TypeRef::U8,
+            ValueType::U16 => TypeRef::U16,
+            ValueType::U32 => TypeRef::U32,
+            ValueType::Tuple(ts) => TypeRef::Tuple(
+                ts.iter()
+                    .map(|t| Self::from_value_type(compiler, t))
+                    .collect(),
+            ),
+            ValueType::Record(fields) => {
+                let fs: Vec<_> = fields
+                    .iter()
+                    .map(|(label, t)| (label.clone(), Self::from_value_type(compiler, t)))
+                    .collect();
+                let n = if let Some(n) = compiler.record_map.get(&fs) {
+                    *n
+                } else {
+                    let t = TypeDef::Record(fs.clone());
+                    let n = compiler.program.typedefs.len();
+                    compiler.program.typedefs.push(t);
+                    compiler.record_map.insert(fs, n);
+                    n
+                };
+                TypeRef::Var(n)
+            }
+            ValueType::Union(branches) => {
+                let bs: Vec<_> = branches
+                    .iter()
+                    .map(|(label, t)| (label.clone(), Self::from_value_type(compiler, t)))
+                    .collect();
+                let n = if let Some(n) = compiler.union_map.get(&bs) {
+                    *n
+                } else {
+                    let t = TypeDef::Union(bs.clone());
+                    let n = compiler.program.typedefs.len();
+                    compiler.program.typedefs.push(t);
+                    compiler.union_map.insert(bs, n);
+                    n
+                };
+                TypeRef::Var(n)
+            }
+            ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, &*t))),
+        }
+    }
+
+    fn to_value_type(&self, typedefs: &[TypeDef]) -> ValueType {
+        match self {
+            TypeRef::Var(n) => match &typedefs[*n] {
+                //TypeDef::Equiv(t) => t.to_value_type(typedefs),
+                TypeDef::Union(ts) => ValueType::Union(
+                    ts.iter()
+                        .map(|(name, t)| (name.clone(), t.to_value_type(typedefs)))
+                        .collect(),
+                ),
+                TypeDef::Record(ts) => ValueType::Record(
+                    ts.iter()
+                        .map(|(name, t)| (name.clone(), t.to_value_type(typedefs)))
+                        .collect(),
+                ),
+            },
+            TypeRef::Empty => ValueType::Empty,
+            TypeRef::Bool => ValueType::Bool,
+            TypeRef::U8 => ValueType::U8,
+            TypeRef::U16 => ValueType::U16,
+            TypeRef::U32 => ValueType::U32,
+            TypeRef::Tuple(ts) => {
+                ValueType::Tuple(ts.iter().map(|t| t.to_value_type(typedefs)).collect())
+            }
+            TypeRef::Seq(t) => ValueType::Seq(Box::new(t.to_value_type(typedefs))),
+        }
+    }
+}
+
 impl Decoder {
     pub fn compile_one(format: &Format) -> Result<Decoder, String> {
         let module = FormatModule::new();
@@ -1104,7 +1719,7 @@ impl Decoder {
                 } else {
                     Rc::new(Next::Empty)
                 };
-                let n = if let Some(n) = compiler.map.get(&(*level, next.clone())) {
+                let n = if let Some(n) = compiler.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
                     let d = Decoder::compile_next(
@@ -1114,12 +1729,12 @@ impl Decoder {
                     )?;
                     let n = compiler.program.decoders.len();
                     compiler.program.decoders.push(d);
-                    compiler.map.insert((*level, next.clone()), n);
+                    compiler.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
                 let arg_names = compiler.module.get_args(*level);
                 let mut args = Vec::new();
-                for (name, expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
+                for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
                 Ok(Decoder::Call(n, args))

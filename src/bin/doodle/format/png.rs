@@ -31,6 +31,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
     let ihdr = module.define_format("png.ihdr", chunk(ihdr_tag.call(), ihdr_data.call()));
+    let ihdr_type = module.get_format_type(ihdr.get_level()).clone();
 
     let idat_tag = module.define_format("png.idat-tag", is_bytes(b"IDAT"));
     let idat_data = module.define_format("png.idat-data", repeat(base.u8()));
@@ -69,7 +70,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
     let bkgd = module.define_format_args(
         "png.bkgd",
-        vec!["ihdr".to_string()],
+        vec![("ihdr".to_string(), ihdr_type.clone())],
         chunk(is_bytes(b"bKGD"), bkgd_data),
     );
 
@@ -117,13 +118,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
     let trns = module.define_format_args(
         "png.trns",
-        vec!["ihdr".to_string()],
+        vec![("ihdr".to_string(), ihdr_type.clone())],
         chunk(is_bytes(b"tRNS"), trns_data),
     );
 
     let png_chunk = module.define_format_args(
         "png.chunk",
-        vec!["ihdr".to_string()],
+        vec![("ihdr".to_string(), ihdr_type)],
         alts([
             ("bKGD", bkgd.call_args(vec![var("ihdr")])),
             ("pHYs", phys.call()),
