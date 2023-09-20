@@ -471,8 +471,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 Box::new(var("y")),
                             )))),
                             Box::new(add(
-                                Expr::AsU16(Box::new(add(var("hlit"), var("hdist")))),
-                                Expr::U16(258),
+                                Expr::AsU32(Box::new(add(var("hlit"), var("hdist")))),
+                                Expr::U32(258),
                             )),
                         )),
                     ),
