@@ -560,6 +560,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_proj_expr(expr1)
             }
 
+            Expr::AsU8(expr) => {
+                write!(&mut self.writer, "as-u8 ")?;
+                self.write_proj_expr(expr)
+            }
             Expr::AsU16(expr) => {
                 write!(&mut self.writer, "as-u16 ")?;
                 self.write_proj_expr(expr)

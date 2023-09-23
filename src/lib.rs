@@ -175,6 +175,7 @@ pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
 
+    AsU8(Box<Expr>),
     AsU16(Box<Expr>),
     AsU32(Box<Expr>),
 
@@ -527,9 +528,16 @@ impl Expr {
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
 
+            Expr::AsU8(x) => match x.eval_value(scope) {
+                Value::U8(x) => Value::U8(x),
+                Value::U16(x) if x < 256 => Value::U8(x as u8),
+                Value::U32(x) if x < 256 => Value::U8(x as u8),
+                x => panic!("cannot convert {x:?} to U8"),
+            },
             Expr::AsU16(x) => match x.eval_value(scope) {
                 Value::U8(x) => Value::U16(u16::from(x)),
                 Value::U16(x) => Value::U16(x),
+                Value::U32(x) if x < 65536 => Value::U16(x as u16),
                 x => panic!("cannot convert {x:?} to U16"),
             },
             Expr::AsU32(x) => match x.eval_value(scope) {
