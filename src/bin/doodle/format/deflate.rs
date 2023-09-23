@@ -143,10 +143,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
                 None,
             )),
         ),
-        (
-            "distance-code-value",
-            Format::Compute(Expr::UnwrapVariant(Box::new(var("distance-code")))),
-        ),
+        ("distance-code-value", Format::Compute(var("distance-code"))),
         ("distance-record", distance_record(base)),
     ])
 }
@@ -251,9 +248,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Eq(
-                            Box::new(Expr::AsU16(Box::new(Expr::UnwrapVariant(Box::new(
-                                Expr::RecordProj(Box::new(var("x")), "code".to_string()),
-                            ))))),
+                            Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
+                                Box::new(var("x")),
+                                "code".to_string(),
+                            )))),
                             Box::new(Expr::U16(256)),
                         )),
                     ),
@@ -265,7 +263,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra",
                             Format::Match(
-                                Expr::UnwrapVariant(Box::new(var("code"))),
+                                var("code"),
                                 vec![
                                     (Pattern::U16(257), length_record_fixed(3, base, 0)),
                                     (Pattern::U16(258), length_record_fixed(4, base, 0)),
@@ -309,10 +307,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Box::new(Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                Box::new(var("x")),
-                                "code".to_string(),
-                            )))),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".to_string())),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
@@ -348,10 +343,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![Expr::Variant(
                                         "literal".to_string(),
-                                        Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
+                                        Box::new(Expr::RecordProj(
                                             Box::new(var("x")),
                                             "code".to_string(),
-                                        )))),
+                                        )),
                                     )]),
                                 ),
                             ],
@@ -383,10 +378,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 Box::new(Expr::Lambda(
                                     "x".to_string(),
                                     Box::new(Expr::Match(
-                                        Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
+                                        Box::new(Expr::RecordProj(
                                             Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
                                             "code".to_string(),
-                                        )))),
+                                        )),
                                         vec![
                                             (
                                                 Pattern::U8(16),
@@ -403,9 +398,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                             ),
                                                             Expr::U8(3),
                                                         )),
-                                                        Box::new(Expr::UnwrapVariant(Box::new(
-                                                            Expr::TupleProj(Box::new(var("x")), 0),
-                                                        ))),
+                                                        Box::new(Expr::Match(
+                                                            Box::new(Expr::TupleProj(
+                                                                Box::new(var("x")),
+                                                                0,
+                                                            )),
+                                                            vec![(
+                                                                Pattern::Variant(
+                                                                    "some".to_string(),
+                                                                    Box::new(Pattern::Binding(
+                                                                        "y".to_string(),
+                                                                    )),
+                                                                ),
+                                                                Expr::Var("y".to_string()),
+                                                            )],
+                                                        )),
                                                     ),
                                                 ]),
                                             ),
@@ -500,7 +507,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra",
                             Format::Match(
-                                Expr::UnwrapVariant(Box::new(var("code"))),
+                                var("code"),
                                 vec![
                                     (Pattern::U8(16), bits2.clone()),
                                     (Pattern::U8(17), bits3.clone()),
@@ -518,10 +525,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Box::new(Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
+                            Box::new(Expr::RecordProj(
                                 Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
                                 "code".to_string(),
-                            )))),
+                            )),
                             vec![
                                 (
                                     Pattern::U8(16),
@@ -538,9 +545,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 ),
                                                 Expr::U8(3),
                                             )),
-                                            Box::new(Expr::UnwrapVariant(Box::new(
-                                                Expr::TupleProj(Box::new(var("x")), 0),
-                                            ))),
+                                            Box::new(Expr::Match(
+                                                Box::new(Expr::TupleProj(Box::new(var("x")), 0)),
+                                                vec![(
+                                                    Pattern::Variant(
+                                                        "some".to_string(),
+                                                        Box::new(Pattern::Binding("y".to_string())),
+                                                    ),
+                                                    Expr::Var("y".to_string()),
+                                                )],
+                                            )),
                                         ),
                                     ]),
                                 ),
@@ -618,9 +632,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Eq(
-                            Box::new(Expr::AsU16(Box::new(Expr::UnwrapVariant(Box::new(
-                                Expr::RecordProj(Box::new(var("x")), "code".to_string()),
-                            ))))),
+                            Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
+                                Box::new(var("x")),
+                                "code".to_string(),
+                            )))),
                             Box::new(Expr::U16(256)),
                         )),
                     ),
@@ -635,7 +650,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra",
                             Format::Match(
-                                Expr::UnwrapVariant(Box::new(var("code"))),
+                                var("code"),
                                 vec![
                                     (Pattern::U16(257), length_record(3, base, 0)),
                                     (Pattern::U16(258), length_record(4, base, 0)),
@@ -679,10 +694,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Box::new(Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
-                                Box::new(var("x")),
-                                "code".to_string(),
-                            )))),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".to_string())),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
@@ -718,10 +730,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![Expr::Variant(
                                         "literal".to_string(),
-                                        Box::new(Expr::UnwrapVariant(Box::new(Expr::RecordProj(
+                                        Box::new(Expr::RecordProj(
                                             Box::new(var("x")),
                                             "code".to_string(),
-                                        )))),
+                                        )),
                                     )]),
                                 ),
                             ],

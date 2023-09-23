@@ -158,7 +158,6 @@ pub enum Expr {
     Record(Vec<(String, Expr)>),
     RecordProj(Box<Expr>, String),
     Variant(String, Box<Expr>),
-    UnwrapVariant(Box<Expr>),
     Seq(Vec<Expr>),
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Lambda(String, Box<Expr>),
@@ -440,10 +439,6 @@ impl Expr {
             }
             Expr::RecordProj(head, label) => head.eval(scope).record_proj(label),
             Expr::Variant(label, expr) => Value::variant(label, expr.eval(scope)),
-            Expr::UnwrapVariant(expr) => match expr.eval_value(scope) {
-                Value::Variant(_label, value) => *value.clone(),
-                _ => panic!("expected variant"),
-            },
             Expr::Seq(exprs) => Value::Seq(exprs.iter().map(|expr| expr.eval(scope)).collect()),
             Expr::Match(head, branches) => {
                 let head = head.eval(scope);
@@ -1467,11 +1462,19 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
     }
 
     let mut codes = Vec::with_capacity(lengths.len());
+    let mut branches = Vec::new();
 
     for n in 0..lengths.len() {
         let len = lengths[n];
         if len != 0 {
-            codes.push((n.to_string(), bit_range(len, next_code[len], n)));
+            codes.push((n.to_string(), bit_range(len, next_code[len])));
+            let pattern = Pattern::Variant(n.to_string(), Box::new(Pattern::Wildcard));
+            let val = if n > 255 {
+                Expr::U16(n.try_into().unwrap())
+            } else {
+                Expr::U8(n.try_into().unwrap())
+            };
+            branches.push((pattern, val));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;
         } else {
@@ -1479,27 +1482,26 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         }
     }
 
-    Format::alts(codes)
+    Format::record([
+        ("bits", Format::alts(codes)),
+        (
+            "@value",
+            Format::Compute(Expr::Match(
+                Box::new(Expr::Var("bits".to_string())),
+                branches,
+            )),
+        ),
+    ])
 }
 
-fn bit_range(n: usize, bits: usize, val: usize) -> Format {
+fn bit_range(n: usize, bits: usize) -> Format {
     let mut fs = Vec::with_capacity(n);
     for i in 0..n {
         let r = n - 1 - i;
         let b = (bits & (1 << r)) >> r != 0;
         fs.push(is_bit(b));
     }
-    Format::record([
-        ("bits", Format::Tuple(fs)),
-        (
-            "@value",
-            Format::Compute(if val > 255 {
-                Expr::U16(val.try_into().unwrap())
-            } else {
-                Expr::U8(val.try_into().unwrap())
-            }),
-        ),
-    ])
+    Format::Tuple(fs)
 }
 
 fn is_bit(b: bool) -> Format {
