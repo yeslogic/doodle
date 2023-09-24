@@ -90,7 +90,7 @@ fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Forma
 
 fn distance_record(base: &BaseModule) -> Format {
     Format::Match(
-        var("distance-code-value"),
+        var("distance-code"),
         vec![
             (Pattern::U8(0), distance_record0(1, base, 0)),
             (Pattern::U8(1), distance_record0(2, base, 0)),
@@ -143,7 +143,6 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
                 None,
             )),
         ),
-        ("distance-code-value", Format::Compute(var("distance-code"))),
         ("distance-record", distance_record(base)),
     ])
 }
@@ -159,7 +158,6 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
             )),
         ),
         ("distance-code", bits(5, base)),
-        ("distance-code-value", Format::Compute(var("distance-code"))),
         ("distance-record", distance_record(base)),
     ])
 }
