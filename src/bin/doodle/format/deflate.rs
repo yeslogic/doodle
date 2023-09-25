@@ -90,7 +90,7 @@ fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Forma
 
 fn distance_record(base: &BaseModule) -> Format {
     Format::Match(
-        var("distance-code"),
+        Expr::AsU8(Box::new(var("distance-code"))),
         vec![
             (Pattern::U8(0), distance_record0(1, base, 0)),
             (Pattern::U8(1), distance_record0(2, base, 0)),
@@ -341,10 +341,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![Expr::Variant(
                                         "literal".to_string(),
-                                        Box::new(Expr::RecordProj(
+                                        Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                             Box::new(var("x")),
                                             "code".to_string(),
-                                        )),
+                                        )))),
                                     )]),
                                 ),
                             ],
@@ -376,10 +376,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 Box::new(Expr::Lambda(
                                     "x".to_string(),
                                     Box::new(Expr::Match(
-                                        Box::new(Expr::RecordProj(
+                                        Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                             Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
                                             "code".to_string(),
-                                        )),
+                                        )))),
                                         vec![
                                             (
                                                 Pattern::U8(16),
@@ -505,7 +505,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "extra",
                             Format::Match(
-                                var("code"),
+                                Expr::AsU8(Box::new(var("code"))),
                                 vec![
                                     (Pattern::U8(16), bits2.clone()),
                                     (Pattern::U8(17), bits3.clone()),
@@ -523,10 +523,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Box::new(Expr::Lambda(
                         "x".to_string(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(
+                            Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                 Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
                                 "code".to_string(),
-                            )),
+                            )))),
                             vec![
                                 (
                                     Pattern::U8(16),
@@ -728,10 +728,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![Expr::Variant(
                                         "literal".to_string(),
-                                        Box::new(Expr::RecordProj(
+                                        Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                             Box::new(var("x")),
                                             "code".to_string(),
-                                        )),
+                                        )))),
                                     )]),
                                 ),
                             ],

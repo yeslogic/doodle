@@ -1473,11 +1473,7 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         if len != 0 {
             codes.push((n.to_string(), bit_range(len, next_code[len])));
             let pattern = Pattern::Variant(n.to_string(), Box::new(Pattern::Wildcard));
-            let val = if n > 255 {
-                Expr::U16(n.try_into().unwrap())
-            } else {
-                Expr::U8(n.try_into().unwrap())
-            };
+            let val = Expr::U16(n.try_into().unwrap());
             branches.push((pattern, val));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;
