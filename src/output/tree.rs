@@ -130,6 +130,21 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.scope.truncate(initial_len);
                 Ok(())
             }
+            Format::MatchVariant(head, branches) => {
+                let head = head.eval(&mut self.scope);
+                let initial_len = self.scope.len();
+                let (_, _label, format) = branches
+                    .iter()
+                    .find(|(pattern, _, _)| head.matches(&mut self.scope, pattern))
+                    .expect("exhaustive patterns");
+                if let Value::Variant(_label, value) = value {
+                    self.write_decoded_value(value, format)?;
+                } else {
+                    panic!("expected variant value");
+                }
+                self.scope.truncate(initial_len);
+                Ok(())
+            }
             Format::Dynamic(_) => self.write_value(value),
         }
     }
@@ -720,7 +735,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 self.write_expr(expr)
             }
 
-            Format::Match(head, _) => {
+            Format::Match(head, _) | Format::MatchVariant(head, _) => {
                 write!(&mut self.writer, "match ")?;
                 self.write_proj_expr(head)?;
                 write!(&mut self.writer, " {{ ... }}")

@@ -52,11 +52,11 @@ pub fn repeat_until_seq(cond: Expr, format: Format) -> Format {
 }
 
 pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
-    Format::Match(
+    Format::MatchVariant(
         cond,
         vec![
-            (Pattern::Bool(true), format0),
-            (Pattern::Bool(false), format1),
+            (Pattern::Bool(true), "yes".to_string(), format0),
+            (Pattern::Bool(false), "no".to_string(), format1),
         ],
     )
 }

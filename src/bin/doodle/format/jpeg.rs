@@ -198,13 +198,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ("identifier", base.asciiz_string()),
             (
                 "data",
-                Format::Match(
+                Format::MatchVariant(
                     Expr::RecordProj(Box::new(var("identifier")), "string".to_string()),
                     vec![
-                        (Pattern::from_bytes(b"JFIF"), app0_jfif.call()),
+                        (
+                            Pattern::from_bytes(b"JFIF"),
+                            "jfif".to_string(),
+                            app0_jfif.call(),
+                        ),
                         // FIXME: there are other APP0 formats
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, repeat(base.u8())),
+                        (Pattern::Wildcard, "other".to_string(), repeat(base.u8())),
                     ],
                 ),
             ),
@@ -228,17 +232,22 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ("identifier", base.asciiz_string()),
             (
                 "data",
-                Format::Match(
+                Format::MatchVariant(
                     Expr::RecordProj(Box::new(var("identifier")), "string".to_string()),
                     vec![
-                        (Pattern::from_bytes(b"Exif"), app1_exif.call()),
+                        (
+                            Pattern::from_bytes(b"Exif"),
+                            "exif".to_string(),
+                            app1_exif.call(),
+                        ),
                         (
                             Pattern::from_bytes(b"http://ns.adobe.com/xap/1.0/"),
+                            "xmp".to_string(),
                             app1_xmp.call(),
                         ),
                         // FIXME: there are other APP1 formats
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, repeat(base.u8())),
+                        (Pattern::Wildcard, "other".to_string(), repeat(base.u8())),
                     ],
                 ),
             ),
