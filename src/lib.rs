@@ -253,7 +253,7 @@ impl ValueType {
             (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
             (ValueType::Tuple(ts1), ValueType::Tuple(ts2)) => {
                 if ts1.len() != ts2.len() {
-                    return Err(format!("tuples must have same length"));
+                    return Err(format!("tuples must have same length {ts1:?} vs. {ts2:?}"));
                 }
                 let mut ts = Vec::new();
                 for (t1, t2) in Iterator::zip(ts1.iter(), ts2.iter()) {
@@ -263,7 +263,9 @@ impl ValueType {
             }
             (ValueType::Record(fs1), ValueType::Record(fs2)) => {
                 if fs1.len() != fs2.len() {
-                    return Err(format!("records must have same number of fields"));
+                    return Err(format!(
+                        "records must have same number of fields {fs1:?} vs. {fs2:?}"
+                    ));
                 }
                 // FIXME field order
                 let mut fs = Vec::new();
@@ -435,6 +437,8 @@ pub enum Format {
     Compute(Expr),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
+    /// Pattern match on an expression and return a variant
+    MatchVariant(Expr, Vec<(Pattern, String, Format)>),
     /// Format generated dynamically
     Dynamic(DynFormat),
 }
@@ -580,7 +584,11 @@ impl FormatModule {
                     scope.push(label.clone(), t);
                 }
                 scope.truncate(initial_len);
-                Ok(ValueType::Record(ts))
+                if let Some((_l, t)) = ts.iter().find(|(l, _)| l == "@value") {
+                    Ok(t.clone())
+                } else {
+                    Ok(ValueType::Record(ts))
+                }
             }
             Format::Repeat(a) | Format::Repeat1(a) => {
                 let t = self.infer_format_type(scope, a)?;
@@ -604,15 +612,23 @@ impl FormatModule {
                 let head_type = head.infer_type_coerce_value(scope)?;
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
-                    // FIXME bails out early if type checking fails
-                    t = match (|| {
-                        Ok::<ValueType, String>(t.unify(
-                            &pattern.infer_format_branch_type(scope, &head_type, self, branch)?,
-                        )?)
-                    })() {
-                        Ok(t) => t,
-                        Err(_msg) => return Ok(t), // FIXME
-                    };
+                    t = t.unify(
+                        &pattern.infer_format_branch_type(scope, &head_type, self, branch)?,
+                    )?;
+                }
+                Ok(t)
+            }
+            Format::MatchVariant(head, branches) => {
+                if branches.is_empty() {
+                    return Err(format!("infer_format_type: empty MatchVariant"));
+                }
+                let head_type = head.infer_type_coerce_value(scope)?;
+                let mut t = ValueType::Any;
+                for (pattern, label, branch) in branches {
+                    t = t.unify(&ValueType::Union(vec![(
+                        label.clone(),
+                        pattern.infer_format_branch_type(scope, &head_type, self, branch)?,
+                    )]))?;
                 }
                 Ok(t)
             }
@@ -675,6 +691,7 @@ enum Decoder {
     WithRelativeOffset(Expr, Box<Decoder>),
     Compute(Expr),
     Match(Expr, Vec<(Pattern, Decoder)>),
+    MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
     Dynamic(DynFormat),
 }
 
@@ -1139,6 +1156,9 @@ impl Format {
             Format::WithRelativeOffset(_, _) => true,
             Format::Compute(_) => true,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
+            Format::MatchVariant(_, branches) => {
+                branches.iter().any(|(_, _, f)| f.is_nullable(module))
+            }
             Format::Dynamic(DynFormat::Huffman(_, _)) => false,
         }
     }
@@ -1165,6 +1185,9 @@ impl Format {
             Format::WithRelativeOffset(_, _) => false,
             Format::Compute(_) => false,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
+            Format::MatchVariant(_, branches) => {
+                branches.iter().any(|(_, _, f)| f.depends_on_next(module))
+            }
             Format::Dynamic(_) => false,
         }
     }
@@ -1331,6 +1354,12 @@ impl<'a> MatchTreeLevel<'a> {
             Format::Compute(_expr) => self.add_next(module, index, next),
             Format::Match(_, branches) => {
                 for (_, f) in branches {
+                    self.add(module, index, f, next.clone())?;
+                }
+                Ok(())
+            }
+            Format::MatchVariant(_, branches) => {
+                for (_, _, f) in branches {
                     self.add(module, index, f, next.clone())?;
                 }
                 Ok(())
@@ -1853,6 +1882,19 @@ impl Decoder {
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
             }
+            Format::MatchVariant(head, branches) => {
+                let branches = branches
+                    .iter()
+                    .map(|(pattern, label, f)| {
+                        Ok((
+                            pattern.clone(),
+                            label.clone(),
+                            Decoder::compile_next(compiler, f, next.clone())?,
+                        ))
+                    })
+                    .collect::<Result<_, String>>()?;
+                Ok(Decoder::MatchVariant(head.clone(), branches))
+            }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
         }
     }
@@ -2023,9 +2065,20 @@ impl Decoder {
                     .iter()
                     .find(|(pattern, _)| head.matches(scope, pattern))
                     .expect("exhaustive patterns");
-                let value = decoder.parse(program, scope, input);
+                let (v, input) = decoder.parse(program, scope, input)?;
                 scope.truncate(initial_len);
-                value
+                Some((v, input))
+            }
+            Decoder::MatchVariant(head, branches) => {
+                let head = head.eval(scope);
+                let initial_len = scope.len();
+                let (_, label, decoder) = branches
+                    .iter()
+                    .find(|(pattern, _, _)| head.matches(scope, pattern))
+                    .expect("exhaustive patterns");
+                let (v, input) = decoder.parse(program, scope, input)?;
+                scope.truncate(initial_len);
+                Some((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
                 let lengths_val = lengths_expr.eval(scope);

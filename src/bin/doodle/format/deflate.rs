@@ -47,21 +47,16 @@ fn bits_value_u16(n: usize) -> Expr {
             bits_value_u16(n - 1),
         )
     } else {
-        tuple_proj(var("bits"), 0)
+        Expr::AsU16(Box::new(tuple_proj(var("bits"), 0)))
     }
 }
 
-fn bits(n: usize, base: &BaseModule) -> Format {
+fn bits8(n: usize, base: &BaseModule) -> Format {
     let mut fs = Vec::with_capacity(n);
     for _ in 0..n {
         fs.push(base.bit());
     }
-    if n > 8 {
-        record([
-            ("bits", tuple(fs)),
-            ("@value", Format::Compute(bits_value_u16(n))),
-        ])
-    } else if n > 0 {
+    if n > 0 {
         record([
             ("bits", tuple(fs)),
             ("@value", Format::Compute(bits_value_u8(n))),
@@ -75,15 +70,30 @@ fn bits(n: usize, base: &BaseModule) -> Format {
     }
 }
 
+fn bits16(n: usize, base: &BaseModule) -> Format {
+    let mut fs = Vec::with_capacity(n);
+    for _ in 0..n {
+        fs.push(base.bit());
+    }
+    if n > 0 {
+        record([
+            ("bits", tuple(fs)),
+            ("@value", Format::Compute(bits_value_u16(n))),
+        ])
+    } else {
+        record([
+            ("bits", tuple(fs)),
+            ("@value", Format::Compute(Expr::U16(0))),
+        ])
+    }
+}
+
 fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
     record([
-        ("distance-extra-bits", bits(extra_bits, base)),
+        ("distance-extra-bits", bits16(extra_bits, base)),
         (
             "distance",
-            Format::Compute(add(
-                Expr::U16(start as u16),
-                Expr::AsU16(Box::new(var("distance-extra-bits"))),
-            )),
+            Format::Compute(add(Expr::U16(start as u16), var("distance-extra-bits"))),
         ),
     ])
 }
@@ -128,7 +138,7 @@ fn distance_record(base: &BaseModule) -> Format {
 
 fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
     record([
-        ("length-extra-bits", bits(extra_bits, base)),
+        ("length-extra-bits", bits8(extra_bits, base)),
         (
             "length",
             Format::Compute(add(
@@ -149,7 +159,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
 
 fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
     record([
-        ("length-extra-bits", bits(extra_bits, base)),
+        ("length-extra-bits", bits8(extra_bits, base)),
         (
             "length",
             Format::Compute(add(
@@ -157,34 +167,40 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
                 Expr::AsU16(Box::new(var("length-extra-bits"))),
             )),
         ),
-        ("distance-code", bits(5, base)),
+        ("distance-code", bits8(5, base)),
         ("distance-record", distance_record(base)),
     ])
 }
 
 fn reference_record() -> Expr {
-    Expr::Seq(vec![Expr::Variant(
-        "reference".to_string(),
-        Box::new(Expr::Record(vec![
-            (
-                "length".to_string(),
-                Expr::RecordProj(
-                    Box::new(Expr::RecordProj(Box::new(var("x")), "extra".to_string())),
-                    "length".to_string(),
-                ),
+    Expr::Match(
+        Box::new(Expr::RecordProj(Box::new(var("x")), "extra".to_string())),
+        vec![(
+            Pattern::Variant(
+                "some".to_string(),
+                Box::new(Pattern::Binding("rec".to_string())),
             ),
-            (
-                "distance".to_string(),
-                Expr::RecordProj(
-                    Box::new(Expr::RecordProj(
-                        Box::new(Expr::RecordProj(Box::new(var("x")), "extra".to_string())),
-                        "distance-record".to_string(),
-                    )),
-                    "distance".to_string(),
-                ),
-            ),
-        ])),
-    )])
+            Expr::Seq(vec![Expr::Variant(
+                "reference".to_string(),
+                Box::new(Expr::Record(vec![
+                    (
+                        "length".to_string(),
+                        Expr::RecordProj(Box::new(var("rec")), "length".to_string()),
+                    ),
+                    (
+                        "distance".to_string(),
+                        Expr::RecordProj(
+                            Box::new(Expr::RecordProj(
+                                Box::new(var("rec")),
+                                "distance-record".to_string(),
+                            )),
+                            "distance".to_string(),
+                        ),
+                    ),
+                ])),
+            )]),
+        )],
+    )
 }
 
 fn fixed_code_lengths() -> Expr {
@@ -208,19 +224,19 @@ fn fixed_code_lengths() -> Expr {
 ///
 #[allow(clippy::redundant_clone)]
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
-    let bits2 = bits(2, base);
-    let bits3 = bits(3, base);
-    let bits4 = bits(4, base);
-    let bits5 = bits(5, base);
-    let bits7 = bits(7, base);
+    let bits2 = bits8(2, base);
+    let bits3 = bits8(3, base);
+    let bits4 = bits8(4, base);
+    let bits5 = bits8(5, base);
+    let bits7 = bits8(7, base);
 
     let uncompressed = module.define_format(
         "deflate.uncompressed",
         record([
             ("align", Format::Align(8)),
-            ("len", bits(16, base)),
-            ("nlen", bits(16, base)),
-            ("bytes", repeat_count(var("len"), bits(8, base))),
+            ("len", bits16(16, base)),
+            ("nlen", bits16(16, base)),
+            ("bytes", repeat_count(var("len"), bits8(8, base))),
             (
                 "codes-values",
                 Format::Compute(Expr::FlatMap(
@@ -260,39 +276,155 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                         (
                             "extra",
-                            Format::Match(
+                            Format::MatchVariant(
                                 var("code"),
                                 vec![
-                                    (Pattern::U16(257), length_record_fixed(3, base, 0)),
-                                    (Pattern::U16(258), length_record_fixed(4, base, 0)),
-                                    (Pattern::U16(259), length_record_fixed(5, base, 0)),
-                                    (Pattern::U16(260), length_record_fixed(6, base, 0)),
-                                    (Pattern::U16(261), length_record_fixed(7, base, 0)),
-                                    (Pattern::U16(262), length_record_fixed(8, base, 0)),
-                                    (Pattern::U16(263), length_record_fixed(9, base, 0)),
-                                    (Pattern::U16(264), length_record_fixed(10, base, 0)),
-                                    (Pattern::U16(265), length_record_fixed(11, base, 1)),
-                                    (Pattern::U16(266), length_record_fixed(13, base, 1)),
-                                    (Pattern::U16(267), length_record_fixed(15, base, 1)),
-                                    (Pattern::U16(268), length_record_fixed(17, base, 1)),
-                                    (Pattern::U16(269), length_record_fixed(19, base, 2)),
-                                    (Pattern::U16(270), length_record_fixed(23, base, 2)),
-                                    (Pattern::U16(271), length_record_fixed(27, base, 2)),
-                                    (Pattern::U16(272), length_record_fixed(31, base, 2)),
-                                    (Pattern::U16(273), length_record_fixed(35, base, 3)),
-                                    (Pattern::U16(274), length_record_fixed(43, base, 3)),
-                                    (Pattern::U16(275), length_record_fixed(51, base, 3)),
-                                    (Pattern::U16(276), length_record_fixed(59, base, 3)),
-                                    (Pattern::U16(277), length_record_fixed(67, base, 4)),
-                                    (Pattern::U16(278), length_record_fixed(83, base, 4)),
-                                    (Pattern::U16(279), length_record_fixed(99, base, 4)),
-                                    (Pattern::U16(280), length_record_fixed(115, base, 4)),
-                                    (Pattern::U16(281), length_record_fixed(131, base, 5)),
-                                    (Pattern::U16(282), length_record_fixed(163, base, 5)),
-                                    (Pattern::U16(283), length_record_fixed(195, base, 5)),
-                                    (Pattern::U16(284), length_record_fixed(227, base, 5)),
-                                    (Pattern::U16(285), length_record_fixed(258, base, 0)),
-                                    (Pattern::Wildcard, Format::EMPTY),
+                                    (
+                                        Pattern::U16(257),
+                                        "some".to_string(),
+                                        length_record_fixed(3, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(258),
+                                        "some".to_string(),
+                                        length_record_fixed(4, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(259),
+                                        "some".to_string(),
+                                        length_record_fixed(5, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(260),
+                                        "some".to_string(),
+                                        length_record_fixed(6, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(261),
+                                        "some".to_string(),
+                                        length_record_fixed(7, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(262),
+                                        "some".to_string(),
+                                        length_record_fixed(8, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(263),
+                                        "some".to_string(),
+                                        length_record_fixed(9, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(264),
+                                        "some".to_string(),
+                                        length_record_fixed(10, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(265),
+                                        "some".to_string(),
+                                        length_record_fixed(11, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(266),
+                                        "some".to_string(),
+                                        length_record_fixed(13, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(267),
+                                        "some".to_string(),
+                                        length_record_fixed(15, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(268),
+                                        "some".to_string(),
+                                        length_record_fixed(17, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(269),
+                                        "some".to_string(),
+                                        length_record_fixed(19, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(270),
+                                        "some".to_string(),
+                                        length_record_fixed(23, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(271),
+                                        "some".to_string(),
+                                        length_record_fixed(27, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(272),
+                                        "some".to_string(),
+                                        length_record_fixed(31, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(273),
+                                        "some".to_string(),
+                                        length_record_fixed(35, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(274),
+                                        "some".to_string(),
+                                        length_record_fixed(43, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(275),
+                                        "some".to_string(),
+                                        length_record_fixed(51, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(276),
+                                        "some".to_string(),
+                                        length_record_fixed(59, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(277),
+                                        "some".to_string(),
+                                        length_record_fixed(67, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(278),
+                                        "some".to_string(),
+                                        length_record_fixed(83, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(279),
+                                        "some".to_string(),
+                                        length_record_fixed(99, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(280),
+                                        "some".to_string(),
+                                        length_record_fixed(115, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(281),
+                                        "some".to_string(),
+                                        length_record_fixed(131, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(282),
+                                        "some".to_string(),
+                                        length_record_fixed(163, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(283),
+                                        "some".to_string(),
+                                        length_record_fixed(195, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(284),
+                                        "some".to_string(),
+                                        length_record_fixed(227, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(285),
+                                        "some".to_string(),
+                                        length_record_fixed(258, base, 0),
+                                    ),
+                                    (Pattern::Wildcard, "none".to_string(), Format::EMPTY),
                                 ],
                             ),
                         ),
@@ -514,7 +646,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     (Pattern::U8(16), bits2.clone()),
                                     (Pattern::U8(17), bits3.clone()),
                                     (Pattern::U8(18), bits7.clone()),
-                                    (Pattern::Wildcard, Format::EMPTY),
+                                    (Pattern::Wildcard, Format::Compute(Expr::U8(0))),
                                 ],
                             ),
                         ),
@@ -655,39 +787,155 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                         (
                             "extra",
-                            Format::Match(
+                            Format::MatchVariant(
                                 var("code"),
                                 vec![
-                                    (Pattern::U16(257), length_record(3, base, 0)),
-                                    (Pattern::U16(258), length_record(4, base, 0)),
-                                    (Pattern::U16(259), length_record(5, base, 0)),
-                                    (Pattern::U16(260), length_record(6, base, 0)),
-                                    (Pattern::U16(261), length_record(7, base, 0)),
-                                    (Pattern::U16(262), length_record(8, base, 0)),
-                                    (Pattern::U16(263), length_record(9, base, 0)),
-                                    (Pattern::U16(264), length_record(10, base, 0)),
-                                    (Pattern::U16(265), length_record(11, base, 1)),
-                                    (Pattern::U16(266), length_record(13, base, 1)),
-                                    (Pattern::U16(267), length_record(15, base, 1)),
-                                    (Pattern::U16(268), length_record(17, base, 1)),
-                                    (Pattern::U16(269), length_record(19, base, 2)),
-                                    (Pattern::U16(270), length_record(23, base, 2)),
-                                    (Pattern::U16(271), length_record(27, base, 2)),
-                                    (Pattern::U16(272), length_record(31, base, 2)),
-                                    (Pattern::U16(273), length_record(35, base, 3)),
-                                    (Pattern::U16(274), length_record(43, base, 3)),
-                                    (Pattern::U16(275), length_record(51, base, 3)),
-                                    (Pattern::U16(276), length_record(59, base, 3)),
-                                    (Pattern::U16(277), length_record(67, base, 4)),
-                                    (Pattern::U16(278), length_record(83, base, 4)),
-                                    (Pattern::U16(279), length_record(99, base, 4)),
-                                    (Pattern::U16(280), length_record(115, base, 4)),
-                                    (Pattern::U16(281), length_record(131, base, 5)),
-                                    (Pattern::U16(282), length_record(163, base, 5)),
-                                    (Pattern::U16(283), length_record(195, base, 5)),
-                                    (Pattern::U16(284), length_record(227, base, 5)),
-                                    (Pattern::U16(285), length_record(258, base, 0)),
-                                    (Pattern::Wildcard, Format::EMPTY),
+                                    (
+                                        Pattern::U16(257),
+                                        "some".to_string(),
+                                        length_record(3, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(258),
+                                        "some".to_string(),
+                                        length_record(4, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(259),
+                                        "some".to_string(),
+                                        length_record(5, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(260),
+                                        "some".to_string(),
+                                        length_record(6, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(261),
+                                        "some".to_string(),
+                                        length_record(7, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(262),
+                                        "some".to_string(),
+                                        length_record(8, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(263),
+                                        "some".to_string(),
+                                        length_record(9, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(264),
+                                        "some".to_string(),
+                                        length_record(10, base, 0),
+                                    ),
+                                    (
+                                        Pattern::U16(265),
+                                        "some".to_string(),
+                                        length_record(11, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(266),
+                                        "some".to_string(),
+                                        length_record(13, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(267),
+                                        "some".to_string(),
+                                        length_record(15, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(268),
+                                        "some".to_string(),
+                                        length_record(17, base, 1),
+                                    ),
+                                    (
+                                        Pattern::U16(269),
+                                        "some".to_string(),
+                                        length_record(19, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(270),
+                                        "some".to_string(),
+                                        length_record(23, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(271),
+                                        "some".to_string(),
+                                        length_record(27, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(272),
+                                        "some".to_string(),
+                                        length_record(31, base, 2),
+                                    ),
+                                    (
+                                        Pattern::U16(273),
+                                        "some".to_string(),
+                                        length_record(35, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(274),
+                                        "some".to_string(),
+                                        length_record(43, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(275),
+                                        "some".to_string(),
+                                        length_record(51, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(276),
+                                        "some".to_string(),
+                                        length_record(59, base, 3),
+                                    ),
+                                    (
+                                        Pattern::U16(277),
+                                        "some".to_string(),
+                                        length_record(67, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(278),
+                                        "some".to_string(),
+                                        length_record(83, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(279),
+                                        "some".to_string(),
+                                        length_record(99, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(280),
+                                        "some".to_string(),
+                                        length_record(115, base, 4),
+                                    ),
+                                    (
+                                        Pattern::U16(281),
+                                        "some".to_string(),
+                                        length_record(131, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(282),
+                                        "some".to_string(),
+                                        length_record(163, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(283),
+                                        "some".to_string(),
+                                        length_record(195, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(284),
+                                        "some".to_string(),
+                                        length_record(227, base, 5),
+                                    ),
+                                    (
+                                        Pattern::U16(285),
+                                        "some".to_string(),
+                                        length_record(258, base, 0),
+                                    ),
+                                    (Pattern::Wildcard, "none".to_string(), Format::EMPTY),
                                 ],
                             ),
                         ),
@@ -758,14 +1006,24 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("type", bits2.clone()),
             (
                 "data",
-                Format::Match(
+                Format::MatchVariant(
                     var("type"),
                     vec![
-                        (Pattern::U8(0), uncompressed.call()),
-                        (Pattern::U8(1), fixed_huffman.call()),
-                        (Pattern::U8(2), dynamic_huffman.call()),
-                        (Pattern::U8(3), Format::Fail),
-                        (Pattern::Wildcard, Format::Fail),
+                        (
+                            Pattern::U8(0),
+                            "uncompressed".to_string(),
+                            uncompressed.call(),
+                        ),
+                        (
+                            Pattern::U8(1),
+                            "fixed_huffman".to_string(),
+                            fixed_huffman.call(),
+                        ),
+                        (
+                            Pattern::U8(2),
+                            "dynamic_huffman".to_string(),
+                            dynamic_huffman.call(),
+                        ),
                     ],
                 ),
             ),
@@ -793,9 +1051,40 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 Format::Compute(Expr::FlatMap(
                     Box::new(Expr::Lambda(
                         "x".to_string(),
-                        Box::new(Expr::RecordProj(
+                        Box::new(Expr::Match(
                             Box::new(Expr::RecordProj(Box::new(var("x")), "data".to_string())),
-                            "codes-values".to_string(),
+                            vec![
+                                (
+                                    Pattern::Variant(
+                                        "uncompressed".to_string(),
+                                        Box::new(Pattern::Binding("y".to_string())),
+                                    ),
+                                    Expr::RecordProj(
+                                        Box::new(var("y")),
+                                        "codes-values".to_string(),
+                                    ),
+                                ),
+                                (
+                                    Pattern::Variant(
+                                        "fixed_huffman".to_string(),
+                                        Box::new(Pattern::Binding("y".to_string())),
+                                    ),
+                                    Expr::RecordProj(
+                                        Box::new(var("y")),
+                                        "codes-values".to_string(),
+                                    ),
+                                ),
+                                (
+                                    Pattern::Variant(
+                                        "dynamic_huffman".to_string(),
+                                        Box::new(Pattern::Binding("y".to_string())),
+                                    ),
+                                    Expr::RecordProj(
+                                        Box::new(var("y")),
+                                        "codes-values".to_string(),
+                                    ),
+                                ),
+                            ],
                         )),
                     )),
                     Box::new(var("blocks")),

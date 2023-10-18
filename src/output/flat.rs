@@ -154,6 +154,11 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
+        Format::MatchVariant(_head, branches) => {
+            for (_pattern, _label, format) in branches {
+                check_covered(module, path, format)?;
+            }
+        }
         Format::Dynamic(_) => {} // FIXME
     }
     Ok(())
@@ -238,6 +243,21 @@ impl<'module, W: io::Write> Context<'module, W> {
                     .find(|(pattern, _)| head.matches(&mut self.scope, pattern))
                     .expect("exhaustive patterns");
                 self.write_flat(value, format)?;
+                self.scope.truncate(initial_len);
+                Ok(())
+            }
+            Format::MatchVariant(head, branches) => {
+                let head = head.eval(&mut self.scope);
+                let initial_len = self.scope.len();
+                let (_, _label, format) = branches
+                    .iter()
+                    .find(|(pattern, _, _)| head.matches(&mut self.scope, pattern))
+                    .expect("exhaustive patterns");
+                if let Value::Variant(_label, value) = value {
+                    self.write_flat(value, format)?;
+                } else {
+                    panic!("expected variant value");
+                }
                 self.scope.truncate(initial_len);
                 Ok(())
             }
