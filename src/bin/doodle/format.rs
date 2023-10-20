@@ -10,6 +10,7 @@ mod gzip;
 mod jpeg;
 mod png;
 mod riff;
+mod tar;
 mod tiff;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
@@ -22,6 +23,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let jpeg = jpeg::main(module, &base, &tiff);
     let png = png::main(module, &base);
     let riff = riff::main(module, &base);
+    let tar = tar::main(module, &base);
 
     module.define_format(
         "main",
@@ -34,6 +36,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("jpeg", jpeg.call()),
                     ("png", png.call()),
                     ("riff", riff.call()),
+                    ("tar", tar.call()),
                 ]),
             ),
             ("end", Format::EndOfInput),
