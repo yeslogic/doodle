@@ -554,6 +554,16 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " << ")?;
                 self.write_proj_expr(expr1)
             }
+            Expr::Shr(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " >> ")?;
+                self.write_proj_expr(expr1)
+            }
+            Expr::Div(expr0, expr1) => {
+                self.write_proj_expr(expr0)?;
+                write!(&mut self.writer, " / ")?;
+                self.write_proj_expr(expr1)
+            }
             Expr::Rem(expr0, expr1) => {
                 self.write_proj_expr(expr0)?;
                 write!(&mut self.writer, " % ")?;

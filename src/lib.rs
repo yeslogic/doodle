@@ -170,8 +170,10 @@ pub enum Expr {
     Gt(Box<Expr>, Box<Expr>),
     Lte(Box<Expr>, Box<Expr>),
     Gte(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
     Shl(Box<Expr>, Box<Expr>),
+    Shr(Box<Expr>, Box<Expr>),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
 
@@ -272,7 +274,7 @@ pub enum Format {
     RepeatUntilSeq(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
-    /// Restrict a format to a sub-stream of a given number of bytes
+    /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
     Slice(Expr, Box<Format>),
     /// Parse bitstream
     Bits(Box<Format>),
@@ -502,6 +504,12 @@ impl Expr {
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
+            Expr::Div(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            }
             Expr::Rem(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
@@ -513,6 +521,13 @@ impl Expr {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_shl(x, u32::from(y)).unwrap()),
                 (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
+            #[rustfmt::skip]
+            Expr::Shr(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_shr(x, u32::from(y)).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_shr(x, u32::from(y)).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
             Expr::Add(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
