@@ -9,7 +9,10 @@ use serde::Serialize;
 use crate::byte_set::ByteSet;
 
 pub mod byte_set;
+pub mod error;
 pub mod output;
+
+use error::{ParseError, ParseResult};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
@@ -144,7 +147,7 @@ impl Value {
                 Some((_, v)) => v.clone(),
                 None => panic!("{label} not found in record"),
             },
-            _ => panic!("expected record"),
+            _ => panic!("expected record, found {self:?}"),
         }
     }
 
@@ -431,6 +434,8 @@ pub enum Format {
     Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
     Slice(Expr, Box<Format>),
+    /// Like [Format::Slice], except the number of bytes is invariant and known in advance
+    FixedSlice(usize, Box<Format>),
     /// Parse bitstream
     Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
@@ -604,6 +609,7 @@ impl FormatModule {
             }
             Format::Peek(a) => self.infer_format_type(scope, a),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
+            Format::FixedSlice(_sz, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
             Format::Compute(expr) => expr.infer_type(scope),
@@ -689,6 +695,7 @@ enum Decoder {
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
+    FixedSlice(usize, Box<Decoder>),
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Compute(Expr),
@@ -1249,6 +1256,7 @@ impl Format {
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
+            Format::FixedSlice(sz, _) => Bounds::exact(*sz),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
             Format::Compute(_) => Bounds::exact(0),
@@ -1288,7 +1296,7 @@ impl Format {
             Format::RepeatUntilLast(_, _f) => false,
             Format::RepeatUntilSeq(_, _f) => false,
             Format::Peek(_) => false,
-            Format::Slice(_, _) => false,
+            Format::Slice(_, _) | Format::FixedSlice(_, _) => false,
             Format::Bits(_) => false,
             Format::WithRelativeOffset(_, _) => false,
             Format::Compute(_) => false,
@@ -1438,8 +1446,14 @@ impl<'a> MatchTreeLevel<'a> {
                 self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 Ok(())
             }
-            Format::RepeatCount(_expr, _a) => {
-                self.accept(index) // FIXME
+            Format::RepeatCount(expr, a) => {
+                // FIXME (still)
+                match expr.bounds().min {
+                    0 => self.add_next(module, index, next.clone())?,
+                    _ => {}
+                }
+                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                Ok(())
             }
             Format::RepeatUntilLast(_expr, _a) => {
                 self.accept(index) // FIXME
@@ -1447,11 +1461,21 @@ impl<'a> MatchTreeLevel<'a> {
             Format::RepeatUntilSeq(_expr, _a) => {
                 self.accept(index) // FIXME
             }
-            Format::Peek(_a) => {
-                self.accept(index) // FIXME
+            Format::Peek(a) => {
+                // FIXME - this does not properly model the general case
+                // but woks for our purposes for isolated single-byte lookahead
+                self.add(module, index, a, next.clone())?;
+                Ok(())
             }
             Format::Slice(_expr, _a) => {
                 self.accept(index) // FIXME
+            }
+            Format::FixedSlice(sz, a) => {
+                if *sz == 0 {
+                    self.accept(index)
+                } else {
+                    self.add(module, index, a, next.clone()) // FIXME thi may not be right
+                }
             }
             Format::Bits(_a) => {
                 self.accept(index) // FIXME
@@ -1615,7 +1639,7 @@ impl Program {
         Program { typedefs, decoders }
     }
 
-    pub fn run<'input>(&self, input: ReadCtxt<'input>) -> Option<(Value, ReadCtxt<'input>)> {
+    pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
         let mut scope = Scope::new();
         self.decoders[0].parse(self, &mut scope, input)
     }
@@ -1677,6 +1701,41 @@ pub struct TypeScope {
 pub struct Scope {
     names: Vec<String>,
     values: Vec<Value>,
+}
+
+pub struct ScopeIter {
+    name_iter: std::vec::IntoIter<String>,
+    value_iter: std::vec::IntoIter<Value>,
+}
+
+impl Iterator for ScopeIter {
+    type Item = (String, Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.name_iter.next(), self.value_iter.next()) {
+            (Some(name), Some(value)) => Some((name, value)),
+            _ => None,
+        }
+    }
+}
+
+impl IntoIterator for &Scope {
+    type Item = (String, Value);
+
+    type IntoIter = ScopeIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ScopeIter {
+            name_iter: self.names.clone().into_iter(),
+            value_iter: self.values.clone().into_iter(),
+        }
+    }
+}
+
+impl Scope {
+    pub fn iter(&self) -> impl Iterator<Item = (String, Value)> {
+        (&self).into_iter()
+    }
 }
 
 impl TypeScope {
@@ -1920,7 +1979,7 @@ impl Decoder {
             }
             Format::Repeat(a) => {
                 if a.is_nullable(compiler.module) {
-                    return Err("cannot repeat nullable format".to_string());
+                    return Err(format!("cannot repeat nullable format: {a:?}"));
                 }
                 let da =
                     Decoder::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
@@ -1935,7 +1994,7 @@ impl Decoder {
             }
             Format::Repeat1(a) => {
                 if a.is_nullable(compiler.module) {
-                    return Err("cannot repeat nullable format".to_string());
+                    return Err(format!("cannot repeat nullable format: {a:?}"));
                 }
                 let da =
                     Decoder::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
@@ -1970,6 +2029,10 @@ impl Decoder {
             Format::Slice(expr, a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
+            }
+            Format::FixedSlice(sz, a) => {
+                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Decoder::FixedSlice(*sz, da))
             }
             Format::Bits(a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
@@ -2014,7 +2077,7 @@ impl Decoder {
         program: &Program,
         scope: &mut Scope,
         input: ReadCtxt<'input>,
-    ) -> Option<(Value, ReadCtxt<'input>)> {
+    ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es) => {
                 let mut new_scope = Scope::new();
@@ -2024,29 +2087,35 @@ impl Decoder {
                 }
                 program.decoders[*n].parse(program, &mut new_scope, input)
             }
-            Decoder::Fail => None,
+            Decoder::Fail => Err(ParseError::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
-                None => Some((Value::UNIT, input)),
-                Some(_) => None,
+                None => Ok((Value::UNIT, input)),
+                Some((b, _)) => Err(ParseError::trailing(b, input.offset)),
             },
             Decoder::Align(n) => {
-                let skip = (n - input.offset % n) % n;
-                let (_, input) = input.split_at(skip)?;
-                Some((Value::UNIT, input))
+                let skip = (n - (input.offset % n)) % n;
+                let (_, input) = input
+                    .split_at(skip)
+                    .ok_or(ParseError::overrun(skip, input.offset))?;
+                Ok((Value::UNIT, input))
             }
             Decoder::Byte(bs) => {
-                let (b, input) = input.read_byte()?;
+                let (b, input) = input
+                    .read_byte()
+                    .ok_or(ParseError::overbyte(input.offset))?;
                 if bs.contains(b) {
-                    Some((Value::U8(b), input))
+                    Ok((Value::U8(b), input))
                 } else {
-                    None
+                    Err(ParseError::unexpected(b, bs.clone(), input.offset))
                 }
             }
             Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input)?;
+                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    offset: input.offset,
+                })?;
                 let (label, d) = &branches[index];
                 let (v, input) = d.parse(program, scope, input)?;
-                Some((Value::Variant(label.clone(), Box::new(v)), input))
+                Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
@@ -2056,7 +2125,7 @@ impl Decoder {
                     input = next_input;
                     v.push(vf.clone());
                 }
-                Some((Value::Tuple(v), input))
+                Ok((Value::Tuple(v), input))
             }
             Decoder::Record(fields) => {
                 let mut input = input;
@@ -2070,17 +2139,20 @@ impl Decoder {
                 for _ in fields {
                     scope.pop();
                 }
-                Some((Value::Record(v), input))
+                Ok((Value::Record(v), input))
             }
             Decoder::While(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
-                while tree.matches(input)? == 0 {
+                while tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    offset: input.offset,
+                })? == 0
+                {
                     let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
                 }
-                Some((Value::Seq(v), input))
+                Ok((Value::Seq(v), input))
             }
             Decoder::Until(tree, a) => {
                 let mut input = input;
@@ -2089,11 +2161,14 @@ impl Decoder {
                     let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
-                    if tree.matches(input)? == 0 {
+                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                        offset: input.offset,
+                    })? == 0
+                    {
                         break;
                     }
                 }
-                Some((Value::Seq(v), input))
+                Ok((Value::Seq(v), input))
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
@@ -2104,7 +2179,7 @@ impl Decoder {
                     input = next_input;
                     v.push(va);
                 }
-                Some((Value::Seq(v), input))
+                Ok((Value::Seq(v), input))
             }
             Decoder::RepeatUntilLast(expr, a) => {
                 let mut input = input;
@@ -2118,7 +2193,7 @@ impl Decoder {
                         break;
                     }
                 }
-                Some((Value::Seq(v), input))
+                Ok((Value::Seq(v), input))
             }
             Decoder::RepeatUntilSeq(expr, a) => {
                 let mut input = input;
@@ -2133,17 +2208,26 @@ impl Decoder {
                         break;
                     }
                 }
-                Some((Value::Seq(v), input))
+                Ok((Value::Seq(v), input))
             }
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;
-                Some((v, input))
+                Ok((v, input))
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
-                let (slice, input) = input.split_at(size)?;
+                let (slice, input) = input
+                    .split_at(size)
+                    .ok_or(ParseError::overrun(size, input.offset))?;
                 let (v, _) = a.parse(program, scope, slice)?;
-                Some((v, input))
+                Ok((v, input))
+            }
+            Decoder::FixedSlice(size, a) => {
+                let (slice, input) = input
+                    .split_at(*size)
+                    .ok_or(ParseError::overrun(*size, input.offset))?;
+                let (v, _) = a.parse(program, scope, slice)?;
+                Ok((v, input))
             }
             Decoder::Bits(a) => {
                 let mut bits = Vec::with_capacity(input.remaining().len() * 8);
@@ -2155,18 +2239,22 @@ impl Decoder {
                 let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
                 let bytes_remain = bits.remaining().len() >> 3;
                 let bytes_read = input.remaining().len() - bytes_remain;
-                let (_, input) = input.split_at(bytes_read)?;
-                Some((v, input))
+                let (_, input) = input
+                    .split_at(bytes_read)
+                    .ok_or(ParseError::overrun(bytes_read, input.offset))?;
+                Ok((v, input))
             }
             Decoder::WithRelativeOffset(expr, a) => {
                 let offset = expr.eval_value(scope).unwrap_usize();
-                let (_, slice) = input.split_at(offset)?;
+                let (_, slice) = input
+                    .split_at(offset)
+                    .ok_or(ParseError::overrun(offset, input.offset))?;
                 let (v, _) = a.parse(program, scope, slice)?;
-                Some((v, input))
+                Ok((v, input))
             }
             Decoder::Compute(expr) => {
                 let v = expr.eval(scope);
-                Some((v, input))
+                Ok((v, input))
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
@@ -2177,7 +2265,7 @@ impl Decoder {
                     .expect("exhaustive patterns");
                 let (v, input) = decoder.parse(program, scope, input)?;
                 scope.truncate(initial_len);
-                Some((v, input))
+                Ok((v, input))
             }
             Decoder::MatchVariant(head, branches) => {
                 let head = head.eval(scope);
@@ -2188,7 +2276,7 @@ impl Decoder {
                     .expect("exhaustive patterns");
                 let (v, input) = decoder.parse(program, scope, input)?;
                 scope.truncate(initial_len);
-                Some((Value::Variant(label.clone(), Box::new(v)), input))
+                Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
                 let lengths_val = lengths_expr.eval(scope);
@@ -2384,9 +2472,7 @@ mod tests {
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
         let mut scope = Scope::new();
-        assert!(d
-            .parse(&program, &mut scope, ReadCtxt::new(input))
-            .is_none());
+        assert!(d.parse(&program, &mut scope, ReadCtxt::new(input)).is_err());
     }
 
     #[test]

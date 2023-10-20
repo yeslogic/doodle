@@ -115,7 +115,9 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_decoded_value(value, format),
-            Format::Slice(_, format) => self.write_decoded_value(value, format),
+            Format::Slice(_, format) | Format::FixedSlice(_, format) => {
+                self.write_decoded_value(value, format)
+            }
             Format::Bits(format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
             Format::Compute(_expr) => self.write_value(value),
@@ -696,7 +698,10 @@ impl<'module, W: io::Write> Context<'module, W> {
     fn write_format(&mut self, format: &Format) -> io::Result<()> {
         match format {
             Format::Union(_) => write!(&mut self.writer, "_ |...| _"),
-
+            Format::Peek(format) => {
+                write!(&mut self.writer, "peek ")?;
+                self.write_atomic_format(format)
+            }
             Format::Repeat(format) => {
                 write!(&mut self.writer, "repeat ")?;
                 self.write_atomic_format(format)
@@ -727,6 +732,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "slice ")?;
                 self.write_atomic_expr(len)?;
                 write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
+            Format::FixedSlice(size, format) => {
+                write!(&mut self.writer, "slice {size} ")?;
                 self.write_atomic_format(format)
             }
             Format::Bits(format) => {

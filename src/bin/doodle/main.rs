@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             let program = Compiler::compile(&module, &format)?;
 
             let input = fs::read(filename)?;
-            let (value, _) = program.run(ReadCtxt::new(&input)).ok_or("parse failure")?;
+            let (value, _) = program.run(ReadCtxt::new(&input))?;
 
             match output {
                 FileOutput::Debug => println!("{value:?}"),
