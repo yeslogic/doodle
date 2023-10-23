@@ -1644,6 +1644,7 @@ impl Scope {
 }
 
 impl TypeRef {
+    #[allow(dead_code)]
     fn from_value_type<'a>(compiler: &mut Compiler<'a>, t: &ValueType) -> Self {
         match t {
             ValueType::Any => panic!("ValueType::Any"),
@@ -1693,6 +1694,7 @@ impl TypeRef {
         }
     }
 
+    #[allow(dead_code)]
     fn to_value_type(&self, typedefs: &[TypeDef]) -> ValueType {
         match self {
             TypeRef::Var(n) => match &typedefs[*n] {
