@@ -1131,36 +1131,124 @@ impl Expr {
             t => Ok(t),
         }
     }
+
+    /// Conservative bounds for unsigned numeric expressions
+    fn bounds(&self) -> Bounds {
+        match self {
+            Expr::U8(n) => Bounds::exact(usize::from(*n)),
+            Expr::U16(n) => Bounds::exact(usize::from(*n)),
+            Expr::U32(n) => Bounds::exact(*n as usize),
+            _ => Bounds::new(0, None),
+        }
+    }
+}
+
+struct Bounds {
+    min: usize,
+    max: Option<usize>,
+}
+
+impl Bounds {
+    fn new(min: usize, max: Option<usize>) -> Bounds {
+        Bounds { min, max }
+    }
+
+    fn exact(n: usize) -> Bounds {
+        Bounds {
+            min: n,
+            max: Some(n),
+        }
+    }
+
+    fn union(lhs: Bounds, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: usize::min(lhs.min, rhs.min),
+            max: match (lhs.max, rhs.max) {
+                (Some(m1), Some(m2)) => Some(usize::max(m1, m2)),
+                _ => None,
+            },
+        }
+    }
+
+    fn concat(lhs: Bounds, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: lhs.min + rhs.min,
+            max: match (lhs.max, rhs.max) {
+                (Some(m1), Some(m2)) => Some(m1 + m2),
+                _ => None,
+            },
+        }
+    }
+
+    fn repeat(&self, count: Bounds) -> Bounds {
+        Bounds {
+            min: self.min * count.min,
+            max: match (self.max, count.max) {
+                (Some(m1), Some(m2)) => Some(m1 * m2),
+                _ => None,
+            },
+        }
+    }
+
+    fn bits_to_bytes(&self) -> Bounds {
+        Bounds {
+            min: (self.min + 7) / 8,
+            max: self.max.map(|n| (n + 7) / 8),
+        }
+    }
 }
 
 impl Format {
+    /// Conservative bounds for number of bytes matched by a format
+    fn match_bounds(&self, module: &FormatModule) -> Bounds {
+        match self {
+            Format::ItemVar(level, _args) => module.get_format(*level).match_bounds(module),
+            Format::Fail => Bounds::exact(0),
+            Format::EndOfInput => Bounds::exact(0),
+            Format::Align(n) => Bounds::new(0, Some(n - 1)),
+            Format::Byte(_) => Bounds::exact(1),
+            Format::Union(branches) => branches
+                .iter()
+                .map(|(_, f)| f.match_bounds(module))
+                .reduce(Bounds::union)
+                .unwrap(),
+            Format::Tuple(fields) => fields
+                .iter()
+                .map(|f| f.match_bounds(module))
+                .reduce(Bounds::concat)
+                .unwrap_or(Bounds::exact(0)),
+            Format::Record(fields) => fields
+                .iter()
+                .map(|(_, f)| f.match_bounds(module))
+                .reduce(Bounds::concat)
+                .unwrap_or(Bounds::exact(0)),
+            Format::Repeat(_) => Bounds::new(0, None),
+            Format::Repeat1(f) => f.match_bounds(module).repeat(Bounds::new(1, None)),
+            Format::RepeatCount(expr, f) => f.match_bounds(module).repeat(expr.bounds()),
+            Format::RepeatUntilLast(_, f) => f.match_bounds(module).repeat(Bounds::new(1, None)),
+            Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
+            Format::Peek(_) => Bounds::exact(0),
+            Format::Slice(expr, _) => expr.bounds(),
+            Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
+            Format::WithRelativeOffset(_, _) => Bounds::exact(0),
+            Format::Compute(_) => Bounds::exact(0),
+            Format::Match(_, branches) => branches
+                .iter()
+                .map(|(_, f)| f.match_bounds(module))
+                .reduce(Bounds::union)
+                .unwrap(),
+            Format::MatchVariant(_, branches) => branches
+                .iter()
+                .map(|(_, _, f)| f.match_bounds(module))
+                .reduce(Bounds::union)
+                .unwrap(),
+            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::new(1, None),
+        }
+    }
+
     /// Returns `true` if the format could match the empty byte string
     fn is_nullable(&self, module: &FormatModule) -> bool {
-        match self {
-            Format::ItemVar(level, _args) => module.get_format(*level).is_nullable(module),
-            Format::Fail => false,
-            Format::EndOfInput => true,
-            Format::Align(_) => true,
-            Format::Byte(_) => false,
-            Format::Union(branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
-            Format::Tuple(fields) => fields.iter().all(|f| f.is_nullable(module)),
-            Format::Record(fields) => fields.iter().all(|(_, f)| f.is_nullable(module)),
-            Format::Repeat(_) => true,
-            Format::Repeat1(_) => false,
-            Format::RepeatCount(_, _) => true,
-            Format::RepeatUntilLast(_, f) => f.is_nullable(module),
-            Format::RepeatUntilSeq(_, f) => f.is_nullable(module),
-            Format::Peek(_) => true,
-            Format::Slice(_, _) => true,
-            Format::Bits(f) => f.is_nullable(module),
-            Format::WithRelativeOffset(_, _) => true,
-            Format::Compute(_) => true,
-            Format::Match(_, branches) => branches.iter().any(|(_, f)| f.is_nullable(module)),
-            Format::MatchVariant(_, branches) => {
-                branches.iter().any(|(_, _, f)| f.is_nullable(module))
-            }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => false,
-        }
+        self.match_bounds(module).min == 0
     }
 
     /// True if the compilation of this format depends on the format that follows it
