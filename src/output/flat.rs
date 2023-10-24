@@ -90,6 +90,10 @@ fn is_show_format(name: &str) -> Option<&'static str> {
         "jpeg.sof15" => Some("Start of Frame (differential lossless, arithmetic)"),
         "jpeg.sos" => Some("Start of Scan"),
         "jpeg.scan-data" => Some("Entropy-Coded Segment"),
+
+        // Tar
+        "tar.header" => Some("Tar Header"),
+        "tar.header_with_data" => Some("Tar File Entry"),
         _ => None,
     }
 }

@@ -2,6 +2,8 @@ use std::{fmt, io};
 
 use crate::{Expr, Format, FormatModule, Scope, Value};
 
+use super::Fragment;
+
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     Context::new(io::stdout(), module)
         .write_decoded_value(value, format)
@@ -814,5 +816,74 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, ")")
             }
         }
+    }
+}
+
+pub struct MonoidalPrinter<'module, W: io::Write> {
+    oput: W,
+    gutter: Vec<Column>,
+    current_depth: u8,
+    preview_len: Option<usize>,
+    flags: Flags,
+    module: &'module FormatModule,
+    scope: Scope,
+    tree: Vec<Fragment>,
+}
+
+impl<'module, W: io::Write> MonoidalPrinter<'module, W> {
+    pub fn compile(&mut self, format: &Format) -> Fragment {
+        match format {
+            Format::ItemVar(ix, expr) => todo!(),
+            Format::Fail => todo!(),
+            Format::EndOfInput => todo!(),
+            Format::Align(_) => todo!(),
+            Format::Byte(_) => todo!(),
+            Format::Union(_) => todo!(),
+            Format::Tuple(_) => todo!(),
+            Format::Record(_) => todo!(),
+            Format::Repeat(_) => todo!(),
+            Format::Repeat1(_) => todo!(),
+            Format::RepeatCount(_, _) => todo!(),
+            Format::RepeatUntilLast(_, _) => todo!(),
+            Format::RepeatUntilSeq(_, _) => todo!(),
+            Format::Peek(_) => todo!(),
+            Format::Slice(_, _) => todo!(),
+            Format::FixedSlice(_, _) => todo!(),
+            Format::Bits(_) => todo!(),
+            Format::WithRelativeOffset(_, _) => todo!(),
+            Format::Compute(_) => todo!(),
+            Format::Match(_, _) => todo!(),
+            Format::MatchVariant(_, _) => todo!(),
+            Format::Dynamic(_) => todo!(),
+        }
+    }
+
+    pub fn push_decoded_value(&self, value: &Value, fmt: &Format) -> Result<&Fragment, ()> {
+        let mut frag = Fragment::Empty;
+        match fmt {
+            Format::ItemVar(_, _) => todo!(),
+            Format::Fail => todo!(),
+            Format::EndOfInput => todo!(),
+            Format::Align(_) => todo!(),
+            Format::Byte(_) => todo!(),
+            Format::Union(_) => todo!(),
+            Format::Tuple(_) => todo!(),
+            Format::Record(_) => todo!(),
+            Format::Repeat(_) => todo!(),
+            Format::Repeat1(_) => todo!(),
+            Format::RepeatCount(_, _) => todo!(),
+            Format::RepeatUntilLast(_, _) => todo!(),
+            Format::RepeatUntilSeq(_, _) => todo!(),
+            Format::Peek(_) => todo!(),
+            Format::Slice(_, _) => todo!(),
+            Format::FixedSlice(_, _) => todo!(),
+            Format::Bits(_) => todo!(),
+            Format::WithRelativeOffset(_, _) => todo!(),
+            Format::Compute(_) => todo!(),
+            Format::Match(_, _) => todo!(),
+            Format::MatchVariant(_, _) => todo!(),
+            Format::Dynamic(_) => todo!(),
+        }
+
     }
 }
