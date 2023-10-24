@@ -436,6 +436,8 @@ pub enum Format {
     RepeatUntilSeq(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
+    /// Attempt to parse a format and fail if it succeeds
+    PeekNot(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
     Slice(Expr, Box<Format>),
     /// Parse bitstream
@@ -610,6 +612,7 @@ impl FormatModule {
                 Ok(ValueType::Seq(Box::new(t)))
             }
             Format::Peek(a) => self.infer_format_type(scope, a),
+            Format::PeekNot(_a) => Ok(ValueType::Tuple(vec![])),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
@@ -663,6 +666,7 @@ enum Next<'a> {
     RepeatCount(usize, &'a Format, Rc<Next<'a>>),
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
     Peek(Rc<Next<'a>>, Rc<Next<'a>>),
+    PeekNot(Rc<Next<'a>>, Vec<Rc<Next<'a>>>),
 }
 
 #[derive(Clone, Debug)]
@@ -699,6 +703,7 @@ enum Decoder {
     RepeatUntilLast(Expr, Box<Decoder>),
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
+    PeekNot(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -1213,6 +1218,7 @@ impl Format {
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
+            Format::PeekNot(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
@@ -1253,6 +1259,7 @@ impl Format {
             Format::RepeatUntilLast(_, _f) => false,
             Format::RepeatUntilSeq(_, _f) => false,
             Format::Peek(_) => false,
+            Format::PeekNot(_) => false,
             Format::Slice(_, _) => false,
             Format::Bits(_) => false,
             Format::WithRelativeOffset(_, _) => false,
@@ -1362,6 +1369,37 @@ impl<'a> MatchTreeStep<'a> {
         self
     }
 
+    fn peek_not(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        self.accept = self.accept && !peek.accept;
+        if peek.accept {
+            self.branches = Vec::new();
+        } else {
+            let mut branches = Vec::new();
+            for (bs1, nexts1) in self.branches.into_iter() {
+                for (bs2, nexts2) in &peek.branches {
+                    let common = bs1.intersection(bs2);
+                    let diff = bs1.difference(bs2);
+                    if !common.is_empty() {
+                        let mut nexts = HashSet::new();
+                        for next1 in &nexts1 {
+                            let mut peek_nexts = Vec::new();
+                            for next2 in nexts2 {
+                                peek_nexts.push(next2.clone());
+                            }
+                            nexts.insert(Rc::new(Next::PeekNot(next1.clone(), peek_nexts)));
+                        }
+                        branches.push((common, nexts));
+                    }
+                    if !diff.is_empty() {
+                        branches.push((diff, nexts1.clone()));
+                    }
+                }
+            }
+            self.branches = branches;
+        }
+        self
+    }
+
     fn add_tuple(
         module: &'a FormatModule,
         fields: &'a [Format],
@@ -1448,6 +1486,14 @@ impl<'a> MatchTreeStep<'a> {
                 let tree2 = Self::add_next(module, next2.clone());
                 tree1.peek(tree2)
             }
+            Next::PeekNot(next1, peek_not_nexts) => {
+                let tree = Self::add_next(module, next1.clone());
+                let mut peek_not = Self::reject();
+                for peek_not_next in peek_not_nexts {
+                    peek_not = peek_not.union(Self::add_next(module, peek_not_next.clone()));
+                }
+                tree.peek_not(peek_not)
+            }
         }
     }
 
@@ -1492,6 +1538,11 @@ impl<'a> MatchTreeStep<'a> {
                 let tree = Self::add_next(module, next.clone());
                 let peek = Self::add(module, a, Rc::new(Next::Empty));
                 tree.peek(peek)
+            }
+            Format::PeekNot(a) => {
+                let tree = Self::add_next(module, next.clone());
+                let peek = Self::add(module, a, Rc::new(Next::Empty));
+                tree.peek_not(peek)
             }
             Format::Slice(expr, f) => {
                 let inside = Rc::new(Next::Cat(f, Rc::new(Next::Empty)));
@@ -2118,6 +2169,20 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Peek(da))
             }
+            Format::PeekNot(a) => {
+                const MAX_LOOKAHEAD: usize = 1024;
+                match a.match_bounds(compiler.module).max {
+                    None => return Err(format!("PeekNot cannot require unbounded lookahead")),
+                    Some(n) if n > MAX_LOOKAHEAD => {
+                        return Err(format!(
+                            "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
+                        ))
+                    }
+                    _ => {}
+                }
+                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Decoder::PeekNot(da))
+            }
             Format::Slice(expr, a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
@@ -2301,6 +2366,13 @@ impl Decoder {
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;
                 Ok((v, input))
+            }
+            Decoder::PeekNot(a) => {
+                if a.parse(program, scope, input).is_ok() {
+                    Err(ParseError::fail(scope, input))
+                } else {
+                    Ok((Value::Tuple(vec![]), input))
+                }
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
@@ -3081,5 +3153,101 @@ mod tests {
             &[],
             Value::Tuple(vec![Value::U8(0x00), Value::UNIT, Value::U8(0xFF)]),
         );
+    }
+
+    #[test]
+    fn compile_peek_not() {
+        let any_byte = Format::Byte(ByteSet::full());
+        let a = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
+        let peek_not = Format::PeekNot(Box::new(a));
+        let f = Format::Tuple(vec![peek_not, any_byte.clone(), any_byte.clone()]);
+        let d = Decoder::compile_one(&f).unwrap();
+        rejects(&d, &[]);
+        rejects(&d, &[0xFF]);
+        rejects(&d, &[0xFF, 0xFF]);
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Tuple(vec![Value::Tuple(vec![]), Value::U8(0x00), Value::U8(0xFF)]),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0x00],
+            &[],
+            Value::Tuple(vec![Value::Tuple(vec![]), Value::U8(0xFF), Value::U8(0x00)]),
+        );
+    }
+
+    #[test]
+    fn compile_peek_not_switch() {
+        let any_byte = Format::Byte(ByteSet::full());
+        let guard = Format::PeekNot(Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)])));
+        let a = Format::Tuple(vec![guard, Format::Repeat(Box::new(any_byte.clone()))]);
+        let b = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
+        let f = alts([("a", a), ("b", b)]);
+        let d = Decoder::compile_one(&f).unwrap();
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![])])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![
+                    Value::Tuple(vec![]),
+                    Value::Seq(vec![Value::U8(0xFF)]),
+                ])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![
+                    Value::Tuple(vec![]),
+                    Value::Seq(vec![Value::U8(0x00), Value::U8(0xFF)]),
+                ])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0x00],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![
+                    Value::Tuple(vec![]),
+                    Value::Seq(vec![Value::U8(0xFF), Value::U8(0x00)]),
+                ])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0xFF],
+            &[],
+            Value::Variant(
+                "b".to_string(),
+                Box::new(Value::Tuple(vec![Value::U8(0xFF), Value::U8(0xFF)])),
+            ),
+        );
+    }
+
+    #[test]
+    fn compile_peek_not_lookahead() {
+        let peek_not = Format::PeekNot(Box::new(repeat1(is_byte(0x00))));
+        let any_byte = Format::Byte(ByteSet::full());
+        let f = Format::Tuple(vec![peek_not, repeat1(any_byte)]);
+        assert!(Decoder::compile_one(&f).is_err());
     }
 }
