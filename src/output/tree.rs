@@ -115,6 +115,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_decoded_value(value, format),
+            Format::AndNot(format, _) => self.write_decoded_value(value, format),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::Bits(format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
@@ -716,6 +717,11 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Peek(format) => {
                 write!(&mut self.writer, "peek ")?;
                 self.write_atomic_format(format)
+            }
+            Format::AndNot(format, negated) => {
+                self.write_atomic_format(format)?;
+                write!(&mut self.writer, " and-not ")?;
+                self.write_atomic_format(negated)
             }
             Format::Slice(len, format) => {
                 write!(&mut self.writer, "slice ")?;

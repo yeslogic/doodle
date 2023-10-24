@@ -427,6 +427,8 @@ pub enum Format {
     RepeatUntilSeq(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
+    /// Matches the first format but not the second
+    AndNot(Box<Format>, Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes
     Slice(Expr, Box<Format>),
     /// Parse bitstream
@@ -601,6 +603,7 @@ impl FormatModule {
                 Ok(ValueType::Seq(Box::new(t)))
             }
             Format::Peek(a) => self.infer_format_type(scope, a),
+            Format::AndNot(a, _b) => self.infer_format_type(scope, a),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
@@ -686,6 +689,7 @@ enum Decoder {
     RepeatUntilLast(Expr, Box<Decoder>),
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
+    AndNot(Box<Decoder>, Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -1228,6 +1232,7 @@ impl Format {
             Format::RepeatUntilLast(_, f) => f.match_bounds(module).repeat(Bounds::new(1, None)),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
+            Format::AndNot(a, _b) => a.match_bounds(module),
             Format::Slice(expr, _) => expr.bounds(),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
@@ -1268,6 +1273,7 @@ impl Format {
             Format::RepeatUntilLast(_, _f) => false,
             Format::RepeatUntilSeq(_, _f) => false,
             Format::Peek(_) => false,
+            Format::AndNot(a, _b) => a.depends_on_next(module),
             Format::Slice(_, _) => false,
             Format::Bits(_) => false,
             Format::WithRelativeOffset(_, _) => false,
@@ -1428,6 +1434,9 @@ impl<'a> MatchTreeLevel<'a> {
                 self.accept(index) // FIXME
             }
             Format::Peek(_a) => {
+                self.accept(index) // FIXME
+            }
+            Format::AndNot(_a, _b) => {
                 self.accept(index) // FIXME
             }
             Format::Slice(_expr, _a) => {
@@ -1947,6 +1956,21 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Peek(da))
             }
+            Format::AndNot(a, b) => {
+                const MAX_LOOKAHEAD: usize = 1024;
+                match a.match_bounds(compiler.module).max {
+                    None => return Err(format!("AndNot cannot require unbounded lookahead")),
+                    Some(n) if n > MAX_LOOKAHEAD => {
+                        return Err(format!(
+                            "AndNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
+                        ))
+                    }
+                    _ => {}
+                }
+                let da = Box::new(Decoder::compile_next(compiler, a, next)?);
+                let db = Box::new(Decoder::compile_next(compiler, b, Rc::new(Next::Empty))?);
+                Ok(Decoder::AndNot(da, db))
+            }
             Format::Slice(expr, a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
@@ -2118,6 +2142,16 @@ impl Decoder {
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;
                 Some((v, input))
+            }
+            Decoder::AndNot(a, b) => {
+                let (v, next_input) = a.parse(program, scope, input)?;
+                let size = next_input.offset - input.offset;
+                let (slice, _) = input.split_at(size)?;
+                if b.parse(program, scope, slice).is_none() {
+                    Some((v, next_input))
+                } else {
+                    None
+                }
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
@@ -2864,5 +2898,38 @@ mod tests {
             &[],
             Value::Tuple(vec![Value::U8(0x00), Value::UNIT, Value::U8(0xFF)]),
         );
+    }
+
+    #[test]
+    fn compile_and_not() {
+        let any_byte = Format::Byte(ByteSet::full());
+        let a = Format::Tuple(vec![any_byte.clone(), any_byte.clone()]);
+        let b = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
+        let f = Format::AndNot(Box::new(a), Box::new(b));
+        let d = Decoder::compile_one(&f).unwrap();
+        rejects(&d, &[]);
+        rejects(&d, &[0xFF]);
+        rejects(&d, &[0xFF, 0xFF]);
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Tuple(vec![Value::U8(0x00), Value::U8(0xFF)]),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0x00],
+            &[],
+            Value::Tuple(vec![Value::U8(0xFF), Value::U8(0x00)]),
+        );
+    }
+
+    #[test]
+    fn compile_and_not_lookahead() {
+        let any_byte = Format::Byte(ByteSet::full());
+        let a = repeat1(any_byte);
+        let b = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
+        let f = Format::AndNot(Box::new(a), Box::new(b));
+        assert!(Decoder::compile_one(&f).is_err());
     }
 }
