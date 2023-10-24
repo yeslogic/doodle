@@ -2,12 +2,15 @@
 #![deny(rust_2018_idioms)]
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Add;
 use std::rc::Rc;
 
 use serde::Serialize;
 
+use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 
+pub mod bounds;
 pub mod byte_set;
 pub mod error;
 pub mod output;
@@ -1165,62 +1168,8 @@ impl Expr {
             Expr::U8(n) => Bounds::exact(usize::from(*n)),
             Expr::U16(n) => Bounds::exact(usize::from(*n)),
             Expr::U32(n) => Bounds::exact(*n as usize),
+            Expr::Add(a, b) => a.bounds() + b.bounds(),
             _ => Bounds::new(0, None),
-        }
-    }
-}
-
-struct Bounds {
-    min: usize,
-    max: Option<usize>,
-}
-
-impl Bounds {
-    fn new(min: usize, max: Option<usize>) -> Bounds {
-        Bounds { min, max }
-    }
-
-    fn exact(n: usize) -> Bounds {
-        Bounds {
-            min: n,
-            max: Some(n),
-        }
-    }
-
-    fn union(lhs: Bounds, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: usize::min(lhs.min, rhs.min),
-            max: match (lhs.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(usize::max(m1, m2)),
-                _ => None,
-            },
-        }
-    }
-
-    fn concat(lhs: Bounds, rhs: Bounds) -> Bounds {
-        Bounds {
-            min: lhs.min + rhs.min,
-            max: match (lhs.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1 + m2),
-                _ => None,
-            },
-        }
-    }
-
-    fn repeat(&self, count: Bounds) -> Bounds {
-        Bounds {
-            min: self.min * count.min,
-            max: match (self.max, count.max) {
-                (Some(m1), Some(m2)) => Some(m1 * m2),
-                _ => None,
-            },
-        }
-    }
-
-    fn bits_to_bytes(&self) -> Bounds {
-        Bounds {
-            min: (self.min + 7) / 8,
-            max: self.max.map(|n| (n + 7) / 8),
         }
     }
 }
@@ -1242,17 +1191,17 @@ impl Format {
             Format::Tuple(fields) => fields
                 .iter()
                 .map(|f| f.match_bounds(module))
-                .reduce(Bounds::concat)
+                .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
             Format::Record(fields) => fields
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
-                .reduce(Bounds::concat)
+                .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
             Format::Repeat(_) => Bounds::new(0, None),
-            Format::Repeat1(f) => f.match_bounds(module).repeat(Bounds::new(1, None)),
-            Format::RepeatCount(expr, f) => f.match_bounds(module).repeat(expr.bounds()),
-            Format::RepeatUntilLast(_, f) => f.match_bounds(module).repeat(Bounds::new(1, None)),
+            Format::Repeat1(f) => f.match_bounds(module) * Bounds::new(1, None),
+            Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
+            Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
