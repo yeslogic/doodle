@@ -713,6 +713,10 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
             }
+            Format::Peek(format) => {
+                write!(&mut self.writer, "peek ")?;
+                self.write_atomic_format(format)
+            }
             Format::Slice(len, format) => {
                 write!(&mut self.writer, "slice ")?;
                 self.write_atomic_expr(len)?;
