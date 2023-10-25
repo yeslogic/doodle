@@ -31,6 +31,10 @@ impl std::fmt::Debug for Fragment {
 }
 
 impl Fragment {
+    fn is_empty(&self) -> bool {
+        matches!(self, &Fragment::Empty)
+    }
+
     fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
         Self::Sequence {
             items: items.into_iter().collect(),
@@ -38,18 +42,99 @@ impl Fragment {
         }
     }
 
-    fn cat(frag0: Self, frag1: Self) -> Self {
-        Self::Cat(Box::new(frag0), Box::new(frag1))
+    fn cat(self, frag1: Self) -> Self {
+        if self.is_empty() {
+            frag1
+        } else if frag1.is_empty() {
+            self
+        } else {
+            Self::Cat(Box::new(self), Box::new(frag1))
+        }
     }
 
-    fn grp(self) -> Self {
+    fn opt(frag: Option<Fragment>) -> Fragment {
+        frag.unwrap_or(Fragment::Empty)
+    }
+
+    fn encat(&mut self, other: Self) -> &mut Self {
+        let this = *self;
+        *self = Self::cat(this, other);
+        self
+    }
+
+    fn group(self) -> Self {
         Self::Group(Box::new(self))
+    }
+
+    #[inline]
+    fn enbreak(&mut self) -> &mut Self {
+        self.encat(Fragment::Char('\n'))
+    }
+
+    // Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
+    fn engroup(&mut self) -> &mut Self {
+        let this = Box::new(*self);
+        *self = Self::Group(this);
+        self
+    }
+
+    fn new() -> Self {
+        Self::Empty
     }
 }
 
-struct Snippet {
-    depth: u8,
-    contents: Fragment,
+struct Fragments {
+    frozen: Vec<Fragment>,
+    active: Fragment,
+}
+
+impl Fragments {
+    pub fn new() -> Self {
+        Self {
+            frozen: Vec::new(),
+            active: Fragment::new(),
+        }
+    }
+
+    pub fn active_mut(&mut self) -> &mut Fragment {
+        &mut self.active
+    }
+
+    // Freeze (push) the active fragment, create a new (Empty) one, and return a mutable reference to it
+    pub fn renew(&mut self) -> &mut Fragment {
+        let frag = self.active;
+        if !frag.is_empty() {
+            self.frozen.push(frag);
+        }
+        self.active = Fragment::new();
+        &mut self.active
+    }
+
+    /// Compound operation that freezes the current active and immediately adds a new frozen fragment, leaving
+    /// the active fragment empty.
+    pub fn push(&mut self, frag: Fragment) {
+        let old = self.active;
+
+        if old.is_empty() {
+            self.frozen.push(frag);
+        } else {
+            self.frozen.push(old);
+            if !frag.is_empty() {
+                self.frozen.push(frag);
+            }
+            self.active = Fragment::new();
+        }
+    }
+
+    pub fn finalize(&mut self) -> Fragment {
+        let _ = self.renew();
+        Fragment::seq(self.frozen, None)
+    }
+
+    pub fn finalize_with_sep(&mut self, sep: Fragment) -> Fragment {
+        let _ = self.renew();
+        Fragment::seq(self.frozen, Some(sep))
+    }
 }
 
 impl std::fmt::Display for Fragment {
