@@ -1,5 +1,6 @@
 use std::ops::{Add, Mul};
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Bounds {
     pub min: usize,
     pub max: Option<usize>,
