@@ -339,7 +339,9 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn is_ascii_char_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(level, _args) => self.module.get_name(*level) == "base.ascii-char",
+            Format::ItemVar(level, _args) => {
+                self.module.get_name(*level).starts_with("base.ascii-char")
+            }
             _ => false,
         }
     }
