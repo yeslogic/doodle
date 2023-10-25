@@ -328,6 +328,7 @@ pub enum Expr {
     Gt(Box<Expr>, Box<Expr>),
     Lte(Box<Expr>, Box<Expr>),
     Gte(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
     Div(Box<Expr>, Box<Expr>),
     Rem(Box<Expr>, Box<Expr>),
     Shl(Box<Expr>, Box<Expr>),
@@ -780,6 +781,12 @@ impl Expr {
                 (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
             },
+            Expr::Mul(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            },
             Expr::Div(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
                 (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
@@ -1026,6 +1033,7 @@ impl Expr {
             },
             Expr::Add(x, y)
             | Expr::Sub(x, y)
+            | Expr::Mul(x, y)
             | Expr::Div(x, y)
             | Expr::Rem(x, y)
             | Expr::Shl(x, y)
@@ -1162,6 +1170,7 @@ impl Expr {
             Expr::U16(n) => Bounds::exact(usize::from(*n)),
             Expr::U32(n) => Bounds::exact(*n as usize),
             Expr::Add(a, b) => a.bounds() + b.bounds(),
+            Expr::Mul(a, b) => a.bounds() * b.bounds(),
             _ => Bounds::new(0, None),
         }
     }
