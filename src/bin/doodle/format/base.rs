@@ -1,5 +1,5 @@
 use doodle::byte_set::ByteSet;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{ Expr, Format, FormatModule, FormatRef, Pattern };
 
 pub fn var(name: &str) -> Expr {
     Expr::Var(name.to_string())
@@ -11,22 +11,27 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
 
 pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
     Format::Union(
-        (fields.into_iter())
+        fields
+            .into_iter()
             .map(|(label, format)| (label.into(), format))
-            .collect(),
+            .collect()
     )
 }
 
 pub fn record<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
     Format::Record(
-        (fields.into_iter())
+        fields
+            .into_iter()
             .map(|(label, format)| (label.into(), format))
-            .collect(),
+            .collect()
     )
 }
 
 pub fn optional(format: Format) -> Format {
-    alts([("some", format), ("none", Format::EMPTY)])
+    alts([
+        ("some", format),
+        ("none", Format::EMPTY),
+    ])
 }
 
 pub fn repeat(format: Format) -> Format {
@@ -56,8 +61,8 @@ pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
         cond,
         vec![
             (Pattern::Bool(true), "yes".to_string(), format0),
-            (Pattern::Bool(false), "no".to_string(), format1),
-        ],
+            (Pattern::Bool(false), "no".to_string(), format1)
+        ]
     )
 }
 
@@ -82,6 +87,13 @@ pub struct BaseModule {
     u32le: FormatRef,
     ascii_char: FormatRef,
     asciiz_string: FormatRef,
+
+    // extensions to ascii-char
+    ascii_octal_digit: FormatRef,
+    ascii_decimal_digit: FormatRef,
+    ascii_hex_lower: FormatRef,
+    ascii_hex_upper: FormatRef,
+    ascii_hex_any: FormatRef,
 }
 
 #[rustfmt::skip]
@@ -96,6 +108,41 @@ impl BaseModule {
     pub fn asciiz_string(&self) -> Format { self.asciiz_string.call() }
 }
 
+impl BaseModule {
+    #[rustfmt::skip]
+    pub const ASCII_OCTAL_DIGIT: [u8; 8] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7'];
+
+    pub fn ascii_octal_digit(&self) -> Format { self.ascii_octal_digit.call() }
+
+    #[rustfmt::skip]
+    pub const ASCII_DECIMAL_DIGIT: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
+
+    pub fn ascii_decimal_digit(&self) -> Format { self.ascii_decimal_digit.call() }
+
+    #[rustfmt::skip]
+    pub const ASCII_HEX_LOWER: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9',
+        b'a', b'b', b'c', b'd', b'e', b'f'
+    ];
+
+    #[rustfmt::skip]
+    pub const ASCII_HEX_UPPER: [u8; 16] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9',
+        b'A', b'B', b'C', b'D', b'E', b'F'
+    ];
+
+    #[rustfmt::skip]
+    pub const ASCII_HEX_ANY: [u8; 22] = [
+        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9',
+        b'A', b'B', b'C', b'D', b'E', b'F',
+        b'a', b'b', b'c', b'd', b'e', b'f'
+    ];
+
+    pub fn ascii_hex_lower(&self) -> Format { self.ascii_hex_lower.call() }
+    pub fn ascii_hex_upper(&self) -> Format { self.ascii_hex_upper.call() }
+    pub fn ascii_hex_any(&self) -> Format { self.ascii_hex_any.call() }
+}
+
 pub fn main(module: &mut FormatModule) -> BaseModule {
     let bit = module.define_format("base.bit", Format::Byte(ByteSet::full()));
 
@@ -105,51 +152,65 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         "base.u16be",
         record([
             ("bytes", tuple([u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U16Be(Box::new(var("bytes")))),
-            ),
-        ]),
+            ("@value", Format::Compute(Expr::U16Be(Box::new(var("bytes"))))),
+        ])
     );
 
     let u16le = module.define_format(
         "base.u16le",
         record([
             ("bytes", tuple([u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U16Le(Box::new(var("bytes")))),
-            ),
-        ]),
+            ("@value", Format::Compute(Expr::U16Le(Box::new(var("bytes"))))),
+        ])
     );
 
     let u32be = module.define_format(
         "base.u32be",
         record([
             ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U32Be(Box::new(var("bytes")))),
-            ),
-        ]),
+            ("@value", Format::Compute(Expr::U32Be(Box::new(var("bytes"))))),
+        ])
     );
 
     let u32le = module.define_format(
         "base.u32le",
         record([
             ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U32Le(Box::new(var("bytes")))),
-            ),
-        ]),
+            ("@value", Format::Compute(Expr::U32Le(Box::new(var("bytes"))))),
+        ])
     );
 
     let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
 
     let asciiz_string = module.define_format(
         "base.asciiz-string",
-        record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
+        record([
+            ("string", repeat(not_byte(0x00))),
+            ("null", is_byte(0x00)),
+        ])
+    );
+
+    let ascii_octal_digit = module.define_format(
+        "base.ascii-char.octal",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_OCTAL_DIGIT)),
+    );
+
+    let ascii_decimal_digit = module.define_format(
+        "base.ascii-char.decimal",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_DECIMAL_DIGIT)),
+    );
+
+    let ascii_hex_lower = module.define_format(
+        "base.ascii-char.hex.lower",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_LOWER)),
+    );
+    let ascii_hex_upper = module.define_format(
+        "base.ascii-char.hex.upper",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_UPPER)),
+    );
+    let ascii_hex_any = module.define_format(
+        "base.ascii-char.hex.any",
+        Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_ANY)),
     );
 
     BaseModule {
@@ -161,5 +222,10 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         u32le,
         ascii_char,
         asciiz_string,
+        ascii_octal_digit,
+        ascii_decimal_digit,
+        ascii_hex_lower,
+        ascii_hex_upper,
+        ascii_hex_any,
     }
 }
