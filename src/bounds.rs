@@ -18,6 +18,13 @@ impl Bounds {
         }
     }
 
+    pub fn is_exact(&self) -> Option<usize> {
+        match self.max {
+            Some(n) if n == self.min => Some(n),
+            _ => None,
+        }
+    }
+
     pub fn union(lhs: Bounds, rhs: Bounds) -> Bounds {
         Bounds {
             min: usize::min(lhs.min, rhs.min),

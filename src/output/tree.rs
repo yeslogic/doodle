@@ -126,6 +126,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_decoded_value(value, format),
+            Format::PeekNot(_format) => self.write_value(value),
             Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::Bits(format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
@@ -721,10 +722,6 @@ impl<'module, W: io::Write> Context<'module, W> {
     fn write_format(&mut self, format: &Format) -> io::Result<()> {
         match format {
             Format::Union(_) | Format::NondetUnion(_) => write!(&mut self.writer, "_ |...| _"),
-            Format::Peek(format) => {
-                write!(&mut self.writer, "peek ")?;
-                self.write_atomic_format(format)
-            }
             Format::Repeat(format) => {
                 write!(&mut self.writer, "repeat ")?;
                 self.write_atomic_format(format)
@@ -749,6 +746,14 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, "repeat-until-seq ")?;
                 self.write_atomic_expr(len)?;
                 write!(&mut self.writer, " ")?;
+                self.write_atomic_format(format)
+            }
+            Format::Peek(format) => {
+                write!(&mut self.writer, "peek ")?;
+                self.write_atomic_format(format)
+            }
+            Format::PeekNot(format) => {
+                write!(&mut self.writer, "peek-not ")?;
                 self.write_atomic_format(format)
             }
             Format::Slice(len, format) => {
@@ -1032,6 +1037,7 @@ impl<'module> MonoidalPrinter<'module> {
                 _ => panic!("expected sequence, found {value:?}"),
             },
             Format::Peek(format) => self.compile_decoded_value(value, format),
+            Format::PeekNot(_format) => self.compile_value(value),
             Format::Slice(_, format) => self.compile_decoded_value(value, format),
             Format::Bits(format) => self.compile_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.compile_decoded_value(value, format),
@@ -1622,11 +1628,6 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
-            Format::Peek(format) => cond_paren(
-                self.compile_nested_format("peek", None, format, prec),
-                prec,
-                Precedence::FORMAT_COMPOUND,
-            ),
             Format::Repeat(format) => cond_paren(
                 self.compile_nested_format("repeat", None, format, prec),
                 prec,
@@ -1671,6 +1672,16 @@ impl<'module> MonoidalPrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
+            Format::Peek(format) => cond_paren(
+                self.compile_nested_format("peek", None, format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
+            Format::PeekNot(format) => cond_paren(
+                self.compile_nested_format("peek-not", None, format, prec),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
             Format::Slice(len, format) => {
                 let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
