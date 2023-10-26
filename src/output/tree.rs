@@ -206,8 +206,8 @@ impl<'module, W: io::Write> Context<'module, W> {
         match b {
             0x00 => write!(&mut self.writer, "\\0"),
             0x09 => write!(&mut self.writer, "\\t"),
-            0x0A => write!(&mut self.writer, "\\n"),
-            0x0D => write!(&mut self.writer, "\\r"),
+            0x0a => write!(&mut self.writer, "\\n"),
+            0x0d => write!(&mut self.writer, "\\r"),
             32..=127 => write!(&mut self.writer, "{}", b as char),
             _ => write!(&mut self.writer, "\\x{:02X}", b),
         }
@@ -1777,5 +1777,80 @@ fn cond_paren(frag: Fragment, should_paren: bool) -> Fragment {
         Fragment::seq([Fragment::Char('('), frag, Fragment::Char(')')], None)
     } else {
         frag
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_expr() -> impl Strategy<Value = Expr> {
+        let atom = prop_oneof![
+            any::<bool>().prop_map(Expr::Bool),
+            any::<u8>().prop_map(Expr::U8),
+            any::<u16>().prop_map(Expr::U16),
+            any::<u32>().prop_map(Expr::U32),
+            ".*".prop_map(Expr::Var),
+        ];
+        let leaf = prop_oneof![atom, Just(Expr::Tuple(Vec::new())),];
+        leaf.prop_recursive(4, 100, 9, |inner| {
+            prop_oneof![
+                inner.clone().prop_flat_map(|term| prop_oneof![
+                    Just(Expr::AsU8(Box::new(term.clone()))),
+                    Just(Expr::AsU16(Box::new(term.clone()))),
+                    Just(Expr::AsU32(Box::new(term.clone()))),
+                    Just(Expr::U16Be(Box::new(term.clone()))),
+                    Just(Expr::U16Le(Box::new(term.clone()))),
+                    Just(Expr::U32Be(Box::new(term.clone()))),
+                    Just(Expr::U32Le(Box::new(term.clone()))),
+                ]),
+                (inner.clone(), inner.clone()).prop_flat_map(|(lhs, rhs)| prop_oneof![
+                    Just(Expr::BitAnd(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::BitOr(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Eq(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Ne(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Lt(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Gt(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Lte(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Gte(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Div(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Rem(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Shl(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Shr(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Add(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Sub(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                ]),
+                prop::collection::vec(inner.clone(), 1..9).prop_flat_map(|v| prop_oneof![
+                    Just(Expr::Tuple(v.clone())),
+                    (Just(Expr::Tuple(v.clone())), 0..v.len())
+                        .prop_map(|(tup, ix)| Expr::TupleProj(Box::new(tup), ix))
+                ]) // TODO add more expression cases
+            ]
+        })
+    }
+
+    fn equiv(expr: &Expr) -> (Vec<u8>, Vec<u8>) {
+        use std::io::Write;
+        let mut buf_context = Vec::<u8>::new();
+        let mut buf_monoid = Vec::<u8>::new();
+
+        let module = FormatModule::new();
+        let mut ctxt = Context::new(&mut buf_context, &module);
+        let mut mprt = MonoidalPrinter::new(&module);
+
+        ctxt.write_expr(expr).unwrap();
+        let frag = mprt.compile_expr(expr, 0);
+        write!(&mut buf_monoid, "{}", frag).unwrap();
+
+        (buf_context, buf_monoid)
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn test_expr(expr in arb_expr()) {
+            let (ctxt, mond) = equiv(&expr);
+            prop_assert_eq!(String::from_utf8_lossy(&ctxt[..]), String::from_utf8_lossy(&mond[..]));
+        }
     }
 }
