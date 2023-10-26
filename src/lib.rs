@@ -438,6 +438,8 @@ pub enum Format {
     RepeatUntilSeq(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
+    /// Attempt to parse a format and fail if it succeeds
+    PeekNot(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
     Slice(Expr, Box<Format>),
     /// Parse bitstream
@@ -612,6 +614,7 @@ impl FormatModule {
                 Ok(ValueType::Seq(Box::new(t)))
             }
             Format::Peek(a) => self.infer_format_type(scope, a),
+            Format::PeekNot(_a) => Ok(ValueType::Tuple(vec![])),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
@@ -658,21 +661,27 @@ impl FormatModule {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Next<'a> {
     Empty,
+    Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Tuple(&'a [Format], Rc<Next<'a>>),
     Record(&'a [(String, Format)], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
+    RepeatCount(usize, &'a Format, Rc<Next<'a>>),
+    Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
+    Peek(Rc<Next<'a>>, Rc<Next<'a>>),
+    PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
 #[derive(Clone, Debug)]
-struct Nexts<'a> {
-    set: HashSet<(usize, Rc<Next<'a>>)>,
+struct MatchTreeStep<'a> {
+    accept: bool,
+    branches: Vec<(ByteSet, Rc<Next<'a>>)>,
 }
 
 #[derive(Clone, Debug)]
 struct MatchTreeLevel<'a> {
     accept: Option<usize>,
-    branches: Vec<(ByteSet, Nexts<'a>)>,
+    branches: Vec<(ByteSet, HashSet<(usize, Rc<Next<'a>>)>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -698,6 +707,7 @@ enum Decoder {
     RepeatUntilLast(Expr, Box<Decoder>),
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
+    PeekNot(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
@@ -1212,6 +1222,7 @@ impl Format {
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
+            Format::PeekNot(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
@@ -1254,6 +1265,7 @@ impl Format {
             Format::RepeatUntilLast(_, _f) => false,
             Format::RepeatUntilSeq(_, _f) => false,
             Format::Peek(_) => false,
+            Format::PeekNot(_) => false,
             Format::Slice(_, _) => false,
             Format::Bits(_) => false,
             Format::WithRelativeOffset(_, _) => false,
@@ -1278,16 +1290,273 @@ impl Format {
     }
 }
 
-impl<'a> Nexts<'a> {
-    fn new() -> Self {
-        Nexts {
-            set: HashSet::new(),
+impl<'a> MatchTreeStep<'a> {
+    fn reject() -> MatchTreeStep<'a> {
+        MatchTreeStep {
+            accept: false,
+            branches: vec![],
         }
     }
 
-    fn add(&mut self, index: usize, next: Rc<Next<'a>>) -> Result<(), ()> {
-        self.set.insert((index, next));
-        Ok(())
+    fn accept() -> MatchTreeStep<'a> {
+        MatchTreeStep {
+            accept: true,
+            branches: vec![],
+        }
+    }
+
+    fn branch(bs: ByteSet, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+        MatchTreeStep {
+            accept: false,
+            branches: vec![(bs, next)],
+        }
+    }
+
+    fn union_branch(&mut self, mut bs: ByteSet, next: Rc<Next<'a>>) {
+        let mut branches = Vec::new();
+        for (bs0, next0) in self.branches.iter_mut() {
+            let common = bs0.intersection(&bs);
+            if !common.is_empty() {
+                let orig = bs0.difference(&bs);
+                if !orig.is_empty() {
+                    branches.push((orig, next0.clone()));
+                }
+                *bs0 = common;
+                *next0 = Rc::new(Next::Union(next0.clone(), next.clone()));
+                bs = bs.difference(bs0);
+            }
+        }
+        if !bs.is_empty() {
+            self.branches.push((bs, next));
+        }
+        self.branches.append(&mut branches);
+    }
+
+    fn union(mut self, other: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        self.accept = self.accept || other.accept;
+        for (bs, next) in other.branches {
+            self.union_branch(bs, next);
+        }
+        self
+    }
+
+    fn peek(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        self.accept = self.accept && peek.accept;
+        if peek.accept {
+            // do nothing
+        } else if self.accept {
+            self.branches = peek.branches;
+        } else {
+            let mut branches = Vec::new();
+            for (bs1, next1) in self.branches {
+                for (bs2, next2) in &peek.branches {
+                    let bs = bs1.intersection(bs2);
+                    if !bs.is_empty() {
+                        let next = Rc::new(Next::Peek(next1.clone(), next2.clone()));
+                        branches.push((bs, next));
+                    }
+                }
+            }
+            self.branches = branches;
+        }
+        self
+    }
+
+    fn peek_not(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        self.accept = self.accept && !peek.accept;
+        if peek.accept {
+            self.branches = Vec::new();
+        } else {
+            let mut branches = Vec::new();
+            for (bs1, next1) in self.branches.into_iter() {
+                for (bs2, next2) in &peek.branches {
+                    let common = bs1.intersection(bs2);
+                    let diff = bs1.difference(bs2);
+                    if !common.is_empty() {
+                        let next = Rc::new(Next::PeekNot(next1.clone(), next2.clone()));
+                        branches.push((common, next));
+                    }
+                    if !diff.is_empty() {
+                        branches.push((diff, next1.clone()));
+                    }
+                }
+            }
+            self.branches = branches;
+        }
+        self
+    }
+
+    fn add_tuple(
+        module: &'a FormatModule,
+        fields: &'a [Format],
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        match fields.split_first() {
+            None => Self::add_next(module, next),
+            Some((f, fs)) => Self::add(module, f, Rc::new(Next::Tuple(fs, next))),
+        }
+    }
+
+    fn add_record(
+        module: &'a FormatModule,
+        fields: &'a [(String, Format)],
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        match fields.split_first() {
+            None => Self::add_next(module, next),
+            Some(((_label, f), fs)) => Self::add(module, f, Rc::new(Next::Record(fs, next))),
+        }
+    }
+
+    fn add_repeat_count(
+        module: &'a FormatModule,
+        n: usize,
+        f: &'a Format,
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        if n > 0 {
+            Self::add(module, f, Rc::new(Next::RepeatCount(n - 1, f, next)))
+        } else {
+            Self::add_next(module, next)
+        }
+    }
+
+    pub fn add_slice(
+        module: &'a FormatModule,
+        n: usize,
+        inside: Rc<Next<'a>>,
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        if n > 0 {
+            let mut tree = Self::add_next(module, inside);
+            tree.accept = false;
+            if tree.branches.is_empty() {
+                let next = Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone()));
+                tree.branches.push((ByteSet::full(), next));
+            } else {
+                for (_bs, ref mut inside) in tree.branches.iter_mut() {
+                    *inside = Rc::new(Next::Slice(n - 1, inside.clone(), next.clone()));
+                }
+            }
+            tree
+        } else {
+            Self::add_next(module, next.clone())
+        }
+    }
+
+    fn add_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+        match next.as_ref() {
+            Next::Empty => Self::accept(),
+            Next::Union(next1, next2) => {
+                let tree1 = Self::add_next(module, next1.clone());
+                let tree2 = Self::add_next(module, next2.clone());
+                tree1.union(tree2)
+            }
+            Next::Cat(f, next) => Self::add(module, f, next.clone()),
+            Next::Tuple(fields, next) => Self::add_tuple(module, fields, next.clone()),
+            Next::Record(fields, next) => Self::add_record(module, fields, next.clone()),
+            Next::Repeat(a, next0) => {
+                let tree = Self::add_next(module, next0.clone());
+                tree.union(Self::add(module, a, next))
+            }
+            Next::RepeatCount(n, a, next0) => Self::add_repeat_count(module, *n, a, next0.clone()),
+            Next::Slice(n, inside, next0) => {
+                Self::add_slice(module, *n, inside.clone(), next0.clone())
+            }
+            Next::Peek(next1, next2) => {
+                let tree1 = Self::add_next(module, next1.clone());
+                let tree2 = Self::add_next(module, next2.clone());
+                tree1.peek(tree2)
+            }
+            Next::PeekNot(next1, next2) => {
+                let tree1 = Self::add_next(module, next1.clone());
+                let tree2 = Self::add_next(module, next2.clone());
+                tree1.peek_not(tree2)
+            }
+        }
+    }
+
+    pub fn add(module: &'a FormatModule, f: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+        match f {
+            Format::ItemVar(level, _args) => Self::add(module, module.get_format(*level), next),
+            Format::Fail => Self::reject(),
+            Format::EndOfInput => Self::accept(),
+            Format::Align(_) => {
+                Self::accept() // FIXME
+            }
+            Format::Byte(bs) => Self::branch(*bs, next),
+            Format::Union(branches) | Format::NondetUnion(branches) => {
+                let mut tree = Self::reject();
+                for (_, f) in branches {
+                    tree = tree.union(Self::add(module, f, next.clone()));
+                }
+                tree
+            }
+            Format::Tuple(fields) => Self::add_tuple(module, fields, next),
+            Format::Record(fields) => Self::add_record(module, fields, next),
+            Format::Repeat(a) => {
+                let tree = Self::add_next(module, next.clone());
+                tree.union(Self::add(module, a, Rc::new(Next::Repeat(a, next.clone()))))
+            }
+            Format::Repeat1(a) => Self::add(module, a, Rc::new(Next::Repeat(a, next.clone()))),
+            Format::RepeatCount(expr, a) => {
+                let bounds = expr.bounds();
+                if let Some(n) = bounds.is_exact() {
+                    Self::add_repeat_count(module, n, a, next.clone())
+                } else {
+                    Self::add_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
+                }
+            }
+            Format::RepeatUntilLast(_expr, _a) => {
+                Self::accept() // FIXME
+            }
+            Format::RepeatUntilSeq(_expr, _a) => {
+                Self::accept() // FIXME
+            }
+            Format::Peek(a) => {
+                let tree = Self::add_next(module, next.clone());
+                let peek = Self::add(module, a, Rc::new(Next::Empty));
+                tree.peek(peek)
+            }
+            Format::PeekNot(a) => {
+                let tree = Self::add_next(module, next.clone());
+                let peek = Self::add(module, a, Rc::new(Next::Empty));
+                tree.peek_not(peek)
+            }
+            Format::Slice(expr, f) => {
+                let inside = Rc::new(Next::Cat(f, Rc::new(Next::Empty)));
+                let bounds = expr.bounds();
+                if let Some(n) = bounds.is_exact() {
+                    Self::add_slice(module, n, inside, next)
+                } else {
+                    Self::add_slice(module, bounds.min, inside, Rc::new(Next::Empty))
+                }
+            }
+            Format::Bits(_a) => {
+                Self::accept() // FIXME
+            }
+            Format::WithRelativeOffset(_expr, _a) => {
+                Self::accept() // FIXME
+            }
+            Format::Compute(_expr) => Self::add_next(module, next),
+            Format::Match(_, branches) => {
+                let mut tree = Self::reject();
+                for (_, f) in branches {
+                    tree = tree.union(Self::add(module, f, next.clone()));
+                }
+                tree
+            }
+            Format::MatchVariant(_, branches) => {
+                let mut tree = Self::reject();
+                for (_, _, f) in branches {
+                    tree = tree.union(Self::add(module, f, next.clone()));
+                }
+                tree
+            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => {
+                Self::accept() // FIXME
+            }
+        }
     }
 }
 
@@ -1299,7 +1568,7 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
-    fn accept(&mut self, index: usize) -> Result<(), ()> {
+    fn merge_accept(&mut self, index: usize) -> Result<(), ()> {
         match self.accept {
             None => {
                 self.accept = Some(index);
@@ -1310,153 +1579,48 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
-    fn add_next(
+    fn merge_branch(
         &mut self,
-        module: &'a FormatModule,
         index: usize,
+        mut bs: ByteSet,
         next: Rc<Next<'a>>,
     ) -> Result<(), ()> {
-        match next.as_ref() {
-            Next::Empty => self.accept(index),
-            Next::Cat(f, next) => self.add(module, index, f, next.clone()),
-            Next::Tuple(fs, next) => match fs.split_first() {
-                None => self.add_next(module, index, next.clone()),
-                Some((f, fs)) => self.add(module, index, f, Rc::new(Next::Tuple(fs, next.clone()))),
-            },
-            Next::Record(fs, next) => match fs.split_first() {
-                None => self.add_next(module, index, next.clone()),
-                Some(((_n, f), fs)) => {
-                    self.add(module, index, f, Rc::new(Next::Record(fs, next.clone())))
+        let mut new_branches = Vec::new();
+        for (bs0, nexts) in self.branches.iter_mut() {
+            let common = bs0.intersection(&bs);
+            if !common.is_empty() {
+                let orig = bs0.difference(&bs);
+                if !orig.is_empty() {
+                    new_branches.push((orig, nexts.clone()));
                 }
-            },
-            Next::Repeat(a, next0) => {
-                self.add_next(module, index, next0.clone())?;
-                self.add(module, index, a, next)?;
-                Ok(())
+                *bs0 = common;
+                nexts.insert((index, next.clone()));
+                bs = bs.difference(bs0);
             }
         }
-    }
-
-    pub fn add(
-        &mut self,
-        module: &'a FormatModule,
-        index: usize,
-        f: &'a Format,
-        next: Rc<Next<'a>>,
-    ) -> Result<(), ()> {
-        match f {
-            Format::ItemVar(level, _args) => {
-                self.add(module, index, module.get_format(*level), next)
-            }
-            Format::Fail => Ok(()),
-            Format::EndOfInput => self.accept(index),
-            Format::Align(_) => {
-                self.accept(index) // FIXME
-            }
-            Format::Byte(bs) => {
-                let mut bs = *bs;
-                let mut new_branches = Vec::new();
-                for (bs0, nexts) in self.branches.iter_mut() {
-                    let common = bs0.intersection(&bs);
-                    if !common.is_empty() {
-                        let orig = bs0.difference(&bs);
-                        if !orig.is_empty() {
-                            new_branches.push((orig, nexts.clone()));
-                        }
-                        *bs0 = common;
-                        nexts.add(index, next.clone())?;
-                        bs = bs.difference(bs0);
-                    }
-                }
-                if !bs.is_empty() {
-                    let mut nexts = Nexts::new();
-                    nexts.add(index, next.clone())?;
-                    self.branches.push((bs, nexts));
-                }
-                self.branches.append(&mut new_branches);
-                Ok(())
-            }
-            Format::Union(branches) | Format::NondetUnion(branches) => {
-                for (_, f) in branches {
-                    self.add(module, index, f, next.clone())?;
-                }
-                Ok(())
-            }
-            Format::Tuple(fields) => match fields.split_first() {
-                None => self.add_next(module, index, next),
-                Some((a, fields)) => {
-                    self.add(module, index, a, Rc::new(Next::Tuple(fields, next.clone())))
-                }
-            },
-            Format::Record(fields) => match fields.split_first() {
-                None => self.add_next(module, index, next),
-                Some(((_, a), fields)) => {
-                    let next = Rc::new(Next::Record(fields, next.clone()));
-                    self.add(module, index, a, next)
-                }
-            },
-            Format::Repeat(a) => {
-                self.add_next(module, index, next.clone())?;
-                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
-                Ok(())
-            }
-            Format::Repeat1(a) => {
-                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
-                Ok(())
-            }
-            Format::RepeatCount(expr, a) => {
-                // FIXME (still)
-                match expr.bounds().min {
-                    0 => self.add_next(module, index, next.clone())?,
-                    _ => {}
-                }
-                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
-                Ok(())
-            }
-            Format::RepeatUntilLast(_expr, _a) => {
-                self.accept(index) // FIXME
-            }
-            Format::RepeatUntilSeq(_expr, _a) => {
-                self.accept(index) // FIXME
-            }
-            Format::Peek(a) => {
-                // FIXME - this does not properly model the general case
-                // but woks for our purposes for isolated single-byte lookahead
-                self.add(module, index, a, next.clone())?;
-                Ok(())
-            }
-            Format::Slice(_expr, _a) => {
-                self.accept(index) // FIXME
-            }
-            Format::Bits(_a) => {
-                self.accept(index) // FIXME
-            }
-            Format::WithRelativeOffset(_expr, _a) => {
-                self.accept(index) // FIXME
-            }
-            Format::Compute(_expr) => self.add_next(module, index, next),
-            Format::Match(_, branches) => {
-                for (_, f) in branches {
-                    self.add(module, index, f, next.clone())?;
-                }
-                Ok(())
-            }
-            Format::MatchVariant(_, branches) => {
-                for (_, _, f) in branches {
-                    self.add(module, index, f, next.clone())?;
-                }
-                Ok(())
-            }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => {
-                self.accept(index) // FIXME
-            }
+        if !bs.is_empty() {
+            let mut nexts = HashSet::new();
+            nexts.insert((index, next.clone()));
+            self.branches.push((bs, nexts));
         }
+        self.branches.append(&mut new_branches);
+        Ok(())
     }
 
-    fn accepts(nexts: &Nexts<'a>) -> Option<MatchTree> {
-        let mut tree = MatchTreeLevel::reject();
-        for (i, _next) in nexts.set.iter() {
-            tree.accept(*i).ok()?;
+    fn merge(mut self, index: usize, other: MatchTreeStep<'a>) -> Result<MatchTreeLevel<'a>, ()> {
+        if other.accept {
+            self.merge_accept(index)?;
+        }
+        for (bs, next) in other.branches {
+            self.merge_branch(index, bs, next)?;
+        }
+        Ok(self)
+    }
+
+    fn accepts(nexts: &HashSet<(usize, Rc<Next<'a>>)>) -> Option<MatchTree> {
+        let mut tree = Self::reject();
+        for (i, _next) in nexts.iter() {
+            tree.merge_accept(*i).ok()?;
         }
         Some(MatchTree {
             accept: tree.accept,
@@ -1464,17 +1628,22 @@ impl<'a> MatchTreeLevel<'a> {
         })
     }
 
-    fn grow(module: &FormatModule, mut nexts: Nexts<'a>, depth: usize) -> Option<MatchTree> {
-        if let Some(tree) = MatchTreeLevel::accepts(&nexts) {
+    fn grow(
+        module: &'a FormatModule,
+        nexts: HashSet<(usize, Rc<Next<'a>>)>,
+        depth: usize,
+    ) -> Option<MatchTree> {
+        if let Some(tree) = Self::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
-            let mut tree = MatchTreeLevel::reject();
-            for (i, next) in nexts.set.drain() {
-                tree.add_next(module, i, next).ok()?;
+            let mut tree = Self::reject();
+            for (i, next) in nexts {
+                let subtree = MatchTreeStep::add_next(module, next);
+                tree = tree.merge(i, subtree).ok()?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
-                let t = MatchTreeLevel::grow(module, nexts, depth - 1)?;
+                let t = Self::grow(module, nexts, depth - 1)?;
                 branches.push((bs, t));
             }
             Some(MatchTree {
@@ -1503,9 +1672,9 @@ impl MatchTree {
     }
 
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
-        let mut nexts = Nexts::new();
+        let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
-            nexts.add(i, Rc::new(Next::Cat(f, next.clone()))).ok()?;
+            nexts.insert((i, Rc::new(Next::Cat(f, next.clone()))));
         }
         const MAX_DEPTH: usize = 32;
         MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
@@ -1987,6 +2156,20 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Peek(da))
             }
+            Format::PeekNot(a) => {
+                const MAX_LOOKAHEAD: usize = 1024;
+                match a.match_bounds(compiler.module).max {
+                    None => return Err(format!("PeekNot cannot require unbounded lookahead")),
+                    Some(n) if n > MAX_LOOKAHEAD => {
+                        return Err(format!(
+                            "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
+                        ))
+                    }
+                    _ => {}
+                }
+                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Decoder::PeekNot(da))
+            }
             Format::Slice(expr, a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
@@ -2181,6 +2364,13 @@ impl Decoder {
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;
                 Ok((v, input))
+            }
+            Decoder::PeekNot(a) => {
+                if a.parse(program, scope, input).is_ok() {
+                    Err(ParseError::fail(scope, input))
+                } else {
+                    Ok((Value::Tuple(vec![]), input))
+                }
             }
             Decoder::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
@@ -2493,6 +2683,36 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0x00))]);
+        assert!(Decoder::compile_one(&f).is_err());
+    }
+
+    #[test]
+    fn compile_alt_slice_byte() {
+        let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0xFF)));
+        let f = alts([("a", slice_a), ("b", slice_b)]);
+        let d = Decoder::compile_one(&f).unwrap();
+        accepts(&d, &[0x00], &[], Value::variant("a", Value::U8(0x00)));
+        accepts(&d, &[0xFF], &[], Value::variant("b", Value::U8(0xFF)));
+        rejects(&d, &[0x11]);
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt_slice_ambiguous1() {
+        let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let f = alts([("a", slice_a), ("b", slice_b)]);
+        assert!(Decoder::compile_one(&f).is_err());
+    }
+
+    #[test]
+    fn compile_alt_slice_ambiguous2() {
+        let tuple_a = Format::Tuple(vec![is_byte(0x00), is_byte(0x00)]);
+        let tuple_b = Format::Tuple(vec![is_byte(0x00), is_byte(0xFF)]);
+        let slice_a = Format::Slice(Expr::U8(1), Box::new(tuple_a));
+        let slice_b = Format::Slice(Expr::U8(1), Box::new(tuple_b));
+        let f = alts([("a", slice_a), ("b", slice_b)]);
         assert!(Decoder::compile_one(&f).is_err());
     }
 
@@ -2931,5 +3151,101 @@ mod tests {
             &[],
             Value::Tuple(vec![Value::U8(0x00), Value::UNIT, Value::U8(0xFF)]),
         );
+    }
+
+    #[test]
+    fn compile_peek_not() {
+        let any_byte = Format::Byte(ByteSet::full());
+        let a = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
+        let peek_not = Format::PeekNot(Box::new(a));
+        let f = Format::Tuple(vec![peek_not, any_byte.clone(), any_byte.clone()]);
+        let d = Decoder::compile_one(&f).unwrap();
+        rejects(&d, &[]);
+        rejects(&d, &[0xFF]);
+        rejects(&d, &[0xFF, 0xFF]);
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Tuple(vec![Value::Tuple(vec![]), Value::U8(0x00), Value::U8(0xFF)]),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0x00],
+            &[],
+            Value::Tuple(vec![Value::Tuple(vec![]), Value::U8(0xFF), Value::U8(0x00)]),
+        );
+    }
+
+    #[test]
+    fn compile_peek_not_switch() {
+        let any_byte = Format::Byte(ByteSet::full());
+        let guard = Format::PeekNot(Box::new(Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)])));
+        let a = Format::Tuple(vec![guard, Format::Repeat(Box::new(any_byte.clone()))]);
+        let b = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
+        let f = alts([("a", a), ("b", b)]);
+        let d = Decoder::compile_one(&f).unwrap();
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![])])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![
+                    Value::Tuple(vec![]),
+                    Value::Seq(vec![Value::U8(0xFF)]),
+                ])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![
+                    Value::Tuple(vec![]),
+                    Value::Seq(vec![Value::U8(0x00), Value::U8(0xFF)]),
+                ])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0x00],
+            &[],
+            Value::Variant(
+                "a".to_string(),
+                Box::new(Value::Tuple(vec![
+                    Value::Tuple(vec![]),
+                    Value::Seq(vec![Value::U8(0xFF), Value::U8(0x00)]),
+                ])),
+            ),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0xFF],
+            &[],
+            Value::Variant(
+                "b".to_string(),
+                Box::new(Value::Tuple(vec![Value::U8(0xFF), Value::U8(0xFF)])),
+            ),
+        );
+    }
+
+    #[test]
+    fn compile_peek_not_lookahead() {
+        let peek_not = Format::PeekNot(Box::new(repeat1(is_byte(0x00))));
+        let any_byte = Format::Byte(ByteSet::full());
+        let f = Format::Tuple(vec![peek_not, repeat1(any_byte)]);
+        assert!(Decoder::compile_one(&f).is_err());
     }
 }
