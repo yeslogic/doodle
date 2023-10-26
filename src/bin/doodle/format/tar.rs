@@ -111,7 +111,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let header = module.define_format(
         "tar.header",
         tuple([
-            Format::Peek(Box::new(not_byte(0x00))),
+            Format::Peek(Box::new(is_byte(0x61))), // FIXME filename must start with 'a'
             Format::FixedSlice(
                 BLOCK_SIZE as usize,
                 Box::new(record([

@@ -664,6 +664,7 @@ enum Next<'a> {
     Record(&'a [(String, Format)], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
     RepeatCount(usize, &'a Format, Rc<Next<'a>>),
+    Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
 #[derive(Clone, Debug)]
@@ -1372,6 +1373,38 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
+    pub fn add_slice(
+        module: &'a FormatModule,
+        index: usize,
+        n: usize,
+        inside: Rc<Next<'a>>,
+        next: Rc<Next<'a>>,
+    ) -> Result<MatchTreeStep<'a>, ()> {
+        if n > 0 {
+            let mut tree = Self::add_next(module, index, inside)?;
+            tree.accept = None;
+            if tree.branches.is_empty() {
+                let mut nexts = Nexts::new();
+                nexts.add(
+                    index,
+                    Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone())),
+                )?;
+                tree.branches.push((ByteSet::full(), nexts));
+            } else {
+                for (_bs, ref mut nexts) in tree.branches.iter_mut() {
+                    let mut new_nexts = Nexts::new();
+                    for (index, inside) in nexts.set.drain() {
+                        new_nexts.add(index, Rc::new(Next::Slice(n - 1, inside, next.clone())))?;
+                    }
+                    *nexts = new_nexts;
+                }
+            }
+            Ok(tree)
+        } else {
+            Self::add_next(module, index, next.clone())
+        }
+    }
+
     fn add_next(
         module: &'a FormatModule,
         index: usize,
@@ -1398,6 +1431,9 @@ impl<'a> MatchTreeStep<'a> {
             }
             Next::RepeatCount(n, a, next0) => {
                 Self::add_repeat_count(module, index, *n, a, next0.clone())
+            }
+            Next::Slice(n, inside, next0) => {
+                Self::add_slice(module, index, *n, inside.clone(), next0.clone())
             }
         }
     }
@@ -1473,8 +1509,14 @@ impl<'a> MatchTreeStep<'a> {
                 // but woks for our purposes for isolated single-byte lookahead
                 Self::add(module, index, a, next.clone())
             }
-            Format::Slice(_expr, _a) => {
-                Ok(Self::accept(index)) // FIXME
+            Format::Slice(expr, f) => {
+                let inside = Rc::new(Next::Cat(f, Rc::new(Next::Empty)));
+                let bounds = expr.bounds();
+                if let Some(n) = bounds.is_exact() {
+                    Self::add_slice(module, index, n, inside, next)
+                } else {
+                    Self::add_slice(module, index, bounds.min, inside, Rc::new(Next::Empty))
+                }
             }
             Format::FixedSlice(sz, a) => {
                 if *sz == 0 {
@@ -2541,6 +2583,36 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0x00))]);
+        assert!(Decoder::compile_one(&f).is_err());
+    }
+
+    #[test]
+    fn compile_alt_slice_byte() {
+        let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0xFF)));
+        let f = alts([("a", slice_a), ("b", slice_b)]);
+        let d = Decoder::compile_one(&f).unwrap();
+        accepts(&d, &[0x00], &[], Value::variant("a", Value::U8(0x00)));
+        accepts(&d, &[0xFF], &[], Value::variant("b", Value::U8(0xFF)));
+        rejects(&d, &[0x11]);
+        rejects(&d, &[]);
+    }
+
+    #[test]
+    fn compile_alt_slice_ambiguous1() {
+        let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let f = alts([("a", slice_a), ("b", slice_b)]);
+        assert!(Decoder::compile_one(&f).is_err());
+    }
+
+    #[test]
+    fn compile_alt_slice_ambiguous2() {
+        let tuple_a = Format::Tuple(vec![is_byte(0x00), is_byte(0x00)]);
+        let tuple_b = Format::Tuple(vec![is_byte(0x00), is_byte(0xFF)]);
+        let slice_a = Format::Slice(Expr::U8(1), Box::new(tuple_a));
+        let slice_b = Format::Slice(Expr::U8(1), Box::new(tuple_b));
+        let f = alts([("a", slice_a), ("b", slice_b)]);
         assert!(Decoder::compile_one(&f).is_err());
     }
 
