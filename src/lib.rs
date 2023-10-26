@@ -672,7 +672,7 @@ struct Nexts<'a> {
 }
 
 #[derive(Clone, Debug)]
-struct MatchTreeLevel<'a> {
+struct MatchTreeStep<'a> {
     accept: Option<usize>,
     branches: Vec<(ByteSet, Nexts<'a>)>,
 }
@@ -1292,9 +1292,9 @@ impl<'a> Nexts<'a> {
     }
 }
 
-impl<'a> MatchTreeLevel<'a> {
-    fn reject() -> MatchTreeLevel<'a> {
-        MatchTreeLevel {
+impl<'a> MatchTreeStep<'a> {
+    fn reject() -> MatchTreeStep<'a> {
+        MatchTreeStep {
             accept: None,
             branches: vec![],
         }
@@ -1479,7 +1479,7 @@ impl<'a> MatchTreeLevel<'a> {
     }
 
     fn accepts(nexts: &Nexts<'a>) -> Option<MatchTree> {
-        let mut tree = MatchTreeLevel::reject();
+        let mut tree = MatchTreeStep::reject();
         for (i, _next) in nexts.set.iter() {
             tree.accept(*i).ok()?;
         }
@@ -1490,16 +1490,16 @@ impl<'a> MatchTreeLevel<'a> {
     }
 
     fn grow(module: &FormatModule, mut nexts: Nexts<'a>, depth: usize) -> Option<MatchTree> {
-        if let Some(tree) = MatchTreeLevel::accepts(&nexts) {
+        if let Some(tree) = MatchTreeStep::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
-            let mut tree = MatchTreeLevel::reject();
+            let mut tree = MatchTreeStep::reject();
             for (i, next) in nexts.set.drain() {
                 tree.add_next(module, i, next).ok()?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
-                let t = MatchTreeLevel::grow(module, nexts, depth - 1)?;
+                let t = MatchTreeStep::grow(module, nexts, depth - 1)?;
                 branches.push((bs, t));
             }
             Some(MatchTree {
@@ -1533,7 +1533,7 @@ impl MatchTree {
             nexts.add(i, Rc::new(Next::Cat(f, next.clone()))).ok()?;
         }
         const MAX_DEPTH: usize = 32;
-        MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
+        MatchTreeStep::grow(module, nexts, MAX_DEPTH)
     }
 }
 
