@@ -1,6 +1,6 @@
 use crate::{byte_set::ByteSet, ReadCtxt, Scope, Value};
 
-pub(crate) type ParseResult<T> = Result<T, ParseError>;
+pub type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -84,7 +84,7 @@ impl std::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 impl ParseError {
-    pub(crate) fn fail(scope: &Scope, input: ReadCtxt<'_>) -> Self {
+    pub fn fail(scope: &Scope, input: ReadCtxt<'_>) -> Self {
         let bindings = scope.iter().collect::<Vec<_>>();
         let buffer = input.input.to_owned();
         let offset = input.offset;
@@ -95,22 +95,22 @@ impl ParseError {
         }
     }
 
-    pub(crate) fn trailing(byte: u8, offset: usize) -> Self {
+    pub fn trailing(byte: u8, offset: usize) -> Self {
         Self::Trailing { byte, offset }
     }
 
-    pub(crate) fn overrun(skip: usize, offset: usize) -> Self {
+    pub fn overrun(skip: usize, offset: usize) -> Self {
         Self::Overrun {
             nbytes: skip,
             offset,
         }
     }
 
-    pub(crate) fn overbyte(offset: usize) -> Self {
+    pub fn overbyte(offset: usize) -> Self {
         Self::Overbyte { offset }
     }
 
-    pub(crate) fn unexpected(found: u8, expected: ByteSet, offset: usize) -> Self {
+    pub fn unexpected(found: u8, expected: ByteSet, offset: usize) -> Self {
         Self::Unexpected {
             found,
             expected,
