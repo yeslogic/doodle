@@ -141,7 +141,7 @@ fn check_covered(
             check_covered(module, path, format)?;
         }
         Format::Peek(_) => {} // FIXME
-        Format::Slice(_, format) | Format::FixedSlice(_, format) => {
+        Format::Slice(_, format) => {
             check_covered(module, path, format)?;
         }
 
@@ -232,9 +232,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_flat(value, format),
-            Format::Slice(_, format) | Format::FixedSlice(_, format) => {
-                self.write_flat(value, format)
-            }
+            Format::Slice(_, format) => self.write_flat(value, format),
             Format::Bits(format) => self.write_flat(value, format),
             Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Compute(_expr) => Ok(()),

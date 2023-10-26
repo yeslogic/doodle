@@ -112,8 +112,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "tar.header",
         tuple([
             Format::Peek(Box::new(is_byte(0x61))), // FIXME filename must start with 'a'
-            Format::FixedSlice(
-                BLOCK_SIZE as usize,
+            Format::Slice(
+                Expr::U32(BLOCK_SIZE),
                 Box::new(record([
                     ("name", cstr_arr_opt0(100)),                       // bytes 0 - 99
                     ("mode", cbytes(8)),                                // bytes 100 - 107
@@ -142,8 +142,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let full_block = repeat_count(Expr::U32(BLOCK_SIZE), Format::Byte(ByteSet::full()));
     let partial_block = |nbytes: Expr| {
-        Format::FixedSlice(
-            BLOCK_SIZE as usize,
+        Format::Slice(
+            Expr::U32(BLOCK_SIZE),
             Box::new(tuple([
                 repeat_count(nbytes, Format::Byte(ByteSet::full())),
                 repeat(is_byte(0x00)),
