@@ -1,13 +1,15 @@
-use std::{fmt::Write, borrow::Borrow};
+use std::{borrow::Borrow, fmt::Write};
 
 pub mod flat;
 pub mod tree;
 
+#[derive(Clone, Default)]
 pub enum Fragment {
+    #[default]
     Empty,
     Char(char),
     String(std::borrow::Cow<'static, str>),
-    DisplayAtom(Box<dyn std::fmt::Display>),
+    DisplayAtom(std::rc::Rc<dyn std::fmt::Display>),
     Group(Box<Fragment>),
     Cat(Box<Fragment>, Box<Fragment>),
     Sequence {
@@ -22,10 +24,17 @@ impl std::fmt::Debug for Fragment {
             Self::Empty => write!(f, "Empty"),
             Self::Char(arg0) => f.debug_tuple("Char").field(arg0).finish(),
             Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
-            Self::DisplayAtom(arg0) => f.debug_tuple("DisplayAtom").field(&format!("{}", arg0)).finish(),
+            Self::DisplayAtom(arg0) => f
+                .debug_tuple("DisplayAtom")
+                .field(&format!("{}", arg0))
+                .finish(),
             Self::Group(arg0) => f.debug_tuple("Group").field(arg0).finish(),
             Self::Cat(arg0, arg1) => f.debug_tuple("Cat").field(arg0).field(arg1).finish(),
-            Self::Sequence { sep, items } => f.debug_struct("Sequence").field("sep", sep).field("items", items).finish(),
+            Self::Sequence { sep, items } => f
+                .debug_struct("Sequence")
+                .field("sep", sep)
+                .field("items", items)
+                .finish(),
         }
     }
 }
@@ -52,12 +61,13 @@ impl Fragment {
         }
     }
 
+    #[allow(dead_code)]
     fn opt(frag: Option<Fragment>) -> Fragment {
         frag.unwrap_or(Fragment::Empty)
     }
 
     fn encat(&mut self, other: Self) -> &mut Self {
-        let this = *self;
+        let this = std::mem::take(self);
         *self = Self::cat(this, other);
         self
     }
@@ -73,7 +83,7 @@ impl Fragment {
 
     // Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
     fn engroup(&mut self) -> &mut Self {
-        let this = Box::new(*self);
+        let this = Box::new(std::mem::take(self));
         *self = Self::Group(this);
         self
     }
@@ -102,18 +112,17 @@ impl Fragments {
 
     // Freeze (push) the active fragment, create a new (Empty) one, and return a mutable reference to it
     pub fn renew(&mut self) -> &mut Fragment {
-        let frag = self.active;
+        let frag = std::mem::take(&mut self.active);
         if !frag.is_empty() {
             self.frozen.push(frag);
         }
-        self.active = Fragment::new();
         &mut self.active
     }
 
     /// Compound operation that freezes the current active and immediately adds a new frozen fragment, leaving
     /// the active fragment empty.
     pub fn push(&mut self, frag: Fragment) {
-        let old = self.active;
+        let old = std::mem::take(&mut self.active);
 
         if old.is_empty() {
             self.frozen.push(frag);
@@ -126,12 +135,12 @@ impl Fragments {
         }
     }
 
-    pub fn finalize(&mut self) -> Fragment {
+    pub fn finalize(mut self) -> Fragment {
         let _ = self.renew();
         Fragment::seq(self.frozen, None)
     }
 
-    pub fn finalize_with_sep(&mut self, sep: Fragment) -> Fragment {
+    pub fn finalize_with_sep(mut self, sep: Fragment) -> Fragment {
         let _ = self.renew();
         Fragment::seq(self.frozen, Some(sep))
     }
@@ -144,9 +153,7 @@ impl std::fmt::Display for Fragment {
             Fragment::Char(c) => f.write_char(*c),
             Fragment::String(s) => f.write_str(s.borrow()),
             Fragment::DisplayAtom(atom) => atom.fmt(f),
-            Fragment::Group(frag) => {
-                frag.fmt(f)
-            }
+            Fragment::Group(frag) => frag.fmt(f),
             Fragment::Cat(frag0, frag1) => {
                 frag0.fmt(f)?;
                 frag1.fmt(f)
