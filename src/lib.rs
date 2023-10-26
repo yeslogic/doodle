@@ -663,6 +663,7 @@ enum Next<'a> {
     Tuple(&'a [Format], Rc<Next<'a>>),
     Record(&'a [(String, Format)], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
+    RepeatCount(usize, &'a Format, Rc<Next<'a>>),
 }
 
 #[derive(Clone, Debug)]
@@ -1310,6 +1311,21 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
+    fn add_repeat_count(
+        &mut self,
+        module: &'a FormatModule,
+        index: usize,
+        n: usize,
+        f: &'a Format,
+        next: Rc<Next<'a>>,
+    ) -> Result<(), ()> {
+        if n > 0 {
+            self.add(module, index, f, Rc::new(Next::RepeatCount(n - 1, f, next)))
+        } else {
+            self.add_next(module, index, next)
+        }
+    }
+
     fn add_next(
         &mut self,
         module: &'a FormatModule,
@@ -1333,6 +1349,9 @@ impl<'a> MatchTreeLevel<'a> {
                 self.add_next(module, index, next0.clone())?;
                 self.add(module, index, a, next)?;
                 Ok(())
+            }
+            Next::RepeatCount(n, a, next0) => {
+                self.add_repeat_count(module, index, *n, a, next0.clone())
             }
         }
     }
@@ -1405,13 +1424,12 @@ impl<'a> MatchTreeLevel<'a> {
                 Ok(())
             }
             Format::RepeatCount(expr, a) => {
-                // FIXME (still)
-                match expr.bounds().min {
-                    0 => self.add_next(module, index, next.clone())?,
-                    _ => {}
+                let bounds = expr.bounds();
+                if let Some(n) = bounds.is_exact() {
+                    self.add_repeat_count(module, index, n, a, next.clone())
+                } else {
+                    self.add_repeat_count(module, index, bounds.min, a, Rc::new(Next::Empty))
                 }
-                self.add(module, index, a, Rc::new(Next::Repeat(a, next.clone())))?;
-                Ok(())
             }
             Format::RepeatUntilLast(_expr, _a) => {
                 self.accept(index) // FIXME
