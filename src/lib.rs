@@ -1282,9 +1282,8 @@ impl<'a> Nexts<'a> {
         }
     }
 
-    fn add(&mut self, index: usize, next: Rc<Next<'a>>) -> Result<(), ()> {
+    fn add(&mut self, index: usize, next: Rc<Next<'a>>) {
         self.set.insert((index, next));
-        Ok(())
     }
 }
 
@@ -1329,13 +1328,13 @@ impl<'a> MatchTreeStep<'a> {
                     new_branches.push((orig, nexts.clone()));
                 }
                 *bs0 = common;
-                nexts.add(index, next.clone())?;
+                nexts.add(index, next.clone());
                 bs = bs.difference(bs0);
             }
         }
         if !bs.is_empty() {
             let mut nexts = Nexts::new();
-            nexts.add(index, next.clone())?;
+            nexts.add(index, next.clone());
             self.branches.push((bs, nexts));
         }
         self.branches.append(&mut new_branches);
@@ -1383,13 +1382,13 @@ impl<'a> MatchTreeStep<'a> {
                 nexts.add(
                     index,
                     Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone())),
-                )?;
+                );
                 tree.branches.push((ByteSet::full(), nexts));
             } else {
                 for (_bs, ref mut nexts) in tree.branches.iter_mut() {
                     let mut new_nexts = Nexts::new();
                     for (index, inside) in nexts.set.drain() {
-                        new_nexts.add(index, Rc::new(Next::Slice(n - 1, inside, next.clone())))?;
+                        new_nexts.add(index, Rc::new(Next::Slice(n - 1, inside, next.clone())));
                     }
                     *nexts = new_nexts;
                 }
@@ -1593,7 +1592,7 @@ impl MatchTree {
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         let mut nexts = Nexts::new();
         for (i, f) in branches.iter().enumerate() {
-            nexts.add(i, Rc::new(Next::Cat(f, next.clone()))).ok()?;
+            nexts.add(i, Rc::new(Next::Cat(f, next.clone())));
         }
         const MAX_DEPTH: usize = 32;
         MatchTreeStep::grow(module, nexts, MAX_DEPTH)
