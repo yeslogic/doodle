@@ -1302,6 +1302,15 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
+    fn branch(index: usize, bs: ByteSet, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+        let mut nexts = Nexts::new();
+        nexts.add(index, next);
+        MatchTreeStep {
+            accept: None,
+            branches: vec![(bs, nexts)],
+        }
+    }
+
     fn merge_accept(&mut self, index: usize) -> Result<(), ()> {
         match self.accept {
             None => {
@@ -1447,11 +1456,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::Align(_) => {
                 Ok(Self::accept(index)) // FIXME
             }
-            Format::Byte(bs) => {
-                let mut tree = Self::reject();
-                tree.merge_branch(index, *bs, next)?;
-                Ok(tree)
-            }
+            Format::Byte(bs) => Ok(Self::branch(index, *bs, next)),
             Format::Union(branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
