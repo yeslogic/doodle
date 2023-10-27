@@ -1271,7 +1271,7 @@ impl<'module> MonoidalPrinter<'module> {
         frags.push(Fragment::String(format!("├── {label}").into()));
         if let Some(format) = format {
             frags.push(Fragment::String(" <- ".into()));
-            frags.push(self.compile_format(format, 0));
+            frags.push(self.compile_format(format, Default::default()));
         }
         self.gutter.push(Column::Branch);
         frags.push(self.compile_field_value(value, format));
@@ -1290,7 +1290,7 @@ impl<'module> MonoidalPrinter<'module> {
         frags.push(Fragment::String(format!("└── {label}").into()));
         if let Some(format) = format {
             frags.push(Fragment::String(" <- ".into()));
-            frags.push(self.compile_format(format, 0));
+            frags.push(self.compile_format(format, Default::default()));
         }
         self.gutter.push(Column::Space);
         frags.push(self.compile_field_value(value, format));
@@ -1390,14 +1390,14 @@ impl<'module> MonoidalPrinter<'module> {
                 frag.encat(Fragment::Char('('));
                 frag.encat(Fragment::seq(
                     args.into_iter()
-                        .map(|arg| self.compile_expr(arg, PREC_ATOM))
+                        .map(|arg| self.compile_expr(arg, Precedence::default()))
                         .collect::<Vec<_>>(),
                     Some(Fragment::String(", ".into())),
                 ));
                 frag.encat(Fragment::Char(')'));
             }
         }
-        frags.push(self.compile_expr(operand, PREC_ATOM));
+        frags.push(self.compile_expr(operand, Precedence::ATOM));
         frags.finalize_with_sep(Fragment::Char(' '))
     }
 
@@ -1407,158 +1407,205 @@ impl<'module> MonoidalPrinter<'module> {
                 Fragment::seq(
                     [
                         Fragment::String("match ".into()),
-                        self.compile_expr(head, prec + 1),
+                        self.compile_expr(head, Precedence::MATCH + 1),
                         Fragment::String(" { ... }".into()),
                     ],
                     None,
                 )
                 .group(),
-                prec > PREC_MATCH,
+                prec > Precedence::MATCH,
             ),
             Expr::Lambda(name, expr) => cond_paren(
                 Fragment::seq(
                     [
                         Fragment::String(format!("{name} -> ").into()),
-                        self.compile_expr(expr, prec + 1),
+                        self.compile_expr(expr, Precedence::ARROW + 1),
                     ],
                     None,
                 )
                 .group(),
-                prec > PREC_ARROW,
+                prec > Precedence::ARROW,
             ),
             Expr::BitAnd(lhs, rhs) => cond_paren(
-                self.compile_binop(" & ", lhs, rhs, prec, prec + 1),
-                prec > PREC_BITAND,
+                self.compile_binop(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND + 1),
+                prec > Precedence::BITAND,
             ),
             Expr::BitOr(lhs, rhs) => cond_paren(
-                self.compile_binop(" | ", lhs, rhs, prec, prec + 1),
-                prec > PREC_BITOR,
+                self.compile_binop(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR + 1),
+                prec > Precedence::BITOR,
             ),
             Expr::Eq(lhs, rhs) => cond_paren(
-                self.compile_binop(" == ", lhs, rhs, prec + 1, prec + 1),
-                prec > PREC_COMPARISON,
+                self.compile_binop(
+                    " == ",
+                    lhs,
+                    rhs,
+                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE + 1,
+                ),
+                prec > Precedence::COMPARE,
             ),
             Expr::Ne(lhs, rhs) => cond_paren(
-                self.compile_binop(" != ", lhs, rhs, prec + 1, prec + 1),
-                prec > PREC_COMPARISON,
+                self.compile_binop(
+                    " != ",
+                    lhs,
+                    rhs,
+                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE + 1,
+                ),
+                prec > Precedence::COMPARE,
             ),
             Expr::Lt(lhs, rhs) => cond_paren(
-                self.compile_binop(" < ", lhs, rhs, prec + 1, prec + 1),
-                prec > PREC_COMPARISON,
+                self.compile_binop(
+                    " < ",
+                    lhs,
+                    rhs,
+                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE + 1,
+                ),
+                prec > Precedence::COMPARE,
             ),
             Expr::Gt(lhs, rhs) => cond_paren(
-                self.compile_binop(" > ", lhs, rhs, prec + 1, prec + 1),
-                prec > PREC_COMPARISON,
+                self.compile_binop(
+                    " > ",
+                    lhs,
+                    rhs,
+                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE + 1,
+                ),
+                prec > Precedence::COMPARE,
             ),
             Expr::Lte(lhs, rhs) => cond_paren(
-                self.compile_binop(" <= ", lhs, rhs, prec + 1, prec + 1),
-                prec > PREC_COMPARISON,
+                self.compile_binop(
+                    " <= ",
+                    lhs,
+                    rhs,
+                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE + 1,
+                ),
+                prec > Precedence::COMPARE,
             ),
             Expr::Gte(lhs, rhs) => cond_paren(
-                self.compile_binop(" >= ", lhs, rhs, prec + 1, prec + 1),
-                prec > PREC_COMPARISON,
+                self.compile_binop(
+                    " >= ",
+                    lhs,
+                    rhs,
+                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE + 1,
+                ),
+                prec > Precedence::COMPARE,
             ),
             Expr::Add(lhs, rhs) => cond_paren(
-                self.compile_binop(" + ", lhs, rhs, prec, prec + 1),
-                prec > PREC_ADDSUB,
+                self.compile_binop(" + ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB + 1),
+                prec > Precedence::ADDSUB,
             ),
             Expr::Sub(lhs, rhs) => cond_paren(
-                self.compile_binop(" - ", lhs, rhs, prec, prec + 1),
-                prec > PREC_ADDSUB,
+                self.compile_binop(" - ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB + 1),
+                prec > Precedence::ADDSUB,
             ),
             Expr::Shl(lhs, rhs) => cond_paren(
-                self.compile_binop(" << ", lhs, rhs, prec, prec + 1),
-                prec > PREC_BITSHIFT,
+                self.compile_binop(
+                    " << ",
+                    lhs,
+                    rhs,
+                    Precedence::BITSHIFT,
+                    Precedence::BITSHIFT + 1,
+                ),
+                prec > Precedence::BITSHIFT,
             ),
             Expr::Shr(lhs, rhs) => cond_paren(
-                self.compile_binop(" >> ", lhs, rhs, prec, prec + 1),
-                prec > PREC_BITSHIFT,
+                self.compile_binop(
+                    " >> ",
+                    lhs,
+                    rhs,
+                    Precedence::BITSHIFT,
+                    Precedence::BITSHIFT + 1,
+                ),
+                prec > Precedence::BITSHIFT,
             ),
             Expr::Div(lhs, rhs) => cond_paren(
-                self.compile_binop(" / ", lhs, rhs, prec, prec + 1),
-                prec > PREC_DIVREM,
+                self.compile_binop(" / ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM + 1),
+                prec > Precedence::DIVREM,
             ),
             Expr::Rem(lhs, rhs) => cond_paren(
-                self.compile_binop(" % ", lhs, rhs, prec, prec + 1),
-                prec > PREC_DIVREM,
+                self.compile_binop(" % ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM + 1),
+                prec > Precedence::DIVREM,
             ),
-
             Expr::AsU8(expr) => cond_paren(
                 self.compile_prefix("as-u8", None, expr),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::AsU16(expr) => cond_paren(
                 self.compile_prefix("as-u16", None, expr),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::AsU32(expr) => cond_paren(
                 self.compile_prefix("as-u32", None, expr),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::U16Be(bytes) => cond_paren(
                 self.compile_prefix("u16be", None, bytes),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::U16Le(bytes) => cond_paren(
                 self.compile_prefix("u16le", None, bytes),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::U32Be(bytes) => cond_paren(
                 self.compile_prefix("u32be", None, bytes),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::U32Le(bytes) => cond_paren(
                 self.compile_prefix("u32le", None, bytes),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::CAST,
             ),
             Expr::SeqLength(seq) => cond_paren(
                 self.compile_prefix("seq-length", None, seq),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::FUNAPP,
             ),
             Expr::SubSeq(seq, start, length) => cond_paren(
                 self.compile_prefix("sub-seq", Some(&[&start, &length]), seq),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::FUNAPP,
             ),
             Expr::FlatMap(expr, seq) => cond_paren(
                 self.compile_prefix("flat-map", Some(&[&expr]), seq),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::FUNAPP,
             ),
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => cond_paren(
                 self.compile_prefix("flat-map-accum", Some(&[&expr, &accum]), seq),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::FUNAPP,
             ),
             Expr::Dup(count, expr) => cond_paren(
                 self.compile_prefix("dup", Some(&[&count]), expr),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::FUNAPP,
             ),
             Expr::Inflate(expr) => cond_paren(
                 self.compile_prefix("inflate", None, expr),
-                prec > PREC_NON_INFIX,
+                prec > Precedence::FUNAPP,
             ),
 
             Expr::TupleProj(head, index) => cond_paren(
                 Fragment::seq(
                     [
-                        self.compile_expr(head, prec + 1),
+                        self.compile_expr(head, Precedence::PROJ + 1),
                         Fragment::Char('.'),
                         Fragment::DisplayAtom(Rc::new(*index)),
                     ],
                     None,
                 )
                 .group(),
-                prec > PREC_PROJ,
+                prec > Precedence::PROJ,
             ),
             Expr::RecordProj(head, label) => cond_paren(
                 Fragment::seq(
                     [
-                        self.compile_expr(head, prec + 1),
+                        self.compile_expr(head, Precedence::PROJ + 1),
                         Fragment::Char('.'),
                         Fragment::String(label.clone().into()),
                     ],
                     None,
                 )
                 .group(),
-                prec > PREC_PROJ,
+                prec > Precedence::PROJ,
             ),
             Expr::Var(name) => Fragment::String(name.clone().into()),
             Expr::Bool(b) => Fragment::DisplayAtom(Rc::new(*b)),
@@ -1570,7 +1617,7 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::Variant(label, expr) => {
                 let mut frag = Fragment::new();
                 frag.encat(Fragment::String(format!("{{ {label} := ").into()));
-                frag.encat(self.compile_expr(expr, 0));
+                frag.encat(self.compile_expr(expr, Default::default()));
                 frag.encat(Fragment::String(" }".into()));
                 frag.engroup();
                 frag
@@ -1603,29 +1650,29 @@ impl<'module> MonoidalPrinter<'module> {
         match format {
             Format::Union(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::Peek(format) => cond_paren(
                 self.compile_nested_format("peek", None, format, prec),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::Repeat(format) => cond_paren(
                 self.compile_nested_format("repeat", None, format, prec),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::Repeat1(format) => cond_paren(
                 self.compile_nested_format("repeat1", None, format, prec),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::RepeatCount(len, format) => {
-                let expr_frag = self.compile_expr(len, PREC_ATOM);
+                let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("repeat-count", Some(&[expr_frag]), format, prec),
-                    prec > PREC_FORMAT_COMPOUND,
+                    prec > Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::RepeatUntilLast(expr, format) => {
-                let expr_frag = self.compile_expr(expr, PREC_ATOM);
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "repeat-until-last",
@@ -1633,11 +1680,11 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > PREC_FORMAT_COMPOUND,
+                    prec > Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::RepeatUntilSeq(expr, format) => {
-                let expr_frag = self.compile_expr(expr, PREC_ATOM);
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "repeat-until-seq",
@@ -1645,14 +1692,14 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > PREC_FORMAT_COMPOUND,
+                    prec > Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::Slice(len, format) => {
-                let expr_frag = self.compile_expr(len, PREC_ATOM);
+                let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("slice", Some(&[expr_frag]), format, prec),
-                    prec > PREC_FORMAT_COMPOUND,
+                    prec > Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::FixedSlice(size, format) => {
@@ -1664,15 +1711,15 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > PREC_FORMAT_COMPOUND,
+                    prec > Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::Bits(format) => cond_paren(
                 self.compile_nested_format("bits", None, format, prec),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::WithRelativeOffset(offset, format) => {
-                let expr_frag = self.compile_expr(offset, PREC_ATOM);
+                let expr_frag = self.compile_expr(offset, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format(
                         "with-relative-offset",
@@ -1680,26 +1727,26 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > PREC_FORMAT_COMPOUND,
+                    prec > Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::Compute(expr) => cond_paren(
                 Fragment::cat(
                     Fragment::String("compute ".into()),
-                    self.compile_expr(expr, 0),
+                    self.compile_expr(expr, Default::default()),
                 ),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::Match(head, _) | Format::MatchVariant(head, _) => cond_paren(
                 Fragment::seq(
                     [
                         Fragment::String("match".into()),
-                        self.compile_expr(head, PREC_PROJ),
+                        self.compile_expr(head, Precedence::PROJ),
                         Fragment::String("{ ... }".into()),
                     ],
                     Some(Fragment::Char(' ')),
                 ),
-                prec > PREC_FORMAT_COMPOUND,
+                prec > Precedence::FORMAT_COMPOUND,
             ),
             Format::Dynamic(_) => Fragment::String("dynamic".into()),
 
@@ -1746,31 +1793,38 @@ impl<'module> MonoidalPrinter<'module> {
 }
 
 /// Operator precedence
-type Precedence = u8;
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+struct Precedence(u8);
 
-const PREC_ATOM: Precedence = 11;
-const PREC_NON_INFIX: Precedence = 10;
+impl Precedence {
+    // Expression Precedences
+    // const TOP: Self = Self(0);
 
-const PREC_PROJ: Precedence = 9;
+    // Gapped by 1 to allow for implicit 'bumping' for co-associativity forcing
+    const ARROW: Self = Self(1);
+    const MATCH: Self = Self(3);
+    const COMPARE: Self = Self(5);
+    const BITOR: Self = Self(7);
+    const ADDSUB: Self = Self(9);
+    const BITAND: Self = Self(11);
+    const DIVREM: Self = Self(11);
+    const BITSHIFT: Self = Self(13);
+    const FUNAPP: Self = Self(15);
+    const CAST: Self = Self(15);
+    const PROJ: Self = Self(17);
+    const ATOM: Self = Self(19);
 
-const PREC_BITSHIFT: Precedence = 8;
+    const FORMAT_COMPOUND: Self = Self(1);
+    // const FORMAT_ATOM : Self = Self(2);
+}
 
-const PREC_DIVREM: Precedence = 7;
-const PREC_BITAND: Precedence = 7;
+impl std::ops::Add<u8> for Precedence {
+    type Output = Precedence;
 
-const PREC_ADDSUB: Precedence = 6;
-
-const PREC_BITOR: Precedence = 5;
-
-const PREC_COMPARISON: Precedence = 4;
-
-const PREC_MATCH: Precedence = 1;
-const PREC_ARROW: Precedence = 1;
-
-// Format Precedence
-
-const PREC_FORMAT_COMPOUND: Precedence = 1;
-const PREC_FORMAT_ATOM: Precedence = 2;
+    fn add(self, rhs: u8) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
 
 fn cond_paren(frag: Fragment, should_paren: bool) -> Fragment {
     if should_paren {
@@ -1782,29 +1836,39 @@ fn cond_paren(frag: Fragment, should_paren: bool) -> Fragment {
 
 #[cfg(test)]
 mod tests {
+    use crate::ValueType;
+
     use super::*;
     use proptest::prelude::*;
 
     fn arb_expr() -> impl Strategy<Value = Expr> {
-        let atom = prop_oneof![
+        let leaf = prop_oneof![
             any::<bool>().prop_map(Expr::Bool),
             any::<u8>().prop_map(Expr::U8),
             any::<u16>().prop_map(Expr::U16),
             any::<u32>().prop_map(Expr::U32),
-            ".*".prop_map(Expr::Var),
+            "[_a-z][_a-zA-Z]*".prop_map(Expr::Var)
         ];
-        let leaf = prop_oneof![atom, Just(Expr::Tuple(Vec::new())),];
-        leaf.prop_recursive(4, 100, 9, |inner| {
+
+        leaf.prop_recursive(5, 100, 9, move |inner| {
             prop_oneof![
-                inner.clone().prop_flat_map(|term| prop_oneof![
-                    Just(Expr::AsU8(Box::new(term.clone()))),
-                    Just(Expr::AsU16(Box::new(term.clone()))),
-                    Just(Expr::AsU32(Box::new(term.clone()))),
-                    Just(Expr::U16Be(Box::new(term.clone()))),
-                    Just(Expr::U16Le(Box::new(term.clone()))),
-                    Just(Expr::U32Be(Box::new(term.clone()))),
-                    Just(Expr::U32Le(Box::new(term.clone()))),
-                ]),
+                inner.clone().prop_flat_map(|term: Expr| {
+                    prop_oneof![
+                        Just(Expr::AsU8(Box::new(term.clone()))),
+                        Just(Expr::AsU16(Box::new(term.clone()))),
+                        Just(Expr::AsU32(Box::new(term.clone()))),
+                        Just(Expr::U16Be(Box::new(term.clone()))),
+                        Just(Expr::U16Le(Box::new(term.clone()))),
+                        Just(Expr::U32Be(Box::new(term.clone()))),
+                        Just(Expr::U32Le(Box::new(term.clone()))),
+                        "[_a-z][_a-zA-Z]*".prop_flat_map(move |label| {
+                            prop_oneof![
+                                Just(Expr::Variant(label.clone(), Box::new(term.clone()))),
+                                Just(Expr::Lambda(label.clone(), Box::new(term.clone())))
+                            ]
+                        })
+                    ]
+                }),
                 (inner.clone(), inner.clone()).prop_flat_map(|(lhs, rhs)| prop_oneof![
                     Just(Expr::BitAnd(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                     Just(Expr::BitOr(Box::new(lhs.clone()), Box::new(rhs.clone()))),
@@ -1819,14 +1883,96 @@ mod tests {
                     Just(Expr::Shl(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                     Just(Expr::Shr(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                     Just(Expr::Add(Box::new(lhs.clone()), Box::new(rhs.clone()))),
-                    Just(Expr::Sub(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                    Just(Expr::Sub(Box::new(lhs.clone()), Box::new(rhs.clone())))
                 ]),
-                prop::collection::vec(inner.clone(), 1..9).prop_flat_map(|v| prop_oneof![
-                    Just(Expr::Tuple(v.clone())),
-                    (Just(Expr::Tuple(v.clone())), 0..v.len())
-                        .prop_map(|(tup, ix)| Expr::TupleProj(Box::new(tup), ix))
-                ]) // TODO add more expression cases
+                prop::collection::vec(inner.clone(), 0..9).prop_flat_map(|v: Vec<Expr>| {
+                    if v.is_empty() {
+                        Just(Expr::Tuple(v)).boxed()
+                    } else {
+                        let l = v.len();
+                        let tup = Expr::Tuple(v);
+                        prop_oneof![
+                            Just(tup.clone()),
+                            (0..l).prop_map(move |ix| Expr::TupleProj(Box::new(tup.clone()), ix))
+                        ]
+                        .boxed()
+                    }
+                }),
+                prop::collection::vec(("[_a-z][_a-zA-Z]*", inner.clone()), 0..9).prop_flat_map(
+                    |v: Vec<(String, Expr)>| {
+                        if v.is_empty() {
+                            Just(Expr::Record(v)).boxed()
+                        } else {
+                            let l = v.len();
+                            let labs = v
+                                .iter()
+                                .map(|(lab, _)| lab.clone())
+                                .collect::<Vec<String>>();
+                            let rec = Expr::Record(v);
+                            prop_oneof![
+                                Just(rec.clone()),
+                                (0..l).prop_map(move |ix| Expr::RecordProj(
+                                    Box::new(rec.clone()),
+                                    labs[ix].clone()
+                                ))
+                            ]
+                            .boxed()
+                        }
+                    }
+                ),
+                (
+                    ("[a-z]+", inner.clone()),
+                    inner
+                        .clone()
+                        .prop_filter_map("Typed-Atomic Values Only", |e| match e {
+                            Expr::Bool(_) => Some((ValueType::Bool, Box::new(e))),
+                            Expr::U8(_) => Some((ValueType::U8, Box::new(e))),
+                            Expr::U16(_) => Some((ValueType::U16, Box::new(e))),
+                            Expr::U32(_) => Some((ValueType::U32, Box::new(e))),
+                            _ => None,
+                        }),
+                    prop::collection::vec(inner.clone(), 0..9)
+                )
+                    .prop_flat_map(|((lab, term), (typ, atom), v_seq)| {
+                        let expr_seq = Expr::Seq(v_seq.clone());
+                        let numeric = prop_oneof![
+                            any::<u8>().prop_map(Expr::U8),
+                            any::<u16>().prop_map(Expr::U16),
+                            any::<u32>().prop_map(Expr::U32),
+                            "[_a-z][_A-Za-z]*".prop_map(Expr::Var),
+                            prop::collection::vec(Just(Expr::Bool(true)), 0..9).prop_flat_map(
+                                |v: Vec<Expr>| Just(Expr::SeqLength(Box::new(Expr::Seq(v))))
+                            )
+                        ];
+                        prop_oneof![
+                            Just(expr_seq.clone()),
+                            (Just(expr_seq.clone()), numeric.clone(), numeric.clone(),).prop_map(
+                                |(expr, ix, sublen)| {
+                                    Expr::SubSeq(Box::new(expr), Box::new(ix), Box::new(sublen))
+                                }
+                            )
+                        ]
+                        .prop_flat_map(move |seq| {
+                            let lambda = Expr::Lambda(lab.clone(), Box::new(term.clone()));
+                            prop_oneof![
+                                Just(Expr::SeqLength(Box::new(seq.clone()))),
+                                Just(Expr::FlatMap(
+                                    Box::new(seq.clone()),
+                                    Box::new(lambda.clone())
+                                )),
+                                Just(Expr::FlatMapAccum(
+                                    Box::new(seq.clone()),
+                                    Box::new(lambda.clone()),
+                                    typ.clone(),
+                                    atom.clone(),
+                                ))
+                            ]
+                            .boxed()
+                        })
+                        .boxed()
+                    })
             ]
+            .boxed()
         })
     }
 
@@ -1840,7 +1986,7 @@ mod tests {
         let mut mprt = MonoidalPrinter::new(&module);
 
         ctxt.write_expr(expr).unwrap();
-        let frag = mprt.compile_expr(expr, 0);
+        let frag = mprt.compile_expr(expr, Default::default());
         write!(&mut buf_monoid, "{}", frag).unwrap();
 
         (buf_context, buf_monoid)
