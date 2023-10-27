@@ -1362,6 +1362,28 @@ impl<'a> MatchTreeStep<'a> {
         self
     }
 
+    fn add_tuple(
+        module: &'a FormatModule,
+        fields: &'a [Format],
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        match fields.split_first() {
+            None => Self::add_next(module, next),
+            Some((f, fs)) => Self::add(module, f, Rc::new(Next::Tuple(fs, next))),
+        }
+    }
+
+    fn add_record(
+        module: &'a FormatModule,
+        fields: &'a [(String, Format)],
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        match fields.split_first() {
+            None => Self::add_next(module, next),
+            Some(((_label, f), fs)) => Self::add(module, f, Rc::new(Next::Record(fs, next))),
+        }
+    }
+
     fn add_repeat_count(
         module: &'a FormatModule,
         n: usize,
@@ -1411,16 +1433,8 @@ impl<'a> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Cat(f, next) => Self::add(module, f, next.clone()),
-            Next::Tuple(fs, next) => match fs.split_first() {
-                None => Self::add_next(module, next.clone()),
-                Some((f, fs)) => Self::add(module, f, Rc::new(Next::Tuple(fs, next.clone()))),
-            },
-            Next::Record(fs, next) => match fs.split_first() {
-                None => Self::add_next(module, next.clone()),
-                Some(((_n, f), fs)) => {
-                    Self::add(module, f, Rc::new(Next::Record(fs, next.clone())))
-                }
-            },
+            Next::Tuple(fields, next) => Self::add_tuple(module, fields, next.clone()),
+            Next::Record(fields, next) => Self::add_record(module, fields, next.clone()),
             Next::Repeat(a, next0) => {
                 let tree = Self::add_next(module, next0.clone());
                 tree.union(Self::add(module, a, next))
@@ -1453,19 +1467,8 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::Tuple(fields) => match fields.split_first() {
-                None => Self::add_next(module, next),
-                Some((a, fields)) => {
-                    Self::add(module, a, Rc::new(Next::Tuple(fields, next.clone())))
-                }
-            },
-            Format::Record(fields) => match fields.split_first() {
-                None => Self::add_next(module, next),
-                Some(((_, a), fields)) => {
-                    let next = Rc::new(Next::Record(fields, next.clone()));
-                    Self::add(module, a, next)
-                }
-            },
+            Format::Tuple(fields) => Self::add_tuple(module, fields, next),
+            Format::Record(fields) => Self::add_record(module, fields, next),
             Format::Repeat(a) => {
                 let tree = Self::add_next(module, next.clone());
                 tree.union(Self::add(module, a, Rc::new(Next::Repeat(a, next.clone()))))
