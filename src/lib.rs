@@ -662,6 +662,7 @@ enum Next<'a> {
     Repeat(&'a Format, Rc<Next<'a>>),
     RepeatCount(usize, &'a Format, Rc<Next<'a>>),
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
+    Peek(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
 #[derive(Clone, Debug)]
@@ -1334,6 +1335,33 @@ impl<'a> MatchTreeStep<'a> {
         self
     }
 
+    fn peek(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
+        self.accept = self.accept && peek.accept;
+        if peek.accept {
+            // do nothing
+        } else if self.accept {
+            self.branches = peek.branches;
+        } else {
+            let mut branches = Vec::new();
+            for (bs1, nexts1) in self.branches {
+                for (bs2, nexts2) in &peek.branches {
+                    let bs = bs1.intersection(bs2);
+                    if !bs.is_empty() {
+                        let mut nexts = HashSet::new();
+                        for next1 in &nexts1 {
+                            for next2 in nexts2 {
+                                nexts.insert(Rc::new(Next::Peek(next1.clone(), next2.clone())));
+                            }
+                        }
+                        branches.push((bs, nexts));
+                    }
+                }
+            }
+            self.branches = branches;
+        }
+        self
+    }
+
     fn add_repeat_count(
         module: &'a FormatModule,
         n: usize,
@@ -1401,6 +1429,11 @@ impl<'a> MatchTreeStep<'a> {
             Next::Slice(n, inside, next0) => {
                 Self::add_slice(module, *n, inside.clone(), next0.clone())
             }
+            Next::Peek(next1, next2) => {
+                let tree1 = Self::add_next(module, next1.clone());
+                let tree2 = Self::add_next(module, next2.clone());
+                tree1.peek(tree2)
+            }
         }
     }
 
@@ -1453,9 +1486,9 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::Peek(a) => {
-                // FIXME - this does not properly model the general case
-                // but woks for our purposes for isolated single-byte lookahead
-                Self::add(module, index, a, next.clone())
+                let tree = Self::add_next(module, next.clone());
+                let peek = Self::add(module, a, Rc::new(Next::Empty));
+                tree.peek(peek)
             }
             Format::Slice(expr, f) => {
                 let inside = Rc::new(Next::Cat(f, Rc::new(Next::Empty)));
