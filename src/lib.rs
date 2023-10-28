@@ -1329,7 +1329,7 @@ impl<'a> MatchTreeStep<'a> {
 
     fn union(mut self, other: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
         self.accept = self.accept || other.accept;
-        for (bs, nexts) in other.branches.into_iter() {
+        for (bs, nexts) in other.branches {
             self.union_branch(bs, nexts);
         }
         self
@@ -1581,8 +1581,8 @@ impl<'a> MatchTreeLevel<'a> {
         if other.accept {
             self.merge_accept(index)?;
         }
-        for (bs, mut nexts) in other.branches.into_iter() {
-            for next in nexts.drain() {
+        for (bs, nexts) in other.branches {
+            for next in nexts {
                 self.merge_branch(index, bs, next)?;
             }
         }
@@ -1602,14 +1602,14 @@ impl<'a> MatchTreeLevel<'a> {
 
     fn grow(
         module: &'a FormatModule,
-        mut nexts: HashSet<(usize, Rc<Next<'a>>)>,
+        nexts: HashSet<(usize, Rc<Next<'a>>)>,
         depth: usize,
     ) -> Option<MatchTree> {
         if let Some(tree) = Self::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
             let mut tree = Self::reject();
-            for (i, next) in nexts.drain() {
+            for (i, next) in nexts {
                 let subtree = MatchTreeStep::add_next(module, next);
                 tree = tree.merge(i, subtree).ok()?;
             }
