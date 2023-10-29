@@ -1307,24 +1307,24 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
-    fn union_branch(&mut self, mut bs: ByteSet, new_next: Rc<Next<'a>>) {
-        let mut new_branches = Vec::new();
-        for (bs0, next) in self.branches.iter_mut() {
+    fn union_branch(&mut self, mut bs: ByteSet, next: Rc<Next<'a>>) {
+        let mut branches = Vec::new();
+        for (bs0, next0) in self.branches.iter_mut() {
             let common = bs0.intersection(&bs);
             if !common.is_empty() {
                 let orig = bs0.difference(&bs);
                 if !orig.is_empty() {
-                    new_branches.push((orig, next.clone()));
+                    branches.push((orig, next0.clone()));
                 }
                 *bs0 = common;
-                *next = Rc::new(Next::Union(next.clone(), new_next.clone()));
+                *next0 = Rc::new(Next::Union(next0.clone(), next.clone()));
                 bs = bs.difference(bs0);
             }
         }
         if !bs.is_empty() {
-            self.branches.push((bs, new_next));
+            self.branches.push((bs, next));
         }
-        self.branches.append(&mut new_branches);
+        self.branches.append(&mut branches);
     }
 
     fn union(mut self, other: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
