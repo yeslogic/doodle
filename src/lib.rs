@@ -659,7 +659,7 @@ impl FormatModule {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Next<'a> {
     Empty,
-    Union(Vec<Rc<Next<'a>>>),
+    Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Tuple(&'a [Format], Rc<Next<'a>>),
     Record(&'a [(String, Format)], Rc<Next<'a>>),
@@ -673,7 +673,7 @@ enum Next<'a> {
 #[derive(Clone, Debug)]
 struct MatchTreeStep<'a> {
     accept: bool,
-    branches: Vec<(ByteSet, Vec<Rc<Next<'a>>>)>,
+    branches: Vec<(ByteSet, Rc<Next<'a>>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -1303,40 +1303,34 @@ impl<'a> MatchTreeStep<'a> {
     fn branch(bs: ByteSet, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         MatchTreeStep {
             accept: false,
-            branches: vec![(bs, vec![next])],
+            branches: vec![(bs, next)],
         }
     }
 
-    fn union_branch(&mut self, mut bs: ByteSet, new_nexts: Vec<Rc<Next<'a>>>) {
+    fn union_branch(&mut self, mut bs: ByteSet, new_next: Rc<Next<'a>>) {
         let mut new_branches = Vec::new();
-        for (bs0, nexts) in self.branches.iter_mut() {
+        for (bs0, next) in self.branches.iter_mut() {
             let common = bs0.intersection(&bs);
             if !common.is_empty() {
                 let orig = bs0.difference(&bs);
                 if !orig.is_empty() {
-                    new_branches.push((orig, nexts.clone()));
+                    new_branches.push((orig, next.clone()));
                 }
                 *bs0 = common;
-                for next in &new_nexts {
-                    nexts.push(next.clone());
-                }
+                *next = Rc::new(Next::Union(next.clone(), new_next.clone()));
                 bs = bs.difference(bs0);
             }
         }
         if !bs.is_empty() {
-            let mut nexts = Vec::new();
-            for next in new_nexts {
-                nexts.push(next);
-            }
-            self.branches.push((bs, nexts));
+            self.branches.push((bs, new_next));
         }
         self.branches.append(&mut new_branches);
     }
 
     fn union(mut self, other: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
         self.accept = self.accept || other.accept;
-        for (bs, nexts) in other.branches {
-            self.union_branch(bs, nexts);
+        for (bs, next) in other.branches {
+            self.union_branch(bs, next);
         }
         self
     }
@@ -1349,17 +1343,12 @@ impl<'a> MatchTreeStep<'a> {
             self.branches = peek.branches;
         } else {
             let mut branches = Vec::new();
-            for (bs1, nexts1) in self.branches {
-                for (bs2, nexts2) in &peek.branches {
+            for (bs1, next1) in self.branches {
+                for (bs2, next2) in &peek.branches {
                     let bs = bs1.intersection(bs2);
                     if !bs.is_empty() {
-                        let mut nexts = Vec::new();
-                        for next1 in &nexts1 {
-                            for next2 in nexts2 {
-                                nexts.push(Rc::new(Next::Peek(next1.clone(), next2.clone())));
-                            }
-                        }
-                        branches.push((bs, nexts));
+                        let next = Rc::new(Next::Peek(next1.clone(), next2.clone()));
+                        branches.push((bs, next));
                     }
                 }
             }
@@ -1374,20 +1363,16 @@ impl<'a> MatchTreeStep<'a> {
             self.branches = Vec::new();
         } else {
             let mut branches = Vec::new();
-            for (bs1, nexts1) in self.branches.into_iter() {
-                for (bs2, nexts2) in &peek.branches {
+            for (bs1, next1) in self.branches.into_iter() {
+                for (bs2, next2) in &peek.branches {
                     let common = bs1.intersection(bs2);
                     let diff = bs1.difference(bs2);
                     if !common.is_empty() {
-                        let mut nexts = Vec::new();
-                        for next1 in &nexts1 {
-                            let peek_next = Rc::new(Next::Union(nexts2.clone()));
-                            nexts.push(Rc::new(Next::PeekNot(next1.clone(), peek_next)));
-                        }
-                        branches.push((common, nexts));
+                        let next = Rc::new(Next::PeekNot(next1.clone(), next2.clone()));
+                        branches.push((common, next));
                     }
                     if !diff.is_empty() {
-                        branches.push((diff, nexts1.clone()));
+                        branches.push((diff, next1.clone()));
                     }
                 }
             }
@@ -1441,18 +1426,11 @@ impl<'a> MatchTreeStep<'a> {
             let mut tree = Self::add_next(module, inside);
             tree.accept = false;
             if tree.branches.is_empty() {
-                let mut nexts = Vec::new();
-                nexts.push(Rc::new(Next::Slice(
-                    n - 1,
-                    Rc::new(Next::Empty),
-                    next.clone(),
-                )));
-                tree.branches.push((ByteSet::full(), nexts));
+                let next = Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone()));
+                tree.branches.push((ByteSet::full(), next));
             } else {
-                for (_bs, ref mut nexts) in tree.branches.iter_mut() {
-                    for inside in nexts.iter_mut() {
-                        *inside = Rc::new(Next::Slice(n - 1, inside.clone(), next.clone()));
-                    }
+                for (_bs, ref mut inside) in tree.branches.iter_mut() {
+                    *inside = Rc::new(Next::Slice(n - 1, inside.clone(), next.clone()));
                 }
             }
             tree
@@ -1464,12 +1442,10 @@ impl<'a> MatchTreeStep<'a> {
     fn add_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
-            Next::Union(nexts) => {
-                let mut tree = Self::reject();
-                for next0 in nexts {
-                    tree = tree.union(Self::add_next(module, next0.clone()));
-                }
-                tree
+            Next::Union(next1, next2) => {
+                let tree1 = Self::add_next(module, next1.clone());
+                let tree2 = Self::add_next(module, next2.clone());
+                tree1.union(tree2)
             }
             Next::Cat(f, next) => Self::add(module, f, next.clone()),
             Next::Tuple(fields, next) => Self::add_tuple(module, fields, next.clone()),
@@ -1630,10 +1606,8 @@ impl<'a> MatchTreeLevel<'a> {
         if other.accept {
             self.merge_accept(index)?;
         }
-        for (bs, nexts) in other.branches {
-            for next in nexts {
-                self.merge_branch(index, bs, next)?;
-            }
+        for (bs, next) in other.branches {
+            self.merge_branch(index, bs, next)?;
         }
         Ok(self)
     }
