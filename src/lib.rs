@@ -659,6 +659,7 @@ impl FormatModule {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 enum Next<'a> {
     Empty,
+    Union(Vec<Rc<Next<'a>>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Tuple(&'a [Format], Rc<Next<'a>>),
     Record(&'a [(String, Format)], Rc<Next<'a>>),
@@ -666,7 +667,7 @@ enum Next<'a> {
     RepeatCount(usize, &'a Format, Rc<Next<'a>>),
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
     Peek(Rc<Next<'a>>, Rc<Next<'a>>),
-    PeekNot(Rc<Next<'a>>, Vec<Rc<Next<'a>>>),
+    PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
 #[derive(Clone, Debug)]
@@ -1380,11 +1381,8 @@ impl<'a> MatchTreeStep<'a> {
                     if !common.is_empty() {
                         let mut nexts = Vec::new();
                         for next1 in &nexts1 {
-                            let mut peek_nexts = Vec::new();
-                            for next2 in nexts2 {
-                                peek_nexts.push(next2.clone());
-                            }
-                            nexts.push(Rc::new(Next::PeekNot(next1.clone(), peek_nexts)));
+                            let peek_next = Rc::new(Next::Union(nexts2.clone()));
+                            nexts.push(Rc::new(Next::PeekNot(next1.clone(), peek_next)));
                         }
                         branches.push((common, nexts));
                     }
@@ -1466,6 +1464,13 @@ impl<'a> MatchTreeStep<'a> {
     fn add_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
+            Next::Union(nexts) => {
+                let mut tree = Self::reject();
+                for next0 in nexts {
+                    tree = tree.union(Self::add_next(module, next0.clone()));
+                }
+                tree
+            }
             Next::Cat(f, next) => Self::add(module, f, next.clone()),
             Next::Tuple(fields, next) => Self::add_tuple(module, fields, next.clone()),
             Next::Record(fields, next) => Self::add_record(module, fields, next.clone()),
@@ -1482,13 +1487,10 @@ impl<'a> MatchTreeStep<'a> {
                 let tree2 = Self::add_next(module, next2.clone());
                 tree1.peek(tree2)
             }
-            Next::PeekNot(next1, peek_not_nexts) => {
-                let tree = Self::add_next(module, next1.clone());
-                let mut peek_not = Self::reject();
-                for peek_not_next in peek_not_nexts {
-                    peek_not = peek_not.union(Self::add_next(module, peek_not_next.clone()));
-                }
-                tree.peek_not(peek_not)
+            Next::PeekNot(next1, next2) => {
+                let tree1 = Self::add_next(module, next1.clone());
+                let tree2 = Self::add_next(module, next2.clone());
+                tree1.peek_not(tree2)
             }
         }
     }
