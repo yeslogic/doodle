@@ -672,7 +672,7 @@ enum Next<'a> {
 #[derive(Clone, Debug)]
 struct MatchTreeStep<'a> {
     accept: bool,
-    branches: Vec<(ByteSet, HashSet<Rc<Next<'a>>>)>,
+    branches: Vec<(ByteSet, Vec<Rc<Next<'a>>>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -1300,15 +1300,13 @@ impl<'a> MatchTreeStep<'a> {
     }
 
     fn branch(bs: ByteSet, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
-        let mut nexts = HashSet::new();
-        nexts.insert(next);
         MatchTreeStep {
             accept: false,
-            branches: vec![(bs, nexts)],
+            branches: vec![(bs, vec![next])],
         }
     }
 
-    fn union_branch(&mut self, mut bs: ByteSet, new_nexts: HashSet<Rc<Next<'a>>>) {
+    fn union_branch(&mut self, mut bs: ByteSet, new_nexts: Vec<Rc<Next<'a>>>) {
         let mut new_branches = Vec::new();
         for (bs0, nexts) in self.branches.iter_mut() {
             let common = bs0.intersection(&bs);
@@ -1319,15 +1317,15 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 *bs0 = common;
                 for next in &new_nexts {
-                    nexts.insert(next.clone());
+                    nexts.push(next.clone());
                 }
                 bs = bs.difference(bs0);
             }
         }
         if !bs.is_empty() {
-            let mut nexts = HashSet::new();
+            let mut nexts = Vec::new();
             for next in new_nexts {
-                nexts.insert(next);
+                nexts.push(next);
             }
             self.branches.push((bs, nexts));
         }
@@ -1354,10 +1352,10 @@ impl<'a> MatchTreeStep<'a> {
                 for (bs2, nexts2) in &peek.branches {
                     let bs = bs1.intersection(bs2);
                     if !bs.is_empty() {
-                        let mut nexts = HashSet::new();
+                        let mut nexts = Vec::new();
                         for next1 in &nexts1 {
                             for next2 in nexts2 {
-                                nexts.insert(Rc::new(Next::Peek(next1.clone(), next2.clone())));
+                                nexts.push(Rc::new(Next::Peek(next1.clone(), next2.clone())));
                             }
                         }
                         branches.push((bs, nexts));
@@ -1380,13 +1378,13 @@ impl<'a> MatchTreeStep<'a> {
                     let common = bs1.intersection(bs2);
                     let diff = bs1.difference(bs2);
                     if !common.is_empty() {
-                        let mut nexts = HashSet::new();
+                        let mut nexts = Vec::new();
                         for next1 in &nexts1 {
                             let mut peek_nexts = Vec::new();
                             for next2 in nexts2 {
                                 peek_nexts.push(next2.clone());
                             }
-                            nexts.insert(Rc::new(Next::PeekNot(next1.clone(), peek_nexts)));
+                            nexts.push(Rc::new(Next::PeekNot(next1.clone(), peek_nexts)));
                         }
                         branches.push((common, nexts));
                     }
@@ -1445,8 +1443,8 @@ impl<'a> MatchTreeStep<'a> {
             let mut tree = Self::add_next(module, inside);
             tree.accept = false;
             if tree.branches.is_empty() {
-                let mut nexts = HashSet::new();
-                nexts.insert(Rc::new(Next::Slice(
+                let mut nexts = Vec::new();
+                nexts.push(Rc::new(Next::Slice(
                     n - 1,
                     Rc::new(Next::Empty),
                     next.clone(),
@@ -1454,11 +1452,9 @@ impl<'a> MatchTreeStep<'a> {
                 tree.branches.push((ByteSet::full(), nexts));
             } else {
                 for (_bs, ref mut nexts) in tree.branches.iter_mut() {
-                    let mut new_nexts = HashSet::new();
-                    for inside in nexts.drain() {
-                        new_nexts.insert(Rc::new(Next::Slice(n - 1, inside, next.clone())));
+                    for inside in nexts.iter_mut() {
+                        *inside = Rc::new(Next::Slice(n - 1, inside.clone(), next.clone()));
                     }
-                    *nexts = new_nexts;
                 }
             }
             tree
