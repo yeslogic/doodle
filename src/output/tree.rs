@@ -1407,100 +1407,100 @@ impl<'module> MonoidalPrinter<'module> {
                 Fragment::seq(
                     [
                         Fragment::String("match ".into()),
-                        self.compile_expr(head, Precedence::MATCH + 1),
+                        self.compile_expr(head, Precedence::MATCH),
                         Fragment::String(" { ... }".into()),
                     ],
                     None,
                 )
                 .group(),
-                prec > Precedence::MATCH,
+                prec, Precedence::MATCH,
             ),
             Expr::Lambda(name, expr) => cond_paren(
                 Fragment::seq(
                     [
                         Fragment::String(format!("{name} -> ").into()),
-                        self.compile_expr(expr, Precedence::ARROW + 1),
+                        self.compile_expr(expr, Precedence::ARROW),
                     ],
                     None,
                 )
                 .group(),
-                prec > Precedence::ARROW,
+                prec, Precedence::ARROW,
             ),
             Expr::BitAnd(lhs, rhs) => cond_paren(
-                self.compile_binop(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND + 1),
-                prec > Precedence::BITAND,
+                self.compile_binop(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                prec, Precedence::BITAND,
             ),
             Expr::BitOr(lhs, rhs) => cond_paren(
-                self.compile_binop(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR + 1),
-                prec > Precedence::BITOR,
+                self.compile_binop(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                prec, Precedence::BITOR,
             ),
             Expr::Eq(lhs, rhs) => cond_paren(
                 self.compile_binop(
                     " == ",
                     lhs,
                     rhs,
-                    Precedence::COMPARE + 1,
-                    Precedence::COMPARE + 1,
+                    Precedence::EQUALITY,
+                    Precedence::EQUALITY,
                 ),
-                prec > Precedence::COMPARE,
+                prec, Precedence::COMPARE,
             ),
             Expr::Ne(lhs, rhs) => cond_paren(
                 self.compile_binop(
                     " != ",
                     lhs,
                     rhs,
-                    Precedence::COMPARE + 1,
-                    Precedence::COMPARE + 1,
+                    Precedence::EQUALITY,
+                    Precedence::EQUALITY,
                 ),
-                prec > Precedence::COMPARE,
+                prec, Precedence::COMPARE,
             ),
             Expr::Lt(lhs, rhs) => cond_paren(
                 self.compile_binop(
                     " < ",
                     lhs,
                     rhs,
-                    Precedence::COMPARE + 1,
-                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE,
+                    Precedence::COMPARE,
                 ),
-                prec > Precedence::COMPARE,
+                prec, Precedence::COMPARE,
             ),
             Expr::Gt(lhs, rhs) => cond_paren(
                 self.compile_binop(
                     " > ",
                     lhs,
                     rhs,
-                    Precedence::COMPARE + 1,
-                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE,
+                    Precedence::COMPARE,
                 ),
-                prec > Precedence::COMPARE,
+                prec, Precedence::COMPARE,
             ),
             Expr::Lte(lhs, rhs) => cond_paren(
                 self.compile_binop(
                     " <= ",
                     lhs,
                     rhs,
-                    Precedence::COMPARE + 1,
-                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE,
+                    Precedence::COMPARE,
                 ),
-                prec > Precedence::COMPARE,
+                prec, Precedence::COMPARE,
             ),
             Expr::Gte(lhs, rhs) => cond_paren(
                 self.compile_binop(
                     " >= ",
                     lhs,
                     rhs,
-                    Precedence::COMPARE + 1,
-                    Precedence::COMPARE + 1,
+                    Precedence::COMPARE,
+                    Precedence::COMPARE,
                 ),
-                prec > Precedence::COMPARE,
+                prec, Precedence::COMPARE,
             ),
             Expr::Add(lhs, rhs) => cond_paren(
-                self.compile_binop(" + ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB + 1),
-                prec > Precedence::ADDSUB,
+                self.compile_binop(" + ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+                prec, Precedence::ADDSUB,
             ),
             Expr::Sub(lhs, rhs) => cond_paren(
-                self.compile_binop(" - ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB + 1),
-                prec > Precedence::ADDSUB,
+                self.compile_binop(" - ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+                prec, Precedence::ADDSUB,
             ),
             Expr::Shl(lhs, rhs) => cond_paren(
                 self.compile_binop(
@@ -1508,9 +1508,9 @@ impl<'module> MonoidalPrinter<'module> {
                     lhs,
                     rhs,
                     Precedence::BITSHIFT,
-                    Precedence::BITSHIFT + 1,
+                    Precedence::BITSHIFT,
                 ),
-                prec > Precedence::BITSHIFT,
+                prec, Precedence::BITSHIFT,
             ),
             Expr::Shr(lhs, rhs) => cond_paren(
                 self.compile_binop(
@@ -1518,94 +1518,94 @@ impl<'module> MonoidalPrinter<'module> {
                     lhs,
                     rhs,
                     Precedence::BITSHIFT,
-                    Precedence::BITSHIFT + 1,
+                    Precedence::BITSHIFT,
                 ),
-                prec > Precedence::BITSHIFT,
+                prec, Precedence::BITSHIFT,
             ),
             Expr::Div(lhs, rhs) => cond_paren(
-                self.compile_binop(" / ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM + 1),
-                prec > Precedence::DIVREM,
+                self.compile_binop(" / ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+                prec, Precedence::DIVREM,
             ),
             Expr::Rem(lhs, rhs) => cond_paren(
-                self.compile_binop(" % ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM + 1),
-                prec > Precedence::DIVREM,
+                self.compile_binop(" % ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+                prec, Precedence::DIVREM,
             ),
             Expr::AsU8(expr) => cond_paren(
                 self.compile_prefix("as-u8", None, expr),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::AsU16(expr) => cond_paren(
                 self.compile_prefix("as-u16", None, expr),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::AsU32(expr) => cond_paren(
                 self.compile_prefix("as-u32", None, expr),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::U16Be(bytes) => cond_paren(
                 self.compile_prefix("u16be", None, bytes),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::U16Le(bytes) => cond_paren(
                 self.compile_prefix("u16le", None, bytes),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::U32Be(bytes) => cond_paren(
                 self.compile_prefix("u32be", None, bytes),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::U32Le(bytes) => cond_paren(
                 self.compile_prefix("u32le", None, bytes),
-                prec > Precedence::CAST,
+                prec, Precedence::CAST,
             ),
             Expr::SeqLength(seq) => cond_paren(
                 self.compile_prefix("seq-length", None, seq),
-                prec > Precedence::FUNAPP,
+                prec, Precedence::FUNAPP,
             ),
             Expr::SubSeq(seq, start, length) => cond_paren(
                 self.compile_prefix("sub-seq", Some(&[&start, &length]), seq),
-                prec > Precedence::FUNAPP,
+                prec, Precedence::FUNAPP,
             ),
             Expr::FlatMap(expr, seq) => cond_paren(
                 self.compile_prefix("flat-map", Some(&[&expr]), seq),
-                prec > Precedence::FUNAPP,
+                prec, Precedence::FUNAPP,
             ),
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => cond_paren(
                 self.compile_prefix("flat-map-accum", Some(&[&expr, &accum]), seq),
-                prec > Precedence::FUNAPP,
+                prec, Precedence::FUNAPP,
             ),
             Expr::Dup(count, expr) => cond_paren(
                 self.compile_prefix("dup", Some(&[&count]), expr),
-                prec > Precedence::FUNAPP,
+                prec, Precedence::FUNAPP,
             ),
             Expr::Inflate(expr) => cond_paren(
                 self.compile_prefix("inflate", None, expr),
-                prec > Precedence::FUNAPP,
+                prec, Precedence::FUNAPP,
             ),
 
             Expr::TupleProj(head, index) => cond_paren(
                 Fragment::seq(
                     [
-                        self.compile_expr(head, Precedence::PROJ + 1),
+                        self.compile_expr(head, Precedence::PROJ),
                         Fragment::Char('.'),
                         Fragment::DisplayAtom(Rc::new(*index)),
                     ],
                     None,
                 )
                 .group(),
-                prec > Precedence::PROJ,
+                prec, Precedence::PROJ,
             ),
             Expr::RecordProj(head, label) => cond_paren(
                 Fragment::seq(
                     [
-                        self.compile_expr(head, Precedence::PROJ + 1),
+                        self.compile_expr(head, Precedence::PROJ),
                         Fragment::Char('.'),
                         Fragment::String(label.clone().into()),
                     ],
                     None,
                 )
                 .group(),
-                prec > Precedence::PROJ,
+                prec, Precedence::PROJ,
             ),
             Expr::Var(name) => Fragment::String(name.clone().into()),
             Expr::Bool(b) => Fragment::DisplayAtom(Rc::new(*b)),
@@ -1642,7 +1642,7 @@ impl<'module> MonoidalPrinter<'module> {
                 frags.push(arg.clone());
             }
         }
-        frags.push(self.compile_format(inner, prec + 1));
+        frags.push(self.compile_format(inner, prec));
         frags.finalize_with_sep(Fragment::Char(' '))
     }
 
@@ -1650,25 +1650,25 @@ impl<'module> MonoidalPrinter<'module> {
         match format {
             Format::Union(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::Peek(format) => cond_paren(
                 self.compile_nested_format("peek", None, format, prec),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::Repeat(format) => cond_paren(
                 self.compile_nested_format("repeat", None, format, prec),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::Repeat1(format) => cond_paren(
                 self.compile_nested_format("repeat1", None, format, prec),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::RepeatCount(len, format) => {
                 let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("repeat-count", Some(&[expr_frag]), format, prec),
-                    prec > Precedence::FORMAT_COMPOUND,
+                    prec , Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::RepeatUntilLast(expr, format) => {
@@ -1680,7 +1680,7 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > Precedence::FORMAT_COMPOUND,
+                    prec, Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::RepeatUntilSeq(expr, format) => {
@@ -1692,14 +1692,14 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > Precedence::FORMAT_COMPOUND,
+                    prec, Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::Slice(len, format) => {
                 let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("slice", Some(&[expr_frag]), format, prec),
-                    prec > Precedence::FORMAT_COMPOUND,
+                    prec, Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::FixedSlice(size, format) => {
@@ -1711,12 +1711,12 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > Precedence::FORMAT_COMPOUND,
+                    prec, Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::Bits(format) => cond_paren(
                 self.compile_nested_format("bits", None, format, prec),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::WithRelativeOffset(offset, format) => {
                 let expr_frag = self.compile_expr(offset, Precedence::ATOM);
@@ -1727,7 +1727,7 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
-                    prec > Precedence::FORMAT_COMPOUND,
+                    prec, Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::Compute(expr) => cond_paren(
@@ -1735,7 +1735,7 @@ impl<'module> MonoidalPrinter<'module> {
                     Fragment::String("compute ".into()),
                     self.compile_expr(expr, Default::default()),
                 ),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::Match(head, _) | Format::MatchVariant(head, _) => cond_paren(
                 Fragment::seq(
@@ -1746,7 +1746,7 @@ impl<'module> MonoidalPrinter<'module> {
                     ],
                     Some(Fragment::Char(' ')),
                 ),
-                prec > Precedence::FORMAT_COMPOUND,
+                prec, Precedence::FORMAT_COMPOUND,
             ),
             Format::Dynamic(_) => Fragment::String("dynamic".into()),
 
@@ -1792,45 +1792,181 @@ impl<'module> MonoidalPrinter<'module> {
     }
 }
 
-/// Operator precedence
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
-struct Precedence(u8);
-
-impl Precedence {
-    // Expression Precedences
-    // const TOP: Self = Self(0);
-
-    // Gapped by 1 to allow for implicit 'bumping' for co-associativity forcing
-    const ARROW: Self = Self(1);
-    const MATCH: Self = Self(3);
-    const COMPARE: Self = Self(5);
-    const BITOR: Self = Self(7);
-    const ADDSUB: Self = Self(9);
-    const BITAND: Self = Self(11);
-    const DIVREM: Self = Self(11);
-    const BITSHIFT: Self = Self(13);
-    const FUNAPP: Self = Self(15);
-    const CAST: Self = Self(15);
-    const PROJ: Self = Self(17);
-    const ATOM: Self = Self(19);
-
-    const FORMAT_COMPOUND: Self = Self(1);
-    // const FORMAT_ATOM : Self = Self(2);
+/// Operator Precedence classes
+///
+///
+#[derive(Copy, Clone, Debug, Default)]
+enum Precedence {
+    Atomic, // Highest precedence
+    Projection,
+    Prefix, // Highest natural precedence
+    ArithInfix(ArithLevel),
+    BitwiseInfix(BitwiseLevel),
+    Comparison(CompareLevel), // Unsound when chained
+    Calculus, // Arrow and Match
+    #[default]
+    Top, // Entry level for neutral context
 }
 
-impl std::ops::Add<u8> for Precedence {
-    type Output = Precedence;
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+enum CompareLevel {
+    Comparison = 0, // Highest comparative precedence
+    Equality,
+}
 
-    fn add(self, rhs: u8) -> Self::Output {
-        Self(self.0 + rhs)
+
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+enum ArithLevel {
+    DivRem = 0, // Highest arithmetic precedence
+    AddSub = 1,
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+enum BitwiseLevel {
+    Shift = 0, // Highest bitwise precedence
+    And = 1,
+    Or = 2,
+}
+
+/// Intransitive partial relation over operator subclasses
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Relation {
+    Inferior, /// .<
+    Congruent, // .=
+    Superior,  // .>
+    Disjoint,  // ><
+}
+
+trait IntransitiveOrd {
+    fn relate(&self, other: &Self) -> Relation;
+
+    fn inferior(&self, other: &Self) -> bool {
+        matches!(self.relate(other), Relation::Inferior)
+    }
+
+    fn superior(&self, other: &Self) -> bool {
+        matches!(self.relate(other), Relation::Superior)
+    }
+
+    fn congruent(&self, other: &Self) -> bool {
+        matches!(self.relate(other), Relation::Congruent)
+    }
+
+    fn disjoint(&self, other: &Self) -> bool {
+        matches!(self.relate(other), Relation::Disjoint)
     }
 }
 
-fn cond_paren(frag: Fragment, should_paren: bool) -> Fragment {
-    if should_paren {
-        Fragment::seq([Fragment::Char('('), frag, Fragment::Char(')')], None)
-    } else {
-        frag
+impl IntransitiveOrd for CompareLevel {
+    fn relate(&self, other: &Self) -> Relation {
+        match (self, other) {
+            | (Self::Comparison, Self::Comparison)
+            | (Self::Equality, Self::Equality) => Relation::Congruent,
+            (Self::Comparison, Self::Equality) => Relation::Disjoint,
+            (Self::Equality, Self::Comparison) => Relation::Disjoint,
+        }
+    }
+}
+
+impl IntransitiveOrd for ArithLevel {
+    fn relate(&self, other: &Self) -> Relation {
+        match (self, other) {
+            | (Self::DivRem, Self::DivRem)
+            | (Self::AddSub, Self::AddSub) => Relation::Congruent,
+            (Self::AddSub, Self::DivRem) => Relation::Inferior,
+            (Self::DivRem, Self::AddSub) => Relation::Superior,
+        }
+    }
+}
+
+impl IntransitiveOrd for BitwiseLevel {
+    fn relate(&self, other: &Self) -> Relation {
+        match (self, other) {
+            (BitwiseLevel::Shift, BitwiseLevel::Shift) => Relation::Congruent,
+            (BitwiseLevel::Shift, _) => Relation::Superior,
+            (_, BitwiseLevel::Shift) => Relation::Inferior,
+            (BitwiseLevel::And, BitwiseLevel::And) => Relation::Congruent,
+            (BitwiseLevel::And, BitwiseLevel::Or) => Relation::Superior,
+            (BitwiseLevel::Or, BitwiseLevel::And) => Relation::Inferior,
+            (BitwiseLevel::Or, BitwiseLevel::Or) => Relation::Congruent,
+        }
+    }
+}
+
+/// Rules:
+///   x .= x
+///   Atomic .> Proj .> Prefix .> *Infix .> Comparison .> Calculus .> Top
+///   rel(x, y) = rel(ArithInfix(x), ArithInfix(y))
+///   rel(x, y) = rel(BitwiseInfix(x), BitwiseInfix(y))
+///   Bitwise(_) >< Arith(_)
+impl IntransitiveOrd for Precedence {
+    fn relate(&self, other: &Self) -> Relation {
+        match (self, other) {
+            // Trivial Congruences
+            (Self::Atomic, Self::Atomic) => Relation::Congruent,
+            (Self::Projection, Self::Projection) => Relation::Congruent,
+            (Self::Prefix, Self::Prefix) => Relation::Congruent,
+            (Self::Calculus, Self::Calculus) => Relation::Congruent,
+            (Self::Top, Self::Top) => Relation::Congruent,
+
+            // Descending relations
+            (Self::Atomic, _) => Relation::Superior,
+            (_, Self::Atomic) => Relation::Superior,
+            (Self::Projection, _) => Relation::Superior,
+            (_, Self::Projection) => Relation::Inferior,
+            (Self::Prefix, _) => Relation::Superior,
+            (_, Self::Prefix) => Relation::Inferior,
+
+            // Ascending relations
+            (Self::Top, _) => Relation::Inferior,
+            (_, Self::Top) => Relation::Superior,
+            (Self::Calculus, _) => Relation::Inferior,
+            (_, Self::Calculus) => Relation::Superior,
+
+
+            // Implications
+            (Self::ArithInfix(x), Self::ArithInfix(y)) => x.relate(y),
+            (Self::BitwiseInfix(x), Self::BitwiseInfix(y)) => x.relate(y),
+            (Self::Comparison(x), Self::Comparison(y)) => x.relate(y),
+
+            // Ascending relations (continued)
+            (Self::Comparison(_), _) => Relation::Inferior,
+            (_, Self::Comparison(_)) => Relation::Superior,
+
+            // Disjunctions
+            (Self::ArithInfix(_), Self::BitwiseInfix(_)) => Relation::Disjoint,
+            (Self::BitwiseInfix(_), Self::ArithInfix(_)) => Relation::Disjoint,
+        }
+    }
+}
+
+impl Precedence {
+    const TOP: Self = Precedence::Top;
+    const ARROW: Self = Precedence::Calculus;
+    const MATCH: Self = Precedence::Calculus;
+    const COMPARE: Self = Precedence::Comparison(CompareLevel::Comparison);
+    const EQUALITY: Self = Precedence::Comparison(CompareLevel::Equality);
+    const BITOR: Self = Precedence::BitwiseInfix(BitwiseLevel::Or);
+    const ADDSUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
+    const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
+    const DIVREM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
+    const BITSHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
+    const FUNAPP: Self = Precedence::Prefix;
+    const CAST: Self = Precedence::Prefix;
+    const PROJ: Self = Precedence::Projection;
+    const ATOM: Self = Precedence::Atomic;
+
+    const FORMAT_COMPOUND: Self = Self::Top;
+    const FORMAT_ATOM : Self = Self::Atomic;
+}
+
+fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
+    match current.relate(&cutoff) {
+        Relation::Disjoint | Relation::Superior => Fragment::seq([Fragment::Char('('), frag, Fragment::Char(')')], None),
+        Relation::Congruent | Relation::Inferior => frag,
     }
 }
 
@@ -1850,7 +1986,7 @@ mod tests {
             "[_a-z][_a-zA-Z]*".prop_map(Expr::Var)
         ];
 
-        leaf.prop_recursive(5, 100, 9, move |inner| {
+        leaf.prop_recursive(7, 128, 10, move |inner| {
             prop_oneof![
                 inner.clone().prop_flat_map(|term: Expr| {
                     prop_oneof![
@@ -1990,6 +2126,14 @@ mod tests {
         write!(&mut buf_monoid, "{}", frag).unwrap();
 
         (buf_context, buf_monoid)
+    }
+
+    #[test]
+    fn test_specific() {
+        for expr in &[Expr::BitOr(Box::new(Expr::Div(Box::new(Expr::U8(1)), Box::new(Expr::U8(0)))), Box::new(Expr::U8(1)))] {
+            let (ctxt, mond) = equiv(expr);
+            assert_eq!(String::from_utf8_lossy(&ctxt[..]), String::from_utf8_lossy(&mond[..]));
+        }
     }
 
     proptest::proptest! {
