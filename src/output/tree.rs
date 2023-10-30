@@ -2,7 +2,7 @@ use std::{fmt, io, rc::Rc};
 
 use crate::{Expr, Format, FormatModule, Scope, Value};
 
-use super::{FragmentBuilder, Fragment};
+use super::{Fragment, FragmentBuilder};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     Context::new(io::stdout(), module)
@@ -1488,6 +1488,11 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::BITSHIFT,
             ),
+            Expr::Mul(lhs, rhs) => cond_paren(
+                self.compile_binop(" * ", lhs, rhs, Precedence::MUL, Precedence::MUL),
+                prec,
+                Precedence::MUL,
+            ),
             Expr::Div(lhs, rhs) => cond_paren(
                 self.compile_binop(" / ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
                 prec,
@@ -1805,17 +1810,16 @@ enum Precedence {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(u8)]
 enum CompareLevel {
     Comparison = 0, // Highest comparative precedence
     Equality,
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(u8)]
 enum ArithLevel {
     DivRem = 0, // Highest arithmetic precedence
-    AddSub = 1,
+    Mul,
+    AddSub,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1871,9 +1875,12 @@ impl IntransitiveOrd for CompareLevel {
 impl IntransitiveOrd for ArithLevel {
     fn relate(&self, other: &Self) -> Relation {
         match (self, other) {
-            (Self::DivRem, Self::DivRem) | (Self::AddSub, Self::AddSub) => Relation::Congruent,
-            (Self::AddSub, Self::DivRem) => Relation::Inferior,
-            (Self::DivRem, Self::AddSub) => Relation::Superior,
+            (Self::DivRem, Self::DivRem)
+            | (Self::Mul, Self::Mul)
+            | (Self::AddSub, Self::AddSub) => Relation::Congruent,
+            (Self::DivRem, Self::Mul) | (Self::Mul, Self::DivRem) => Relation::Disjoint,
+            (Self::AddSub, _) => Relation::Inferior,
+            (_, Self::AddSub) => Relation::Superior,
         }
     }
 }
@@ -1949,6 +1956,7 @@ impl Precedence {
     const ADDSUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
     const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
     const DIVREM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
+    const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
     const BITSHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
     const FUNAPP: Self = Precedence::Prefix;
     const CAST: Self = Precedence::Prefix;
@@ -2020,6 +2028,7 @@ mod tests {
                         Just(Expr::BitAnd(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                         Just(Expr::BitOr(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                         Just(Expr::Div(Box::new(lhs.clone()), Box::new(rhs.clone()))),
+                        Just(Expr::Mul(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                         Just(Expr::Rem(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                         Just(Expr::Shl(Box::new(lhs.clone()), Box::new(rhs.clone()))),
                         Just(Expr::Shr(Box::new(lhs.clone()), Box::new(rhs.clone()))),
