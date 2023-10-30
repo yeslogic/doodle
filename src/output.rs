@@ -44,6 +44,11 @@ impl Fragment {
         matches!(self, &Fragment::Empty)
     }
 
+    /// Forms a compound fragment from a Fragment-valued iterable, with
+    /// an optional Fragment separating each element in the output sequence.
+    ///
+    /// It is more efficient to pass `sep := None` than `sep := Some(Fragment::Empty)`,
+    /// but the resulting output will differ in performance alone, and not output.
     fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
         Self::Sequence {
             items: items.into_iter().collect(),
@@ -51,6 +56,10 @@ impl Fragment {
         }
     }
 
+    /// Concatenates two fragments into one.
+    ///
+    /// If either fragment is empty, will short-circuit to the other
+    /// to avoid needless allocation.
     fn cat(self, frag1: Self) -> Self {
         if self.is_empty() {
             frag1
@@ -66,39 +75,49 @@ impl Fragment {
         frag.unwrap_or(Fragment::Empty)
     }
 
+    /// Appends a given fragment to the receiver.
+    ///
+    /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
+    #[inline]
     fn encat(&mut self, other: Self) -> &mut Self {
         let this = std::mem::take(self);
         *self = Self::cat(this, other);
         self
     }
 
+    /// Wraps the current fragment in a [`Fragment::Group`] and returns the result.
     fn group(self) -> Self {
         Self::Group(Box::new(self))
     }
 
+    /// Append a newline character to the receiver.
+    ///
+    /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
     #[inline]
     fn enbreak(&mut self) -> &mut Self {
         self.encat(Fragment::Char('\n'))
     }
 
-    // Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
+    /// Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
     fn engroup(&mut self) -> &mut Self {
         let this = Box::new(std::mem::take(self));
         *self = Self::Group(this);
         self
     }
 
+    /// Returns an empty fragment
     fn new() -> Self {
         Self::Empty
     }
 }
 
-struct Fragments {
+/// helper struct for building up longer sequences of [Fragment]s
+struct FragmentBuilder {
     frozen: Vec<Fragment>,
     active: Fragment,
 }
 
-impl Fragments {
+impl FragmentBuilder {
     pub fn new() -> Self {
         Self {
             frozen: Vec::new(),
@@ -110,7 +129,8 @@ impl Fragments {
         &mut self.active
     }
 
-    // Freeze (push) the active fragment, create a new (Empty) one, and return a mutable reference to it
+    /// Freezes the currently-active fragment and returns a mutable reference to a new active fragment,
+    /// which will be reinitialized to [`Fragment::Empty`].
     pub fn renew(&mut self) -> &mut Fragment {
         let frag = std::mem::take(&mut self.active);
         if !frag.is_empty() {
@@ -159,20 +179,23 @@ impl std::fmt::Display for Fragment {
                 frag1.fmt(f)
             }
             Fragment::Sequence { sep, items } => {
-                if items.is_empty() {
-                    Ok(())
+                let mut iter = items.iter();
+                if let Some(head) = iter.next() {
+                    head.fmt(f)?;
                 } else {
-                    let mut is_first = true;
-                    for item in items.iter() {
-                        if !is_first {
-                            sep.as_ref().map_or(Ok(()), |frag| frag.fmt(f))?;
-                        } else {
-                            is_first = false;
-                        }
-                        item.fmt(f)?;
-                    }
-                    Ok(())
+                    return Ok(());
                 }
+                let f_sep: Box<dyn Fn(&mut std::fmt::Formatter<'_>) -> std::fmt::Result> =
+                    if let Some(frag) = sep.as_deref() {
+                        Box::new(|f| frag.fmt(f))
+                    } else {
+                        Box::new(|_| Ok(()))
+                    };
+                for item in iter {
+                    f_sep(f)?;
+                    item.fmt(f)?;
+                }
+                Ok(())
             }
         }
     }
