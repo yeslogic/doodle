@@ -3,10 +3,31 @@ use std::{borrow::Borrow, fmt::Write};
 pub mod flat;
 pub mod tree;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Symbol {
+    Vacuum,
+    Elbow,
+    Pipe,
+    Junction,
+}
+
+impl std::fmt::Display for Symbol {
+    #[rustfmt::skip]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Vacuum   => f.write_str("    "),
+            Self::Pipe     => f.write_str("│   "),
+            Self::Junction => f.write_str("├── "),
+            Self::Elbow    => f.write_str("└── "),
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 pub enum Fragment {
     #[default]
     Empty,
+    Symbol(Symbol),
     Char(char),
     String(std::borrow::Cow<'static, str>),
     DisplayAtom(std::rc::Rc<dyn std::fmt::Display>),
@@ -23,6 +44,7 @@ impl std::fmt::Debug for Fragment {
         match self {
             Self::Empty => write!(f, "Empty"),
             Self::Char(arg0) => f.debug_tuple("Char").field(arg0).finish(),
+            Self::Symbol(symb) => f.debug_tuple("Symbol").field(symb).finish(),
             Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
             Self::DisplayAtom(arg0) => f
                 .debug_tuple("DisplayAtom")
@@ -90,19 +112,25 @@ impl Fragment {
         Self::Group(Box::new(self))
     }
 
-    /// Append a newline character to the receiver.
-    ///
-    /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
-    #[inline]
-    fn enbreak(&mut self) -> &mut Self {
-        self.encat(Fragment::Char('\n'))
-    }
-
     /// Like [Fragment::group], except that it modifies a mutable reference in-place and passes it back to the caller
     fn engroup(&mut self) -> &mut Self {
         let this = Box::new(std::mem::take(self));
         *self = Self::Group(this);
         self
+    }
+
+    /// Return a new Fragment consisting of `self` with a newline appended to the end.
+    #[inline]
+    fn cat_break(self) -> Self {
+        Self::cat(self, Fragment::Char('\n'))
+    }
+
+    /// Append a newline character to the receiver.
+    ///
+    /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
+    #[inline]
+    fn encat_break(&mut self) -> &mut Self {
+        self.encat(Fragment::Char('\n'))
     }
 
     /// Returns an empty fragment
@@ -171,6 +199,7 @@ impl std::fmt::Display for Fragment {
         match self {
             Fragment::Empty => Ok(()),
             Fragment::Char(c) => f.write_char(*c),
+            Fragment::Symbol(symb) => symb.fmt(f),
             Fragment::String(s) => f.write_str(s.borrow()),
             Fragment::DisplayAtom(atom) => atom.fmt(f),
             Fragment::Group(frag) => frag.fmt(f),
