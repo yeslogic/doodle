@@ -2,7 +2,7 @@ use std::{fmt, io, rc::Rc};
 
 use crate::{Expr, Format, FormatModule, Scope, Value};
 
-use super::{Fragment, FragmentBuilder};
+use super::{Fragment, FragmentBuilder, Symbol};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     Context::new(io::stdout(), module)
@@ -1186,13 +1186,13 @@ impl<'module> MonoidalPrinter<'module> {
         let mut frags = FragmentBuilder::new();
         let frag = frags.active_mut();
         frag.encat(self.compile_gutter());
-        frag.encat(Fragment::String("└── ".into()));
+        frag.encat(Fragment::Symbol(Symbol::Elbow));
         for (i, th) in header.iter().enumerate() {
             frag.encat(Fragment::String(
                 format!(" {:>width$}", th, width = cols[i]).into(),
             ));
         }
-        frag.engroup().enbreak();
+        frag.engroup().encat_break();
         let mut frag = frags.renew();
         self.gutter.push(Column::Space);
         for tr in rows {
@@ -1202,7 +1202,7 @@ impl<'module> MonoidalPrinter<'module> {
                     format!(" {:>width$}", td, width = cols[i]).into(),
                 ));
             }
-            frag.engroup().enbreak();
+            frag.engroup().encat_break();
             frag = frags.renew();
         }
         self.gutter.pop();
@@ -1253,8 +1253,8 @@ impl<'module> MonoidalPrinter<'module> {
         let mut frags = FragmentBuilder::new();
         for column in &self.gutter {
             match column {
-                Column::Branch => frags.push(Fragment::String("│   ".into())),
-                Column::Space => frags.push(Fragment::String("    ".into())),
+                Column::Branch => frags.push(Fragment::Symbol(Symbol::Pipe)),
+                Column::Space => frags.push(Fragment::Symbol(Symbol::Vacuum)),
             }
         }
         frags.finalize()
@@ -1268,10 +1268,13 @@ impl<'module> MonoidalPrinter<'module> {
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         frags.push(self.compile_gutter());
-        frags.push(Fragment::String(format!("├── {label}").into()));
+        frags.push(Fragment::cat(
+            Fragment::Symbol(Symbol::Junction),
+            Fragment::String(format!("{label}").into()),
+        ));
         if let Some(format) = format {
             frags.push(Fragment::String(" <- ".into()));
-            frags.push(self.compile_format(format, Default::default()));
+            frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
         }
         self.gutter.push(Column::Branch);
         frags.push(self.compile_field_value(value, format));
@@ -1287,7 +1290,10 @@ impl<'module> MonoidalPrinter<'module> {
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         frags.push(self.compile_gutter());
-        frags.push(Fragment::String(format!("└── {label}").into()));
+        frags.push(Fragment::cat(
+            Fragment::Symbol(Symbol::Elbow),
+            Fragment::String(format!("{label}").into()),
+        ));
         if let Some(format) = format {
             frags.push(Fragment::String(" <- ".into()));
             frags.push(self.compile_format(format, Default::default()));
@@ -1326,21 +1332,12 @@ impl<'module> MonoidalPrinter<'module> {
             }
             None => {
                 if self.is_atomic_value(value, None) {
-                    Fragment::seq(
-                        [
-                            Fragment::String(" := ".into()),
-                            self.compile_value(value),
-                            Fragment::Char('\n'),
-                        ],
-                        None,
-                    )
-                    .group()
+                    Fragment::cat(Fragment::String(" := ".into()), self.compile_value(value))
+                        .cat_break()
+                        .group()
                 } else {
-                    Fragment::seq(
-                        [Fragment::String(" :=\n".into()), self.compile_value(value)],
-                        None,
-                    )
-                    .group()
+                    Fragment::cat(Fragment::String(" :=\n".into()), self.compile_value(value))
+                        .group()
                 }
             }
         }
@@ -1406,11 +1403,11 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::Match(head, _) => cond_paren(
                 Fragment::seq(
                     [
-                        Fragment::String("match ".into()),
+                        Fragment::String("match".into()),
                         self.compile_expr(head, Precedence::MATCH),
-                        Fragment::String(" { ... }".into()),
+                        Fragment::String("{ ... }".into()),
                     ],
-                    None,
+                    Some(Fragment::Char(' ')),
                 )
                 .group(),
                 prec,
@@ -1602,14 +1599,17 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Expr::Tuple(..) => Fragment::String("(...)".into()),
             Expr::Record(..) => Fragment::String("{ ... }".into()),
-            Expr::Variant(label, expr) => {
-                let mut frag = Fragment::new();
-                frag.encat(Fragment::String(format!("{{ {label} := ").into()));
-                frag.encat(self.compile_expr(expr, Default::default()));
-                frag.encat(Fragment::String(" }".into()));
-                frag.engroup();
-                frag
-            }
+            Expr::Variant(label, expr) => Fragment::seq(
+                [
+                    Fragment::Char('{'),
+                    Fragment::String(label.clone().into()),
+                    Fragment::String(":=".into()),
+                    self.compile_expr(expr, Default::default()),
+                    Fragment::Char('}'),
+                ],
+                Some(Fragment::Char(' ')),
+            )
+            .group(),
             Expr::Seq(..) => Fragment::String("[..]".into()),
         }
     }
