@@ -118,7 +118,7 @@ fn check_covered(
         Format::Byte(_) => {
             return Err(format!("uncovered byte: {:?}", path));
         }
-        Format::Union(branches) => {
+        Format::Union(branches) | Format::NondetUnion(branches) => {
             for (label, format) in branches {
                 path.push(label.clone());
                 check_covered(module, path, format)?;
@@ -192,7 +192,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::EndOfInput => Ok(()),
             Format::Align(_) => Ok(()),
             Format::Byte(_) => Ok(()),
-            Format::Union(branches) => match value {
+            Format::Union(branches) | Format::NondetUnion(branches) => match value {
                 Value::Variant(label, value) => {
                     let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
                     self.write_flat(value, format)

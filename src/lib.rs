@@ -419,6 +419,8 @@ pub enum Format {
     Byte(ByteSet),
     /// Matches the union of the byte strings matched by all the formats
     Union(Vec<(String, Format)>),
+    /// Temporary hack for nondeterministic unions
+    NondetUnion(Vec<(String, Format)>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
@@ -572,7 +574,7 @@ impl FormatModule {
             Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
             Format::Byte(_bs) => Ok(ValueType::U8),
-            Format::Union(branches) => {
+            Format::Union(branches) | Format::NondetUnion(branches) => {
                 let mut ts = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
                     ts.push((label.clone(), self.infer_format_type(scope, f)?));
@@ -690,6 +692,7 @@ enum Decoder {
     Align(usize),
     Byte(ByteSet),
     Branch(MatchTree, Vec<(String, Decoder)>),
+    Parallel(Vec<(String, Decoder)>),
     Tuple(Vec<Decoder>),
     Record(Vec<(String, Decoder)>),
     While(MatchTree, Box<Decoder>),
@@ -1192,7 +1195,7 @@ impl Format {
             Format::EndOfInput => Bounds::exact(0),
             Format::Align(n) => Bounds::new(0, Some(n - 1)),
             Format::Byte(_) => Bounds::exact(1),
-            Format::Union(branches) => branches
+            Format::Union(branches) | Format::NondetUnion(branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
@@ -1245,7 +1248,9 @@ impl Format {
             Format::EndOfInput => false,
             Format::Align(_) => false,
             Format::Byte(_) => false,
-            Format::Union(branches) => Format::union_depends_on_next(&branches, module),
+            Format::Union(branches) | Format::NondetUnion(branches) => {
+                Format::union_depends_on_next(&branches, module)
+            }
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Repeat(_) => true,
@@ -1376,7 +1381,7 @@ impl<'a> MatchTreeLevel<'a> {
                 self.branches.append(&mut new_branches);
                 Ok(())
             }
-            Format::Union(branches) => {
+            Format::Union(branches) | Format::NondetUnion(branches) => {
                 for (_, f) in branches {
                     self.add(module, index, f, next.clone())?;
                 }
@@ -1915,6 +1920,16 @@ impl Decoder {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
             }
+            Format::NondetUnion(branches) => {
+                let mut ds = Vec::with_capacity(branches.len());
+                for (label, f) in branches {
+                    ds.push((
+                        label.clone(),
+                        Decoder::compile_next(compiler, f, next.clone())?,
+                    ));
+                }
+                Ok(Decoder::Parallel(ds))
+            }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
@@ -2074,6 +2089,17 @@ impl Decoder {
                 let (label, d) = &branches[index];
                 let (v, input) = d.parse(program, scope, input)?;
                 Ok((Value::Variant(label.clone(), Box::new(v)), input))
+            }
+            Decoder::Parallel(branches) => {
+                for (label, d) in branches {
+                    let initial_len = scope.len();
+                    let res = d.parse(program, scope, input);
+                    if let Ok((v, input)) = res {
+                        return Ok((Value::Variant(label.clone(), Box::new(v)), input));
+                    }
+                    scope.truncate(initial_len);
+                }
+                Err(ParseError::fail(scope, input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
