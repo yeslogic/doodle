@@ -206,8 +206,8 @@ impl<'module, W: io::Write> Context<'module, W> {
         match b {
             0x00 => write!(&mut self.writer, "\\0"),
             0x09 => write!(&mut self.writer, "\\t"),
-            0x0a => write!(&mut self.writer, "\\n"),
-            0x0d => write!(&mut self.writer, "\\r"),
+            0x0A => write!(&mut self.writer, "\\n"),
+            0x0D => write!(&mut self.writer, "\\r"),
             32..=127 => write!(&mut self.writer, "{}", b as char),
             _ => write!(&mut self.writer, "\\x{:02X}", b),
         }
@@ -1100,8 +1100,8 @@ impl<'module> MonoidalPrinter<'module> {
         match b {
             0x00 => Fragment::String("\\0".into()),
             0x09 => Fragment::String("\\t".into()),
-            0x0a => Fragment::String("\\n".into()),
-            0x0d => Fragment::String("\\r".into()),
+            0x0A => Fragment::String("\\n".into()),
+            0x0D => Fragment::String("\\r".into()),
             32..=127 => Fragment::Char(b as char),
             _ => Fragment::String(format!("\\x{b:02X}").into()),
         }
