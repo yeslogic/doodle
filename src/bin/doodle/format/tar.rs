@@ -110,34 +110,31 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let header = module.define_format(
         "tar.header",
-        tuple([
-            Format::Peek(Box::new(not_byte(0x00))),
-            Format::FixedSlice(
-                BLOCK_SIZE as usize,
-                Box::new(record([
-                    ("name", cstr_arr_opt0(100)),                       // bytes 0 - 99
-                    ("mode", cbytes(8)),                                // bytes 100 - 107
-                    ("uid", cbytes(8)),                                 // bytes 108 - 115
-                    ("gid", cbytes(8)),                                 // bytes 116 - 123
-                    ("size", size_field),                               // bytes 124 - 135
-                    ("mtime", cbytes(12)),                              // bytes 136 - 147
-                    ("chksum", cstr_arr(8)),                            // bytes 148 - 155
-                    ("typeflag", base.u8()),                            // byte 156
-                    ("linkname", cstr_arr_opt0(100)),                   // bytes 157 - 256
-                    ("magic", magic),                                   // bytes 257 - 262
-                    ("version", tuple([is_byte(b'0'), is_byte(b'0')])), // bytes 263 - 264
-                    ("uname", cstr_arr(32)),                            // bytes 265 - 296
-                    ("gname", cstr_arr(32)),                            // bytes 297 - 328
-                    ("devmajor", cbytes(8)),                            // bytes 329 - 336
-                    ("devminor", cbytes(8)),                            // bytes 337 - 344
-                    ("prefix", cstr_arr_opt0(155)),                     // bytes 345 - 500
-                    (
-                        "@padding",
-                        repeat_count(Expr::U16(12), Format::Byte(ByteSet::full())),
-                    ),
-                ])),
-            ),
-        ]),
+        Format::FixedSlice(
+            BLOCK_SIZE as usize,
+            Box::new(record([
+                ("name", cstr_arr_opt0(100)),                       // bytes 0 - 99
+                ("mode", cbytes(8)),                                // bytes 100 - 107
+                ("uid", cbytes(8)),                                 // bytes 108 - 115
+                ("gid", cbytes(8)),                                 // bytes 116 - 123
+                ("size", size_field),                               // bytes 124 - 135
+                ("mtime", cbytes(12)),                              // bytes 136 - 147
+                ("chksum", cstr_arr(8)),                            // bytes 148 - 155
+                ("typeflag", base.u8()),                            // byte 156
+                ("linkname", cstr_arr_opt0(100)),                   // bytes 157 - 256
+                ("magic", magic),                                   // bytes 257 - 262
+                ("version", tuple([is_byte(b'0'), is_byte(b'0')])), // bytes 263 - 264
+                ("uname", cstr_arr(32)),                            // bytes 265 - 296
+                ("gname", cstr_arr(32)),                            // bytes 297 - 328
+                ("devmajor", cbytes(8)),                            // bytes 329 - 336
+                ("devminor", cbytes(8)),                            // bytes 337 - 344
+                ("prefix", cstr_arr_opt0(155)),                     // bytes 345 - 500
+                (
+                    "@padding",
+                    repeat_count(Expr::U16(12), Format::Byte(ByteSet::full())),
+                ),
+            ])),
+        ),
     );
 
     let full_block = repeat_count(Expr::U32(BLOCK_SIZE), Format::Byte(ByteSet::full()));
@@ -161,7 +158,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     repeat_count(
                         Expr::Div(
                             Box::new(Expr::RecordProj(
-                                Box::new(Expr::TupleProj(Box::new(var("header")), 1)),
+                                Box::new(var("header")),
                                 "size".to_string(),
                             )),
                             Box::new(Expr::U32(BLOCK_SIZE)),
@@ -170,7 +167,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     partial_block(Expr::Rem(
                         Box::new(Expr::RecordProj(
-                            Box::new(Expr::TupleProj(Box::new(var("header")), 1)),
+                            Box::new(var("header")),
                             "size".to_string(),
                         )),
                         Box::new(Expr::U32(BLOCK_SIZE)),
