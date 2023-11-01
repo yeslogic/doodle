@@ -30,13 +30,13 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         record([
             (
                 "data",
-                alts([
-                    ("gif", gif.call()),
-                    ("gzip", gzip.call()),
-                    ("jpeg", jpeg.call()),
-                    ("png", png.call()),
-                    ("riff", riff.call()),
-                    ("tar", tar.call()),
+                Format::NondetUnion(vec![
+                    ("gif".to_string(), gif.call()),
+                    ("gzip".to_string(), gzip.call()),
+                    ("jpeg".to_string(), jpeg.call()),
+                    ("png".to_string(), png.call()),
+                    ("riff".to_string(), riff.call()),
+                    ("tar".to_string(), tar.call()),
                 ]),
             ),
             ("end", Format::EndOfInput),

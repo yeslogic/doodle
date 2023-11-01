@@ -87,7 +87,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::EndOfInput => self.write_value(value),
             Format::Align(_) => self.write_value(value),
             Format::Byte(_) => self.write_value(value),
-            Format::Union(branches) => match value {
+            Format::Union(branches) | Format::NondetUnion(branches) => match value {
                 Value::Variant(label, value) => {
                     let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
                     self.write_variant(label, value, Some(format))
@@ -716,7 +716,7 @@ impl<'module, W: io::Write> Context<'module, W> {
 
     fn write_format(&mut self, format: &Format) -> io::Result<()> {
         match format {
-            Format::Union(_) => write!(&mut self.writer, "_ |...| _"),
+            Format::Union(_) | Format::NondetUnion(_) => write!(&mut self.writer, "_ |...| _"),
             Format::Peek(format) => {
                 write!(&mut self.writer, "peek ")?;
                 self.write_atomic_format(format)
@@ -975,7 +975,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::EndOfInput => self.compile_value(value),
             Format::Align(_) => self.compile_value(value),
             Format::Byte(_) => self.compile_value(value),
-            Format::Union(branches) => match value {
+            Format::Union(branches) | Format::NondetUnion(branches) => match value {
                 Value::Variant(label, value) => {
                     let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
                     self.compile_variant(label, value, Some(format))
@@ -1604,7 +1604,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_format(&mut self, format: &Format, prec: Precedence) -> Fragment {
         match format {
-            Format::Union(_) => cond_paren(
+            Format::Union(_) | Format::NondetUnion(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
                 prec,
                 Precedence::FORMAT_COMPOUND,
