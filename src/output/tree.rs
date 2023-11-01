@@ -1310,22 +1310,16 @@ impl<'module> MonoidalPrinter<'module> {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
                     Fragment::Char('\n')
                 } else if self.is_atomic_value(value, Some(format)) {
-                    Fragment::seq(
-                        [
-                            Fragment::String(" := ".into()),
-                            self.compile_decoded_value(value, format),
-                            Fragment::Char('\n'),
-                        ],
-                        None,
+                    Fragment::cat(
+                        Fragment::String(" := ".into()),
+                        self.compile_decoded_value(value, format),
                     )
+                    .cat_break()
                     .group()
                 } else {
-                    Fragment::seq(
-                        [
-                            Fragment::String(" :=\n".into()),
-                            self.compile_decoded_value(value, format),
-                        ],
-                        None,
+                    Fragment::cat(
+                        Fragment::String(" :=\n".into()),
+                        self.compile_decoded_value(value, format),
                     )
                     .group()
                 }
@@ -1358,14 +1352,10 @@ impl<'module> MonoidalPrinter<'module> {
         lhs_prec: Precedence,
         rhs_prec: Precedence,
     ) -> Fragment {
-        Fragment::seq(
-            [
-                self.compile_expr(lhs, lhs_prec),
-                self.compile_expr(rhs, rhs_prec),
-            ],
-            Some(Fragment::String(op.into())),
-        )
-        .group()
+        self.compile_expr(lhs, lhs_prec)
+            .cat(Fragment::String(op.into()))
+            .cat(self.compile_expr(rhs, rhs_prec))
+            .group()
     }
 
     /// Renders an Expr as a prefix-operator (with optional auxiliary arguments in parentheses)
@@ -1401,27 +1391,18 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_expr(&mut self, expr: &Expr, prec: Precedence) -> Fragment {
         match expr {
             Expr::Match(head, _) => cond_paren(
-                Fragment::seq(
-                    [
-                        Fragment::String("match".into()),
-                        self.compile_expr(head, Precedence::MATCH),
-                        Fragment::String("{ ... }".into()),
-                    ],
-                    Some(Fragment::Char(' ')),
-                )
-                .group(),
+                Fragment::String("match ".into())
+                    .cat(self.compile_expr(head, Precedence::MATCH))
+                    .cat(Fragment::String(" { ... }".into()))
+                    .group(),
                 prec,
                 Precedence::MATCH,
             ),
             Expr::Lambda(name, expr) => cond_paren(
-                Fragment::seq(
-                    [
-                        Fragment::String(format!("{name} -> ").into()),
-                        self.compile_expr(expr, Precedence::ARROW),
-                    ],
-                    None,
-                )
-                .group(),
+                Fragment::String(name.clone().into())
+                    .cat(Fragment::String(" -> ".into()))
+                    .cat(self.compile_expr(expr, Precedence::ARROW))
+                    .group(),
                 prec,
                 Precedence::ARROW,
             ),
@@ -1567,28 +1548,18 @@ impl<'module> MonoidalPrinter<'module> {
             ),
 
             Expr::TupleProj(head, index) => cond_paren(
-                Fragment::seq(
-                    [
-                        self.compile_expr(head, Precedence::PROJ),
-                        Fragment::Char('.'),
-                        Fragment::DisplayAtom(Rc::new(*index)),
-                    ],
-                    None,
-                )
-                .group(),
+                self.compile_expr(head, Precedence::PROJ)
+                    .cat(Fragment::Char('.'))
+                    .cat(Fragment::DisplayAtom(Rc::new(*index)))
+                    .group(),
                 prec,
                 Precedence::PROJ,
             ),
             Expr::RecordProj(head, label) => cond_paren(
-                Fragment::seq(
-                    [
-                        self.compile_expr(head, Precedence::PROJ),
-                        Fragment::Char('.'),
-                        Fragment::String(label.clone().into()),
-                    ],
-                    None,
-                )
-                .group(),
+                self.compile_expr(head, Precedence::PROJ)
+                    .cat(Fragment::Char('.'))
+                    .cat(Fragment::String(label.clone().into()))
+                    .group(),
                 prec,
                 Precedence::PROJ,
             ),
@@ -1599,17 +1570,12 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Expr::Tuple(..) => Fragment::String("(...)".into()),
             Expr::Record(..) => Fragment::String("{ ... }".into()),
-            Expr::Variant(label, expr) => Fragment::seq(
-                [
-                    Fragment::Char('{'),
-                    Fragment::String(label.clone().into()),
-                    Fragment::String(":=".into()),
-                    self.compile_expr(expr, Default::default()),
-                    Fragment::Char('}'),
-                ],
-                Some(Fragment::Char(' ')),
-            )
-            .group(),
+            Expr::Variant(label, expr) => Fragment::String("{ ".into())
+                .cat(Fragment::String(label.clone().into()))
+                .cat(Fragment::String(" := ".into()))
+                .cat(self.compile_expr(expr, Default::default()))
+                .cat(Fragment::String(" }".into()))
+                .group(),
             Expr::Seq(..) => Fragment::String("[..]".into()),
         }
     }
@@ -1738,14 +1704,10 @@ impl<'module> MonoidalPrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::Match(head, _) | Format::MatchVariant(head, _) => cond_paren(
-                Fragment::seq(
-                    [
-                        Fragment::String("match".into()),
-                        self.compile_expr(head, Precedence::PROJ),
-                        Fragment::String("{ ... }".into()),
-                    ],
-                    Some(Fragment::Char(' ')),
-                ),
+                Fragment::String("match ".into())
+                    .cat(self.compile_expr(head, Precedence::PROJ))
+                    .cat(Fragment::String(" { ... }".into()))
+                    .group(),
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
@@ -1978,7 +1940,7 @@ impl Precedence {
 fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
     match current.relate(&cutoff) {
         Relation::Disjoint | Relation::Superior => {
-            Fragment::seq([Fragment::Char('('), frag, Fragment::Char(')')], None)
+            Fragment::Char('(').cat(frag).cat(Fragment::Char(')'))
         }
         Relation::Congruent | Relation::Inferior => frag,
     }
