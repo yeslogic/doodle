@@ -1,4 +1,8 @@
-use std::{borrow::Borrow, fmt::Write};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt::{Display, Write},
+    rc::Rc,
+};
 
 pub mod flat;
 pub mod tree;
@@ -11,7 +15,7 @@ pub enum Symbol {
     Junction,
 }
 
-impl std::fmt::Display for Symbol {
+impl Display for Symbol {
     #[rustfmt::skip]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -29,8 +33,8 @@ pub enum Fragment {
     Empty,
     Symbol(Symbol),
     Char(char),
-    String(std::borrow::Cow<'static, str>),
-    DisplayAtom(std::rc::Rc<dyn std::fmt::Display>),
+    String(Cow<'static, str>),
+    DisplayAtom(Rc<dyn Display>),
     Group(Box<Fragment>),
     Cat(Box<Fragment>, Box<Fragment>),
     Sequence {
@@ -194,7 +198,7 @@ impl FragmentBuilder {
     }
 }
 
-impl std::fmt::Display for Fragment {
+impl Display for Fragment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Fragment::Empty => Ok(()),
