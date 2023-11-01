@@ -1932,7 +1932,7 @@ impl Precedence {
         match self {
             Precedence::Top => Precedence::Atomic,
             Precedence::Atomic => Precedence::Atomic,
-            _ => unreachable!("Unexpected non-format precdence level {self:?}"),
+            _ => unreachable!("Unexpected non-format precedence level {self:?}"),
         }
     }
 }
