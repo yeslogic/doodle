@@ -76,3 +76,14 @@ mod riff {
         check_output(output, expected)
     }
 }
+
+mod tar {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_tar() {
+        let output = doodle().args(["file", "test.tar"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.tar.stdout");
+        check_output(output, expected)
+    }
+}
