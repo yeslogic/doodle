@@ -4,8 +4,6 @@ use crate::format::base::*;
 
 const BLOCK_SIZE: u32 = 512;
 
-const OCTAL: [u8; 8] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7'];
-
 fn shl(value: Expr, places: Expr) -> Expr {
     Expr::Shl(Box::new(value), Box::new(places))
 }
@@ -44,21 +42,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // A format for uninterpreted N-byte values
     let cbytes =
         |len: u16| -> Format { repeat_count(Expr::U16(len), Format::Byte(ByteSet::full())) };
-
-    // USTAR allows `filename`, `linkname` and `prefix` to omit a trailing NUL if they fully occupy their respective array-fields
-    // Therefore, we eagerly parse all non-NUL characters within an N-byte slice, and in doing so either terminate
-    // by seeing an in-range NUL or running out of bytes to read (reaching the end of the sub-stream).
-    // However, as unused bytes are further required to be zeroed out, we can be more rigorous and demand the next characters,
-    // if any, after reaching the end of the first parse, are all NUL
-    let cstr_arr_opt0 = |len: u16| -> Format {
-        Format::Slice(
-            Expr::U16(len),
-            Box::new(record([
-                ("string", repeat(not_byte(0x00))),
-                ("padding", repeat(is_byte(0x00))),
-            ])),
-        )
-    };
 
     const MAGIC: &[u8; 6] = b"ustar\x00";
 
@@ -111,6 +94,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ])
     };
 
+    // USTAR allows `filename`, `linkname` and `prefix` to omit a trailing NUL if they fully occupy their respective array-fields
+    // Therefore, we eagerly parse all non-NUL characters within an N-byte slice, and in doing so either terminate
+    // by seeing an in-range NUL or running out of bytes to read (reaching the end of the sub-stream).
+    // However, as unused bytes are further required to be zeroed out, we can be more rigorous and demand the next characters,
+    // if any, after reaching the end of the first parse, are all NUL
     let tar_str_optz = module.define_format(
         "tar.ascii-string.opt0",
         record([
