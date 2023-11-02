@@ -126,9 +126,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_decoded_value(value, format),
-            Format::Slice(_, format) | Format::FixedSlice(_, format) => {
-                self.write_decoded_value(value, format)
-            }
+            Format::Slice(_, format) => self.write_decoded_value(value, format),
             Format::Bits(format) => self.write_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.write_decoded_value(value, format),
             Format::Compute(_expr) => self.write_value(value),
@@ -759,10 +757,6 @@ impl<'module, W: io::Write> Context<'module, W> {
                 write!(&mut self.writer, " ")?;
                 self.write_atomic_format(format)
             }
-            Format::FixedSlice(size, format) => {
-                write!(&mut self.writer, "slice {size} ")?;
-                self.write_atomic_format(format)
-            }
             Format::Bits(format) => {
                 write!(&mut self.writer, "bits ")?;
                 self.write_atomic_format(format)
@@ -1038,9 +1032,7 @@ impl<'module> MonoidalPrinter<'module> {
                 _ => panic!("expected sequence, found {value:?}"),
             },
             Format::Peek(format) => self.compile_decoded_value(value, format),
-            Format::Slice(_, format) | Format::FixedSlice(_, format) => {
-                self.compile_decoded_value(value, format)
-            }
+            Format::Slice(_, format) => self.compile_decoded_value(value, format),
             Format::Bits(format) => self.compile_decoded_value(value, format),
             Format::WithRelativeOffset(_, format) => self.compile_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_value(value),
@@ -1683,19 +1675,6 @@ impl<'module> MonoidalPrinter<'module> {
                 let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("slice", Some(&[expr_frag]), format, prec),
-                    prec,
-                    Precedence::FORMAT_COMPOUND,
-                )
-            }
-            Format::FixedSlice(size, format) => {
-                // REVIEW should fixed-size slices display differently from computed slices?
-                cond_paren(
-                    self.compile_nested_format(
-                        "slice",
-                        Some(&[Fragment::DisplayAtom(Rc::new(*size))]),
-                        format,
-                        prec,
-                    ),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )
