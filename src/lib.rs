@@ -452,6 +452,8 @@ pub enum Format {
     MatchVariant(Expr, Vec<(Pattern, String, Format)>),
     /// Format generated dynamically
     Dynamic(DynFormat),
+    /// Format with human-readable description
+    Described(Box<Format>, String),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -461,6 +463,13 @@ pub enum DynFormat {
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
+
+    pub fn with_comment<Comment: Into<String>>(self, comment: Comment) -> Format {
+        Format::Described(
+            Box::new(self),
+            comment.into()
+        )
+    }
 
     pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
         Format::Union(
@@ -651,6 +660,9 @@ impl FormatModule {
                     ("@value".to_string(), ValueType::U16),
                 ];
                 Ok(ValueType::Record(ts))
+            },
+            Format::Described(a, _) => {
+                self.infer_format_type(scope, a)
             }
         }
     }
@@ -1229,6 +1241,7 @@ impl Format {
                 .reduce(Bounds::union)
                 .unwrap(),
             Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::new(1, None),
+            Format::Described(f, _comment) => f.match_bounds(module),
         }
     }
 
@@ -1263,6 +1276,7 @@ impl Format {
                 branches.iter().any(|(_, _, f)| f.depends_on_next(module))
             }
             Format::Dynamic(_) => false,
+            Format::Described(f, _) => f.depends_on_next(module),
         }
     }
 
@@ -1457,6 +1471,7 @@ impl<'a> MatchTreeLevel<'a> {
             Format::Dynamic(DynFormat::Huffman(_, _)) => {
                 self.accept(index) // FIXME
             }
+            Format::Described(f, _comment) => self.add(module, index, f, next),
         }
     }
 
@@ -2027,6 +2042,7 @@ impl Decoder {
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
+            Format::Described(a, _comment) => Decoder::compile_next(compiler, a, next),
         }
     }
 

@@ -160,6 +160,11 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Ok(())
             }
             Format::Dynamic(_) => self.write_value(value),
+            Format::Described(f, comment) => {
+                self.write_decoded_value(value, f)?;
+                write!(&mut self.writer, "/* {comment} */")?;
+                Ok(())
+            }
         }
     }
 
@@ -1050,6 +1055,12 @@ impl<'module> MonoidalPrinter<'module> {
                 frag
             }
             Format::Dynamic(_) => self.compile_value(value),
+            Format::Described(f, comment) => {
+                self.compile_decoded_value(value, f)
+                    .cat(Fragment::String("/* ".into()))
+                    .cat(Fragment::String(comment.clone().into()))
+                    .cat(Fragment::String(" */".into()))
+            }
         }
     }
 
@@ -1748,11 +1759,18 @@ impl<'module> MonoidalPrinter<'module> {
                     frags.finalize()
                 }
             }
-            Format::Tuple(formats) if formats.is_empty() => Fragment::String("()".into()),
-            Format::Tuple(_) => Fragment::String("(...)".into()),
+            Format::Tuple(formats) if formats.is_empty() => Fragment::from("()"),
+            Format::Tuple(_) => Fragment::from("(...)"),
 
-            Format::Record(fields) if fields.is_empty() => Fragment::String("{}".into()),
-            Format::Record(_) => Fragment::String("{ ... }".into()),
+            Format::Record(fields) if fields.is_empty() => Fragment::from("{}"),
+            Format::Record(_) => Fragment::from("{ ... }"),
+
+            Format::Described(f, comment) => {
+                self.compile_format(f, prec)
+                    .cat("/* ".into())
+                    .cat(comment.clone().into())
+                    .cat(" */".into())
+            }
         }
     }
 }
