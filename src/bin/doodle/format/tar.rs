@@ -34,7 +34,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let cstr_arr = |len: u16| -> Format {
         Format::Slice(
             Expr::U16(len),
-            Box::new(tuple([base.asciiz_string(), repeat(is_byte(0x00))])),
+            Box::new(record([
+                ("string", base.asciiz_string()),
+                ("padding", repeat(is_byte(0x00))),
+            ])),
         )
     };
 
@@ -51,7 +54,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         Format::Slice(
             Expr::U16(len),
             Box::new(record([
-                ("data", repeat(not_byte(0x00))),
+                ("string", repeat(not_byte(0x00))),
                 ("padding", repeat(is_byte(0x00))),
             ])),
         )
@@ -61,7 +64,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let magic = is_bytes(MAGIC);
     let size_field = {
-        let octal = Format::Byte(ByteSet::from(OCTAL));
+        let octal = base.ascii_octal_digit();
 
         let octal_digit = record([
             ("bit", octal),
@@ -108,27 +111,49 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ])
     };
 
+    let tar_str_optz = module.define_format(
+        "tar.ascii-string.opt0",
+        record([
+            ("string", repeat(not_byte(0x00))),
+            ("padding", repeat(is_byte(0x00))),
+        ]),
+    );
+
+    let tar_str_optz_ne = module.define_format(
+        "tar.ascii-string.opt0.nonempty",
+        record([
+            ("string", repeat1(not_byte(0x00))),
+            ("padding", repeat(is_byte(0x00))),
+        ]),
+    );
+
+    let filename = Format::Slice(Expr::U16(100), Box::new(tar_str_optz_ne.call()));
+
+    let linkname = Format::Slice(Expr::U16(100), Box::new(tar_str_optz.call()));
+
+    let prefix = Format::Slice(Expr::U16(155), Box::new(tar_str_optz.call()));
+
     let header = module.define_format(
         "tar.header",
         Format::FixedSlice(
             BLOCK_SIZE as usize,
             Box::new(record([
-                ("name", cstr_arr_opt0(100)),                       // bytes 0 - 99
-                ("mode", cbytes(8)),                                // bytes 100 - 107
-                ("uid", cbytes(8)),                                 // bytes 108 - 115
-                ("gid", cbytes(8)),                                 // bytes 116 - 123
-                ("size", size_field),                               // bytes 124 - 135
-                ("mtime", cbytes(12)),                              // bytes 136 - 147
-                ("chksum", cstr_arr(8)),                            // bytes 148 - 155
-                ("typeflag", base.u8()),                            // byte 156
-                ("linkname", cstr_arr_opt0(100)),                   // bytes 157 - 256
-                ("magic", magic),                                   // bytes 257 - 262
-                ("version", tuple([is_byte(b'0'), is_byte(b'0')])), // bytes 263 - 264
-                ("uname", cstr_arr(32)),                            // bytes 265 - 296
-                ("gname", cstr_arr(32)),                            // bytes 297 - 328
-                ("devmajor", cbytes(8)),                            // bytes 329 - 336
-                ("devminor", cbytes(8)),                            // bytes 337 - 344
-                ("prefix", cstr_arr_opt0(155)),                     // bytes 345 - 500
+                ("name", filename),           // bytes 0 - 99
+                ("mode", cbytes(8)),          // bytes 100 - 107
+                ("uid", cbytes(8)),           // bytes 108 - 115
+                ("gid", cbytes(8)),           // bytes 116 - 123
+                ("size", size_field),         // bytes 124 - 135
+                ("mtime", cbytes(12)),        // bytes 136 - 147
+                ("chksum", cstr_arr(8)),      // bytes 148 - 155
+                ("typeflag", base.u8()),      // byte 156
+                ("linkname", linkname),       // bytes 157 - 256
+                ("magic", magic),             // bytes 257 - 262
+                ("version", is_bytes(b"00")), // bytes 263 - 264
+                ("uname", cstr_arr(32)),      // bytes 265 - 296
+                ("gname", cstr_arr(32)),      // bytes 297 - 328
+                ("devmajor", cbytes(8)),      // bytes 329 - 336
+                ("devminor", cbytes(8)),      // bytes 337 - 344
+                ("prefix", prefix),           // bytes 345 - 500
                 (
                     "@padding",
                     repeat_count(Expr::U16(12), Format::Byte(ByteSet::full())),

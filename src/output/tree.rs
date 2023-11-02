@@ -69,12 +69,14 @@ impl<'module, W: io::Write> Context<'module, W> {
     pub fn write_decoded_value(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
             Format::ItemVar(level, _args) => {
+                let fmt_name = self.module.get_name(*level);
+
                 if self.flags.pretty_ascii_strings
-                    && self.module.get_name(*level) == "base.asciiz-string"
+                    && (fmt_name == "base.asciiz-string"
+                        || (fmt_name.contains("ascii") && fmt_name.contains("string")))
                 {
                     self.write_ascii_string(value)
-                } else if self.flags.pretty_ascii_strings
-                    && self.module.get_name(*level) == "base.ascii-char"
+                } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
                     write!(&mut self.writer, "'")?;
                     self.write_ascii_char(value)?;
@@ -313,6 +315,12 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
             Format::Record(fields) => fields.iter().all(|(_, f)| self.is_implied_value_format(f)),
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatUntilSeq(_, format)
+            | Format::RepeatUntilLast(_, format) => self.is_implied_value_format(format),
+            Format::Slice(_, format) => self.is_implied_value_format(format),
             _ => false,
         }
     }
@@ -329,6 +337,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             | Format::RepeatCount(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => self.is_ascii_char_format(format),
+            Format::Slice(_, format) => self.is_ascii_string_format(format),
             _ => false,
         }
     }
@@ -849,6 +858,12 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Byte(bs) => bs.len() == 1,
             Format::Tuple(fields) => fields.iter().all(|f| self.is_implied_value_format(f)),
             Format::Record(fields) => fields.iter().all(|(_, f)| self.is_implied_value_format(f)),
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatUntilSeq(_, format)
+            | Format::RepeatUntilLast(_, format) => self.is_implied_value_format(format),
+            Format::Slice(_, format) => self.is_implied_value_format(format),
             _ => false,
         }
     }
@@ -865,6 +880,7 @@ impl<'module> MonoidalPrinter<'module> {
             | Format::RepeatCount(_, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => self.is_ascii_char_format(format),
+            Format::Slice(_, format) => self.is_ascii_string_format(format),
             _ => false,
         }
     }
@@ -956,12 +972,15 @@ impl<'module> MonoidalPrinter<'module> {
         let mut frag = Fragment::Empty;
         match fmt {
             Format::ItemVar(level, _args) => {
+                let fmt_name = self.module.get_name(*level);
+
                 if self.flags.pretty_ascii_strings
-                    && self.module.get_name(*level) == "base.asciiz-string"
+                    && (fmt_name == "base.asciiz-string"
+                        || (fmt_name.contains("ascii") && fmt_name.contains("string")))
                 {
                     self.compile_ascii_string(value)
                 } else if self.flags.pretty_ascii_strings
-                    && self.module.get_name(*level) == "base.ascii-char"
+                    && self.module.get_name(*level).starts_with("base.ascii-char")
                 {
                     frag.encat(Fragment::Char('\''));
                     frag.encat(self.compile_ascii_char(value));
