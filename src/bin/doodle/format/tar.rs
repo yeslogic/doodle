@@ -29,28 +29,26 @@ fn o4u32(hh: Expr, hl: Expr, lh: Expr, ll: Expr) -> Expr {
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // A format for C-style `char[N]` fields for static `N`, representing
     // CString values. All unused bytes following the terminal NUL must also be NUL
-    let cstr_arr = |len: u16| -> Format {
-        Format::Slice(
-            Expr::U16(len),
-            Box::new(record([
-                ("string", base.asciiz_string()),
-                ("padding", repeat(is_byte(0x00))),
-            ])),
-        )
-    };
+    let tar_asciiz = module.define_format(
+        "tar.ascii-string",
+        record([
+            ("string", repeat(not_byte(0x00))),
+            ("padding", repeat1(is_byte(0x00))),
+        ]),
+    );
+
+    let cstr_arr =
+        |len: u16| -> Format { Format::Slice(Expr::U16(len), Box::new(tar_asciiz.call())) };
 
     // A format for uninterpreted N-byte values
-    let cbytes =
-        |len: u16| -> Format { repeat_count(Expr::U16(len), Format::Byte(ByteSet::full())) };
+    let cbytes = |len: u16| -> Format { repeat_count(Expr::U16(len), base.u8()) };
 
     const MAGIC: &[u8; 6] = b"ustar\x00";
 
     let magic = is_bytes(MAGIC);
     let size_field = {
-        let octal = base.ascii_octal_digit();
-
         let octal_digit = record([
-            ("bit", octal),
+            ("bit", base.ascii_octal_digit()),
             (
                 "@value",
                 Format::Compute(Expr::Sub(
