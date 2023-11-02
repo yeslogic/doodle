@@ -165,6 +165,9 @@ fn check_covered(
             }
         }
         Format::Dynamic(_) => {} // FIXME
+        Format::Described(format, _comment) => {
+            check_covered(module, path, format)?;
+        }
     }
     Ok(())
 }
@@ -269,6 +272,11 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Ok(())
             }
             Format::Dynamic(_) => Ok(()), // FIXME
+            Format::Described(f, comment) => {
+                self.write_flat(value, f)?;
+                write!(&mut self.writer, "/* {comment} */")?;
+                Ok(())
+            }
         }
     }
 }

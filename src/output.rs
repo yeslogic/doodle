@@ -233,3 +233,21 @@ impl Display for Fragment {
         }
     }
 }
+
+impl From<&'static str> for Fragment {
+    fn from(value: &'static str) -> Self {
+        Self::String(Cow::Borrowed(value))
+    }
+}
+
+impl From<String> for Fragment {
+    fn from(value: String) -> Self {
+        Self::String(Cow::Owned(value))
+    }
+}
+
+impl From<char> for Fragment {
+    fn from(value: char) -> Self {
+        Self::Char(value)
+    }
+}
