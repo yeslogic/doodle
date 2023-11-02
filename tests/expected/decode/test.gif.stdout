@@ -10,7 +10,7 @@
 │       │   │   ├── flags <- base.u8 := 244
 │       │   │   ├── bg-color-index <- base.u8 := 0
 │       │   │   └── pixel-aspect-ratio <- base.u8 := 0
-│       │   └── global-color-table <- match ((descriptor.flags & 128) != 0) { ... } :=
+│       │   └── global-color-table <- match (descriptor.flags & 128 != 0) { ... } :=
 │       │       └──    r   g   b
 │       │              0   0   0
 │       │            162 161 162
@@ -65,7 +65,7 @@
 │       │                   │   ├── image-width <- base.u16le := 50
 │       │                   │   ├── image-height <- base.u16le := 50
 │       │                   │   └── flags <- base.u8 := 0
-│       │                   ├── local-color-table <- match ((descriptor.flags & 128) != 0) { ... } := ()
+│       │                   ├── local-color-table <- match (descriptor.flags & 128 != 0) { ... } := ()
 │       │                   └── data <- gif.table-based-image-data :=
 │       │                       ├── lzw-min-code-size <- base.u8 := 5
 │       │                       ├── image-data <- repeat gif.subblock :=
