@@ -806,21 +806,25 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::EndOfInput => write!(&mut self.writer, "end-of-input"),
             Format::Align(n) => write!(&mut self.writer, "align {n}"),
 
-            Format::Byte(bs) => {
-                if bs.len() < 128 {
+            Format::Byte(bs) => match bs.len() {
+                0 => unreachable!("matches against the empty byteset are unsatisfiable"),
+                1..=127 => {
                     write!(&mut self.writer, "[=")?;
                     for b in bs.iter() {
                         write!(&mut self.writer, " {b}")?;
                     }
                     write!(&mut self.writer, "]")
-                } else {
+                }
+                128..=255 => {
                     write!(&mut self.writer, "[!=")?;
                     for b in (!bs).iter() {
                         write!(&mut self.writer, " {b}")?;
                     }
                     write!(&mut self.writer, "]")
                 }
-            }
+                256 => write!(&mut self.writer, "U8"),
+                _n => unreachable!("impossible ByteSet size {_n}!"),
+            },
 
             Format::Tuple(formats) if formats.is_empty() => write!(&mut self.writer, "()"),
             Format::Tuple(_) => write!(&mut self.writer, "(...)"),
@@ -1746,8 +1750,9 @@ impl<'module> MonoidalPrinter<'module> {
             Format::EndOfInput => Fragment::String("end-of-input".into()),
             Format::Align(n) => Fragment::String(format!("align {n}").into()),
 
-            Format::Byte(bs) => {
-                if bs.len() < 128 {
+            Format::Byte(bs) => match bs.len() {
+                0 => unreachable!("matches against the empty byteset are unsatisfiable"),
+                1..=127 => {
                     let mut frags = FragmentBuilder::new();
                     frags.push(Fragment::String("[=".into()));
                     for b in bs.iter() {
@@ -1755,7 +1760,8 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                     frags.push(Fragment::Char(']'));
                     frags.finalize()
-                } else {
+                }
+                128..=255 => {
                     let mut frags = FragmentBuilder::new();
                     frags.push(Fragment::String("[!=".into()));
                     for b in (!bs).iter() {
@@ -1764,7 +1770,9 @@ impl<'module> MonoidalPrinter<'module> {
                     frags.push(Fragment::Char(']'));
                     frags.finalize()
                 }
-            }
+                256 => Fragment::String("U8".into()),
+                _n => unreachable!("impossible ByteSet size {_n}"),
+            },
             Format::Tuple(formats) if formats.is_empty() => Fragment::String("()".into()),
             Format::Tuple(_) => Fragment::String("(...)".into()),
 
