@@ -440,8 +440,6 @@ pub enum Format {
     Peek(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
     Slice(Expr, Box<Format>),
-    /// Like [Format::Slice], except the number of bytes is invariant and known in advance
-    FixedSlice(usize, Box<Format>),
     /// Parse bitstream
     Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
@@ -615,7 +613,6 @@ impl FormatModule {
             }
             Format::Peek(a) => self.infer_format_type(scope, a),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
-            Format::FixedSlice(_sz, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
             Format::Compute(expr) => expr.infer_type(scope),
@@ -702,7 +699,6 @@ enum Decoder {
     RepeatUntilSeq(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
-    FixedSlice(usize, Box<Decoder>),
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Compute(Expr),
@@ -1217,7 +1213,6 @@ impl Format {
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
-            Format::FixedSlice(sz, _) => Bounds::exact(*sz),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
             Format::Compute(_) => Bounds::exact(0),
@@ -1259,7 +1254,7 @@ impl Format {
             Format::RepeatUntilLast(_, _f) => false,
             Format::RepeatUntilSeq(_, _f) => false,
             Format::Peek(_) => false,
-            Format::Slice(_, _) | Format::FixedSlice(_, _) => false,
+            Format::Slice(_, _) => false,
             Format::Bits(_) => false,
             Format::WithRelativeOffset(_, _) => false,
             Format::Compute(_) => false,
@@ -1432,13 +1427,6 @@ impl<'a> MatchTreeLevel<'a> {
             }
             Format::Slice(_expr, _a) => {
                 self.accept(index) // FIXME
-            }
-            Format::FixedSlice(sz, a) => {
-                if *sz == 0 {
-                    self.accept(index)
-                } else {
-                    self.add(module, index, a, next.clone()) // FIXME thi may not be right
-                }
             }
             Format::Bits(_a) => {
                 self.accept(index) // FIXME
@@ -2003,10 +1991,6 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Slice(expr.clone(), da))
             }
-            Format::FixedSlice(sz, a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
-                Ok(Decoder::FixedSlice(*sz, da))
-            }
             Format::Bits(a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::Bits(da))
@@ -2203,13 +2187,6 @@ impl Decoder {
                 let (slice, input) = input
                     .split_at(size)
                     .ok_or(ParseError::overrun(size, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
-                Ok((v, input))
-            }
-            Decoder::FixedSlice(size, a) => {
-                let (slice, input) = input
-                    .split_at(*size)
-                    .ok_or(ParseError::overrun(*size, input.offset))?;
                 let (v, _) = a.parse(program, scope, slice)?;
                 Ok((v, input))
             }
