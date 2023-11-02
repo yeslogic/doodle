@@ -108,6 +108,6 @@
 │       └── iend <- png.iend :=
 │           ├── length <- base.u32be := 0
 │           ├── tag <- png.iend-tag
-│           ├── data <- slice length png.iend-data := ()
+│           ├── data <- slice length png.iend-data
 │           └── crc <- base.u32be := 2923585666
 └── end <- end-of-input

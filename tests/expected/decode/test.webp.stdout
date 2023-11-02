@@ -19,7 +19,7 @@
 │       │       │   │   ├── 7 <- base.u8 := 58
 │       │       │   │   ├── 8 <- base.u8 := 0
 │       │       │   │   └── 9 <- base.u8 := 0
-│       │       │   └── pad <- match ((length % 2) == 0) { ... } := ()
+│       │       │   └── pad <- match (length % 2 == 0) { ... } := ()
 │       │       ├── 1 <- riff.chunk :=
 │       │       │   ├── tag <- riff.tag := "VP8L"
 │       │       │   ├── length <- base.u32le := 963
@@ -36,7 +36,7 @@
 │       │       │   │   ├── 9 <- base.u8 := 173
 │       │       │   │   ~
 │       │       │   │   └── 962 <- base.u8 := 13
-│       │       │   └── pad <- match ((length % 2) == 0) { ... } := 0
+│       │       │   └── pad <- match (length % 2 == 0) { ... } := 0
 │       │       └── 2 <- riff.chunk :=
 │       │           ├── tag <- riff.tag := "EXIF"
 │       │           ├── length <- base.u32le := 138
@@ -53,6 +53,6 @@
 │       │           │   ├── 9 <- base.u8 := 42
 │       │           │   ~
 │       │           │   └── 137 <- base.u8 := 0
-│       │           └── pad <- match ((length % 2) == 0) { ... } := ()
-│       └── pad <- match ((length % 2) == 0) { ... } := ()
+│       │           └── pad <- match (length % 2 == 0) { ... } := ()
+│       └── pad <- match (length % 2 == 0) { ... } := ()
 └── end <- end-of-input
