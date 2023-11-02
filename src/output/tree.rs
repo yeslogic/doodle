@@ -71,10 +71,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::ItemVar(level, _args) => {
                 let fmt_name = self.module.get_name(*level);
 
-                if self.flags.pretty_ascii_strings
-                    && (fmt_name == "base.asciiz-string"
-                        || (fmt_name.contains("ascii") && fmt_name.contains("string")))
-                {
+                if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
                     self.write_ascii_string(value)
                 } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
@@ -328,7 +325,7 @@ impl<'module, W: io::Write> Context<'module, W> {
     fn is_ascii_string_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level, _args) => {
-                self.module.get_name(*level) == "base.asciiz-string"
+                name_is_ascii_string(self.module.get_name(*level))
                     || self.is_ascii_string_format(self.module.get_format(*level))
             }
             Format::Tuple(formats) => self.is_ascii_tuple_format(formats),
@@ -840,6 +837,11 @@ impl<'module, W: io::Write> Context<'module, W> {
     }
 }
 
+#[inline]
+fn name_is_ascii_string(name: &str) -> bool {
+    name.contains("ascii") && name.contains("string")
+}
+
 pub struct MonoidalPrinter<'module> {
     gutter: Vec<Column>,
     preview_len: Option<usize>,
@@ -871,7 +873,7 @@ impl<'module> MonoidalPrinter<'module> {
     fn is_ascii_string_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level, _args) => {
-                self.module.get_name(*level) == "base.asciiz-string"
+                name_is_ascii_string(self.module.get_name(*level))
                     || self.is_ascii_string_format(self.module.get_format(*level))
             }
             Format::Tuple(formats) => self.is_ascii_tuple_format(formats),
@@ -974,13 +976,9 @@ impl<'module> MonoidalPrinter<'module> {
             Format::ItemVar(level, _args) => {
                 let fmt_name = self.module.get_name(*level);
 
-                if self.flags.pretty_ascii_strings
-                    && (fmt_name == "base.asciiz-string"
-                        || (fmt_name.contains("ascii") && fmt_name.contains("string")))
-                {
+                if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
                     self.compile_ascii_string(value)
-                } else if self.flags.pretty_ascii_strings
-                    && self.module.get_name(*level).starts_with("base.ascii-char")
+                } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
                     frag.encat(Fragment::Char('\''));
                     frag.encat(self.compile_ascii_char(value));
