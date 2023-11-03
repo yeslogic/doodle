@@ -1,4 +1,4 @@
-use std::{fmt, io, rc::Rc};
+use std::{fmt, io, ops::Deref, rc::Rc};
 
 use crate::{Expr, Format, FormatModule, Scope, Value};
 
@@ -31,6 +31,7 @@ pub struct Flags {
     omit_implied_values: bool,
     tables_for_record_sequences: bool,
     pretty_ascii_strings: bool,
+    hide_double_underscore_fields: bool,
 }
 
 #[inline]
@@ -132,6 +133,7 @@ impl<'module> MonoidalPrinter<'module> {
             omit_implied_values: true,
             tables_for_record_sequences: true,
             pretty_ascii_strings: true,
+            hide_double_underscore_fields: true,
         };
         MonoidalPrinter {
             gutter: Vec::new(),
@@ -410,6 +412,32 @@ impl<'module> MonoidalPrinter<'module> {
         value_fields: &[(String, Value)],
         format_fields: Option<&[(String, Format)]>,
     ) -> Fragment {
+        let mut value_fields_filt = Vec::new();
+        let mut format_fields_filt = format_fields.map(|_| Vec::new());
+
+        let (value_fields, format_fields) = if self.flags.hide_double_underscore_fields
+            && value_fields.iter().any(|(lab, _)| lab.starts_with("__"))
+        {
+            value_fields_filt.extend(
+                value_fields
+                    .iter()
+                    .filter(|(lab, _)| !lab.starts_with("__"))
+                    .cloned(),
+            );
+            // we can unwrap below because format_fields_filt is only Some (and the closure will only be called) if format_fields is Some
+            format_fields_filt.as_mut().map(|v: &mut Vec<_>| {
+                v.extend(
+                    format_fields
+                        .unwrap()
+                        .iter()
+                        .filter(|(lab, _)| !lab.starts_with("__"))
+                        .cloned(),
+                )
+            });
+            (value_fields_filt.deref(), format_fields_filt.as_deref())
+        } else {
+            (value_fields, format_fields)
+        };
         if value_fields.is_empty() {
             Fragment::String("{}".into())
         } else if let Some((_, v)) = value_fields.iter().find(|(label, _)| label == "@value") {

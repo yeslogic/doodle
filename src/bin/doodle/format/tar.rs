@@ -37,14 +37,26 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
-    let cstr_arr =
-        |len: u16| -> Format { Format::Slice(Expr::U16(len), Box::new(tar_asciiz.call())) };
-
-    // A format for uninterpreted N-byte values
-    let cbytes = |len: u16| -> Format { repeat_count(Expr::U16(len), base.u8()) };
-
     const MAGIC: &[u8; 6] = b"ustar\x00";
 
+    let nul_or_wsp = module.define_format(
+        "tar.padding-char",
+        Format::Byte(ByteSet::from([0x00, b' '])),
+    );
+
+    // A format for uninterpreted N-byte values
+    let cbytes = |len: u16| {
+        record([
+            (
+                "string",
+                repeat_count(Expr::U16(len - 1), base.ascii_char()),
+            ),
+            ("__pad", nul_or_wsp.call()),
+        ])
+    };
+
+    let cstr_arr =
+        |len: u16| -> Format { Format::Slice(Expr::U16(len), Box::new(tar_asciiz.call())) };
     let magic = is_bytes(MAGIC);
     let size_field = {
         let octal_digit = record([
@@ -58,8 +70,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
         ]);
 
-        let nul_or_wsp = Format::Byte(ByteSet::from([0x00, b' ']));
-
         record([
             ("oA", octal_digit.clone()),
             ("o9", octal_digit.clone()),
@@ -72,7 +82,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("o2", octal_digit.clone()),
             ("o1", octal_digit.clone()),
             ("o0", octal_digit.clone()),
-            ("nil", nul_or_wsp),
+            ("__nil", nul_or_wsp.call()),
             (
                 "@value",
                 Format::Compute(bitor(
@@ -101,7 +111,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "tar.ascii-string.opt0",
         record([
             ("string", repeat(not_byte(0x00))),
-            ("padding", repeat(is_byte(0x00))),
+            ("__padding", repeat(is_byte(0x00))),
         ]),
     );
 
@@ -109,7 +119,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "tar.ascii-string.opt0.nonempty",
         record([
             ("string", repeat1(not_byte(0x00))),
-            ("padding", repeat(is_byte(0x00))),
+            ("__padding", repeat(is_byte(0x00))),
         ]),
     );
 
@@ -130,7 +140,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("gid", cbytes(8)),           // bytes 116 - 123
                 ("size", size_field),         // bytes 124 - 135
                 ("mtime", cbytes(12)),        // bytes 136 - 147
-                ("chksum", cstr_arr(8)),      // bytes 148 - 155
+                ("chksum", cbytes(8)),      // bytes 148 - 155
                 ("typeflag", base.u8()),      // byte 156
                 ("linkname", linkname),       // bytes 157 - 256
                 ("magic", magic),             // bytes 257 - 262
@@ -141,8 +151,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("devminor", cbytes(8)),      // bytes 337 - 344
                 ("prefix", prefix),           // bytes 345 - 500
                 (
-                    "@padding",
-                    repeat_count(Expr::U16(12), Format::Byte(ByteSet::full())),
+                    "pad",
+                    repeat_count(Expr::U16(12), is_byte(0x00)),
                 ),
             ])),
         ),
@@ -162,7 +172,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             base.u8(),
                         ),
                     ),
-                    ("@padding", Format::Align(512)),
+                    ("__padding", Format::Align(512)),
                 ]),
             ),
         ]),
@@ -173,10 +183,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("contents", repeat1(header_with_data.call())),
             (
-                "padding",
+                "__padding",
                 repeat_count(Expr::U32(2 * BLOCK_SIZE), is_byte(0x00)),
             ),
-            ("trailing", repeat(is_byte(0x00))),
+            ("__trailing", repeat(is_byte(0x00))),
         ]),
     )
 }
