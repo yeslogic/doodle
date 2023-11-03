@@ -134,22 +134,22 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         Format::Slice(
             Expr::U32(BLOCK_SIZE),
             Box::new(record([
-                ("name", filename),           // bytes 0 - 99
-                ("mode", cbytes(8)),          // bytes 100 - 107
-                ("uid", cbytes(8)),           // bytes 108 - 115
-                ("gid", cbytes(8)),           // bytes 116 - 123
-                ("size", size_field),         // bytes 124 - 135
-                ("mtime", cbytes(12)),        // bytes 136 - 147
-                ("chksum", cbytes(8)),      // bytes 148 - 155
-                ("typeflag", base.u8()),      // byte 156
-                ("linkname", linkname),       // bytes 157 - 256
-                ("magic", magic),             // bytes 257 - 262
-                ("version", is_bytes(b"00")), // bytes 263 - 264
-                ("uname", cstr_arr(32)),      // bytes 265 - 296
-                ("gname", cstr_arr(32)),      // bytes 297 - 328
-                ("devmajor", cbytes(8)),      // bytes 329 - 336
-                ("devminor", cbytes(8)),      // bytes 337 - 344
-                ("prefix", prefix),           // bytes 345 - 500
+                ("name", filename),              // bytes 0 - 99
+                ("mode", cbytes(8)),             // bytes 100 - 107
+                ("uid", cbytes(8)),              // bytes 108 - 115
+                ("gid", cbytes(8)),              // bytes 116 - 123
+                ("size", size_field),            // bytes 124 - 135
+                ("mtime", cbytes(12)),           // bytes 136 - 147
+                ("chksum", cbytes(8)),           // bytes 148 - 155
+                ("typeflag", base.ascii_char()), // byte 156
+                ("linkname", linkname),          // bytes 157 - 256
+                ("magic", magic),                // bytes 257 - 262
+                ("version", is_bytes(b"00")),    // bytes 263 - 264
+                ("uname", cstr_arr(32)),         // bytes 265 - 296
+                ("gname", cstr_arr(32)),         // bytes 297 - 328
+                ("devmajor", cbytes(8)),         // bytes 329 - 336
+                ("devminor", cbytes(8)),         // bytes 337 - 344
+                ("prefix", prefix),              // bytes 345 - 500
                 (
                     "pad",
                     repeat_count(Expr::U16(12), is_byte(0x00)),
