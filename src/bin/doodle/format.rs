@@ -11,6 +11,7 @@ mod jpeg;
 mod png;
 mod riff;
 mod tar;
+mod text;
 mod tiff;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
@@ -24,6 +25,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let png = png::main(module, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
+    let text = text::main(module, &base);
 
     module.define_format(
         "main",
@@ -37,6 +39,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("png".to_string(), png.call()),
                     ("riff".to_string(), riff.call()),
                     ("tar".to_string(), tar.call()),
+                    ("text".to_string(), text.call()),
                 ]),
             ),
             ("end", Format::EndOfInput),

@@ -87,3 +87,14 @@ mod tar {
         check_output(output, expected)
     }
 }
+
+mod text {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_text() {
+        let output = doodle().args(["file", "test.txt"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.txt.stdout");
+        check_output(output, expected)
+    }
+}

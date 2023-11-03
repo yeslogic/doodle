@@ -81,6 +81,7 @@ pub struct BaseModule {
     u32be: FormatRef,
     u32le: FormatRef,
     ascii_char: FormatRef,
+    ascii_char_strict: FormatRef,
     asciiz_string: FormatRef,
 
     // extensions to ascii-char
@@ -100,6 +101,7 @@ impl BaseModule {
     pub fn u32be(&self) -> Format { self.u32be.call() }
     pub fn u32le(&self) -> Format { self.u32le.call() }
     pub fn ascii_char(&self) -> Format { self.ascii_char.call() }
+    pub fn ascii_char_strict(&self) -> Format { self.ascii_char_strict.call() }
     pub fn asciiz_string(&self) -> Format { self.asciiz_string.call() }
 }
 
@@ -185,6 +187,12 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
 
     let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
 
+    let mut bs = ByteSet::from(32..=127);
+    bs.insert(b'\t');
+    bs.insert(b'\n');
+    bs.insert(b'\r');
+    let ascii_char_strict = module.define_format("base.ascii-char.strict", Format::Byte(bs));
+
     let asciiz_string = module.define_format(
         "base.asciiz-string",
         record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
@@ -221,6 +229,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         u32be,
         u32le,
         ascii_char,
+        ascii_char_strict,
         asciiz_string,
         ascii_octal_digit,
         ascii_decimal_digit,
