@@ -1,3 +1,4 @@
+use std::ops::{Range, RangeInclusive};
 use std::{fmt, ops};
 
 use serde::ser::{Serialize, SerializeSeq, SerializeStruct, Serializer};
@@ -119,6 +120,26 @@ impl<const LEN: usize> From<[u8; LEN]> for ByteSet {
     fn from(bytes: [u8; LEN]) -> ByteSet {
         let mut bs = ByteSet::new();
         for b in bytes {
+            bs.insert(b);
+        }
+        bs
+    }
+}
+
+impl From<Range<u8>> for ByteSet {
+    fn from(range: Range<u8>) -> ByteSet {
+        let mut bs = ByteSet::new();
+        for b in range {
+            bs.insert(b);
+        }
+        bs
+    }
+}
+
+impl From<RangeInclusive<u8>> for ByteSet {
+    fn from(range: RangeInclusive<u8>) -> ByteSet {
+        let mut bs = ByteSet::new();
+        for b in range {
             bs.insert(b);
         }
         bs
