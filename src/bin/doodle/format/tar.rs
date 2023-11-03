@@ -46,13 +46,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     // A format for uninterpreted N-byte values
     let cbytes = |len: u16| {
-        record([
-            (
-                "string",
-                repeat_count(Expr::U16(len - 1), base.ascii_char()),
-            ),
-            ("__pad", nul_or_wsp.call()),
-        ])
+        Format::Slice(
+            Expr::U16(len),
+            Box::new(record([
+                ("string", repeat(base.ascii_octal_digit())),
+                ("__nul_or_wsp", nul_or_wsp.call()),
+                ("__padding", repeat(is_byte(0x00))),
+            ]))
+        )
     };
 
     let cstr_arr =
