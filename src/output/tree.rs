@@ -144,7 +144,13 @@ impl<'module> MonoidalPrinter<'module> {
                             .unwrap_or(false))
             }
             Value::Seq(values) => values.is_empty(),
-            Value::Variant(_, value) => self.is_atomic_value(value, None),
+            Value::Variant(label, value) => match format {
+                Some(Format::Union(branches)) | Some(Format::NondetUnion(branches)) => {
+                    let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
+                    self.is_atomic_value(value, Some(format))
+                }
+                _ => self.is_atomic_value(value, None),
+            },
         }
     }
 }
@@ -453,7 +459,11 @@ impl<'module> MonoidalPrinter<'module> {
         if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
             frag.encat(Fragment::String(format!("{{ {label} := ").into()));
-            frag.encat(self.compile_value(value));
+            if let Some(format) = format {
+                frag.encat(self.compile_decoded_value(value, format));
+            } else {
+                frag.encat(self.compile_value(value));
+            }
             frag.encat(Fragment::String(" }".into()));
             frag.engroup();
             frag
