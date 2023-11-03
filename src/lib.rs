@@ -1290,6 +1290,42 @@ impl Format {
     }
 }
 
+impl Format {
+    /// Returns `true` if values associated to this format should be handled as single ASCII characters
+    pub fn is_ascii_char_format(&self, module: &FormatModule) -> bool {
+        match self {
+            // NOTE - currently only true for named formats matching 'base\.ascii-char.*'
+            Format::ItemVar(level, _args) => module.get_name(*level).starts_with("base.ascii-char"),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if values associated to this format should be handled as multi-character ASCII strings
+    pub fn is_ascii_string_format(&self, module: &FormatModule) -> bool {
+        match self {
+            Format::ItemVar(level, _args) => {
+                let fmt_name = module.get_name(*level);
+                // REVIEW - consider different heuristic for short-circuit
+                if fmt_name.contains("ascii-string") || fmt_name.contains("asciiz-string") {
+                    return true;
+                }
+                module.get_format(*level).is_ascii_string_format(module)
+            }
+            Format::Tuple(formats) => {
+                !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(module))
+            }
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatUntilLast(_, format)
+            | Format::RepeatUntilSeq(_, format) => format.is_ascii_char_format(module),
+            Format::Slice(_, format) => format.is_ascii_string_format(module),
+            // NOTE there may be other cases we should consider ASCII
+            _ => false,
+        }
+    }
+}
+
 impl<'a> MatchTreeStep<'a> {
     fn reject() -> MatchTreeStep<'a> {
         MatchTreeStep {

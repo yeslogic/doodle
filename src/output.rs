@@ -70,6 +70,38 @@ impl Fragment {
         matches!(self, &Fragment::Empty)
     }
 
+    fn join_with_wsp(self, other: Self) -> Self {
+        if other.fits_inline() {
+            self.cat(Self::Char(' ')).cat(other).cat_break()
+        } else {
+            self.cat_break().cat(other)
+        }
+    }
+
+    fn fits_inline(&self) -> bool {
+        match self {
+            Fragment::Empty => true,
+            Fragment::Char(c) => *c != '\n',
+            Fragment::String(s) => !s.contains('\n'),
+            Fragment::Symbol(_) => false,
+            Fragment::DisplayAtom(_) => true,
+            Fragment::Group(frag) => frag.fits_inline(),
+            Fragment::Cat(lhs, rhs) => lhs.fits_inline() && rhs.fits_inline(),
+            Fragment::Sequence { sep, items } => {
+                match sep {
+                    None => (),
+                    Some(join) => {
+                        if items.len() >= 1 && !join.fits_inline() {
+                            return false;
+                        }
+                    }
+                }
+                let l = items.len();
+                items.iter().all(Self::fits_inline)
+            }
+        }
+    }
+
     /// Forms a compound fragment from a Fragment-valued iterable, with
     /// an optional Fragment separating each element in the output sequence.
     ///
