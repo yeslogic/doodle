@@ -15,7 +15,7 @@
 │           │   │   │   └── string <- repeat-count 11 base.ascii-char := "14520553416"
 │           │   │   ├── chksum <- { ... } :=
 │           │   │   │   └── string <- repeat-count 7 base.ascii-char := "013113\0"
-│           │   │   ├── typeflag <- base.u8 := 48
+│           │   │   ├── typeflag <- base.ascii-char := '0'
 │           │   │   ├── linkname <- slice 100 tar.ascii-string.opt0 := ""
 │           │   │   ├── magic <- (...)
 │           │   │   ├── version <- (...)
@@ -54,7 +54,7 @@
 │           │   │   │   └── string <- repeat-count 11 base.ascii-char := "14520553416"
 │           │   │   ├── chksum <- { ... } :=
 │           │   │   │   └── string <- repeat-count 7 base.ascii-char := "014641\0"
-│           │   │   ├── typeflag <- base.u8 := 120
+│           │   │   ├── typeflag <- base.ascii-char := 'x'
 │           │   │   ├── linkname <- slice 100 tar.ascii-string.opt0 := ""
 │           │   │   ├── magic <- (...)
 │           │   │   ├── version <- (...)
@@ -93,7 +93,7 @@
 │               │   │   └── string <- repeat-count 11 base.ascii-char := "14520553416"
 │               │   ├── chksum <- { ... } :=
 │               │   │   └── string <- repeat-count 7 base.ascii-char := "012673\0"
-│               │   ├── typeflag <- base.u8 := 48
+│               │   ├── typeflag <- base.ascii-char := '0'
 │               │   ├── linkname <- slice 100 tar.ascii-string.opt0 := ""
 │               │   ├── magic <- (...)
 │               │   ├── version <- (...)
