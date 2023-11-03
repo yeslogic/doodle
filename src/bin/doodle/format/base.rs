@@ -229,3 +229,20 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         ascii_hex_any,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_ascii_char_sanity() {
+        let mut module = FormatModule::new();
+        let base = super::main(&mut module);
+
+        let good = base.ascii_char();
+        let bad = base.u8();
+
+        assert!(good.is_ascii_char_format(&module));
+        assert!(!bad.is_ascii_char_format(&module));
+    }
+}

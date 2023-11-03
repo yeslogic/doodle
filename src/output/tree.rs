@@ -66,36 +66,6 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn is_ascii_string_format(&self, format: &Format) -> bool {
-        match format {
-            Format::ItemVar(level, _args) => {
-                name_is_ascii_string(self.module.get_name(*level))
-                    || self.is_ascii_string_format(self.module.get_format(*level))
-            }
-            Format::Tuple(formats) => self.is_ascii_tuple_format(formats),
-            Format::Repeat(format)
-            | Format::Repeat1(format)
-            | Format::RepeatCount(_, format)
-            | Format::RepeatUntilLast(_, format)
-            | Format::RepeatUntilSeq(_, format) => self.is_ascii_char_format(format),
-            Format::Slice(_, format) => self.is_ascii_string_format(format),
-            _ => false,
-        }
-    }
-
-    fn is_ascii_tuple_format(&self, formats: &[Format]) -> bool {
-        !formats.is_empty() && formats.iter().all(|f| self.is_ascii_char_format(f))
-    }
-
-    fn is_ascii_char_format(&self, format: &Format) -> bool {
-        match format {
-            Format::ItemVar(level, _args) => {
-                self.module.get_name(*level).starts_with("base.ascii-char")
-            }
-            _ => false,
-        }
-    }
-
     fn is_atomic_format(&self, format: &Format) -> bool {
         match format {
             Format::ItemVar(level, _args) => self.is_atomic_format(self.module.get_format(*level)),
@@ -125,7 +95,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn is_atomic_value(&self, value: &Value, format: Option<&Format>) -> bool {
         if let Some(format) = format {
-            if self.flags.pretty_ascii_strings && self.is_ascii_string_format(format) {
+            if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
                 return true;
             }
         }
@@ -221,7 +191,9 @@ impl<'module> MonoidalPrinter<'module> {
                         && self.is_record_with_atomic_fields(format).is_some()
                     {
                         self.compile_seq_records(values, format)
-                    } else if self.flags.pretty_ascii_strings && self.is_ascii_char_format(format) {
+                    } else if self.flags.pretty_ascii_strings
+                        && format.is_ascii_char_format(self.module)
+                    {
                         self.compile_ascii_seq(values)
                     } else {
                         self.compile_seq(values, Some(format))
@@ -263,6 +235,10 @@ impl<'module> MonoidalPrinter<'module> {
             }
             Format::Dynamic(_) => self.compile_value(value),
         }
+    }
+
+    fn is_ascii_tuple_format(&self, formats: &[Format]) -> bool {
+        !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(self.module))
     }
 
     pub fn compile_value(&mut self, value: &Value) -> Fragment {
@@ -457,7 +433,6 @@ impl<'module> MonoidalPrinter<'module> {
             frag.encat(Fragment::String(" }".into()));
             frag.engroup();
             frag
-            // TODO [inherited, possibly inaccurate] write format
         } else {
             self.compile_field_value_last(label, value, format)
         }
@@ -523,30 +498,17 @@ impl<'module> MonoidalPrinter<'module> {
             Some(format) => {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
                     Fragment::Char('\n')
-                } else if self.is_atomic_value(value, Some(format)) {
-                    Fragment::cat(
-                        Fragment::String(" := ".into()),
-                        self.compile_decoded_value(value, format),
-                    )
-                    .cat_break()
-                    .group()
                 } else {
-                    Fragment::cat(
-                        Fragment::String(" :=\n".into()),
+                    Fragment::join_with_wsp(
+                        Fragment::String(" :=".into()),
                         self.compile_decoded_value(value, format),
                     )
                     .group()
                 }
             }
             None => {
-                if self.is_atomic_value(value, None) {
-                    Fragment::cat(Fragment::String(" := ".into()), self.compile_value(value))
-                        .cat_break()
-                        .group()
-                } else {
-                    Fragment::cat(Fragment::String(" :=\n".into()), self.compile_value(value))
-                        .group()
-                }
+                Fragment::join_with_wsp(Fragment::String(" :=".into()), self.compile_value(value))
+                    .group()
             }
         }
     }
