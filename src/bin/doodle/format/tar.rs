@@ -148,41 +148,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ),
     );
 
-    let full_block = repeat_count(Expr::U32(BLOCK_SIZE), Format::Byte(ByteSet::full()));
-    let partial_block = |nbytes: Expr| {
-        Format::Slice(
-            Expr::U32(BLOCK_SIZE),
-            Box::new(tuple([
-                repeat_count(nbytes, Format::Byte(ByteSet::full())),
-                repeat(is_byte(0x00)),
-            ])),
-        )
-    };
-
     let header_with_data = module.define_format(
         "tar.header_with_data",
         record([
             ("header", header.call()),
             (
                 "file",
-                tuple([
-                    repeat_count(
-                        Expr::Div(
-                            Box::new(Expr::RecordProj(
-                                Box::new(var("header")),
-                                "size".to_string(),
-                            )),
-                            Box::new(Expr::U32(BLOCK_SIZE)),
+                record([
+                    (
+                        "@value",
+                        repeat_count(
+                            Expr::RecordProj(Box::new(var("header")), "size".to_string()),
+                            base.u8(),
                         ),
-                        full_block,
                     ),
-                    partial_block(Expr::Rem(
-                        Box::new(Expr::RecordProj(
-                            Box::new(var("header")),
-                            "size".to_string(),
-                        )),
-                        Box::new(Expr::U32(BLOCK_SIZE)),
-                    )),
+                    ("@padding", Format::Align(512)),
                 ]),
             ),
         ]),
