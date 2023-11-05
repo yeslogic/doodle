@@ -52,7 +52,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("string", repeat(base.ascii_octal_digit())),
                 ("__nul_or_wsp", nul_or_wsp.call()),
                 ("__padding", repeat(is_byte(0x00))),
-            ]))
+            ])),
         )
     };
 
@@ -151,10 +151,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("devmajor", cbytes(8)),         // bytes 329 - 336
                 ("devminor", cbytes(8)),         // bytes 337 - 344
                 ("prefix", prefix),              // bytes 345 - 500
-                (
-                    "pad",
-                    repeat_count(Expr::U16(12), is_byte(0x00)),
-                ),
+                ("pad", repeat_count(Expr::U16(12), is_byte(0x00))),
             ])),
         ),
     );
