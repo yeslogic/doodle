@@ -487,6 +487,7 @@ pub struct Compiler<'a> {
     record_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
     union_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
+    compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
 }
 
 impl<'a> Compiler<'a> {
@@ -495,12 +496,14 @@ impl<'a> Compiler<'a> {
         let record_map = HashMap::new();
         let union_map = HashMap::new();
         let decoder_map = HashMap::new();
+        let compile_queue = Vec::new();
         Compiler {
             module,
             program,
             record_map,
             union_map,
             decoder_map,
+            compile_queue,
         }
     }
 
@@ -515,11 +518,19 @@ impl<'a> Compiler<'a> {
         );
         */
         // decoder
-        let n = compiler.program.decoders.len();
-        compiler.program.decoders.push(Decoder::Fail);
-        let d = Decoder::compile(&mut compiler, format)?;
-        compiler.program.decoders[n] = d;
+        compiler.queue_compile(format, Rc::new(Next::Empty));
+        while let Some((f, next, n)) = compiler.compile_queue.pop() {
+            let d = Decoder::compile_next(&mut compiler, &f, next)?;
+            compiler.program.decoders[n] = d;
+        }
         Ok(compiler.program)
+    }
+
+    fn queue_compile(&mut self, f: &'a Format, next: Rc<Next<'a>>) -> usize {
+        let n = self.program.decoders.len();
+        self.program.decoders.push(Decoder::Fail);
+        self.compile_queue.push((f, next, n));
+        n
     }
 
     pub fn add_typedef(&mut self, t: TypeDef) -> TypeRef {
@@ -748,11 +759,8 @@ impl Decoder {
     ) -> Result<Decoder, String> {
         match format {
             Format::ItemVar(level, arg_exprs) => {
-                let next = if compiler
-                    .module
-                    .get_format(*level)
-                    .depends_on_next(compiler.module)
-                {
+                let f = compiler.module.get_format(*level);
+                let next = if f.depends_on_next(compiler.module) {
                     next
                 } else {
                     Rc::new(Next::Empty)
@@ -760,13 +768,7 @@ impl Decoder {
                 let n = if let Some(n) = compiler.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
-                    let d = Decoder::compile_next(
-                        compiler,
-                        compiler.module.get_format(*level),
-                        next.clone(),
-                    )?;
-                    let n = compiler.program.decoders.len();
-                    compiler.program.decoders.push(d);
+                    let n = compiler.queue_compile(f, next.clone());
                     compiler.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
