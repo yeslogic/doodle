@@ -1,4 +1,4 @@
-use std::{fmt, io, ops::Deref, rc::Rc};
+use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::{Expr, Format, FormatModule, Scope, Value};
 
@@ -108,13 +108,27 @@ impl<'module> MonoidalPrinter<'module> {
     fn is_record_with_atomic_fields<'a>(
         &'a self,
         format: &'a Format,
-    ) -> Option<&'a [(String, Format)]> {
+    ) -> Option<Cow<'a, [(String, Format)]>> {
         match format {
             Format::ItemVar(level, _args) => {
                 self.is_record_with_atomic_fields(self.module.get_format(*level))
             }
             Format::Record(fields) => {
-                if fields.iter().all(|(_l, f)| self.is_atomic_format(f)) {
+                let fields = if self.flags.hide_double_underscore_fields
+                    && fields.iter().any(|(l, _)| l.starts_with("__"))
+                {
+                    Cow::Owned(
+                        fields
+                            .iter()
+                            .filter_map(|(l, x)| {
+                                (!l.starts_with("__")).then(|| (l.clone(), x.clone()))
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                } else {
+                    Cow::Borrowed(fields.deref())
+                };
+                if fields.iter().all(|(l, f)| self.is_atomic_format(f)) {
                     Some(fields)
                 } else {
                     None
@@ -372,7 +386,7 @@ impl<'module> MonoidalPrinter<'module> {
         let fields = self.is_record_with_atomic_fields(format).unwrap();
         let mut cols = Vec::new();
         let mut header = Vec::new();
-        for (label, _) in fields {
+        for (label, _) in fields.as_ref() {
             cols.push(label.len());
             header.push(label.clone());
         }
