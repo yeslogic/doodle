@@ -1826,6 +1826,7 @@ pub struct Compiler<'a> {
     record_map: HashMap<Vec<(String, TypeRef)>, usize>,
     union_map: HashMap<Vec<(String, TypeRef)>, usize>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
+    to_compile: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
 }
 
 impl<'a> Compiler<'a> {
@@ -1834,12 +1835,14 @@ impl<'a> Compiler<'a> {
         let record_map = HashMap::new();
         let union_map = HashMap::new();
         let decoder_map = HashMap::new();
+        let to_compile = Vec::new();
         Compiler {
             module,
             program,
             record_map,
             union_map,
             decoder_map,
+            to_compile,
         }
     }
 
@@ -1854,11 +1857,19 @@ impl<'a> Compiler<'a> {
         );
         */
         // decoder
-        let n = compiler.program.decoders.len();
-        compiler.program.decoders.push(Decoder::Fail);
-        let d = Decoder::compile(&mut compiler, format)?;
-        compiler.program.decoders[n] = d;
+        compiler.queue_compile(format, Rc::new(Next::Empty));
+        while let Some((f, next, n)) = compiler.to_compile.pop() {
+            let d = Decoder::compile_next(&mut compiler, &f, next)?;
+            compiler.program.decoders[n] = d;
+        }
         Ok(compiler.program)
+    }
+
+    fn queue_compile(&mut self, f: &'a Format, next: Rc<Next<'a>>) -> usize {
+        let n = self.program.decoders.len();
+        self.program.decoders.push(Decoder::Fail);
+        self.to_compile.push((f, next, n));
+        n
     }
 
     pub fn add_typedef(&mut self, t: TypeDef) -> TypeRef {
@@ -2097,13 +2108,7 @@ impl Decoder {
                 let n = if let Some(n) = compiler.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
-                    let d = Decoder::compile_next(
-                        compiler,
-                        compiler.module.get_format(*level),
-                        next.clone(),
-                    )?;
-                    let n = compiler.program.decoders.len();
-                    compiler.program.decoders.push(d);
+                    let n = compiler.queue_compile(compiler.module.get_format(*level), next.clone());
                     compiler.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
