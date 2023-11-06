@@ -30,7 +30,13 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
 pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     let utf8_tail = drop_n_msb(2, byte_in(0x80..=0xBF));
 
-    let utf8_1 = record([("byte", Format::Byte(VALID_ASCII)), ("@value", Format::Compute(Expr::AsU32(Box::new(var("byte")))))]);
+    let utf8_1 = record([
+        ("byte", Format::Byte(VALID_ASCII)),
+        (
+            "@value",
+            Format::Compute(Expr::AsU32(Box::new(var("byte")))),
+        ),
+    ]);
     let utf8_2 = record([
         (
             "bytes",
