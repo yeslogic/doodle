@@ -166,6 +166,7 @@ fn check_covered(
             }
         }
         Format::Dynamic(_) => {} // FIXME
+        Format::Apply(_) => {}   // FIXME
     }
     Ok(())
 }
@@ -269,6 +270,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Ok(())
             }
             Format::Dynamic(_) => Ok(()), // FIXME
+            Format::Apply(_) => Ok(()),   // FIXME
         }
     }
 }
