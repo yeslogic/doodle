@@ -128,7 +128,7 @@ impl<'module> MonoidalPrinter<'module> {
                 } else {
                     Cow::Borrowed(fields.deref())
                 };
-                if fields.iter().all(|(l, f)| self.is_atomic_format(f)) {
+                if fields.iter().all(|(_l, f)| self.is_atomic_format(f)) {
                     Some(fields)
                 } else {
                     None
