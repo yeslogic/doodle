@@ -1,7 +1,6 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -731,7 +730,7 @@ enum Decoder {
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
     Dynamic(DynFormat),
-    Apply(String, RefCell<HashMap<Format, Decoder>>),
+    Apply(String),
 }
 
 impl Expr {
@@ -1876,6 +1875,7 @@ pub struct TypeScope {
 pub struct Scope {
     names: Vec<String>,
     values: Vec<Value>,
+    decoders: Vec<Option<Decoder>>,
 }
 
 pub struct ScopeIter {
@@ -1953,16 +1953,23 @@ impl Scope {
     fn new() -> Self {
         let names = Vec::new();
         let values = Vec::new();
-        Scope { names, values }
+        let decoders = Vec::new();
+        Scope {
+            names,
+            values,
+            decoders,
+        }
     }
 
     fn push(&mut self, name: String, v: Value) {
         self.names.push(name);
         self.values.push(v);
+        self.decoders.push(None);
     }
 
     fn pop(&mut self) -> Value {
         self.names.pop();
+        self.decoders.pop();
         self.values.pop().unwrap()
     }
 
@@ -1973,15 +1980,40 @@ impl Scope {
     fn truncate(&mut self, len: usize) {
         self.names.truncate(len);
         self.values.truncate(len);
+        self.decoders.truncate(len);
     }
 
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    fn get_index_by_name(&self, name: &str) -> usize {
         for (i, n) in self.names.iter().enumerate().rev() {
             if n == name {
-                return &self.values[i];
+                return i;
             }
         }
         panic!("variable not found: {name}");
+    }
+
+    fn get_value_by_name(&self, name: &str) -> &Value {
+        &self.values[self.get_index_by_name(name)]
+    }
+
+    fn call_decoder_by_name<'input>(
+        &mut self,
+        name: &str,
+        program: &Program,
+        input: ReadCtxt<'input>,
+    ) -> ParseResult<(Value, ReadCtxt<'input>)> {
+        let i = self.get_index_by_name(name);
+        let mut od = std::mem::replace(&mut self.decoders[i], None);
+        if od.is_none() {
+            let d = match &self.values[i] {
+                Value::Format(f) => Decoder::compile_one(&*f).unwrap(),
+                _ => panic!("variable not format: {name}"),
+            };
+            od = Some(d);
+        }
+        let res = od.as_ref().unwrap().parse(program, self, input);
+        self.decoders[i] = od;
+        res
     }
 }
 
@@ -2266,7 +2298,7 @@ impl Decoder {
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
-            Format::Apply(name) => Ok(Decoder::Apply(name.clone(), RefCell::new(HashMap::new()))),
+            Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
         }
     }
 
@@ -2504,14 +2536,7 @@ impl Decoder {
                 let f = make_huffman_codes(&lengths);
                 Ok((Value::Format(Box::new(f)), input))
             }
-            Decoder::Apply(name, cache) => match scope.get_value_by_name(name) {
-                Value::Format(f) => cache
-                    .borrow_mut()
-                    .entry(*f.clone())
-                    .or_insert_with(|| Decoder::compile_one(&f).unwrap())
-                    .parse(program, scope, input),
-                _ => panic!("expected format value"),
-            },
+            Decoder::Apply(name) => scope.call_decoder_by_name(name, program, input),
         }
     }
 }
