@@ -121,6 +121,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => self.is_atomic_value(value, None),
             },
+            Value::Format(_) => false,
         }
     }
 }
@@ -240,6 +241,7 @@ impl<'module> MonoidalPrinter<'module> {
                 frag
             }
             Format::Dynamic(_) => self.compile_value(value),
+            Format::Apply(_) => self.compile_value(value),
         }
     }
 
@@ -258,6 +260,7 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Seq(vals) => self.compile_seq(vals, None),
             Value::Record(fields) => self.compile_record(fields, None),
             Value::Variant(label, value) => self.compile_variant(label, value, None),
+            Value::Format(f) => self.compile_format(f, Default::default()),
         }
     }
 
@@ -890,6 +893,7 @@ impl<'module> MonoidalPrinter<'module> {
                 Precedence::FORMAT_COMPOUND,
             ),
             Format::Dynamic(_) => Fragment::String("dynamic".into()),
+            Format::Apply(_) => Fragment::String("apply".into()),
 
             Format::ItemVar(var, args) => {
                 let mut frag = Fragment::new();

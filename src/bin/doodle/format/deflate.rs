@@ -148,10 +148,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
         ),
         (
             "distance-code",
-            Format::Dynamic(DynFormat::Huffman(
-                var("distance-alphabet-code-lengths-value"),
-                None,
-            )),
+            Format::Apply(var("distance-alphabet-format")),
         ),
         ("distance-record", distance_record(base)),
     ])
@@ -257,6 +254,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "deflate.fixed_huffman",
         record([
             (
+                "format",
+                Format::Dynamic(DynFormat::Huffman(fixed_code_lengths(), None)),
+            ),
+            (
                 "codes",
                 repeat_until_last(
                     Expr::Lambda(
@@ -270,10 +271,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        (
-                            "code",
-                            Format::Dynamic(DynFormat::Huffman(fixed_code_lengths(), None)),
-                        ),
+                        ("code", Format::Apply(var("format"))),
                         (
                             "extra",
                             Format::MatchVariant(
@@ -499,6 +497,33 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 repeat_count(add(var("hclen"), Expr::U8(4)), bits3.clone()),
             ),
             (
+                "code-length-alphabet-format",
+                Format::Dynamic(DynFormat::Huffman(
+                    var("code-length-alphabet-code-lengths"),
+                    Some(Expr::Seq(vec![
+                        Expr::U8(16),
+                        Expr::U8(17),
+                        Expr::U8(18),
+                        Expr::U8(0),
+                        Expr::U8(8),
+                        Expr::U8(7),
+                        Expr::U8(9),
+                        Expr::U8(6),
+                        Expr::U8(10),
+                        Expr::U8(5),
+                        Expr::U8(11),
+                        Expr::U8(4),
+                        Expr::U8(12),
+                        Expr::U8(3),
+                        Expr::U8(13),
+                        Expr::U8(2),
+                        Expr::U8(14),
+                        Expr::U8(1),
+                        Expr::U8(15),
+                    ])),
+                )),
+            ),
+            (
                 "literal-length-distance-alphabet-code-lengths",
                 repeat_until_seq(
                     Expr::Lambda(
@@ -611,33 +636,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        (
-                            "code",
-                            Format::Dynamic(DynFormat::Huffman(
-                                var("code-length-alphabet-code-lengths"),
-                                Some(Expr::Seq(vec![
-                                    Expr::U8(16),
-                                    Expr::U8(17),
-                                    Expr::U8(18),
-                                    Expr::U8(0),
-                                    Expr::U8(8),
-                                    Expr::U8(7),
-                                    Expr::U8(9),
-                                    Expr::U8(6),
-                                    Expr::U8(10),
-                                    Expr::U8(5),
-                                    Expr::U8(11),
-                                    Expr::U8(4),
-                                    Expr::U8(12),
-                                    Expr::U8(3),
-                                    Expr::U8(13),
-                                    Expr::U8(2),
-                                    Expr::U8(14),
-                                    Expr::U8(1),
-                                    Expr::U8(15),
-                                ])),
-                            )),
-                        ),
+                        ("code", Format::Apply(var("code-length-alphabet-format"))),
                         (
                             "extra",
                             Format::Match(
@@ -765,6 +764,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )),
             ),
             (
+                "distance-alphabet-format",
+                Format::Dynamic(DynFormat::Huffman(
+                    var("distance-alphabet-code-lengths-value"),
+                    None,
+                )),
+            ),
+            (
+                "literal-length-alphabet-format",
+                Format::Dynamic(DynFormat::Huffman(
+                    var("literal-length-alphabet-code-lengths-value"),
+                    None,
+                )),
+            ),
+            (
                 "codes",
                 repeat_until_last(
                     Expr::Lambda(
@@ -778,13 +791,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        (
-                            "code",
-                            Format::Dynamic(DynFormat::Huffman(
-                                var("literal-length-alphabet-code-lengths-value"),
-                                None,
-                            )),
-                        ),
+                        ("code", Format::Apply(var("literal-length-alphabet-format"))),
                         (
                             "extra",
                             Format::MatchVariant(
