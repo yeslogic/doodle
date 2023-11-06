@@ -359,9 +359,6 @@ mod tests {
         }
 
         proptest! {
-
-
-
             #[test]
             fn single_quadrant((start, end) in range_bounds()) {
                 let bs_range_inc = ByteSet::from(start..=end);

@@ -950,8 +950,12 @@ impl Expr {
             },
             Expr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
                 Value::U8(x) => Value::Char(char::from(x)),
-                Value::U16(x) => Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER)),
-                Value::U32(x) => Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER)),
+                Value::U16(x) => {
+                    Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER))
+                }
+                Value::U32(x) => {
+                    Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
+                }
                 _ => panic!("AsChar: expected U8, U16, or U32"),
             }),
             Expr::SeqLength(seq) => match &*seq.eval(scope) {
