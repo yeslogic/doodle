@@ -78,7 +78,7 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
 }
 
 /// ByteSet consisting of 0..=127, or the valid ASCII range (including control characters)
-pub const VALID_ASCII : ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
+pub const VALID_ASCII: ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
 
 pub struct BaseModule {
     bit: FormatRef,
