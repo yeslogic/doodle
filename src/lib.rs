@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -730,7 +731,7 @@ enum Decoder {
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
     Dynamic(DynFormat),
-    Apply(Expr),
+    Apply(Expr, RefCell<HashMap<Format, Decoder>>),
 }
 
 impl Expr {
@@ -2265,7 +2266,7 @@ impl Decoder {
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
-            Format::Apply(expr) => Ok(Decoder::Apply(expr.clone())),
+            Format::Apply(expr) => Ok(Decoder::Apply(expr.clone(), RefCell::new(HashMap::new()))),
         }
     }
 
@@ -2503,11 +2504,12 @@ impl Decoder {
                 let f = make_huffman_codes(&lengths);
                 Ok((Value::Format(Box::new(f)), input))
             }
-            Decoder::Apply(expr) => match expr.eval(scope) {
-                Value::Format(f) => {
-                    let d = Decoder::compile_one(&f).unwrap();
-                    d.parse(program, scope, input)
-                }
+            Decoder::Apply(expr, cache) => match expr.eval(scope) {
+                Value::Format(f) => cache
+                    .borrow_mut()
+                    .entry(*f.clone())
+                    .or_insert_with(|| Decoder::compile_one(&f).unwrap())
+                    .parse(program, scope, input),
                 _ => panic!("expected format value"),
             },
         }
