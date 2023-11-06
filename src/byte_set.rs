@@ -86,16 +86,20 @@ impl ByteSet {
     }
 
     pub fn insert(&mut self, b: u8) {
-        self.set_bit_with(b, |bits, i| *bits |= 1 << i);
+        self.set_bit_with(b, |bits, i| {
+            *bits |= 1 << i;
+        });
     }
 
     #[allow(dead_code)]
     pub fn remove(&mut self, b: u8) {
-        self.set_bit_with(b, |byte, i| *byte &= !(1 << i));
+        self.set_bit_with(b, |byte, i| {
+            *byte &= !(1 << i);
+        });
     }
 
     pub fn contains(&self, b: u8) -> bool {
-        self.get_bit_with(b, |bits, i| bits & (1 << i) != 0)
+        self.get_bit_with(b, |bits, i| (bits & (1 << i)) != 0)
     }
 
     pub fn complement(&self) -> ByteSet {
@@ -155,7 +159,7 @@ impl From<ops::RangeInclusive<u8>> for ByteSet {
         if start_ix == end_ix {
             let mut mask = 0u64;
             for i in value {
-                mask |= 1 << (i % 64);
+                mask |= 1 << i % 64;
             }
             let bits = match start_ix {
                 0 => [mask, 0, 0, 0],
@@ -330,17 +334,35 @@ mod tests {
         use super::*;
 
         prop_compose! {
-            fn range_in_quadrant(q: u8)
-                                (start in (q*64)..=(q*64)+63)
-                                (start in Just(start), end in start..=(q*64)+63) -> (u8, u8) {
-                                    (start, end)
-                                }
+        fn range_in_quadrant(q: u8)
+                            (start in (q*64)..=(q*64)+63)
+                            (start in Just(start), end in start..=(q*64)+63) -> (u8, u8) {
+                                (start, end)
+                            }
+                        }
+        prop_compose! {
+            fn range_any()(start in 0u8..=255)(start in Just(start), end in start..=255) -> (u8, u8) {
+                (start, end)
+            }
+        }
+
+        fn range_bounds() -> impl Strategy<Value = (u8, u8)> {
+            prop_oneof![(0u8..=3).prop_flat_map(range_in_quadrant), range_any(),]
         }
 
         proptest! {
+
+
+
             #[test]
-            fn test_from_range_single_quadrant((start, end) in (0u8..=3).prop_flat_map(range_in_quadrant)) {
-                let bs_range = ByteSet::from(start..=end);
+            fn single_quadrant((start, end) in range_bounds()) {
+                let bs_range_inc = ByteSet::from(start..=end);
+                // NOTE - hack to avoid overflowing integer bounds when end == 255
+                let bs_range_exc = if end < 255 {
+                    ByteSet::from(start..end+1)
+                } else {
+                    bs_range_inc.clone()
+                };
                 let bs_iter = (start..=end).collect::<ByteSet>();
                 let bs_manual = {
                     let mut tmp = ByteSet::empty();
@@ -349,8 +371,9 @@ mod tests {
                     }
                     tmp
                 };
-                prop_assert_eq!(bs_range, bs_iter);
-                prop_assert_eq!(bs_range, bs_manual);
+                prop_assert_eq!(bs_range_inc, bs_range_exc);
+                prop_assert_eq!(bs_range_inc, bs_iter);
+                prop_assert_eq!(bs_range_inc, bs_manual);
             }
         }
     }
