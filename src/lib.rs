@@ -27,6 +27,7 @@ pub enum Pattern {
     U8(u8),
     U16(u16),
     U32(u32),
+    Char(char),
     Tuple(Vec<Pattern>),
     Variant(String, Box<Pattern>),
     Seq(Vec<Pattern>),
@@ -110,6 +111,7 @@ pub enum ValueType {
     U8,
     U16,
     U32,
+    Char,
     Tuple(Vec<ValueType>),
     Record(Vec<(String, ValueType)>),
     Union(Vec<(String, ValueType)>),
@@ -124,6 +126,7 @@ pub enum Value {
     U8(u8),
     U16(u16),
     U32(u32),
+    Char(char),
     Tuple(Vec<Value>),
     Record(Vec<(String, Value)>),
     Variant(String, Box<Value>),
@@ -177,6 +180,7 @@ impl Value {
             (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
             (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
             (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
+            (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
             {
@@ -231,6 +235,13 @@ impl Value {
             _ => panic!("value is not a bool"),
         }
     }
+
+    fn unwrap_char(self) -> char {
+        match self {
+            Value::Char(c) => c,
+            _ => panic!("value is not a char"),
+        }
+    }
 }
 
 impl ValueType {
@@ -267,6 +278,7 @@ impl ValueType {
             (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
             (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
             (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+            (ValueType::Char, ValueType::Char) => Ok(ValueType::Char),
             (ValueType::Tuple(ts1), ValueType::Tuple(ts2)) => {
                 if ts1.len() != ts2.len() {
                     return Err(format!("tuples must have same length {ts1:?} vs. {ts2:?}"));
@@ -357,6 +369,7 @@ pub enum Expr {
     U16Le(Box<Expr>),
     U32Be(Box<Expr>),
     U32Le(Box<Expr>),
+    AsChar(Box<Expr>),
 
     SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -935,6 +948,12 @@ impl Expr {
                 }
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
+            Expr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
+                Value::U8(x) => Value::Char(char::from(x)),
+                Value::U16(x) => Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER)),
+                Value::U32(x) => Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER)),
+                _ => panic!("AsChar: expected U8, U16, or U32"),
+            }),
             Expr::SeqLength(seq) => match &*seq.eval(scope) {
                 Value::Seq(values) => {
                     let len = values.len();
@@ -1135,6 +1154,12 @@ impl Expr {
                 ValueType::U16 => Ok(ValueType::U32),
                 ValueType::U32 => Ok(ValueType::U32),
                 x => Err(format!("cannot convert {x:?} to U32")),
+            },
+            Expr::AsChar(x) => match x.infer_type_coerce_value(scope)? {
+                ValueType::U8 => Ok(ValueType::Char),
+                ValueType::U16 => Ok(ValueType::Char),
+                ValueType::U32 => Ok(ValueType::Char),
+                x => Err(format!("cannot convert {x:?} to Char")),
             },
 
             Expr::U16Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
@@ -1831,6 +1856,7 @@ pub enum TypeRef {
     U32,
     Tuple(Vec<TypeRef>),
     Seq(Box<TypeRef>),
+    Char,
     Format(Box<TypeRef>),
 }
 
@@ -2070,6 +2096,7 @@ impl TypeRef {
             ValueType::Empty => TypeRef::Empty,
             ValueType::Bool => TypeRef::Bool,
             ValueType::U8 => TypeRef::U8,
+            ValueType::Char => TypeRef::Char,
             ValueType::U16 => TypeRef::U16,
             ValueType::U32 => TypeRef::U32,
             ValueType::Tuple(ts) => TypeRef::Tuple(
@@ -2135,6 +2162,7 @@ impl TypeRef {
             TypeRef::U8 => ValueType::U8,
             TypeRef::U16 => ValueType::U16,
             TypeRef::U32 => ValueType::U32,
+            TypeRef::Char => ValueType::Char,
             TypeRef::Tuple(ts) => {
                 ValueType::Tuple(ts.iter().map(|t| t.to_value_type(typedefs)).collect())
             }
