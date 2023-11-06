@@ -30,7 +30,7 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
 pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     let utf8_tail = drop_n_msb(2, byte_in(0x80..=0xBF));
 
-    let utf8_1 = Format::Byte(VALID_ASCII);
+    let utf8_1 = record([("byte", Format::Byte(VALID_ASCII)), ("@value", Format::Compute(Expr::AsU32(Box::new(var("byte")))))]);
     let utf8_2 = record([
         (
             "bytes",
@@ -214,19 +214,19 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
                     vec![
                         (
                             Pattern::variant("utf8-1", Pattern::Binding("x".to_string())),
-                            Format::Compute(var("x")),
+                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
                             Pattern::variant("utf8-2", Pattern::Binding("x".to_string())),
-                            Format::Compute(var("x")),
+                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
                             Pattern::variant("utf8-3", Pattern::Binding("x".to_string())),
-                            Format::Compute(var("x")),
+                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
                             Pattern::variant("utf8-4", Pattern::Binding("x".to_string())),
-                            Format::Compute(var("x")),
+                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                     ],
                 ),
@@ -243,7 +243,7 @@ fn shift6_2(hi: Expr, lo: Expr) -> Expr {
             Box::new(Expr::AsU32(Box::new(hi))),
             Box::new(Expr::U32(6)),
         )),
-        Box::new(lo),
+        Box::new(Expr::AsU32(Box::new(lo))),
     )
 }
 
