@@ -39,13 +39,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     const MAGIC: &[u8; 6] = b"ustar\x00";
 
+    // Terminating characters for various fields, which for reasons of backwards-compatibility, may either be the
+    // ASCII space character or NUL
     let nul_or_wsp = module.define_format(
         "tar.padding-char",
         Format::Byte(ByteSet::from([0x00, b' '])),
     );
 
-    // A format for uninterpreted N-byte values
-    let cbytes = |len: u16| {
+    // Octal-encoded numeric value (as of UStar) fitting in N bytes, terminated by the space character or NUL
+    let o_numeric = |len: u16| {
         Format::Slice(
             Expr::U16(len),
             Box::new(record([
@@ -130,26 +132,28 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let prefix = Format::Slice(Expr::U16(155), Box::new(tar_str_optz.call()));
 
+    // This specification is only guaranteed to work for UStar archives. Anything else might work
+    // by happenstance but may fail just as easily.
     let header = module.define_format(
         "tar.header",
         Format::Slice(
             Expr::U32(BLOCK_SIZE),
             Box::new(record([
                 ("name", filename),              // bytes 0 - 99
-                ("mode", cbytes(8)),             // bytes 100 - 107
-                ("uid", cbytes(8)),              // bytes 108 - 115
-                ("gid", cbytes(8)),              // bytes 116 - 123
+                ("mode", o_numeric(8)),          // bytes 100 - 107
+                ("uid", o_numeric(8)),           // bytes 108 - 115
+                ("gid", o_numeric(8)),           // bytes 116 - 123
                 ("size", size_field),            // bytes 124 - 135
-                ("mtime", cbytes(12)),           // bytes 136 - 147
-                ("chksum", cbytes(8)),           // bytes 148 - 155
+                ("mtime", o_numeric(12)),        // bytes 136 - 147
+                ("chksum", o_numeric(8)),        // bytes 148 - 155
                 ("typeflag", base.ascii_char()), // byte 156
                 ("linkname", linkname),          // bytes 157 - 256
                 ("magic", magic),                // bytes 257 - 262
                 ("version", is_bytes(b"00")),    // bytes 263 - 264
                 ("uname", cstr_arr(32)),         // bytes 265 - 296
                 ("gname", cstr_arr(32)),         // bytes 297 - 328
-                ("devmajor", cbytes(8)),         // bytes 329 - 336
-                ("devminor", cbytes(8)),         // bytes 337 - 344
+                ("devmajor", o_numeric(8)),      // bytes 329 - 336
+                ("devminor", o_numeric(8)),      // bytes 337 - 344
                 ("prefix", prefix),              // bytes 345 - 500
                 ("pad", repeat_count(Expr::U16(12), is_byte(0x00))),
             ])),
