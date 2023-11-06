@@ -113,6 +113,7 @@ pub enum ValueType {
     Record(Vec<(String, ValueType)>),
     Union(Vec<(String, ValueType)>),
     Seq(Box<ValueType>),
+    Format(Box<ValueType>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -126,6 +127,7 @@ pub enum Value {
     Record(Vec<(String, Value)>),
     Variant(String, Box<Value>),
     Seq(Vec<Value>),
+    Format(Box<Format>),
 }
 
 impl Value {
@@ -454,6 +456,8 @@ pub enum Format {
     MatchVariant(Expr, Vec<(Pattern, String, Format)>),
     /// Format generated dynamically
     Dynamic(DynFormat),
+    /// Apply a dynamic format
+    Apply(Expr),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -646,14 +650,25 @@ impl FormatModule {
                 }
                 Ok(t)
             }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => {
-                // FIXME check expr type
+            Format::Dynamic(DynFormat::Huffman(lengths_expr, _opt_values_expr)) => {
+                match lengths_expr.infer_type_coerce_value(scope)? {
+                    ValueType::Seq(t) => match &*t {
+                        ValueType::U8 | ValueType::U16 => {}
+                        _ => return Err(format!("Huffman: expected U8 or U16")),
+                    },
+                    _ => return Err(format!("Huffman: expected Seq")),
+                }
+                // FIXME check opt_values_expr type
                 let ts = vec![
                     // FIXME ("bits", alt???)
                     ("@value".to_string(), ValueType::U16),
                 ];
-                Ok(ValueType::Record(ts))
+                Ok(ValueType::Format(Box::new(ValueType::Record(ts))))
             }
+            Format::Apply(expr) => match expr.infer_type_coerce_value(scope)? {
+                ValueType::Format(t) => Ok((*t).clone()),
+                _ => Err(format!("Apply: expected format")),
+            },
         }
     }
 }
@@ -715,6 +730,7 @@ enum Decoder {
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
     Dynamic(DynFormat),
+    Apply(Expr),
 }
 
 impl Expr {
@@ -1237,7 +1253,8 @@ impl Format {
                 .map(|(_, _, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
-            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::new(1, None),
+            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::exact(0),
+            Format::Apply(_) => Bounds::new(1, None),
         }
     }
 
@@ -1275,6 +1292,7 @@ impl Format {
                 branches.iter().any(|(_, _, f)| f.depends_on_next(module))
             }
             Format::Dynamic(_) => false,
+            Format::Apply(_) => false,
         }
     }
 
@@ -1589,9 +1607,8 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => {
-                Self::accept() // FIXME
-            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => Self::add_next(module, next),
+            Format::Apply(_expr) => Self::accept(),
         }
     }
 }
@@ -1775,6 +1792,7 @@ pub enum TypeRef {
     U32,
     Tuple(Vec<TypeRef>),
     Seq(Box<TypeRef>),
+    Format(Box<TypeRef>),
 }
 
 pub enum TypeDef {
@@ -2014,6 +2032,7 @@ impl TypeRef {
                 TypeRef::Var(n)
             }
             ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, &*t))),
+            ValueType::Format(t) => TypeRef::Format(Box::new(Self::from_value_type(compiler, &*t))),
         }
     }
 
@@ -2042,6 +2061,7 @@ impl TypeRef {
                 ValueType::Tuple(ts.iter().map(|t| t.to_value_type(typedefs)).collect())
             }
             TypeRef::Seq(t) => ValueType::Seq(Box::new(t.to_value_type(typedefs))),
+            TypeRef::Format(t) => ValueType::Format(Box::new(t.to_value_type(typedefs))),
         }
     }
 }
@@ -2245,6 +2265,7 @@ impl Decoder {
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
+            Format::Apply(expr) => Ok(Decoder::Apply(expr.clone())),
         }
     }
 
@@ -2480,9 +2501,15 @@ impl Decoder {
                     }
                 };
                 let f = make_huffman_codes(&lengths);
-                let d = Decoder::compile_one(&f).unwrap();
-                d.parse(program, scope, input)
+                Ok((Value::Format(Box::new(f)), input))
             }
+            Decoder::Apply(expr) => match expr.eval(scope) {
+                Value::Format(f) => {
+                    let d = Decoder::compile_one(&f).unwrap();
+                    d.parse(program, scope, input)
+                }
+                _ => panic!("expected format value"),
+            },
         }
     }
 }
