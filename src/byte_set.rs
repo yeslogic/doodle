@@ -139,6 +139,12 @@ impl<'a> From<&'a [u8]> for ByteSet {
     }
 }
 
+impl From<ops::Range<u8>> for ByteSet {
+    fn from(value: ops::Range<u8>) -> Self {
+        ByteSet::from(value.start..=value.end - 1)
+    }
+}
+
 impl From<ops::RangeInclusive<u8>> for ByteSet {
     fn from(value: ops::RangeInclusive<u8>) -> Self {
         // because the values are adjacent, we can optimize if they are within the same quadrant
