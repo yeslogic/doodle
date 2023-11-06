@@ -157,18 +157,18 @@ impl From<ops::RangeInclusive<u8>> for ByteSet {
             for i in value {
                 mask |= 1 << (i % 64);
             }
-            match start_ix {
-                0 => ByteSet { bits: [mask, 0, 0, 0] },
-                1 => ByteSet { bits: [0, mask, 0, 0] },
-                2 => ByteSet { bits: [0, 0, mask, 0] },
-                3 => ByteSet { bits: [0, 0, 0, mask] },
-                _ => unreachable!("u8 / 64 not in range 0..=3 ??")
-            }
+            let bits = match start_ix {
+                0 => [mask, 0, 0, 0],
+                1 => [0, mask, 0, 0],
+                2 => [0, 0, mask, 0],
+                3 => [0, 0, 0, mask],
+                _ => unreachable!("u8 / 64 not in range 0..=3 ??"),
+            };
+            ByteSet { bits }
         } else {
             // Fall-back to FromIter implementation, which is less efficient in general
             value.collect::<ByteSet>()
         }
-
     }
 }
 
@@ -337,7 +337,6 @@ mod tests {
                                 }
         }
 
-
         proptest! {
             #[test]
             fn test_from_range_single_quadrant((start, end) in (0u8..=3).prop_flat_map(range_in_quadrant)) {
@@ -355,5 +354,4 @@ mod tests {
             }
         }
     }
-
 }
