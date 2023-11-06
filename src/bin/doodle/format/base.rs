@@ -65,6 +65,10 @@ pub fn is_byte(b: u8) -> Format {
     Format::Byte(ByteSet::from([b]))
 }
 
+pub fn repeat_byte(count: u32, b: u8) -> Format {
+    Format::RepeatCount(Expr::U32(count), Box::new(is_byte(b)))
+}
+
 pub fn not_byte(b: u8) -> Format {
     Format::Byte(!ByteSet::from([b]))
 }
@@ -72,6 +76,9 @@ pub fn not_byte(b: u8) -> Format {
 pub fn is_bytes(bytes: &[u8]) -> Format {
     tuple(bytes.iter().copied().map(is_byte))
 }
+
+/// ByteSet consisting of 0..=127, or the valid ASCII range (including control characters)
+pub const VALID_ASCII : ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
 
 pub struct BaseModule {
     bit: FormatRef,
