@@ -115,6 +115,7 @@ impl<'module> MonoidalPrinter<'module> {
             }
         }
         match value {
+            Value::Char(_) => true,
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) => true,
             Value::Tuple(values) => values.is_empty(),
@@ -278,6 +279,7 @@ impl<'module> MonoidalPrinter<'module> {
             Value::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
+            Value::Char(c) => Fragment::DisplayAtom(Rc::new(*c)),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
             Value::Seq(vals) => self.compile_seq(vals, None),
             Value::Record(fields) => self.compile_record(fields, None),
@@ -730,6 +732,11 @@ impl<'module> MonoidalPrinter<'module> {
             ),
             Expr::AsU32(expr) => cond_paren(
                 self.compile_prefix("as-u32", None, expr),
+                prec,
+                Precedence::CAST,
+            ),
+            Expr::AsChar(expr) => cond_paren(
+                self.compile_prefix("as-char", None, expr),
                 prec,
                 Precedence::CAST,
             ),
