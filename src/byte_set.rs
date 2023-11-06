@@ -11,19 +11,22 @@ pub struct ByteSet {
 }
 
 impl ByteSet {
-    pub fn new() -> ByteSet {
+    #[inline(always)]
+    pub const fn new() -> ByteSet {
         ByteSet::empty()
     }
 
-    pub fn from_bits(bits: [u64; 4]) -> ByteSet {
+    /// Construct a ByteSet that consists of all bytes `i` such that bit `i % 64` is set
+    /// in the binary representation of the 64-bit value at index `i / 4` of the argument array `bits`.
+    pub const fn from_bits(bits: [u64; 4]) -> ByteSet {
         ByteSet { bits }
     }
 
-    pub fn empty() -> ByteSet {
+    pub const fn empty() -> ByteSet {
         ByteSet::from_bits([0; 4])
     }
 
-    pub fn full() -> ByteSet {
+    pub const fn full() -> ByteSet {
         ByteSet::from_bits([u64::MAX; 4])
     }
 
@@ -126,21 +129,49 @@ impl<const LEN: usize> From<[u8; LEN]> for ByteSet {
     }
 }
 
-impl From<Range<u8>> for ByteSet {
-    fn from(range: Range<u8>) -> ByteSet {
+impl<'a> From<&'a [u8]> for ByteSet {
+    fn from(bytes: &'a [u8]) -> ByteSet {
         let mut bs = ByteSet::new();
-        for b in range {
-            bs.insert(b);
+        for b in bytes {
+            bs.insert(*b);
         }
         bs
     }
 }
 
-impl From<RangeInclusive<u8>> for ByteSet {
-    fn from(range: RangeInclusive<u8>) -> ByteSet {
-        let mut bs = ByteSet::new();
-        for b in range {
-            bs.insert(b);
+impl From<ops::RangeInclusive<u8>> for ByteSet {
+    fn from(value: ops::RangeInclusive<u8>) -> Self {
+        // because the values are adjacent, we can optimize if they are within the same quadrant
+        let lo = value.start();
+        let hi = value.end();
+        let start_ix = *lo / 64;
+        let end_ix = *hi / 64;
+        if start_ix == end_ix {
+            let mut mask = 0u64;
+            for i in value {
+                mask |= 1 << (i % 64);
+            }
+            match start_ix {
+                0 => ByteSet { bits: [mask, 0, 0, 0] },
+                1 => ByteSet { bits: [0, mask, 0, 0] },
+                2 => ByteSet { bits: [0, 0, mask, 0] },
+                3 => ByteSet { bits: [0, 0, 0, mask] },
+                _ => unreachable!("u8 / 64 not in range 0..=3 ??")
+            }
+        } else {
+            // Fall-back to FromIter implementation, which is less efficient in general
+            value.collect::<ByteSet>()
+        }
+
+    }
+}
+
+// REVIEW - there might be an optimization we can perform here
+impl FromIterator<u8> for ByteSet {
+    fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
+        let mut bs = ByteSet::empty();
+        for byte in iter {
+            bs.insert(byte);
         }
         bs
     }
@@ -288,4 +319,35 @@ mod tests {
     fn test_debug_above_128() {
         assert_eq!(format!("{:?}", !ByteSet::from([32, 1])), "!{1, 32}");
     }
+
+    mod same_result {
+        use super::*;
+
+        prop_compose! {
+            fn range_in_quadrant(q: u8)
+                                (start in (q*64)..=(q*64)+63)
+                                (start in Just(start), end in start..=(q*64)+63) -> (u8, u8) {
+                                    (start, end)
+                                }
+        }
+
+
+        proptest! {
+            #[test]
+            fn test_from_range_single_quadrant((start, end) in (0u8..=3).prop_flat_map(range_in_quadrant)) {
+                let bs_range = ByteSet::from(start..=end);
+                let bs_iter = (start..=end).collect::<ByteSet>();
+                let bs_manual = {
+                    let mut tmp = ByteSet::empty();
+                    for i in start..=end {
+                        tmp.insert(i);
+                    }
+                    tmp
+                };
+                prop_assert_eq!(bs_range, bs_iter);
+                prop_assert_eq!(bs_range, bs_manual);
+            }
+        }
+    }
+
 }

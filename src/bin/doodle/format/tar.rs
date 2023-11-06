@@ -154,8 +154,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("gname", cstr_arr(32)),         // bytes 297 - 328
                 ("devmajor", o_numeric(8)),      // bytes 329 - 336
                 ("devminor", o_numeric(8)),      // bytes 337 - 344
-                ("prefix", prefix),              // bytes 345 - 500
-                ("pad", repeat_count(Expr::U16(12), is_byte(0x00))),
+                ("prefix", prefix),              // bytes 345 - 499
+                ("pad", repeat_byte(12, 0x00)),  // bytes 500 - 511
             ])),
         ),
     );
