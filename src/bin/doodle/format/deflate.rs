@@ -148,7 +148,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
         ),
         (
             "distance-code",
-            Format::Apply(var("distance-alphabet-format")),
+            Format::Apply("distance-alphabet-format".to_string()),
         ),
         ("distance-record", distance_record(base)),
     ])
@@ -271,7 +271,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        ("code", Format::Apply(var("format"))),
+                        ("code", Format::Apply("format".to_string())),
                         (
                             "extra",
                             Format::MatchVariant(
@@ -636,7 +636,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        ("code", Format::Apply(var("code-length-alphabet-format"))),
+                        (
+                            "code",
+                            Format::Apply("code-length-alphabet-format".to_string()),
+                        ),
                         (
                             "extra",
                             Format::Match(
@@ -791,7 +794,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        ("code", Format::Apply(var("literal-length-alphabet-format"))),
+                        (
+                            "code",
+                            Format::Apply("literal-length-alphabet-format".to_string()),
+                        ),
                         (
                             "extra",
                             Format::MatchVariant(

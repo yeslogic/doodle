@@ -457,8 +457,8 @@ pub enum Format {
     MatchVariant(Expr, Vec<(Pattern, String, Format)>),
     /// Format generated dynamically
     Dynamic(DynFormat),
-    /// Apply a dynamic format
-    Apply(Expr),
+    /// Apply a dynamic format from a named variable in the scope
+    Apply(String),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -666,8 +666,8 @@ impl FormatModule {
                 ];
                 Ok(ValueType::Format(Box::new(ValueType::Record(ts))))
             }
-            Format::Apply(expr) => match expr.infer_type_coerce_value(scope)? {
-                ValueType::Format(t) => Ok((*t).clone()),
+            Format::Apply(name) => match scope.get_type_by_name(name) {
+                ValueType::Format(t) => Ok(*t.clone()),
                 _ => Err(format!("Apply: expected format")),
             },
         }
@@ -731,7 +731,7 @@ enum Decoder {
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
     Dynamic(DynFormat),
-    Apply(Expr, RefCell<HashMap<Format, Decoder>>),
+    Apply(String, RefCell<HashMap<Format, Decoder>>),
 }
 
 impl Expr {
@@ -1609,7 +1609,7 @@ impl<'a> MatchTreeStep<'a> {
                 tree
             }
             Format::Dynamic(DynFormat::Huffman(_, _)) => Self::add_next(module, next),
-            Format::Apply(_expr) => Self::accept(),
+            Format::Apply(_name) => Self::accept(),
         }
     }
 }
@@ -2266,7 +2266,7 @@ impl Decoder {
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
-            Format::Apply(expr) => Ok(Decoder::Apply(expr.clone(), RefCell::new(HashMap::new()))),
+            Format::Apply(name) => Ok(Decoder::Apply(name.clone(), RefCell::new(HashMap::new()))),
         }
     }
 
@@ -2504,7 +2504,7 @@ impl Decoder {
                 let f = make_huffman_codes(&lengths);
                 Ok((Value::Format(Box::new(f)), input))
             }
-            Decoder::Apply(expr, cache) => match expr.eval(scope) {
+            Decoder::Apply(name, cache) => match scope.get_value_by_name(name) {
                 Value::Format(f) => cache
                     .borrow_mut()
                     .entry(*f.clone())
