@@ -141,6 +141,16 @@ mod gzip {
     fn test_decode_test6_gzip() {
         let output = doodle().args(["file", "test6.gz"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test6.gz.stdout");
+    }
+}
+
+mod utf8 {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_utf8() {
+        let output = doodle().args(["file", "test.utf8"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.utf8.stdout");
         check_output(output, expected)
     }
 }
