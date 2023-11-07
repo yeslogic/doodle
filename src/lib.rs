@@ -159,7 +159,7 @@ impl Value {
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the scope
     fn matches(&self, scope: &mut Scope, pattern: &Pattern) -> bool {
-        match (pattern, &self.coerce_record_to_value()) {
+        match (pattern, self.coerce_record_to_value()) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
                 true
@@ -188,16 +188,16 @@ impl Value {
         }
     }
 
-    fn coerce_record_to_value(&self) -> Value {
+    fn coerce_record_to_value(&self) -> &Value {
         match self {
             Value::Record(fields) => {
                 if let Some((_l, v)) = fields.iter().find(|(l, _)| l == "@value") {
-                    return v.clone();
+                    &v
                 } else {
-                    Value::Record(fields.clone())
+                    &self
                 }
             }
-            v => v.clone(),
+            v => v,
         }
     }
 
@@ -975,7 +975,7 @@ impl Expr {
     }
 
     fn eval_value(&self, scope: &mut Scope) -> Value {
-        self.eval(scope).coerce_record_to_value()
+        self.eval(scope).coerce_record_to_value().clone()
     }
 
     fn eval_lambda(&self, scope: &mut Scope, arg: Value) -> Value {
@@ -2548,8 +2548,8 @@ fn value_to_vec_usize(v: &Value) -> Vec<usize> {
     };
     vs.iter()
         .map(|v| match v.coerce_record_to_value() {
-            Value::U8(n) => n as usize,
-            Value::U16(n) => n as usize,
+            Value::U8(n) => *n as usize,
+            Value::U16(n) => *n as usize,
             _ => panic!("expected U8 or U16"),
         })
         .collect::<Vec<usize>>()
@@ -2621,7 +2621,7 @@ fn inflate(codes: &[Value]) -> Vec<Value> {
         match code {
             Value::Variant(name, v) => match (name.as_str(), v.as_ref()) {
                 ("literal", v) => match v.coerce_record_to_value() {
-                    Value::U8(b) => vs.push(Value::U8(b)),
+                    Value::U8(b) => vs.push(Value::U8(*b)),
                     _ => panic!("inflate: expected U8"),
                 },
                 ("reference", Value::Record(fields)) => {
