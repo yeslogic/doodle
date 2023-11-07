@@ -244,7 +244,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Compute(_expr) => Ok(()),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.scope);
+                let head = head.eval(&mut self.scope).into_owned();
                 let initial_len = self.scope.len();
                 let (_, format) = branches
                     .iter()
@@ -255,7 +255,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Ok(())
             }
             Format::MatchVariant(head, branches) => {
-                let head = head.eval(&mut self.scope);
+                let head = head.eval(&mut self.scope).into_owned();
                 let initial_len = self.scope.len();
                 let (_, _label, format) = branches
                     .iter()
