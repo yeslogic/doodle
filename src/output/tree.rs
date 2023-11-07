@@ -231,7 +231,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::WithRelativeOffset(_, format) => self.compile_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_value(value),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.scope);
+                let head = head.eval(&mut self.scope).into_owned();
                 let initial_len = self.scope.len();
                 let (_, format) = branches
                     .iter()
@@ -242,7 +242,7 @@ impl<'module> MonoidalPrinter<'module> {
                 frag
             }
             Format::MatchVariant(head, branches) => {
-                let head = head.eval(&mut self.scope);
+                let head = head.eval(&mut self.scope).into_owned();
                 let initial_len = self.scope.len();
                 let (_, _label, format) = branches
                     .iter()
