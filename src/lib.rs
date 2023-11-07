@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -113,6 +114,7 @@ pub enum ValueType {
     Record(Vec<(String, ValueType)>),
     Union(Vec<(String, ValueType)>),
     Seq(Box<ValueType>),
+    Format(Box<ValueType>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -126,6 +128,7 @@ pub enum Value {
     Record(Vec<(String, Value)>),
     Variant(String, Box<Value>),
     Seq(Vec<Value>),
+    Format(Box<Format>),
 }
 
 impl Value {
@@ -454,6 +457,8 @@ pub enum Format {
     MatchVariant(Expr, Vec<(Pattern, String, Format)>),
     /// Format generated dynamically
     Dynamic(DynFormat),
+    /// Apply a dynamic format
+    Apply(Expr),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -522,6 +527,14 @@ impl FormatModule {
         self.define_format_args(name, vec![], format)
     }
 
+    pub fn define_format_rec(
+        &mut self,
+        name: impl Into<String>,
+        f: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        self.define_format_args_rec(name, vec![], f)
+    }
+
     pub fn define_format_args(
         &mut self,
         name: impl Into<String>,
@@ -542,6 +555,32 @@ impl FormatModule {
         self.formats.push(format);
         self.format_types.push(format_type);
         FormatRef(level)
+    }
+
+    pub fn define_format_args_rec(
+        &mut self,
+        name: impl Into<String>,
+        args: Vec<(String, ValueType)>,
+        f: impl FnOnce(FormatRef) -> Format,
+    ) -> FormatRef {
+        let format_ref = FormatRef(self.names.len());
+        let format = f(format_ref);
+        if let Err(()) = format.recursion_check(self, format_ref) {
+            panic!("format fails recursion check!");
+        }
+        let mut scope = TypeScope::new();
+        for (arg_name, arg_type) in &args {
+            scope.push(arg_name.clone(), arg_type.clone());
+        }
+        let format_type = match self.infer_format_type(&mut scope, &format) {
+            Ok(t) => t,
+            Err(msg) => panic!("{msg}"),
+        };
+        self.names.push(name.into());
+        self.args.push(args);
+        self.formats.push(format);
+        self.format_types.push(format_type);
+        format_ref
     }
 
     fn get_name(&self, level: usize) -> &str {
@@ -646,14 +685,25 @@ impl FormatModule {
                 }
                 Ok(t)
             }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => {
-                // FIXME check expr type
+            Format::Dynamic(DynFormat::Huffman(lengths_expr, _opt_values_expr)) => {
+                match lengths_expr.infer_type_coerce_value(scope)? {
+                    ValueType::Seq(t) => match &*t {
+                        ValueType::U8 | ValueType::U16 => {}
+                        _ => return Err(format!("Huffman: expected U8 or U16")),
+                    },
+                    _ => return Err(format!("Huffman: expected Seq")),
+                }
+                // FIXME check opt_values_expr type
                 let ts = vec![
                     // FIXME ("bits", alt???)
                     ("@value".to_string(), ValueType::U16),
                 ];
-                Ok(ValueType::Record(ts))
+                Ok(ValueType::Format(Box::new(ValueType::Record(ts))))
             }
+            Format::Apply(expr) => match expr.infer_type_coerce_value(scope)? {
+                ValueType::Format(t) => Ok((*t).clone()),
+                _ => Err(format!("Apply: expected format")),
+            },
         }
     }
 }
@@ -715,6 +765,7 @@ enum Decoder {
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
     Dynamic(DynFormat),
+    Apply(Expr, RefCell<HashMap<Format, Decoder>>),
 }
 
 impl Expr {
@@ -1237,7 +1288,8 @@ impl Format {
                 .map(|(_, _, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
-            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::new(1, None),
+            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::exact(0),
+            Format::Apply(_) => Bounds::new(1, None),
         }
     }
 
@@ -1275,6 +1327,7 @@ impl Format {
                 branches.iter().any(|(_, _, f)| f.depends_on_next(module))
             }
             Format::Dynamic(_) => false,
+            Format::Apply(_) => false,
         }
     }
 
@@ -1287,6 +1340,93 @@ impl Format {
             fs.push(f.clone());
         }
         MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
+    }
+
+    fn recursion_check(&self, module: &FormatModule, format_ref: FormatRef) -> Result<bool, ()> {
+        match self {
+            Format::ItemVar(level, _arg_exprs) => {
+                if format_ref.get_level() == *level {
+                    Err(())
+                } else {
+                    Ok(module.get_format(*level).is_nullable(module))
+                }
+            }
+            Format::Fail => Ok(false),
+            Format::EndOfInput => Ok(true),
+            Format::Align(_n) => Ok(true),
+            Format::Byte(_bs) => Ok(false),
+            Format::Union(branches) | Format::NondetUnion(branches) => {
+                let mut nullable = false;
+                for (_label, f) in branches {
+                    nullable = nullable || f.recursion_check(module, format_ref)?;
+                }
+                Ok(nullable)
+            }
+            Format::Tuple(fields) => {
+                for f in fields {
+                    if !f.recursion_check(module, format_ref)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            Format::Record(fields) => {
+                for (_label, f) in fields {
+                    if !f.recursion_check(module, format_ref)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            Format::Repeat(a) => {
+                a.recursion_check(module, format_ref)?;
+                Ok(true)
+            }
+            Format::Repeat1(a) => {
+                a.recursion_check(module, format_ref)?;
+                Ok(false)
+            }
+            Format::RepeatCount(_expr, a)
+            | Format::RepeatUntilLast(_expr, a)
+            | Format::RepeatUntilSeq(_expr, a) => {
+                a.recursion_check(module, format_ref)?;
+                Ok(true) // FIXME bit sloppy but okay
+            }
+            Format::Peek(a) => {
+                a.recursion_check(module, format_ref)?;
+                Ok(true)
+            }
+            Format::PeekNot(a) => {
+                a.recursion_check(module, format_ref)?;
+                Ok(true)
+            }
+            Format::Slice(expr, a) => {
+                a.recursion_check(module, format_ref)?;
+                Ok(expr.bounds().min == 0)
+            }
+            Format::Bits(_a) => Ok(false),
+            Format::WithRelativeOffset(_expr, a) => {
+                a.recursion_check(module, format_ref)?; // technically okay if expr > 0
+                Ok(true)
+            }
+            Format::Compute(_expr) => Ok(true),
+            Format::Match(_head, branches) => {
+                let mut nullable = false;
+                for (_pattern, f) in branches {
+                    nullable = nullable || f.recursion_check(module, format_ref)?;
+                }
+                Ok(nullable)
+            }
+            Format::MatchVariant(_head, branches) => {
+                let mut nullable = false;
+                for (_label, _pattern, f) in branches {
+                    nullable = nullable || f.recursion_check(module, format_ref)?;
+                }
+                Ok(nullable)
+            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => Ok(true),
+            Format::Apply(_expr) => Ok(false),
+        }
     }
 }
 
@@ -1589,9 +1729,8 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => {
-                Self::accept() // FIXME
-            }
+            Format::Dynamic(DynFormat::Huffman(_, _)) => Self::add_next(module, next),
+            Format::Apply(_expr) => Self::accept(),
         }
     }
 }
@@ -1775,6 +1914,7 @@ pub enum TypeRef {
     U32,
     Tuple(Vec<TypeRef>),
     Seq(Box<TypeRef>),
+    Format(Box<TypeRef>),
 }
 
 pub enum TypeDef {
@@ -1807,6 +1947,7 @@ pub struct Compiler<'a> {
     record_map: HashMap<Vec<(String, TypeRef)>, usize>,
     union_map: HashMap<Vec<(String, TypeRef)>, usize>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
+    to_compile: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
 }
 
 impl<'a> Compiler<'a> {
@@ -1815,12 +1956,14 @@ impl<'a> Compiler<'a> {
         let record_map = HashMap::new();
         let union_map = HashMap::new();
         let decoder_map = HashMap::new();
+        let to_compile = Vec::new();
         Compiler {
             module,
             program,
             record_map,
             union_map,
             decoder_map,
+            to_compile,
         }
     }
 
@@ -1835,11 +1978,19 @@ impl<'a> Compiler<'a> {
         );
         */
         // decoder
-        let n = compiler.program.decoders.len();
-        compiler.program.decoders.push(Decoder::Fail);
-        let d = Decoder::compile(&mut compiler, format)?;
-        compiler.program.decoders[n] = d;
+        compiler.queue_compile(format, Rc::new(Next::Empty));
+        while let Some((f, next, n)) = compiler.to_compile.pop() {
+            let d = Decoder::compile_next(&mut compiler, &f, next)?;
+            compiler.program.decoders[n] = d;
+        }
         Ok(compiler.program)
+    }
+
+    fn queue_compile(&mut self, f: &'a Format, next: Rc<Next<'a>>) -> usize {
+        let n = self.program.decoders.len();
+        self.program.decoders.push(Decoder::Fail);
+        self.to_compile.push((f, next, n));
+        n
     }
 
     pub fn add_typedef(&mut self, t: TypeDef) -> TypeRef {
@@ -2014,6 +2165,7 @@ impl TypeRef {
                 TypeRef::Var(n)
             }
             ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, &*t))),
+            ValueType::Format(t) => TypeRef::Format(Box::new(Self::from_value_type(compiler, &*t))),
         }
     }
 
@@ -2042,6 +2194,7 @@ impl TypeRef {
                 ValueType::Tuple(ts.iter().map(|t| t.to_value_type(typedefs)).collect())
             }
             TypeRef::Seq(t) => ValueType::Seq(Box::new(t.to_value_type(typedefs))),
+            TypeRef::Format(t) => ValueType::Format(Box::new(t.to_value_type(typedefs))),
         }
     }
 }
@@ -2076,13 +2229,7 @@ impl Decoder {
                 let n = if let Some(n) = compiler.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
-                    let d = Decoder::compile_next(
-                        compiler,
-                        compiler.module.get_format(*level),
-                        next.clone(),
-                    )?;
-                    let n = compiler.program.decoders.len();
-                    compiler.program.decoders.push(d);
+                    let n = compiler.queue_compile(compiler.module.get_format(*level), next.clone());
                     compiler.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
@@ -2245,6 +2392,7 @@ impl Decoder {
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
             Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
+            Format::Apply(expr) => Ok(Decoder::Apply(expr.clone(), RefCell::new(HashMap::new()))),
         }
     }
 
@@ -2480,9 +2628,16 @@ impl Decoder {
                     }
                 };
                 let f = make_huffman_codes(&lengths);
-                let d = Decoder::compile_one(&f).unwrap();
-                d.parse(program, scope, input)
+                Ok((Value::Format(Box::new(f)), input))
             }
+            Decoder::Apply(expr, cache) => match expr.eval(scope) {
+                Value::Format(f) => cache
+                    .borrow_mut()
+                    .entry(*f.clone())
+                    .or_insert_with(|| Decoder::compile_one(&f).unwrap())
+                    .parse(program, scope, input),
+                _ => panic!("expected format value"),
+            },
         }
     }
 }
