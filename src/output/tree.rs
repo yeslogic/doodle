@@ -231,30 +231,36 @@ impl<'module> MonoidalPrinter<'module> {
             Format::WithRelativeOffset(_, format) => self.compile_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_value(value),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.scope).into_owned();
-                let initial_len = self.scope.len();
-                let (_, format) = branches
-                    .iter()
-                    .find(|(pattern, _)| head.matches(&mut self.scope, pattern))
-                    .expect("exhaustive patterns");
-                frag.encat(self.compile_decoded_value(value, format));
-                self.scope.truncate(initial_len);
-                frag
+                let head = head.eval(&mut self.scope);
+                for (pattern, format) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = self.scope.len();
+                        self.scope.extend(pattern_scope);
+                        frag.encat(self.compile_decoded_value(value, format));
+                        self.scope.truncate(initial_len);
+                        return frag;
+                    }
+                }
+                panic!("non-exhaustive patterns");
             }
             Format::MatchVariant(head, branches) => {
-                let head = head.eval(&mut self.scope).into_owned();
-                let initial_len = self.scope.len();
-                let (_, _label, format) = branches
-                    .iter()
-                    .find(|(pattern, _, _)| head.matches(&mut self.scope, pattern))
-                    .expect("exhaustive patterns");
-                if let Value::Variant(_label, value) = value {
-                    frag.encat(self.compile_decoded_value(value, format));
-                } else {
-                    panic!("expected variant value");
+                let head = head.eval(&mut self.scope);
+                for (pattern, _label, format) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = self.scope.len();
+                        self.scope.extend(pattern_scope);
+                        if let Value::Variant(_label, value) = value {
+                            frag.encat(self.compile_decoded_value(value, format));
+                        } else {
+                            panic!("expected variant value");
+                        }
+                        self.scope.truncate(initial_len);
+                        return frag;
+                    }
                 }
-                self.scope.truncate(initial_len);
-                frag
+                panic!("non-exhaustive patterns");
             }
             Format::Dynamic(_) => self.compile_value(value),
             Format::Apply(_) => self.compile_value(value),
