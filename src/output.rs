@@ -1,6 +1,6 @@
 use std::{
     borrow::{Borrow, Cow},
-    fmt::{Display, Write},
+    fmt::{Write, self},
     rc::Rc,
 };
 
@@ -15,9 +15,9 @@ pub enum Symbol {
     Junction,
 }
 
-impl Display for Symbol {
+impl fmt::Display for Symbol {
     #[rustfmt::skip]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Vacuum   => f.write_str("    "),
             Self::Pipe     => f.write_str("│   "),
@@ -34,7 +34,8 @@ pub enum Fragment {
     Symbol(Symbol),
     Char(char),
     String(Cow<'static, str>),
-    DisplayAtom(Rc<dyn Display>),
+    DebugAtom(Rc<dyn fmt::Debug>),
+    DisplayAtom(Rc<dyn fmt::Display>),
     Group(Box<Fragment>),
     Cat(Box<Fragment>, Box<Fragment>),
     Sequence {
@@ -43,19 +44,23 @@ pub enum Fragment {
     },
 }
 
-impl std::fmt::Debug for Fragment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Fragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Empty => write!(f, "Empty"),
-            Self::Char(arg0) => f.debug_tuple("Char").field(arg0).finish(),
+            Self::Char(c) => f.debug_tuple("Char").field(c).finish(),
             Self::Symbol(symb) => f.debug_tuple("Symbol").field(symb).finish(),
-            Self::String(arg0) => f.debug_tuple("String").field(arg0).finish(),
-            Self::DisplayAtom(arg0) => f
-                .debug_tuple("DisplayAtom")
-                .field(&format!("{}", arg0))
+            Self::String(s) => f.debug_tuple("String").field(s).finish(),
+            Self::DebugAtom(at) => f
+                .debug_tuple("DebugAtom")
+                .field(&format!("{:?}", at))
                 .finish(),
-            Self::Group(arg0) => f.debug_tuple("Group").field(arg0).finish(),
-            Self::Cat(arg0, arg1) => f.debug_tuple("Cat").field(arg0).field(arg1).finish(),
+            Self::DisplayAtom(at) => f
+                .debug_tuple("DisplayAtom")
+                .field(&format!("{}", at))
+                .finish(),
+            Self::Group(grp) => f.debug_tuple("Group").field(grp).finish(),
+            Self::Cat(x, y) => f.debug_tuple("Cat").field(x).field(y).finish(),
             Self::Sequence { sep, items } => f
                 .debug_struct("Sequence")
                 .field("sep", sep)
@@ -84,7 +89,7 @@ impl Fragment {
             Fragment::Char(c) => *c != '\n',
             Fragment::String(s) => !s.contains('\n'),
             Fragment::Symbol(_) => false,
-            Fragment::DisplayAtom(_) => true,
+            Fragment::DisplayAtom(_) | Fragment::DebugAtom(_) => true,
             Fragment::Group(frag) => frag.fits_inline(),
             Fragment::Cat(lhs, rhs) => lhs.fits_inline() && rhs.fits_inline(),
             Fragment::Sequence { sep, items } => {
@@ -96,7 +101,6 @@ impl Fragment {
                         }
                     }
                 }
-                let l = items.len();
                 items.iter().all(Self::fits_inline)
             }
         }
@@ -230,14 +234,15 @@ impl FragmentBuilder {
     }
 }
 
-impl Display for Fragment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Fragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Fragment::Empty => Ok(()),
             Fragment::Char(c) => f.write_char(*c),
             Fragment::Symbol(symb) => symb.fmt(f),
             Fragment::String(s) => f.write_str(s.borrow()),
-            Fragment::DisplayAtom(atom) => atom.fmt(f),
+            Fragment::DebugAtom(atom) => fmt::Debug::fmt(&atom, f),
+            Fragment::DisplayAtom(atom) => fmt::Display::fmt(&atom, f),
             Fragment::Group(frag) => frag.fmt(f),
             Fragment::Cat(frag0, frag1) => {
                 frag0.fmt(f)?;
@@ -250,7 +255,7 @@ impl Display for Fragment {
                 } else {
                     return Ok(());
                 }
-                let f_sep: Box<dyn Fn(&mut std::fmt::Formatter<'_>) -> std::fmt::Result> =
+                let f_sep: Box<dyn Fn(&mut fmt::Formatter<'_>) -> fmt::Result> =
                     if let Some(frag) = sep.as_deref() {
                         Box::new(|f| frag.fmt(f))
                     } else {
