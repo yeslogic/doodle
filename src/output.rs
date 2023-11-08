@@ -1,6 +1,6 @@
 use std::{
     borrow::{Borrow, Cow},
-    fmt::{Write, self},
+    fmt::{self, Write},
     rc::Rc,
 };
 
