@@ -162,12 +162,12 @@ impl From<ops::RangeInclusive<u8>> for ByteSet {
         } else if hi == lo {
             return ByteSet::from([*lo]);
         }
-        let start_ix = *lo / 64;
-        let end_ix = *hi / 64;
+        let start_ix = *lo >> 6;
+        let end_ix = *hi >> 6;
         if start_ix == end_ix {
             let mut mask = 0u64;
             for i in value {
-                mask |= 1 << i % 64;
+                mask |= 1 << (i & 63);
             }
             let bits = match start_ix {
                 0 => [mask, 0, 0, 0],
