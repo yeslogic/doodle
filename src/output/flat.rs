@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::io;
 
 use crate::{Format, FormatModule, Scope, Value};
@@ -100,14 +101,14 @@ fn is_show_format(name: &str) -> Option<&'static str> {
 
 fn check_covered(
     module: &FormatModule,
-    path: &mut Vec<String>,
+    path: &mut Vec<Cow<'static, str>>,
     format: &Format,
 ) -> Result<(), String> {
     match format {
         Format::ItemVar(level, _args) => {
-            let name = module.get_name(*level);
-            if is_show_format(name).is_none() {
-                path.push(name.to_string());
+            let name = module.get_name(*level).to_string();
+            if is_show_format(&name).is_none() {
+                path.push(name.into());
                 check_covered(module, path, module.get_format(*level))?;
                 path.pop();
             }

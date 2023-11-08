@@ -25,7 +25,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         Box::new(Expr::BitAnd(
             Box::new(Expr::RecordProj(
                 Box::new(var("header")),
-                "file-flags".to_string(),
+                "file-flags".into(),
             )),
             Box::new(Expr::U8(0x08)),
         )),
