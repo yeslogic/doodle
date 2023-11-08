@@ -11,7 +11,6 @@ pub struct ByteSet {
 }
 
 impl ByteSet {
-    #[inline(always)]
     pub const fn new() -> ByteSet {
         ByteSet::empty()
     }
@@ -145,7 +144,11 @@ impl<'a> From<&'a [u8]> for ByteSet {
 
 impl From<ops::Range<u8>> for ByteSet {
     fn from(value: ops::Range<u8>) -> Self {
-        ByteSet::from(value.start..=value.end - 1)
+        if value.end <= value.start {
+            ByteSet::empty()
+        } else {
+            ByteSet::from(value.start..=value.end - 1)
+        }
     }
 }
 
@@ -154,6 +157,11 @@ impl From<ops::RangeInclusive<u8>> for ByteSet {
         // because the values are adjacent, we can optimize if they are within the same quadrant
         let lo = value.start();
         let hi = value.end();
+        if hi < lo {
+            return ByteSet::empty();
+        } else if hi == lo {
+            return ByteSet::from([*lo]);
+        }
         let start_ix = *lo / 64;
         let end_ix = *hi / 64;
         if start_ix == end_ix {
