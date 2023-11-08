@@ -98,3 +98,49 @@ mod text {
         check_output(output, expected)
     }
 }
+
+mod gzip {
+    use super::*;
+
+    #[test]
+    fn test_decode_test1_gzip() {
+        let output = doodle().args(["file", "test1.gz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test1.gz.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_test2_gzip() {
+        let output = doodle().args(["file", "test2.gz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test2.gz.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_test3_gzip() {
+        let output = doodle().args(["file", "test3.gz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test3.gz.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_test4_gzip() {
+        let output = doodle().args(["file", "test4.gz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test4.gz.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_test5_gzip() {
+        let output = doodle().args(["file", "test5.gz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test5.gz.stdout");
+        check_output(output, expected)
+    }
+
+    #[test]
+    fn test_decode_test6_gzip() {
+        let output = doodle().args(["file", "test6.gz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test6.gz.stdout");
+        check_output(output, expected)
+    }
+}
