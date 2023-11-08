@@ -236,6 +236,7 @@ impl Value {
         }
     }
 
+    #[allow(dead_code)]
     fn unwrap_char(self) -> char {
         match self {
             Value::Char(c) => c,

@@ -31,6 +31,7 @@ pub struct Flags {
     omit_implied_values: bool,
     tables_for_record_sequences: bool,
     pretty_ascii_strings: bool,
+    pretty_utf8_strings: bool,
     hide_double_underscore_fields: bool,
 }
 
@@ -149,6 +150,7 @@ impl<'module> MonoidalPrinter<'module> {
             omit_implied_values: true,
             tables_for_record_sequences: true,
             pretty_ascii_strings: true,
+            pretty_utf8_strings: true,
             hide_double_underscore_fields: true,
         };
         MonoidalPrinter {
@@ -166,7 +168,10 @@ impl<'module> MonoidalPrinter<'module> {
             Format::ItemVar(level, _args) => {
                 let fmt_name = self.module.get_name(*level);
 
-                if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
+                // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
+                if self.flags.pretty_utf8_strings && fmt_name == "utf8.string" {
+                    self.compile_string(value)
+                } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
                     self.compile_ascii_string(value)
                 } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
                 {
@@ -288,21 +293,94 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
+    fn extract_string_field<'a>(&self, fields: &'a Vec<(String, Value)>) -> Option<&'a Value> {
+        match fields.len() {
+            0 => None,
+            1 => {
+                let (label, value) = &fields[0];
+                match label.as_str() {
+                    "string" => Some(value),
+                    "@value" => Some(value),
+                    _ => {
+                        // REVIEW - is this the right approach, or should we reject outright?
+                        {
+                            #![cfg(debug_assertions)]
+                            eprintln!("DEBUG: treating single-value field `{label}` as string, even though it does not match 'string' or '@value'...");
+                        }
+                        Some(value)
+                    }
+                }
+            }
+            _ => {
+                let mut ret = None;
+                for (label, value) in fields.iter() {
+                    if label == "string" {
+                        if let Some((lab0, _val0)) = ret.replace((label, value)) {
+                            panic!(
+                                "no tie-breaker between field `{label}` with prior field `{lab0}`"
+                            );
+                        }
+                    } else if label == "@value" {
+                        match value {
+                            Value::Record(fields) => {
+                                if let Some(inner) = self.extract_string_field(fields) {
+                                    return Some(inner);
+                                }
+                            }
+                            _ => {
+                                if let Some((lab0, _val0)) = ret.replace((label, value)) {
+                                    panic!("no tie-breaker between field `{label}` with prior field `{lab0}`");
+                                }
+                            }
+                        }
+                    }
+                }
+                ret.map(|(_, value)| value)
+            }
+        }
+    }
+
+    pub fn compile_string(&self, value: &Value) -> Fragment {
+        let vs = match value {
+            Value::Record(fields) => {
+                match self
+                    .extract_string_field(fields)
+                    .unwrap_or_else(|| unreachable!("no string field"))
+                {
+                    Value::Seq(vs) => vs,
+                    v => panic!("expected sequence value, found {v:?}"),
+                }
+            }
+            Value::Seq(vs) => vs,
+            v => panic!("expected record or sequence, found {v:?}"),
+        };
+        self.compile_char_seq(vs)
+    }
+
     pub fn compile_ascii_string(&self, value: &Value) -> Fragment {
         let vs = match value {
             Value::Record(fields) => {
-                match fields
-                    .iter()
-                    .find(|(label, _)| label == "string")
+                match self
+                    .extract_string_field(fields)
                     .unwrap_or_else(|| unreachable!("no string field"))
                 {
-                    (_, Value::Seq(vs)) => vs,
-                    (_, v) => panic!("expected sequence value, found {v:?}"),
+                    Value::Seq(vs) => vs,
+                    v => panic!("expected sequence value, found {v:?}"),
                 }
             }
             _ => panic!("expected record value, found {value:?}"),
         };
         self.compile_ascii_seq(vs)
+    }
+
+    fn compile_char_seq(&self, vals: &[Value]) -> Fragment {
+        let mut frag = Fragment::new();
+        frag.encat(Fragment::Char('"'));
+        for v in vals {
+            frag.encat(self.compile_char(v));
+        }
+        frag.encat(Fragment::Char('"'));
+        frag.group()
     }
 
     fn compile_ascii_seq(&self, vals: &[Value]) -> Fragment {
@@ -312,7 +390,19 @@ impl<'module> MonoidalPrinter<'module> {
             frag.encat(self.compile_ascii_char(v));
         }
         frag.encat(Fragment::Char('"'));
-        frag
+        frag.group()
+    }
+
+    fn compile_char(&self, v: &Value) -> Fragment {
+        let c = match v.coerce_record_to_value() {
+            Value::U8(b) => b as char,
+            Value::Char(c) => c,
+            _ => panic!("expected U8 or Char value, found {v:?}"),
+        };
+        match c {
+            '\x00'..='\x7f' => Fragment::String(c.escape_debug().collect::<String>().into()),
+            _ => Fragment::Char(c),
+        }
     }
 
     fn compile_ascii_char(&self, v: &Value) -> Fragment {
