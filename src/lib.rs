@@ -793,147 +793,123 @@ impl Expr {
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::BitAnd(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::U8(x & y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::U16(x & y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::U32(x & y)),
+            Expr::BitAnd(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
+                (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
+                (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::BitOr(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::U8(x | y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::U16(x | y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::U32(x | y)),
+            }),
+            Expr::BitOr(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
+                (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
+                (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Eq(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::Bool(x == y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::Bool(x == y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::Bool(x == y)),
+            }),
+            Expr::Eq(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Ne(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::Bool(x != y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::Bool(x != y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::Bool(x != y)),
+            }),
+            Expr::Ne(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Lt(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::Bool(x < y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::Bool(x < y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::Bool(x < y)),
+            }),
+            Expr::Lt(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Gt(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::Bool(x > y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::Bool(x > y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::Bool(x > y)),
+            }),
+            Expr::Gt(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Lte(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::Bool(x <= y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::Bool(x <= y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::Bool(x <= y)),
+            }),
+            Expr::Lte(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Gte(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::Bool(x >= y)),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::Bool(x >= y)),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::Bool(x >= y)),
+            }),
+            Expr::Gte(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
+                (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
+                (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Mul(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
+            }),
+            Expr::Mul(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            }),
+            Expr::Div(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            }),
+            Expr::Rem(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
+                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+            }),
+            Expr::Shl(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => {
-                    Cow::Owned(Value::U8(u8::checked_mul(x, y).unwrap()))
+                    Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
                 }
                 (Value::U16(x), Value::U16(y)) => {
-                    Cow::Owned(Value::U16(u16::checked_mul(x, y).unwrap()))
+                    Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
                 }
-                (Value::U32(x), Value::U32(y)) => {
-                    Cow::Owned(Value::U32(u32::checked_mul(x, y).unwrap()))
-                }
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Div(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
+            }),
+            Expr::Shr(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
                 (Value::U8(x), Value::U8(y)) => {
-                    Cow::Owned(Value::U8(u8::checked_div(x, y).unwrap()))
+                    Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
                 }
                 (Value::U16(x), Value::U16(y)) => {
-                    Cow::Owned(Value::U16(u16::checked_div(x, y).unwrap()))
+                    Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
                 }
-                (Value::U32(x), Value::U32(y)) => {
-                    Cow::Owned(Value::U32(u32::checked_div(x, y).unwrap()))
-                }
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Rem(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => {
-                    Cow::Owned(Value::U8(u8::checked_rem(x, y).unwrap()))
-                }
-                (Value::U16(x), Value::U16(y)) => {
-                    Cow::Owned(Value::U16(u16::checked_rem(x, y).unwrap()))
-                }
-                (Value::U32(x), Value::U32(y)) => {
-                    Cow::Owned(Value::U32(u32::checked_rem(x, y).unwrap()))
-                }
+            }),
+            Expr::Add(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            #[rustfmt::skip]
-            Expr::Shl(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::U32(u32::checked_shl(x, y).unwrap())),
+            }),
+            Expr::Sub(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
+                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
+                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
+                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                 (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            #[rustfmt::skip]
-            Expr::Shr(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Cow::Owned(Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())),
-                (Value::U16(x), Value::U16(y)) => Cow::Owned(Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())),
-                (Value::U32(x), Value::U32(y)) => Cow::Owned(Value::U32(u32::checked_shr(x, y).unwrap())),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Add(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => {
-                    Cow::Owned(Value::U8(u8::checked_add(x, y).unwrap()))
-                }
-                (Value::U16(x), Value::U16(y)) => {
-                    Cow::Owned(Value::U16(u16::checked_add(x, y).unwrap()))
-                }
-                (Value::U32(x), Value::U32(y)) => {
-                    Cow::Owned(Value::U32(u32::checked_add(x, y).unwrap()))
-                }
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
-            Expr::Sub(x, y) => match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => {
-                    Cow::Owned(Value::U8(u8::checked_sub(x, y).unwrap()))
-                }
-                (Value::U16(x), Value::U16(y)) => {
-                    Cow::Owned(Value::U16(u16::checked_sub(x, y).unwrap()))
-                }
-                (Value::U32(x), Value::U32(y)) => {
-                    Cow::Owned(Value::U32(u32::checked_sub(x, y).unwrap()))
-                }
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            },
+            }),
 
-            Expr::AsU8(x) => match x.eval_value(scope) {
-                Value::U8(x) => Cow::Owned(Value::U8(x)),
-                Value::U16(x) if x < 256 => Cow::Owned(Value::U8(x as u8)),
-                Value::U32(x) if x < 256 => Cow::Owned(Value::U8(x as u8)),
+            Expr::AsU8(x) => Cow::Owned(match x.eval_value(scope) {
+                Value::U8(x) => Value::U8(x),
+                Value::U16(x) if x < 256 => Value::U8(x as u8),
+                Value::U32(x) if x < 256 => Value::U8(x as u8),
                 x => panic!("cannot convert {x:?} to U8"),
-            },
-            Expr::AsU16(x) => match x.eval_value(scope) {
-                Value::U8(x) => Cow::Owned(Value::U16(u16::from(x))),
-                Value::U16(x) => Cow::Owned(Value::U16(x)),
-                Value::U32(x) if x < 65536 => Cow::Owned(Value::U16(x as u16)),
+            }),
+            Expr::AsU16(x) => Cow::Owned(match x.eval_value(scope) {
+                Value::U8(x) => Value::U16(u16::from(x)),
+                Value::U16(x) => Value::U16(x),
+                Value::U32(x) if x < 65536 => Value::U16(x as u16),
                 x => panic!("cannot convert {x:?} to U16"),
-            },
-            Expr::AsU32(x) => match x.eval_value(scope) {
-                Value::U8(x) => Cow::Owned(Value::U32(u32::from(x))),
-                Value::U16(x) => Cow::Owned(Value::U32(u32::from(x))),
-                Value::U32(x) => Cow::Owned(Value::U32(x)),
+            }),
+            Expr::AsU32(x) => Cow::Owned(match x.eval_value(scope) {
+                Value::U8(x) => Value::U32(u32::from(x)),
+                Value::U16(x) => Value::U32(u32::from(x)),
+                Value::U32(x) => Value::U32(x),
                 x => panic!("cannot convert {x:?} to U32"),
-            },
+            }),
 
             Expr::U16Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(hi), Value::U8(lo)] => {
