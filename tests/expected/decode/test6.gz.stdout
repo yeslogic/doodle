@@ -1,0 +1,76 @@
+├── data <- _ |...| _ :=
+│   └── gzip <- gzip.main :=
+│       └── 0 <- { ... } :=
+│           ├── header <- gzip.header :=
+│           │   ├── magic <- (...)
+│           │   ├── method <- base.u8 := 8
+│           │   ├── file-flags <- base.u8 := 8
+│           │   ├── timestamp <- base.u32le := 1688888025
+│           │   ├── compression-flags <- base.u8 := 0
+│           │   └── os-id <- base.u8 := 3
+│           ├── fname <- match (header.file-flags & 8 != 0) { ... } := "test6"
+│           ├── data <- bits deflate.main :=
+│           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
+│           │   │   └── 0 <- deflate.block :=
+│           │   │       ├── final <- base.bit := 1
+│           │   │       ├── type <- { ... } := 0
+│           │   │       └── data <- match type { ... } :=
+│           │   │           ├── align <- align 8 := ()
+│           │   │           ├── len <- { ... } := 2048
+│           │   │           ├── nlen <- { ... } := 63487
+│           │   │           ├── bytes <- repeat-count len { ... } :=
+│           │   │           │   ├── 0 <- { ... } := 13
+│           │   │           │   ├── 1 <- { ... } := 60
+│           │   │           │   ├── 2 <- { ... } := 105
+│           │   │           │   ├── 3 <- { ... } := 200
+│           │   │           │   ├── 4 <- { ... } := 176
+│           │   │           │   ├── 5 <- { ... } := 100
+│           │   │           │   ├── 6 <- { ... } := 108
+│           │   │           │   ├── 7 <- { ... } := 167
+│           │   │           │   ├── 8 <- { ... } := 57
+│           │   │           │   ├── 9 <- { ... } := 17
+│           │   │           │   ~
+│           │   │           │   └── 2047 <- { ... } := 194
+│           │   │           └── codes-values <- compute flat-map (x -> [..]) bytes :=
+│           │   │               ├── 0 := { literal := 13 }
+│           │   │               ├── 1 := { literal := 60 }
+│           │   │               ├── 2 := { literal := 105 }
+│           │   │               ├── 3 := { literal := 200 }
+│           │   │               ├── 4 := { literal := 176 }
+│           │   │               ├── 5 := { literal := 100 }
+│           │   │               ├── 6 := { literal := 108 }
+│           │   │               ├── 7 := { literal := 167 }
+│           │   │               ├── 8 := { literal := 57 }
+│           │   │               ├── 9 := { literal := 17 }
+│           │   │               ~
+│           │   │               └── 2047 := { literal := 194 }
+│           │   ├── codes <- compute flat-map (x -> match x.data { ... }) blocks :=
+│           │   │   ├── 0 := { literal := 13 }
+│           │   │   ├── 1 := { literal := 60 }
+│           │   │   ├── 2 := { literal := 105 }
+│           │   │   ├── 3 := { literal := 200 }
+│           │   │   ├── 4 := { literal := 176 }
+│           │   │   ├── 5 := { literal := 100 }
+│           │   │   ├── 6 := { literal := 108 }
+│           │   │   ├── 7 := { literal := 167 }
+│           │   │   ├── 8 := { literal := 57 }
+│           │   │   ├── 9 := { literal := 17 }
+│           │   │   ~
+│           │   │   └── 2047 := { literal := 194 }
+│           │   └── inflate <- compute inflate codes :=
+│           │       ├── 0 := 13
+│           │       ├── 1 := 60
+│           │       ├── 2 := 105
+│           │       ├── 3 := 200
+│           │       ├── 4 := 176
+│           │       ├── 5 := 100
+│           │       ├── 6 := 108
+│           │       ├── 7 := 167
+│           │       ├── 8 := 57
+│           │       ├── 9 := 17
+│           │       ~
+│           │       └── 2047 := 194
+│           └── footer <- gzip.footer :=
+│               ├── crc <- base.u32le := 161979641
+│               └── length <- base.u32le := 2048
+└── end <- end-of-input
