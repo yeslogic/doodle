@@ -199,16 +199,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 Format::MatchVariant(
-                    Expr::RecordProj(Box::new(var("identifier")), "string".to_string()),
+                    Expr::RecordProj(Box::new(var("identifier")), "string".into()),
                     vec![
                         (
                             Pattern::from_bytes(b"JFIF"),
-                            "jfif".to_string(),
+                            "jfif".into(),
                             app0_jfif.call(),
                         ),
                         // FIXME: there are other APP0 formats
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, "other".to_string(), repeat(base.u8())),
+                        (Pattern::Wildcard, "other".into(), repeat(base.u8())),
                     ],
                 ),
             ),
@@ -233,21 +233,21 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 Format::MatchVariant(
-                    Expr::RecordProj(Box::new(var("identifier")), "string".to_string()),
+                    Expr::RecordProj(Box::new(var("identifier")), "string".into()),
                     vec![
                         (
                             Pattern::from_bytes(b"Exif"),
-                            "exif".to_string(),
+                            "exif".into(),
                             app1_exif.call(),
                         ),
                         (
                             Pattern::from_bytes(b"http://ns.adobe.com/xap/1.0/"),
-                            "xmp".to_string(),
+                            "xmp".into(),
                             app1_xmp.call(),
                         ),
                         // FIXME: there are other APP1 formats
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, "other".to_string(), repeat(base.u8())),
+                        (Pattern::Wildcard, "other".into(), repeat(base.u8())),
                     ],
                 ),
             ),
@@ -367,7 +367,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     Box::new(var("mcu")),
                     vec![
                         (
-                            Pattern::variant("byte", Pattern::Binding("v".to_string())),
+                            Pattern::variant("byte", Pattern::Binding("v".into())),
                             var("v"),
                         ),
                         (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
@@ -401,12 +401,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 "scan-data-stream",
                 Format::Compute(Expr::FlatMap(
                     Box::new(Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Match(
                             Box::new(var("x")),
                             vec![
                                 (
-                                    Pattern::variant("mcu", Pattern::Binding("v".to_string())),
+                                    Pattern::variant("mcu", Pattern::Binding("v".into())),
                                     Expr::Seq(vec![var("v")]),
                                 ),
                                 (

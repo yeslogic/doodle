@@ -148,7 +148,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
         ),
         (
             "distance-code",
-            Format::Apply("distance-alphabet-format".to_string()),
+            Format::Apply("distance-alphabet-format".into()),
         ),
         ("distance-record", distance_record(base)),
     ])
@@ -171,27 +171,24 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
 
 fn reference_record() -> Expr {
     Expr::Match(
-        Box::new(Expr::RecordProj(Box::new(var("x")), "extra".to_string())),
+        Box::new(Expr::RecordProj(Box::new(var("x")), "extra".into())),
         vec![(
-            Pattern::Variant(
-                "some".to_string(),
-                Box::new(Pattern::Binding("rec".to_string())),
-            ),
+            Pattern::Variant("some".into(), Box::new(Pattern::Binding("rec".into()))),
             Expr::Seq(vec![Expr::Variant(
-                "reference".to_string(),
+                "reference".into(),
                 Box::new(Expr::Record(vec![
                     (
-                        "length".to_string(),
-                        Expr::RecordProj(Box::new(var("rec")), "length".to_string()),
+                        "length".into(),
+                        Expr::RecordProj(Box::new(var("rec")), "length".into()),
                     ),
                     (
-                        "distance".to_string(),
+                        "distance".into(),
                         Expr::RecordProj(
                             Box::new(Expr::RecordProj(
                                 Box::new(var("rec")),
-                                "distance-record".to_string(),
+                                "distance-record".into(),
                             )),
-                            "distance".to_string(),
+                            "distance".into(),
                         ),
                     ),
                 ])),
@@ -238,9 +235,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes-values",
                 Format::Compute(Expr::FlatMap(
                     Box::new(Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Seq(vec![Expr::Variant(
-                            "literal".to_string(),
+                            "literal".into(),
                             Box::new(var("x")),
                         )])),
                     )),
@@ -261,17 +258,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes",
                 repeat_until_last(
                     Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Eq(
                             Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
                                 Box::new(var("x")),
-                                "code".to_string(),
+                                "code".into(),
                             )))),
                             Box::new(Expr::U16(256)),
                         )),
                     ),
                     record([
-                        ("code", Format::Apply("format".to_string())),
+                        ("code", Format::Apply("format".into())),
                         (
                             "extra",
                             Format::MatchVariant(
@@ -279,150 +276,150 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 vec![
                                     (
                                         Pattern::U16(257),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(3, base, 0),
                                     ),
                                     (
                                         Pattern::U16(258),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(4, base, 0),
                                     ),
                                     (
                                         Pattern::U16(259),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(5, base, 0),
                                     ),
                                     (
                                         Pattern::U16(260),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(6, base, 0),
                                     ),
                                     (
                                         Pattern::U16(261),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(7, base, 0),
                                     ),
                                     (
                                         Pattern::U16(262),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(8, base, 0),
                                     ),
                                     (
                                         Pattern::U16(263),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(9, base, 0),
                                     ),
                                     (
                                         Pattern::U16(264),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(10, base, 0),
                                     ),
                                     (
                                         Pattern::U16(265),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(11, base, 1),
                                     ),
                                     (
                                         Pattern::U16(266),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(13, base, 1),
                                     ),
                                     (
                                         Pattern::U16(267),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(15, base, 1),
                                     ),
                                     (
                                         Pattern::U16(268),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(17, base, 1),
                                     ),
                                     (
                                         Pattern::U16(269),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(19, base, 2),
                                     ),
                                     (
                                         Pattern::U16(270),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(23, base, 2),
                                     ),
                                     (
                                         Pattern::U16(271),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(27, base, 2),
                                     ),
                                     (
                                         Pattern::U16(272),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(31, base, 2),
                                     ),
                                     (
                                         Pattern::U16(273),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(35, base, 3),
                                     ),
                                     (
                                         Pattern::U16(274),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(43, base, 3),
                                     ),
                                     (
                                         Pattern::U16(275),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(51, base, 3),
                                     ),
                                     (
                                         Pattern::U16(276),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(59, base, 3),
                                     ),
                                     (
                                         Pattern::U16(277),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(67, base, 4),
                                     ),
                                     (
                                         Pattern::U16(278),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(83, base, 4),
                                     ),
                                     (
                                         Pattern::U16(279),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(99, base, 4),
                                     ),
                                     (
                                         Pattern::U16(280),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(115, base, 4),
                                     ),
                                     (
                                         Pattern::U16(281),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(131, base, 5),
                                     ),
                                     (
                                         Pattern::U16(282),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(163, base, 5),
                                     ),
                                     (
                                         Pattern::U16(283),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(195, base, 5),
                                     ),
                                     (
                                         Pattern::U16(284),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(227, base, 5),
                                     ),
                                     (
                                         Pattern::U16(285),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record_fixed(258, base, 0),
                                     ),
-                                    (Pattern::Wildcard, "none".to_string(), Format::EMPTY),
+                                    (Pattern::Wildcard, "none".into(), Format::EMPTY),
                                 ],
                             ),
                         ),
@@ -433,9 +430,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes-values",
                 Format::Compute(Expr::FlatMap(
                     Box::new(Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".to_string())),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".into())),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
@@ -470,10 +467,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![Expr::Variant(
-                                        "literal".to_string(),
+                                        "literal".into(),
                                         Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                             Box::new(var("x")),
-                                            "code".to_string(),
+                                            "code".into(),
                                         )))),
                                     )]),
                                 ),
@@ -527,15 +524,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "literal-length-distance-alphabet-code-lengths",
                 repeat_until_seq(
                     Expr::Lambda(
-                        "y".to_string(),
+                        "y".into(),
                         Box::new(Expr::Gte(
                             Box::new(Expr::SeqLength(Box::new(Expr::FlatMapAccum(
                                 Box::new(Expr::Lambda(
-                                    "x".to_string(),
+                                    "x".into(),
                                     Box::new(Expr::Match(
                                         Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                             Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
-                                            "code".to_string(),
+                                            "code".into(),
                                         )))),
                                         vec![
                                             (
@@ -549,7 +546,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                                     Box::new(var("x")),
                                                                     1,
                                                                 )),
-                                                                "extra".to_string(),
+                                                                "extra".into(),
                                                             ),
                                                             Expr::U8(3),
                                                         )),
@@ -560,12 +557,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                             )),
                                                             vec![(
                                                                 Pattern::Variant(
-                                                                    "some".to_string(),
+                                                                    "some".into(),
                                                                     Box::new(Pattern::Binding(
-                                                                        "y".to_string(),
+                                                                        "y".into(),
                                                                     )),
                                                                 ),
-                                                                Expr::Var("y".to_string()),
+                                                                Expr::Var("y".into()),
                                                             )],
                                                         )),
                                                     ),
@@ -582,7 +579,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                                     Box::new(var("x")),
                                                                     1,
                                                                 )),
-                                                                "extra".to_string(),
+                                                                "extra".into(),
                                                             ),
                                                             Expr::U8(3),
                                                         )),
@@ -601,7 +598,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                                     Box::new(var("x")),
                                                                     1,
                                                                 )),
-                                                                "extra".to_string(),
+                                                                "extra".into(),
                                                             ),
                                                             Expr::U8(11),
                                                         )),
@@ -610,10 +607,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 ]),
                                             ),
                                             (
-                                                Pattern::Binding("v".to_string()),
+                                                Pattern::Binding("v".into()),
                                                 Expr::Tuple(vec![
                                                     Expr::Variant(
-                                                        "some".to_string(),
+                                                        "some".into(),
                                                         Box::new(var("v")),
                                                     ),
                                                     Expr::Seq(vec![var("v")]),
@@ -622,10 +619,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ],
                                     )),
                                 )),
-                                Box::new(Expr::Variant("none".to_string(), Box::new(Expr::UNIT))),
+                                Box::new(Expr::Variant("none".into(), Box::new(Expr::UNIT))),
                                 ValueType::Union(vec![
-                                    ("none".to_string(), ValueType::Tuple(vec![])),
-                                    ("some".to_string(), ValueType::U8),
+                                    ("none".into(), ValueType::Tuple(vec![])),
+                                    ("some".into(), ValueType::U8),
                                 ]),
                                 Box::new(var("y")),
                             )))),
@@ -636,10 +633,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         )),
                     ),
                     record([
-                        (
-                            "code",
-                            Format::Apply("code-length-alphabet-format".to_string()),
-                        ),
+                        ("code", Format::Apply("code-length-alphabet-format".into())),
                         (
                             "extra",
                             Format::Match(
@@ -659,11 +653,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "literal-length-distance-alphabet-code-lengths-value",
                 Format::Compute(Expr::FlatMapAccum(
                     Box::new(Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Match(
                             Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                 Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
-                                "code".to_string(),
+                                "code".into(),
                             )))),
                             vec![
                                 (
@@ -677,7 +671,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                         Box::new(var("x")),
                                                         1,
                                                     )),
-                                                    "extra".to_string(),
+                                                    "extra".into(),
                                                 ),
                                                 Expr::U8(3),
                                             )),
@@ -685,10 +679,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 Box::new(Expr::TupleProj(Box::new(var("x")), 0)),
                                                 vec![(
                                                     Pattern::Variant(
-                                                        "some".to_string(),
-                                                        Box::new(Pattern::Binding("y".to_string())),
+                                                        "some".into(),
+                                                        Box::new(Pattern::Binding("y".into())),
                                                     ),
-                                                    Expr::Var("y".to_string()),
+                                                    Expr::Var("y".into()),
                                                 )],
                                             )),
                                         ),
@@ -705,7 +699,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                         Box::new(var("x")),
                                                         1,
                                                     )),
-                                                    "extra".to_string(),
+                                                    "extra".into(),
                                                 ),
                                                 Expr::U8(3),
                                             )),
@@ -724,7 +718,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                         Box::new(var("x")),
                                                         1,
                                                     )),
-                                                    "extra".to_string(),
+                                                    "extra".into(),
                                                 ),
                                                 Expr::U8(11),
                                             )),
@@ -733,19 +727,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     ]),
                                 ),
                                 (
-                                    Pattern::Binding("v".to_string()),
+                                    Pattern::Binding("v".into()),
                                     Expr::Tuple(vec![
-                                        Expr::Variant("some".to_string(), Box::new(var("v"))),
+                                        Expr::Variant("some".into(), Box::new(var("v"))),
                                         Expr::Seq(vec![var("v")]),
                                     ]),
                                 ),
                             ],
                         )),
                     )),
-                    Box::new(Expr::Variant("none".to_string(), Box::new(Expr::UNIT))),
+                    Box::new(Expr::Variant("none".into(), Box::new(Expr::UNIT))),
                     ValueType::Union(vec![
-                        ("none".to_string(), ValueType::Tuple(vec![])),
-                        ("some".to_string(), ValueType::U8),
+                        ("none".into(), ValueType::Tuple(vec![])),
+                        ("some".into(), ValueType::U8),
                     ]),
                     Box::new(var("literal-length-distance-alphabet-code-lengths")),
                 )),
@@ -784,11 +778,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes",
                 repeat_until_last(
                     Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Eq(
                             Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
                                 Box::new(var("x")),
-                                "code".to_string(),
+                                "code".into(),
                             )))),
                             Box::new(Expr::U16(256)),
                         )),
@@ -796,159 +790,67 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record([
                         (
                             "code",
-                            Format::Apply("literal-length-alphabet-format".to_string()),
+                            Format::Apply("literal-length-alphabet-format".into()),
                         ),
                         (
                             "extra",
                             Format::MatchVariant(
                                 var("code"),
                                 vec![
-                                    (
-                                        Pattern::U16(257),
-                                        "some".to_string(),
-                                        length_record(3, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(258),
-                                        "some".to_string(),
-                                        length_record(4, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(259),
-                                        "some".to_string(),
-                                        length_record(5, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(260),
-                                        "some".to_string(),
-                                        length_record(6, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(261),
-                                        "some".to_string(),
-                                        length_record(7, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(262),
-                                        "some".to_string(),
-                                        length_record(8, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(263),
-                                        "some".to_string(),
-                                        length_record(9, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(264),
-                                        "some".to_string(),
-                                        length_record(10, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(265),
-                                        "some".to_string(),
-                                        length_record(11, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(266),
-                                        "some".to_string(),
-                                        length_record(13, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(267),
-                                        "some".to_string(),
-                                        length_record(15, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(268),
-                                        "some".to_string(),
-                                        length_record(17, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(269),
-                                        "some".to_string(),
-                                        length_record(19, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(270),
-                                        "some".to_string(),
-                                        length_record(23, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(271),
-                                        "some".to_string(),
-                                        length_record(27, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(272),
-                                        "some".to_string(),
-                                        length_record(31, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(273),
-                                        "some".to_string(),
-                                        length_record(35, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(274),
-                                        "some".to_string(),
-                                        length_record(43, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(275),
-                                        "some".to_string(),
-                                        length_record(51, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(276),
-                                        "some".to_string(),
-                                        length_record(59, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(277),
-                                        "some".to_string(),
-                                        length_record(67, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(278),
-                                        "some".to_string(),
-                                        length_record(83, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(279),
-                                        "some".to_string(),
-                                        length_record(99, base, 4),
-                                    ),
+                                    (Pattern::U16(257), "some".into(), length_record(3, base, 0)),
+                                    (Pattern::U16(258), "some".into(), length_record(4, base, 0)),
+                                    (Pattern::U16(259), "some".into(), length_record(5, base, 0)),
+                                    (Pattern::U16(260), "some".into(), length_record(6, base, 0)),
+                                    (Pattern::U16(261), "some".into(), length_record(7, base, 0)),
+                                    (Pattern::U16(262), "some".into(), length_record(8, base, 0)),
+                                    (Pattern::U16(263), "some".into(), length_record(9, base, 0)),
+                                    (Pattern::U16(264), "some".into(), length_record(10, base, 0)),
+                                    (Pattern::U16(265), "some".into(), length_record(11, base, 1)),
+                                    (Pattern::U16(266), "some".into(), length_record(13, base, 1)),
+                                    (Pattern::U16(267), "some".into(), length_record(15, base, 1)),
+                                    (Pattern::U16(268), "some".into(), length_record(17, base, 1)),
+                                    (Pattern::U16(269), "some".into(), length_record(19, base, 2)),
+                                    (Pattern::U16(270), "some".into(), length_record(23, base, 2)),
+                                    (Pattern::U16(271), "some".into(), length_record(27, base, 2)),
+                                    (Pattern::U16(272), "some".into(), length_record(31, base, 2)),
+                                    (Pattern::U16(273), "some".into(), length_record(35, base, 3)),
+                                    (Pattern::U16(274), "some".into(), length_record(43, base, 3)),
+                                    (Pattern::U16(275), "some".into(), length_record(51, base, 3)),
+                                    (Pattern::U16(276), "some".into(), length_record(59, base, 3)),
+                                    (Pattern::U16(277), "some".into(), length_record(67, base, 4)),
+                                    (Pattern::U16(278), "some".into(), length_record(83, base, 4)),
+                                    (Pattern::U16(279), "some".into(), length_record(99, base, 4)),
                                     (
                                         Pattern::U16(280),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record(115, base, 4),
                                     ),
                                     (
                                         Pattern::U16(281),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record(131, base, 5),
                                     ),
                                     (
                                         Pattern::U16(282),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record(163, base, 5),
                                     ),
                                     (
                                         Pattern::U16(283),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record(195, base, 5),
                                     ),
                                     (
                                         Pattern::U16(284),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record(227, base, 5),
                                     ),
                                     (
                                         Pattern::U16(285),
-                                        "some".to_string(),
+                                        "some".into(),
                                         length_record(258, base, 0),
                                     ),
-                                    (Pattern::Wildcard, "none".to_string(), Format::EMPTY),
+                                    (Pattern::Wildcard, "none".into(), Format::EMPTY),
                                 ],
                             ),
                         ),
@@ -959,9 +861,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes-values",
                 Format::Compute(Expr::FlatMap(
                     Box::new(Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".to_string())),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".into())),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
@@ -996,10 +898,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![Expr::Variant(
-                                        "literal".to_string(),
+                                        "literal".into(),
                                         Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
                                             Box::new(var("x")),
-                                            "code".to_string(),
+                                            "code".into(),
                                         )))),
                                     )]),
                                 ),
@@ -1022,19 +924,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 Format::MatchVariant(
                     var("type"),
                     vec![
-                        (
-                            Pattern::U8(0),
-                            "uncompressed".to_string(),
-                            uncompressed.call(),
-                        ),
-                        (
-                            Pattern::U8(1),
-                            "fixed_huffman".to_string(),
-                            fixed_huffman.call(),
-                        ),
+                        (Pattern::U8(0), "uncompressed".into(), uncompressed.call()),
+                        (Pattern::U8(1), "fixed_huffman".into(), fixed_huffman.call()),
                         (
                             Pattern::U8(2),
-                            "dynamic_huffman".to_string(),
+                            "dynamic_huffman".into(),
                             dynamic_huffman.call(),
                         ),
                     ],
@@ -1050,9 +944,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "blocks",
                 repeat_until_last(
                     Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Eq(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "final".to_string())),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "final".into())),
                             Box::new(Expr::U8(1)),
                         )),
                     ),
@@ -1063,39 +957,30 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes",
                 Format::Compute(Expr::FlatMap(
                     Box::new(Expr::Lambda(
-                        "x".to_string(),
+                        "x".into(),
                         Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "data".to_string())),
+                            Box::new(Expr::RecordProj(Box::new(var("x")), "data".into())),
                             vec![
                                 (
                                     Pattern::Variant(
-                                        "uncompressed".to_string(),
-                                        Box::new(Pattern::Binding("y".to_string())),
+                                        "uncompressed".into(),
+                                        Box::new(Pattern::Binding("y".into())),
                                     ),
-                                    Expr::RecordProj(
-                                        Box::new(var("y")),
-                                        "codes-values".to_string(),
-                                    ),
+                                    Expr::RecordProj(Box::new(var("y")), "codes-values".into()),
                                 ),
                                 (
                                     Pattern::Variant(
-                                        "fixed_huffman".to_string(),
-                                        Box::new(Pattern::Binding("y".to_string())),
+                                        "fixed_huffman".into(),
+                                        Box::new(Pattern::Binding("y".into())),
                                     ),
-                                    Expr::RecordProj(
-                                        Box::new(var("y")),
-                                        "codes-values".to_string(),
-                                    ),
+                                    Expr::RecordProj(Box::new(var("y")), "codes-values".into()),
                                 ),
                                 (
                                     Pattern::Variant(
-                                        "dynamic_huffman".to_string(),
-                                        Box::new(Pattern::Binding("y".to_string())),
+                                        "dynamic_huffman".into(),
+                                        Box::new(Pattern::Binding("y".into())),
                                     ),
-                                    Expr::RecordProj(
-                                        Box::new(var("y")),
-                                        "codes-values".to_string(),
-                                    ),
+                                    Expr::RecordProj(Box::new(var("y")), "codes-values".into()),
                                 ),
                             ],
                         )),

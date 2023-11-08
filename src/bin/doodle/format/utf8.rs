@@ -48,8 +48,8 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
                 var("bytes"),
                 vec![(
                     Pattern::Tuple(vec![
-                        Pattern::Binding("x1".to_string()),
-                        Pattern::Binding("x0".to_string()),
+                        Pattern::Binding("x1".into()),
+                        Pattern::Binding("x0".into()),
                     ]),
                     Format::Compute(shift6_2(var("x1"), var("x0"))),
                 )],
@@ -57,13 +57,13 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
         ),
     ]);
 
-    let pat3 = |lab: &str| {
+    let pat3 = |lab: &'static str| {
         Pattern::variant(
             lab,
             Pattern::Tuple(vec![
-                Pattern::Binding("x2".to_string()),
-                Pattern::Binding("x1".to_string()),
-                Pattern::Binding("x0".to_string()),
+                Pattern::Binding("x2".into()),
+                Pattern::Binding("x1".into()),
+                Pattern::Binding("x0".into()),
             ]),
         )
     };
@@ -133,14 +133,14 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
         ),
     ]);
 
-    let pat4 = |lab: &str| {
+    let pat4 = |lab: &'static str| {
         Pattern::variant(
             lab,
             Pattern::Tuple(vec![
-                Pattern::Binding("x3".to_string()),
-                Pattern::Binding("x2".to_string()),
-                Pattern::Binding("x1".to_string()),
-                Pattern::Binding("x0".to_string()),
+                Pattern::Binding("x3".into()),
+                Pattern::Binding("x2".into()),
+                Pattern::Binding("x1".into()),
+                Pattern::Binding("x0".into()),
             ]),
         )
     };
@@ -219,19 +219,19 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
                     var("bytes"),
                     vec![
                         (
-                            Pattern::variant("utf8-1", Pattern::Binding("x".to_string())),
+                            Pattern::variant("utf8-1", Pattern::Binding("x".into())),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
-                            Pattern::variant("utf8-2", Pattern::Binding("x".to_string())),
+                            Pattern::variant("utf8-2", Pattern::Binding("x".into())),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
-                            Pattern::variant("utf8-3", Pattern::Binding("x".to_string())),
+                            Pattern::variant("utf8-3", Pattern::Binding("x".into())),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
-                            Pattern::variant("utf8-4", Pattern::Binding("x".to_string())),
+                            Pattern::variant("utf8-4", Pattern::Binding("x".into())),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                     ],

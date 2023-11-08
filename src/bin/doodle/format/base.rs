@@ -1,15 +1,19 @@
 use doodle::byte_set::ByteSet;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
-pub fn var(name: &str) -> Expr {
-    Expr::Var(name.to_string())
+use std::borrow::Cow;
+
+pub fn var<Name: Into<Cow<'static, str>>>(name: Name) -> Expr {
+    Expr::Var(name.into())
 }
 
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
 
-pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+pub fn alts<Label: Into<Cow<'static, str>>>(
+    fields: impl IntoIterator<Item = (Label, Format)>,
+) -> Format {
     Format::Union(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
@@ -17,7 +21,9 @@ pub fn alts<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format
     )
 }
 
-pub fn record<Label: Into<String>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+pub fn record<Label: Into<Cow<'static, str>>>(
+    fields: impl IntoIterator<Item = (Label, Format)>,
+) -> Format {
     Format::Record(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
@@ -55,8 +61,8 @@ pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
     Format::MatchVariant(
         cond,
         vec![
-            (Pattern::Bool(true), "yes".to_string(), format0),
-            (Pattern::Bool(false), "no".to_string(), format1),
+            (Pattern::Bool(true), "yes".into(), format0),
+            (Pattern::Bool(false), "no".into(), format1),
         ],
     )
 }

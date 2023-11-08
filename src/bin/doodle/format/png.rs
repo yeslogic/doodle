@@ -43,23 +43,23 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let bkgd_data = Format::MatchVariant(
         Expr::RecordProj(
-            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".to_string())),
-            "color-type".to_string(),
+            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".into())),
+            "color-type".into(),
         ),
         vec![
             (
                 Pattern::U8(0),
-                "color-type-0".to_string(),
+                "color-type-0".into(),
                 record([("greyscale", base.u16be())]),
             ),
             (
                 Pattern::U8(4),
-                "color-type-4".to_string(),
+                "color-type-4".into(),
                 record([("greyscale", base.u16be())]),
             ),
             (
                 Pattern::U8(2),
-                "color-type-2".to_string(),
+                "color-type-2".into(),
                 record([
                     ("red", base.u16be()),
                     ("green", base.u16be()),
@@ -68,7 +68,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 Pattern::U8(6),
-                "color-type-6".to_string(),
+                "color-type-6".into(),
                 record([
                     ("red", base.u16be()),
                     ("green", base.u16be()),
@@ -77,14 +77,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 Pattern::U8(3),
-                "color-type-3".to_string(),
+                "color-type-3".into(),
                 record([("palette-index", base.u8())]),
             ),
         ],
     );
     let bkgd = module.define_format_args(
         "png.bkgd",
-        vec![("ihdr".to_string(), ihdr_type.clone())],
+        vec![("ihdr".into(), ihdr_type.clone())],
         chunk(is_bytes(b"bKGD"), bkgd_data),
     );
 
@@ -111,18 +111,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let trns_data = Format::MatchVariant(
         Expr::RecordProj(
-            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".to_string())),
-            "color-type".to_string(),
+            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".into())),
+            "color-type".into(),
         ),
         vec![
             (
                 Pattern::U8(0),
-                "color-type-0".to_string(),
+                "color-type-0".into(),
                 record([("greyscale", base.u16be())]),
             ),
             (
                 Pattern::U8(2),
-                "color-type-2".to_string(),
+                "color-type-2".into(),
                 record([
                     ("red", base.u16be()),
                     ("green", base.u16be()),
@@ -131,20 +131,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 Pattern::U8(3),
-                "color-type-3".to_string(),
+                "color-type-3".into(),
                 repeat(record([("palette-index", base.u8())])),
             ),
         ],
     );
     let trns = module.define_format_args(
         "png.trns",
-        vec![("ihdr".to_string(), ihdr_type.clone())],
+        vec![("ihdr".into(), ihdr_type.clone())],
         chunk(is_bytes(b"tRNS"), trns_data),
     );
 
     let png_chunk = module.define_format_args(
         "png.chunk",
-        vec![("ihdr".to_string(), ihdr_type)],
+        vec![("ihdr".into(), ihdr_type)],
         alts([
             ("bKGD", bkgd.call_args(vec![var("ihdr")])),
             ("pHYs", phys.call()),

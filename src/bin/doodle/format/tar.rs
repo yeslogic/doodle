@@ -162,7 +162,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         "@value",
                         repeat_count(
-                            Expr::RecordProj(Box::new(var("header")), "size".to_string()),
+                            Expr::RecordProj(Box::new(var("header")), "size".into()),
                             base.u8(),
                         ),
                     ),

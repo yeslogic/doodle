@@ -79,7 +79,7 @@ impl<'module> MonoidalPrinter<'module> {
     fn is_record_with_atomic_fields<'a>(
         &'a self,
         format: &'a Format,
-    ) -> Option<Cow<'a, [(String, Format)]>> {
+    ) -> Option<Cow<'a, [(Cow<'static, str>, Format)]>> {
         match format {
             Format::ItemVar(level, _args) => {
                 self.is_record_with_atomic_fields(self.module.get_format(*level))
@@ -293,7 +293,10 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn extract_string_field<'a>(&self, fields: &'a Vec<(String, Value)>) -> Option<&'a Value> {
+    fn extract_string_field<'a>(
+        &self,
+        fields: &'a Vec<(Cow<'static, str>, Value)>,
+    ) -> Option<&'a Value> {
         fields
             .iter()
             .find_map(|(label, value)| (label == "string").then_some(value))
@@ -452,7 +455,7 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_table(
         &mut self,
         cols: &[usize],
-        header: &[String],
+        header: &[Cow<'static, str>],
         rows: &[Vec<String>],
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
@@ -483,8 +486,8 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_record(
         &mut self,
-        value_fields: &[(String, Value)],
-        format_fields: Option<&[(String, Format)]>,
+        value_fields: &[(Cow<'static, str>, Value)],
+        format_fields: Option<&[(Cow<'static, str>, Format)]>,
     ) -> Fragment {
         let mut value_fields_filt = Vec::new();
         let mut format_fields_filt = format_fields.map(|_| Vec::new());
