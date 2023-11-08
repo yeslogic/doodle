@@ -152,8 +152,8 @@ impl From<ops::Range<u8>> for ByteSet {
     }
 }
 
-impl From<ops::RangeInclusive<u8>> for ByteSet {
-    fn from(value: ops::RangeInclusive<u8>) -> Self {
+impl From<RangeInclusive<u8>> for ByteSet {
+    fn from(value: RangeInclusive<u8>) -> Self {
         // because the values are adjacent, we can optimize if they are within the same quadrant
         let lo = value.start();
         let hi = value.end();

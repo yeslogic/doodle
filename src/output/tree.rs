@@ -279,7 +279,7 @@ impl<'module> MonoidalPrinter<'module> {
             Value::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
-            Value::Char(c) => Fragment::DisplayAtom(Rc::new(*c)),
+            Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
             Value::Tuple(vals) => self.compile_tuple(vals, None),
             Value::Seq(vals) => self.compile_seq(vals, None),
             Value::Record(fields) => self.compile_record(fields, None),
