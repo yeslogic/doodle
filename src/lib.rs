@@ -779,16 +779,17 @@ impl Expr {
             )),
             Expr::Match(head, branches) => {
                 let head = head.eval(scope);
-                let mut new_scope = Scope::new();
-                let (_, expr) = branches
-                    .iter()
-                    .find(|(pattern, _)| head.matches(&mut new_scope, pattern))
-                    .expect("exhaustive patterns");
-                let initial_len = scope.len();
-                scope.extend(new_scope);
-                let value = expr.eval(scope).into_owned();
-                scope.truncate(initial_len);
-                Cow::Owned(value)
+                for (pattern, expr) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = scope.len();
+                        scope.extend(pattern_scope);
+                        let value = expr.eval(scope).into_owned();
+                        scope.truncate(initial_len);
+                        return Cow::Owned(value);
+                    }
+                }
+                panic!("non-exhaustive patterns");
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
@@ -2567,29 +2568,31 @@ impl Decoder {
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
-                let mut new_scope = Scope::new();
-                let (_, decoder) = branches
-                    .iter()
-                    .find(|(pattern, _)| head.matches(&mut new_scope, pattern))
-                    .expect("exhaustive patterns");
-                let initial_len = scope.len();
-                scope.extend(new_scope);
-                let (v, input) = decoder.parse(program, scope, input)?;
-                scope.truncate(initial_len);
-                Ok((v, input))
+                for (pattern, decoder) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = scope.len();
+                        scope.extend(pattern_scope);
+                        let (v, input) = decoder.parse(program, scope, input)?;
+                        scope.truncate(initial_len);
+                        return Ok((v, input));
+                    }
+                }
+                panic!("non-exhaustive patterns");
             }
             Decoder::MatchVariant(head, branches) => {
                 let head = head.eval(scope);
-                let mut new_scope = Scope::new();
-                let (_, label, decoder) = branches
-                    .iter()
-                    .find(|(pattern, _, _)| head.matches(&mut new_scope, pattern))
-                    .expect("exhaustive patterns");
-                let initial_len = scope.len();
-                scope.extend(new_scope);
-                let (v, input) = decoder.parse(program, scope, input)?;
-                scope.truncate(initial_len);
-                Ok((Value::Variant(label.clone(), Box::new(v)), input))
+                for (pattern, label, decoder) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = scope.len();
+                        scope.extend(pattern_scope);
+                        let (v, input) = decoder.parse(program, scope, input)?;
+                        scope.truncate(initial_len);
+                        return Ok((Value::Variant(label.clone(), Box::new(v)), input));
+                    }
+                }
+                panic!("exhaustive patterns");
             }
             Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
                 let lengths_val = lengths_expr.eval(scope);

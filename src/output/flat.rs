@@ -244,30 +244,36 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Compute(_expr) => Ok(()),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.scope).into_owned();
-                let initial_len = self.scope.len();
-                let (_, format) = branches
-                    .iter()
-                    .find(|(pattern, _)| head.matches(&mut self.scope, pattern))
-                    .expect("exhaustive patterns");
-                self.write_flat(value, format)?;
-                self.scope.truncate(initial_len);
-                Ok(())
+                let head = head.eval(&mut self.scope);
+                for (pattern, format) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = self.scope.len();
+                        self.scope.extend(pattern_scope);
+                        self.write_flat(value, format)?;
+                        self.scope.truncate(initial_len);
+                        return Ok(());
+                    }
+                }
+                panic!("non-exhaustive patterns");
             }
             Format::MatchVariant(head, branches) => {
-                let head = head.eval(&mut self.scope).into_owned();
-                let initial_len = self.scope.len();
-                let (_, _label, format) = branches
-                    .iter()
-                    .find(|(pattern, _, _)| head.matches(&mut self.scope, pattern))
-                    .expect("exhaustive patterns");
-                if let Value::Variant(_label, value) = value {
-                    self.write_flat(value, format)?;
-                } else {
-                    panic!("expected variant value");
+                let head = head.eval(&mut self.scope);
+                for (pattern, _label, format) in branches {
+                    let mut pattern_scope = Scope::new();
+                    if head.matches(&mut pattern_scope, pattern) {
+                        let initial_len = self.scope.len();
+                        self.scope.extend(pattern_scope);
+                        if let Value::Variant(_label, value) = value {
+                            self.write_flat(value, format)?;
+                        } else {
+                            panic!("expected variant value");
+                        }
+                        self.scope.truncate(initial_len);
+                        return Ok(());
+                    }
                 }
-                self.scope.truncate(initial_len);
-                Ok(())
+                panic!("non-exhaustive patterns");
             }
             Format::Dynamic(_) => Ok(()), // FIXME
             Format::Apply(_) => Ok(()),   // FIXME
