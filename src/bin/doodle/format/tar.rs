@@ -4,14 +4,6 @@ use crate::format::base::*;
 
 const BLOCK_SIZE: u32 = 512;
 
-fn shl(value: Expr, places: Expr) -> Expr {
-    Expr::Shl(Box::new(value), Box::new(places))
-}
-
-fn bitor(x: Expr, y: Expr) -> Expr {
-    Expr::BitOr(Box::new(x), Box::new(y))
-}
-
 // octal pair to u32 numeric evalue
 fn o2u32(hi: Expr, lo: Expr) -> Expr {
     let hi32 = shl(Expr::AsU32(Box::new(hi)), Expr::U32(3));
