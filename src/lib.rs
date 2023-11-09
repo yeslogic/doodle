@@ -15,95 +15,14 @@ pub mod bounds;
 pub mod byte_set;
 pub mod error;
 pub mod output;
-pub mod scope;
-
-pub use scope::{Scope, TypeScope};
 
 use error::{ParseError, ParseResult};
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-#[serde(tag = "tag", content = "data")]
-pub enum Pattern {
-    Binding(String),
-    Wildcard,
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    Tuple(Vec<Pattern>),
-    Variant(String, Box<Pattern>),
-    Seq(Vec<Pattern>),
-}
+pub mod scope;
+pub use scope::*;
 
-impl Pattern {
-    pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
-
-    pub fn from_bytes(bs: &[u8]) -> Pattern {
-        Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
-    }
-
-    pub fn variant(label: impl Into<String>, value: impl Into<Box<Pattern>>) -> Pattern {
-        Pattern::Variant(label.into(), value.into())
-    }
-
-    fn build_scope(&self, scope: &mut TypeScope, t: &ValueType) {
-        match (self, t) {
-            (Pattern::Binding(name), t) => {
-                scope.push(name.clone(), t.clone());
-            }
-            (Pattern::Wildcard, _) => {}
-            (Pattern::Bool(_b0), ValueType::Bool) => {}
-            (Pattern::U8(_i0), ValueType::U8) => {}
-            (Pattern::U16(_i0), ValueType::U16) => {}
-            (Pattern::U32(_i0), ValueType::U32) => {}
-            (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
-                for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
-                    p.build_scope(scope, t);
-                }
-            }
-            (Pattern::Seq(ps), ValueType::Seq(t)) => {
-                for p in ps {
-                    p.build_scope(scope, t);
-                }
-            }
-            (Pattern::Variant(label, p), ValueType::Union(branches)) => {
-                if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
-                    p.build_scope(scope, t);
-                } else {
-                    panic!("no {label} in {branches:?}");
-                }
-            }
-            _ => panic!("pattern build_scope failed"),
-        }
-    }
-
-    fn infer_expr_branch_type(
-        &self,
-        scope: &mut TypeScope,
-        head_type: &ValueType,
-        expr: &Expr,
-    ) -> Result<ValueType, String> {
-        let initial_len = scope.len();
-        self.build_scope(scope, head_type);
-        let t = expr.infer_type(scope)?;
-        scope.truncate(initial_len);
-        Ok(t)
-    }
-
-    fn infer_format_branch_type(
-        &self,
-        scope: &mut TypeScope,
-        head_type: &ValueType,
-        module: &FormatModule,
-        format: &Format,
-    ) -> Result<ValueType, String> {
-        let initial_len = scope.len();
-        self.build_scope(scope, head_type);
-        let t = module.infer_format_type(scope, format)?;
-        scope.truncate(initial_len);
-        Ok(t)
-    }
-}
+pub mod pattern;
+pub use pattern::*;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ValueType {
@@ -175,12 +94,12 @@ impl Value {
                 scope.push(name.clone(), head.clone());
                 true
             }
-            (Pattern::Wildcard, _) => true,
-            (Pattern::Bool(b0), Value::Bool(b1)) => b0 == b1,
-            (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
-            (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
-            (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
-            (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
+            (pattern::Pattern::Wildcard, _) => true,
+            (pattern::Pattern::Bool(b0), Value::Bool(b1)) => b0 == b1,
+            (pattern::Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
+            (pattern::Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
+            (pattern::Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
+            (pattern::Pattern::Tuple(ps), Value::Tuple(vs)) | (pattern::Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
             {
                 let initial_len = scope.len();
@@ -192,7 +111,7 @@ impl Value {
                 }
                 true
             }
-            (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
+            (pattern::Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
                 v.matches(scope, p)
             }
             _ => false,
@@ -333,7 +252,7 @@ pub enum Expr {
     RecordProj(Box<Expr>, String),
     Variant(String, Box<Expr>),
     Seq(Vec<Expr>),
-    Match(Box<Expr>, Vec<(Pattern, Expr)>),
+    Match(Box<Expr>, Vec<(pattern::Pattern, Expr)>),
     Lambda(String, Box<Expr>),
 
     BitAnd(Box<Expr>, Box<Expr>),
@@ -462,9 +381,9 @@ pub enum Format {
     /// Compute a value
     Compute(Expr),
     /// Pattern match on an expression
-    Match(Expr, Vec<(Pattern, Format)>),
+    Match(Expr, Vec<(pattern::Pattern, Format)>),
     /// Pattern match on an expression and return a variant
-    MatchVariant(Expr, Vec<(Pattern, String, Format)>),
+    MatchVariant(Expr, Vec<(pattern::Pattern, String, Format)>),
     /// Format generated dynamically
     Dynamic(DynFormat),
     /// Apply a dynamic format from a named variable in the scope
@@ -738,11 +657,14 @@ enum Decoder {
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Compute(Expr),
-    Match(Expr, Vec<(Pattern, Decoder)>),
-    MatchVariant(Expr, Vec<(Pattern, String, Decoder)>),
+    Match(Expr, Vec<(pattern::Pattern, Decoder)>),
+    MatchVariant(Expr, Vec<(pattern::Pattern, String, Decoder)>),
     Dynamic(DynFormat),
     Apply(String),
 }
+
+
+
 
 impl Expr {
     fn eval<'a>(&'a self, scope: &'a mut Scope) -> Cow<'a, Value> {
@@ -1909,6 +1831,8 @@ impl<'a> Compiler<'a> {
     }
 }
 
+
+
 impl TypeRef {
     #[allow(dead_code)]
     fn from_value_type<'a>(compiler: &mut Compiler<'a>, t: &ValueType) -> Self {
@@ -2477,7 +2401,7 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         let len = lengths[n];
         if len != 0 {
             codes.push((n.to_string(), bit_range(len, next_code[len])));
-            let pattern = Pattern::Variant(n.to_string(), Box::new(Pattern::Wildcard));
+            let pattern = pattern::Pattern::Variant(n.to_string(), Box::new(pattern::Pattern::Wildcard));
             let val = Expr::U16(n.try_into().unwrap());
             branches.push((pattern, val));
             //println!("{:?}", codes[codes.len()-1]);
