@@ -84,6 +84,14 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
     tuple(bytes.iter().copied().map(is_byte))
 }
 
+pub fn shl(value: Expr, places: Expr) -> Expr {
+    Expr::Shl(Box::new(value), Box::new(places))
+}
+
+pub fn bitor(x: Expr, y: Expr) -> Expr {
+    Expr::BitOr(Box::new(x), Box::new(y))
+}
+
 /// ByteSet consisting of 0..=127, or the valid ASCII range (including control characters)
 pub const VALID_ASCII: ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
 
