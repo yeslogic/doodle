@@ -141,6 +141,7 @@ mod gzip {
     fn test_decode_test6_gzip() {
         let output = doodle().args(["file", "test6.gz"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test6.gz.stdout");
+        check_output(output, expected)
     }
 }
 
