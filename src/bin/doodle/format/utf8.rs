@@ -245,30 +245,21 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
 
 fn shift6_2(hi: Expr, lo: Expr) -> Expr {
     bitor(
-        shl(
-            Expr::AsU32(Box::new(hi)),
-            Expr::U32(6),
-        ),
+        shl(Expr::AsU32(Box::new(hi)), Expr::U32(6)),
         Expr::AsU32(Box::new(lo)),
     )
 }
 
 fn shift6_3(hi: Expr, mid: Expr, lo: Expr) -> Expr {
     bitor(
-        shl(
-            Expr::AsU32(Box::new(hi)),
-            Expr::U32(12),
-        ),
-        shift6_2(mid, lo)
+        shl(Expr::AsU32(Box::new(hi)), Expr::U32(12)),
+        shift6_2(mid, lo),
     )
 }
 
 fn shift6_4(hh: Expr, hl: Expr, lh: Expr, ll: Expr) -> Expr {
     bitor(
-        shl(
-            Expr::AsU32(Box::new(hh)),
-            Expr::U32(18),
-        ),
-        shift6_3(hl, lh, ll)
+        shl(Expr::AsU32(Box::new(hh)), Expr::U32(18)),
+        shift6_3(hl, lh, ll),
     )
 }

@@ -294,54 +294,13 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn extract_string_field<'a>(&self, fields: &'a Vec<(String, Value)>) -> Option<&'a Value> {
-        match fields.len() {
-            0 => None,
-            1 => {
-                let (label, value) = &fields[0];
-                match label.as_str() {
-                    "string" => Some(value),
-                    "@value" => Some(value),
-                    _ => {
-                        // REVIEW - is this the right approach, or should we reject outright?
-                        {
-                            #![cfg(debug_assertions)]
-                            eprintln!("DEBUG: treating single-value field `{label}` as string, even though it does not match 'string' or '@value'...");
-                        }
-                        Some(value)
-                    }
-                }
-            }
-            _ => {
-                let mut ret = None;
-                for (label, value) in fields.iter() {
-                    if label == "string" {
-                        if let Some((lab0, _val0)) = ret.replace((label, value)) {
-                            panic!(
-                                "no tie-breaker between field `{label}` with prior field `{lab0}`"
-                            );
-                        }
-                    } else if label == "@value" {
-                        match value {
-                            Value::Record(fields) => {
-                                if let Some(inner) = self.extract_string_field(fields) {
-                                    return Some(inner);
-                                }
-                            }
-                            _ => {
-                                if let Some((lab0, _val0)) = ret.replace((label, value)) {
-                                    panic!("no tie-breaker between field `{label}` with prior field `{lab0}`");
-                                }
-                            }
-                        }
-                    }
-                }
-                ret.map(|(_, value)| value)
-            }
-        }
+        fields
+            .iter()
+            .find_map(|(label, value)| (label == "string").then_some(value))
     }
 
     pub fn compile_string(&self, value: &Value) -> Fragment {
-        let vs = match value {
+        let vs = match value.coerce_record_to_value() {
             Value::Record(fields) => {
                 match self
                     .extract_string_field(fields)
@@ -358,7 +317,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     pub fn compile_ascii_string(&self, value: &Value) -> Fragment {
-        let vs = match value {
+        let vs = match value.coerce_record_to_value() {
             Value::Record(fields) => {
                 match self
                     .extract_string_field(fields)
