@@ -108,9 +108,13 @@ pub struct BaseModule {
 
     // extensions to ascii-char
     ascii_octal_digit: FormatRef,
+    #[allow(dead_code)]
     ascii_decimal_digit: FormatRef,
+    #[allow(dead_code)]
     ascii_hex_lower: FormatRef,
+    #[allow(dead_code)]
     ascii_hex_upper: FormatRef,
+    #[allow(dead_code)]
     ascii_hex_any: FormatRef,
 }
 
@@ -135,6 +139,7 @@ impl BaseModule {
 
     pub const ASCII_DECIMAL_DIGIT: [u8; 10] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
 
+    #[allow(dead_code)]
     pub fn ascii_decimal_digit(&self) -> Format { self.ascii_decimal_digit.call() }
 
     pub const ASCII_HEX_LOWER: [u8; 16] = [
