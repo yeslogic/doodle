@@ -142,8 +142,8 @@ impl<'a> From<&'a [u8]> for ByteSet {
     }
 }
 
-impl From<ops::Range<u8>> for ByteSet {
-    fn from(value: ops::Range<u8>) -> Self {
+impl From<Range<u8>> for ByteSet {
+    fn from(value: Range<u8>) -> Self {
         if value.end <= value.start {
             ByteSet::empty()
         } else {

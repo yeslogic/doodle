@@ -395,8 +395,8 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_char(&self, v: &Value) -> Fragment {
         let c = match v.coerce_record_to_value() {
-            Value::U8(b) => b as char,
-            Value::Char(c) => c,
+            Value::U8(b) => *b as char,
+            Value::Char(c) => *c,
             _ => panic!("expected U8 or Char value, found {v:?}"),
         };
         match c {
