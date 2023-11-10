@@ -7,6 +7,10 @@ pub fn var<Name: Into<Cow<'static, str>>>(name: Name) -> Expr {
     Expr::Var(name.into())
 }
 
+pub fn bind<Name: Into<Cow<'static, str>>>(name: Name) -> Pattern {
+    Pattern::Binding(name.into())
+}
+
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
@@ -19,6 +23,10 @@ pub fn alts<Label: Into<Cow<'static, str>>>(
             .map(|(label, format)| (label.into(), format))
             .collect(),
     )
+}
+
+pub fn iso_alts(branches: impl IntoIterator<Item = Format>) -> Format {
+    Format::IsoUnion(branches.into_iter().collect())
 }
 
 pub fn record<Label: Into<Cow<'static, str>>>(
