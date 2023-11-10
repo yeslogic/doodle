@@ -126,6 +126,11 @@ fn check_covered(
                 path.pop();
             }
         }
+        Format::IsoUnion(branches) => {
+            for format in branches {
+                check_covered(module, path, format)?;
+            }
+        }
         Format::Tuple(formats) => {
             for format in formats {
                 check_covered(module, path, format)?;
@@ -202,6 +207,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected variant"),
             },
+            Format::IsoUnion(_) => Ok(()), // FIXME
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
                     for (index, value) in values.iter().enumerate() {

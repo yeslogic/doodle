@@ -194,6 +194,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected variant, found {value:?}"),
             },
+            Format::IsoUnion(_branches) => self.compile_value(value),
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
                     if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
@@ -898,7 +899,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_format(&mut self, format: &Format, prec: Precedence) -> Fragment {
         match format {
-            Format::Union(_) | Format::NondetUnion(_) => cond_paren(
+            Format::Union(_) | Format::NondetUnion(_) | Format::IsoUnion(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
                 prec,
                 Precedence::FORMAT_COMPOUND,

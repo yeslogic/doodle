@@ -443,10 +443,12 @@ pub enum Format {
     Align(usize),
     /// Matches a byte in the given byte set
     Byte(ByteSet),
-    /// Matches the union of the byte strings matched by all the formats
+    /// Matches the union of all the formats and returns a variant
     Union(Vec<(Cow<'static, str>, Format)>),
     /// Temporary hack for nondeterministic unions
     NondetUnion(Vec<(Cow<'static, str>, Format)>),
+    /// Matches the union of all the formats, which must have the same type
+    IsoUnion(Vec<Format>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
@@ -615,6 +617,13 @@ impl FormatModule {
                 }
                 Ok(ValueType::Union(ts))
             }
+            Format::IsoUnion(branches) => {
+                let mut t = ValueType::Any;
+                for f in branches {
+                    t = t.unify(&self.infer_format_type(scope, f)?)?;
+                }
+                Ok(t)
+            }
             Format::Tuple(fields) => {
                 let mut ts = Vec::with_capacity(fields.len());
                 for f in fields {
@@ -742,8 +751,9 @@ enum Decoder {
     EndOfInput,
     Align(usize),
     Byte(ByteSet),
-    Branch(MatchTree, Vec<(Cow<'static, str>, Decoder)>),
     Parallel(Vec<(Cow<'static, str>, Decoder)>),
+    Branch(MatchTree, Vec<(Cow<'static, str>, Decoder)>),
+    IsoBranch(MatchTree, Vec<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(Cow<'static, str>, Decoder)>),
     While(MatchTree, Box<Decoder>),
@@ -1299,6 +1309,11 @@ impl Format {
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
+            Format::IsoUnion(branches) => branches
+                .iter()
+                .map(|f| f.match_bounds(module))
+                .reduce(Bounds::union)
+                .unwrap(),
             Format::Tuple(fields) => fields
                 .iter()
                 .map(|f| f.match_bounds(module))
@@ -1351,6 +1366,7 @@ impl Format {
             Format::Union(branches) | Format::NondetUnion(branches) => {
                 Format::union_depends_on_next(&branches, module)
             }
+            Format::IsoUnion(branches) => Format::iso_union_depends_on_next(&branches, module),
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Repeat(_) => true,
@@ -1379,6 +1395,17 @@ impl Format {
     ) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for (_label, f) in branches {
+            if f.depends_on_next(module) {
+                return true;
+            }
+            fs.push(f.clone());
+        }
+        MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
+    }
+
+    fn iso_union_depends_on_next(branches: &[Format], module: &FormatModule) -> bool {
+        let mut fs = Vec::with_capacity(branches.len());
+        for f in branches {
             if f.depends_on_next(module) {
                 return true;
             }
@@ -1622,6 +1649,13 @@ impl<'a> MatchTreeStep<'a> {
             Format::Union(branches) | Format::NondetUnion(branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
+                    tree = tree.union(Self::add(module, f, next.clone()));
+                }
+                tree
+            }
+            Format::IsoUnion(branches) => {
+                let mut tree = Self::reject();
+                for f in branches {
                     tree = tree.union(Self::add(module, f, next.clone()));
                 }
                 tree
@@ -2265,6 +2299,19 @@ impl Decoder {
                 }
                 Ok(Decoder::Parallel(ds))
             }
+            Format::IsoUnion(branches) => {
+                let mut fs = Vec::with_capacity(branches.len());
+                let mut ds = Vec::with_capacity(branches.len());
+                for f in branches {
+                    ds.push(Decoder::compile_next(compiler, f, next.clone())?);
+                    fs.push(f.clone());
+                }
+                if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
+                    Ok(Decoder::IsoBranch(tree, ds))
+                } else {
+                    Err(format!("cannot build match tree for {:?}", format))
+                }
+            }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
@@ -2428,14 +2475,6 @@ impl Decoder {
                     Err(ParseError::unexpected(b, bs.clone(), input.offset))
                 }
             }
-            Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
-                    offset: input.offset,
-                })?;
-                let (label, d) = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Variant(label.clone(), Box::new(v)), input))
-            }
             Decoder::Parallel(branches) => {
                 for (label, d) in branches {
                     let initial_len = scope.len();
@@ -2446,6 +2485,21 @@ impl Decoder {
                     scope.truncate(initial_len);
                 }
                 Err(ParseError::fail(scope, input))
+            }
+            Decoder::Branch(tree, branches) => {
+                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    offset: input.offset,
+                })?;
+                let (label, d) = &branches[index];
+                let (v, input) = d.parse(program, scope, input)?;
+                Ok((Value::Variant(label.clone(), Box::new(v)), input))
+            }
+            Decoder::IsoBranch(tree, branches) => {
+                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    offset: input.offset,
+                })?;
+                let d = &branches[index];
+                d.parse(program, scope, input)
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
