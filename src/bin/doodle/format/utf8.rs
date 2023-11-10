@@ -28,7 +28,7 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
 }
 
 pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
-    let utf8_tail = drop_n_msb(2, byte_in(0x80..=0xBF));
+    let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
     let utf8_1 = record([
         ("byte", Format::Byte(VALID_ASCII)),
@@ -40,162 +40,91 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     let utf8_2 = record([
         (
             "bytes",
-            tuple([drop_n_msb(3, byte_in(0xC2..=0xDF)), utf8_tail.clone()]),
+            tuple([drop_n_msb(3, byte_in(0xC2..=0xDF)), utf8_tail.call()]),
         ),
         (
             "@value",
             Format::Match(
                 var("bytes"),
                 vec![(
-                    Pattern::Tuple(vec![
-                        Pattern::Binding("x1".into()),
-                        Pattern::Binding("x0".into()),
-                    ]),
+                    Pattern::Tuple(vec![bind("x1"), bind("x0")]),
                     Format::Compute(shift6_2(var("x1"), var("x0"))),
                 )],
             ),
         ),
     ]);
 
-    let pat3 = |lab: &'static str| {
-        Pattern::variant(
-            lab,
-            Pattern::Tuple(vec![
-                Pattern::Binding("x2".into()),
-                Pattern::Binding("x1".into()),
-                Pattern::Binding("x0".into()),
-            ]),
-        )
-    };
-
     let utf8_3 = record([
         (
             "bytes",
-            alts([
-                (
-                    "#e0",
-                    tuple([
-                        drop_n_msb(4, is_byte(0xE0)),
-                        drop_n_msb(2, byte_in(0xA0..=0xBF)),
-                        utf8_tail.clone(),
-                    ]),
-                ),
-                (
-                    "#e1",
-                    tuple([
-                        drop_n_msb(4, byte_in(0xE1..=0xEC)),
-                        utf8_tail.clone(),
-                        utf8_tail.clone(),
-                    ]),
-                ),
-                (
-                    "#ed",
-                    tuple([
-                        drop_n_msb(4, is_byte(0xED)),
-                        drop_n_msb(2, byte_in(0x80..=0x9F)),
-                        utf8_tail.clone(),
-                    ]),
-                ),
-                (
-                    "#ee",
-                    tuple([
-                        drop_n_msb(4, byte_in(0xEE..=0xEF)),
-                        utf8_tail.clone(),
-                        utf8_tail.clone(),
-                    ]),
-                ),
+            iso_alts([
+                tuple([
+                    drop_n_msb(4, is_byte(0xE0)),
+                    drop_n_msb(2, byte_in(0xA0..=0xBF)),
+                    utf8_tail.call(),
+                ]),
+                tuple([
+                    drop_n_msb(4, byte_in(0xE1..=0xEC)),
+                    utf8_tail.call(),
+                    utf8_tail.call(),
+                ]),
+                tuple([
+                    drop_n_msb(4, is_byte(0xED)),
+                    drop_n_msb(2, byte_in(0x80..=0x9F)),
+                    utf8_tail.call(),
+                ]),
+                tuple([
+                    drop_n_msb(4, byte_in(0xEE..=0xEF)),
+                    utf8_tail.call(),
+                    utf8_tail.call(),
+                ]),
             ]),
         ),
         (
             "@value",
             Format::Match(
                 var("bytes"),
-                [
-                    (
-                        pat3("#e0"),
-                        Format::Compute(shift6_3(var("x2"), var("x1"), var("x0"))),
-                    ),
-                    (
-                        pat3("#e1"),
-                        Format::Compute(shift6_3(var("x2"), var("x1"), var("x0"))),
-                    ),
-                    (
-                        pat3("#ed"),
-                        Format::Compute(shift6_3(var("x2"), var("x1"), var("x0"))),
-                    ),
-                    (
-                        pat3("#ee"),
-                        Format::Compute(shift6_3(var("x2"), var("x1"), var("x0"))),
-                    ),
-                ]
+                [(
+                    Pattern::Tuple(vec![bind("x2"), bind("x1"), bind("x0")]),
+                    Format::Compute(shift6_3(var("x2"), var("x1"), var("x0"))),
+                )]
                 .to_vec(),
             ),
         ),
     ]);
 
-    let pat4 = |lab: &'static str| {
-        Pattern::variant(
-            lab,
-            Pattern::Tuple(vec![
-                Pattern::Binding("x3".into()),
-                Pattern::Binding("x2".into()),
-                Pattern::Binding("x1".into()),
-                Pattern::Binding("x0".into()),
-            ]),
-        )
-    };
-
     let utf8_4 = record([
         (
             "bytes",
-            alts([
-                (
-                    "#f0",
-                    tuple([
-                        drop_n_msb(5, is_byte(0xF0)),
-                        drop_n_msb(2, byte_in(0x90..=0xBF)),
-                        utf8_tail.clone(),
-                        utf8_tail.clone(),
-                    ]),
-                ),
-                (
-                    "#f1",
-                    tuple([
-                        drop_n_msb(5, byte_in(0xF1..=0xF3)),
-                        utf8_tail.clone(),
-                        utf8_tail.clone(),
-                        utf8_tail.clone(),
-                    ]),
-                ),
-                (
-                    "#f4",
-                    tuple([
-                        drop_n_msb(5, is_byte(0xF4)),
-                        drop_n_msb(2, byte_in(0x80..=0x8F)),
-                        utf8_tail.clone(),
-                        utf8_tail.clone(),
-                    ]),
-                ),
+            iso_alts([
+                tuple([
+                    drop_n_msb(5, is_byte(0xF0)),
+                    drop_n_msb(2, byte_in(0x90..=0xBF)),
+                    utf8_tail.call(),
+                    utf8_tail.call(),
+                ]),
+                tuple([
+                    drop_n_msb(5, byte_in(0xF1..=0xF3)),
+                    utf8_tail.call(),
+                    utf8_tail.call(),
+                    utf8_tail.call(),
+                ]),
+                tuple([
+                    drop_n_msb(5, is_byte(0xF4)),
+                    drop_n_msb(2, byte_in(0x80..=0x8F)),
+                    utf8_tail.call(),
+                    utf8_tail.call(),
+                ]),
             ]),
         ),
         (
             "@value",
             Format::Match(
                 var("bytes"),
-                vec![
-                    (
-                        pat4("#f0"),
-                        Format::Compute(shift6_4(var("x3"), var("x2"), var("x1"), var("x0"))),
-                    ),
-                    (
-                        pat4("#f1"),
-                        Format::Compute(shift6_4(var("x3"), var("x2"), var("x1"), var("x0"))),
-                    ),
-                    (
-                        pat4("#f4"),
-                        Format::Compute(shift6_4(var("x3"), var("x2"), var("x1"), var("x0"))),
-                    ),
-                ],
+                vec![(
+                    Pattern::Tuple(vec![bind("x3"), bind("x2"), bind("x1"), bind("x0")]),
+                    Format::Compute(shift6_4(var("x3"), var("x2"), var("x1"), var("x0"))),
+                )],
             ),
         ),
     ]);
@@ -219,19 +148,19 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
                     var("bytes"),
                     vec![
                         (
-                            Pattern::variant("utf8-1", Pattern::Binding("x".into())),
+                            Pattern::variant("utf8-1", bind("x")),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
-                            Pattern::variant("utf8-2", Pattern::Binding("x".into())),
+                            Pattern::variant("utf8-2", bind("x")),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
-                            Pattern::variant("utf8-3", Pattern::Binding("x".into())),
+                            Pattern::variant("utf8-3", bind("x")),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                         (
-                            Pattern::variant("utf8-4", Pattern::Binding("x".into())),
+                            Pattern::variant("utf8-4", bind("x")),
                             Format::Compute(Expr::AsChar(Box::new(var("x")))),
                         ),
                     ],
