@@ -187,6 +187,16 @@ impl<'module> MonoidalPrinter<'module> {
             Format::EndOfInput => self.compile_value(value),
             Format::Align(_) => self.compile_value(value),
             Format::Byte(_) => self.compile_value(value),
+            Format::Variant(label, format) => match value {
+                Value::Variant(label2, value) => {
+                    if label == label2 {
+                        self.compile_variant(label, value, Some(format))
+                    } else {
+                        panic!("expected variant label {label}, found {label2}");
+                    }
+                }
+                _ => panic!("expected variant, found {value:?}"),
+            },
             Format::Union(branches) | Format::NondetUnion(branches) => match value {
                 Value::Variant(label, value) => {
                     let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
@@ -899,6 +909,16 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_format(&mut self, format: &Format, prec: Precedence) -> Fragment {
         match format {
+            Format::Variant(label, f) => cond_paren(
+                self.compile_nested_format(
+                    "variant",
+                    Some(&[Fragment::String(label.clone())]),
+                    f,
+                    prec,
+                ),
+                prec,
+                Precedence::FORMAT_COMPOUND,
+            ),
             Format::Union(_) | Format::NondetUnion(_) | Format::IsoUnion(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
                 prec,
