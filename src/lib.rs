@@ -2722,15 +2722,14 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
     }
 
     let mut codes = Vec::with_capacity(lengths.len());
-    let mut branches = Vec::new();
 
     for n in 0..lengths.len() {
         let len = lengths[n];
         if len != 0 {
-            codes.push((n.to_string(), bit_range(len, next_code[len])));
-            let pattern = Pattern::Variant(n.to_string().into(), Box::new(Pattern::Wildcard));
-            let val = Expr::U16(n.try_into().unwrap());
-            branches.push((pattern, val));
+            codes.push(Format::record([
+                ("bits", bit_range(len, next_code[len])),
+                ("@value", Format::Compute(Expr::U16(n.try_into().unwrap()))),
+            ]));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;
         } else {
@@ -2738,13 +2737,7 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         }
     }
 
-    Format::record([
-        ("bits", Format::alts(codes)),
-        (
-            "@value",
-            Format::Compute(Expr::Match(Box::new(Expr::Var("bits".into())), branches)),
-        ),
-    ])
+    Format::IsoUnion(codes)
 }
 
 fn bit_range(n: usize, bits: usize) -> Format {
