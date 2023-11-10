@@ -15,7 +15,7 @@
 │       │   │   │       ├── final <- base.bit := 1
 │       │   │   │       ├── type <- { ... } := 1
 │       │   │   │       └── data <- match type { ... } :=
-│       │   │   │           ├── format <- dynamic := { ... }
+│       │   │   │           ├── format <- dynamic := _ |...| _
 │       │   │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │       │   │   │           │   ├── 0 <- { ... } :=
 │       │   │   │           │   │   ├── code <- apply := 72
@@ -108,7 +108,7 @@
 │           │   │       ├── final <- base.bit := 1
 │           │   │       ├── type <- { ... } := 1
 │           │   │       └── data <- match type { ... } :=
-│           │   │           ├── format <- dynamic := { ... }
+│           │   │           ├── format <- dynamic := _ |...| _
 │           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │           │   │           │   ├── 0 <- { ... } :=
 │           │   │           │   │   ├── code <- apply := 104

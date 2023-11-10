@@ -31,7 +31,7 @@
 │           │   │   │       │   ├── 9 <- { ... } := 4
 │           │   │   │       │   ~
 │           │   │   │       │   └── 14 <- { ... } := 6
-│           │   │   │       ├── code-length-alphabet-format <- dynamic := { ... }
+│           │   │   │       ├── code-length-alphabet-format <- dynamic := _ |...| _
 │           │   │   │       ├── literal-length-distance-alphabet-code-lengths <- repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... } :=
 │           │   │   │       │   ├── 0 <- { ... } :=
 │           │   │   │       │   │   ├── code <- apply := 5
@@ -106,8 +106,8 @@
 │           │   │   │       │   ├── 9 := 4
 │           │   │   │       │   ~
 │           │   │   │       │   └── 28 := 8
-│           │   │   │       ├── distance-alphabet-format <- dynamic := { ... }
-│           │   │   │       ├── literal-length-alphabet-format <- dynamic := { ... }
+│           │   │   │       ├── distance-alphabet-format <- dynamic := _ |...| _
+│           │   │   │       ├── literal-length-alphabet-format <- dynamic := _ |...| _
 │           │   │   │       ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │           │   │   │       │   ├── 0 <- { ... } :=
 │           │   │   │       │   │   ├── code <- apply := 255
@@ -176,7 +176,7 @@
 │           │   │   │       │   ├── 9 <- { ... } := 6
 │           │   │   │       │   ~
 │           │   │   │       │   └── 18 <- { ... } := 6
-│           │   │   │       ├── code-length-alphabet-format <- dynamic := { ... }
+│           │   │   │       ├── code-length-alphabet-format <- dynamic := _ |...| _
 │           │   │   │       ├── literal-length-distance-alphabet-code-lengths <- repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... } :=
 │           │   │   │       │   ├── 0 <- { ... } :=
 │           │   │   │       │   │   ├── code <- apply := 6
@@ -251,8 +251,8 @@
 │           │   │   │       │   ├── 9 := 7
 │           │   │   │       │   ~
 │           │   │   │       │   └── 29 := 6
-│           │   │   │       ├── distance-alphabet-format <- dynamic := { ... }
-│           │   │   │       ├── literal-length-alphabet-format <- dynamic := { ... }
+│           │   │   │       ├── distance-alphabet-format <- dynamic := _ |...| _
+│           │   │   │       ├── literal-length-alphabet-format <- dynamic := _ |...| _
 │           │   │   │       ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │           │   │   │       │   ├── 0 <- { ... } :=
 │           │   │   │       │   │   ├── code <- apply := 207
@@ -321,7 +321,7 @@
 │           │   │           │   ├── 9 <- { ... } := 5
 │           │   │           │   ~
 │           │   │           │   └── 16 <- { ... } := 5
-│           │   │           ├── code-length-alphabet-format <- dynamic := { ... }
+│           │   │           ├── code-length-alphabet-format <- dynamic := _ |...| _
 │           │   │           ├── literal-length-distance-alphabet-code-lengths <- repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... } :=
 │           │   │           │   ├── 0 <- { ... } :=
 │           │   │           │   │   ├── code <- apply := 7
@@ -396,8 +396,8 @@
 │           │   │           │   ├── 9 := 7
 │           │   │           │   ~
 │           │   │           │   └── 29 := 5
-│           │   │           ├── distance-alphabet-format <- dynamic := { ... }
-│           │   │           ├── literal-length-alphabet-format <- dynamic := { ... }
+│           │   │           ├── distance-alphabet-format <- dynamic := _ |...| _
+│           │   │           ├── literal-length-alphabet-format <- dynamic := _ |...| _
 │           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │           │   │           │   ├── 0 <- { ... } :=
 │           │   │           │   │   ├── code <- apply := 252
