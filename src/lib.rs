@@ -443,6 +443,8 @@ pub enum Format {
     Align(usize),
     /// Matches a byte in the given byte set
     Byte(ByteSet),
+    /// Wraps the value from the inner format in a variant
+    Variant(Cow<'static, str>, Box<Format>),
     /// Matches the union of all the formats and returns a variant
     Union(Vec<(Cow<'static, str>, Format)>),
     /// Temporary hack for nondeterministic unions
@@ -610,6 +612,10 @@ impl FormatModule {
             Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
             Format::Byte(_bs) => Ok(ValueType::U8),
+            Format::Variant(label, f) => Ok(ValueType::Union(vec![(
+                label.clone(),
+                self.infer_format_type(scope, f)?,
+            )])),
             Format::Union(branches) | Format::NondetUnion(branches) => {
                 let mut ts = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
@@ -751,6 +757,7 @@ enum Decoder {
     EndOfInput,
     Align(usize),
     Byte(ByteSet),
+    Variant(Cow<'static, str>, Box<Decoder>),
     Parallel(Vec<(Cow<'static, str>, Decoder)>),
     Branch(MatchTree, Vec<(Cow<'static, str>, Decoder)>),
     IsoBranch(MatchTree, Vec<Decoder>),
@@ -1304,6 +1311,7 @@ impl Format {
             Format::EndOfInput => Bounds::exact(0),
             Format::Align(n) => Bounds::new(0, Some(n - 1)),
             Format::Byte(_) => Bounds::exact(1),
+            Format::Variant(_label, f) => f.match_bounds(module),
             Format::Union(branches) | Format::NondetUnion(branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
@@ -1363,6 +1371,7 @@ impl Format {
             Format::EndOfInput => false,
             Format::Align(_) => false,
             Format::Byte(_) => false,
+            Format::Variant(_label, f) => f.depends_on_next(module),
             Format::Union(branches) | Format::NondetUnion(branches) => {
                 Format::union_depends_on_next(&branches, module)
             }
@@ -1646,6 +1655,7 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::Byte(bs) => Self::branch(*bs, next),
+            Format::Variant(_label, f) => Self::add(module, f, next.clone()),
             Format::Union(branches) | Format::NondetUnion(branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
@@ -2273,6 +2283,10 @@ impl Decoder {
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Align(n) => Ok(Decoder::Align(*n)),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
+            Format::Variant(label, f) => {
+                let d = Decoder::compile_next(compiler, f, next.clone())?;
+                Ok(Decoder::Variant(label.clone(), Box::new(d)))
+            }
             Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
@@ -2474,6 +2488,10 @@ impl Decoder {
                 } else {
                     Err(ParseError::unexpected(b, bs.clone(), input.offset))
                 }
+            }
+            Decoder::Variant(label, d) => {
+                let (v, input) = d.parse(program, scope, input)?;
+                Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Parallel(branches) => {
                 for (label, d) in branches {
