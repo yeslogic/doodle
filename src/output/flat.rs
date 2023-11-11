@@ -268,8 +268,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, format) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         self.write_flat(&pattern_scope, value, format)?;
                         return Ok(());
                     }
@@ -279,8 +278,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::MatchVariant(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, _label, format) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         if let Value::Variant(_label, value) = value {
                             self.write_flat(&pattern_scope, value, format)?;
                         } else {

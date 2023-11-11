@@ -172,7 +172,13 @@ impl Value {
 
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the scope
-    fn matches(&self, scope: &mut Scope<'_>, pattern: &Pattern) -> bool {
+    fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<Scope<'a>> {
+        let mut pattern_scope = Scope::child(scope);
+        self.matches_inner(&mut pattern_scope, pattern)
+            .then_some(pattern_scope)
+    }
+
+    fn matches_inner(&self, scope: &mut Scope<'_>, pattern: &Pattern) -> bool {
         match (pattern, self.coerce_record_to_value()) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
@@ -188,14 +194,14 @@ impl Value {
                 if ps.len() == vs.len() =>
             {
                 for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches(scope, p) {
+                    if !v.matches_inner(scope, p) {
                         return false;
                     }
                 }
                 true
             }
             (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
-                v.matches(scope, p)
+                v.matches_inner(scope, p)
             }
             _ => false,
         }
@@ -818,8 +824,7 @@ impl Expr {
             Expr::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, expr) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         let value = expr.eval(&pattern_scope).into_owned();
                         return Cow::Owned(value);
                     }
@@ -2640,8 +2645,7 @@ impl Decoder {
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, decoder) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         let (v, input) = decoder.parse(program, &pattern_scope, input)?;
                         return Ok((v, input));
                     }
@@ -2651,8 +2655,7 @@ impl Decoder {
             Decoder::MatchVariant(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, label, decoder) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         let (v, input) = decoder.parse(program, &pattern_scope, input)?;
                         return Ok((Value::Variant(label.clone(), Box::new(v)), input));
                     }
