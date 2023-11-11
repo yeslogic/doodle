@@ -86,7 +86,7 @@ impl std::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 impl ParseError {
-    pub fn fail(scope: &Scope, input: ReadCtxt<'_>) -> Self {
+    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> Self {
         let bindings = scope.iter().collect::<Vec<_>>();
         let buffer = input.input.to_owned();
         let offset = input.offset;

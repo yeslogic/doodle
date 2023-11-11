@@ -6,15 +6,15 @@ use crate::{Format, FormatModule, Scope, Value};
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();
     check_covered(module, &mut path, format).unwrap();
+    let scope = Scope::new();
     Context::new(io::stdout(), module)
-        .write_flat(value, format)
+        .write_flat(&scope, value, format)
         .unwrap()
 }
 
 pub struct Context<'module, W: io::Write> {
     writer: W,
     module: &'module FormatModule,
-    scope: Scope,
 }
 
 fn is_show_format(name: &str) -> Option<&'static str> {
@@ -184,21 +184,22 @@ fn check_covered(
 
 impl<'module, W: io::Write> Context<'module, W> {
     pub fn new(writer: W, module: &'module FormatModule) -> Context<'module, W> {
-        Context {
-            writer,
-            module,
-            scope: Scope::new(),
-        }
+        Context { writer, module }
     }
 
-    pub fn write_flat(&mut self, value: &Value, format: &Format) -> io::Result<()> {
+    pub fn write_flat(
+        &mut self,
+        scope: &Scope<'_>,
+        value: &Value,
+        format: &Format,
+    ) -> io::Result<()> {
         match format {
             Format::ItemVar(level, _args) => {
                 let label = self.module.get_name(*level);
                 if let Some(title) = is_show_format(label) {
                     writeln!(&mut self.writer, "{label} - {title}")
                 } else {
-                    self.write_flat(value, self.module.get_format(*level))
+                    self.write_flat(scope, value, self.module.get_format(*level))
                 }
             }
             Format::Fail => Ok(()),
@@ -208,7 +209,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Variant(label, format) => match value {
                 Value::Variant(label2, value) => {
                     if label == label2 {
-                        self.write_flat(value, format)
+                        self.write_flat(scope, value, format)
                     } else {
                         panic!("expected variant label {label}, found {label2}");
                     }
@@ -218,7 +219,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Union(branches) | Format::NondetUnion(branches) => match value {
                 Value::Variant(label, value) => {
                     let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
-                    self.write_flat(value, format)
+                    self.write_flat(scope, value, format)
                 }
                 _ => panic!("expected variant"),
             },
@@ -227,7 +228,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Value::Tuple(values) => {
                     for (index, value) in values.iter().enumerate() {
                         let format = &formats[index];
-                        self.write_flat(value, format)?;
+                        self.write_flat(scope, value, format)?;
                     }
                     Ok(())
                 }
@@ -235,13 +236,12 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
-                    let initial_len = self.scope.len();
+                    let mut record_scope = Scope::child(scope);
                     for (index, (label, value)) in value_fields.iter().enumerate() {
                         let format = &format_fields[index].1;
-                        self.write_flat(value, format)?;
-                        self.scope.push(label.clone(), value.clone());
+                        self.write_flat(&record_scope, value, format)?;
+                        record_scope.push(label.clone(), value.clone());
                     }
-                    self.scope.truncate(initial_len);
                     Ok(())
                 }
                 _ => panic!("expected record"),
@@ -253,45 +253,39 @@ impl<'module, W: io::Write> Context<'module, W> {
             | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => {
                     for v in values {
-                        self.write_flat(v, format)?;
+                        self.write_flat(scope, v, format)?;
                     }
                     Ok(())
                 }
                 _ => panic!("expected sequence"),
             },
-            Format::Peek(format) => self.write_flat(value, format),
-            Format::PeekNot(format) => self.write_flat(value, format),
-            Format::Slice(_, format) => self.write_flat(value, format),
-            Format::Bits(format) => self.write_flat(value, format),
-            Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
+            Format::Peek(format) => self.write_flat(scope, value, format),
+            Format::PeekNot(format) => self.write_flat(scope, value, format),
+            Format::Slice(_, format) => self.write_flat(scope, value, format),
+            Format::Bits(format) => self.write_flat(scope, value, format),
+            Format::WithRelativeOffset(_, format) => self.write_flat(scope, value, format),
             Format::Compute(_expr) => Ok(()),
             Format::Match(head, branches) => {
-                let head = head.eval(&mut self.scope);
+                let head = head.eval(scope);
                 for (pattern, format) in branches {
-                    let mut pattern_scope = Scope::new();
+                    let mut pattern_scope = Scope::child(scope);
                     if head.matches(&mut pattern_scope, pattern) {
-                        let initial_len = self.scope.len();
-                        self.scope.extend(pattern_scope);
-                        self.write_flat(value, format)?;
-                        self.scope.truncate(initial_len);
+                        self.write_flat(&pattern_scope, value, format)?;
                         return Ok(());
                     }
                 }
                 panic!("non-exhaustive patterns");
             }
             Format::MatchVariant(head, branches) => {
-                let head = head.eval(&mut self.scope);
+                let head = head.eval(scope);
                 for (pattern, _label, format) in branches {
-                    let mut pattern_scope = Scope::new();
+                    let mut pattern_scope = Scope::child(scope);
                     if head.matches(&mut pattern_scope, pattern) {
-                        let initial_len = self.scope.len();
-                        self.scope.extend(pattern_scope);
                         if let Value::Variant(_label, value) = value {
-                            self.write_flat(value, format)?;
+                            self.write_flat(&pattern_scope, value, format)?;
                         } else {
                             panic!("expected variant value");
                         }
-                        self.scope.truncate(initial_len);
                         return Ok(());
                     }
                 }
