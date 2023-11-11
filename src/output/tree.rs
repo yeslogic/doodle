@@ -256,8 +256,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Match(head, branches) => {
                 let head = head.eval(&scope);
                 for (pattern, format) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
                         return frag;
                     }
@@ -267,8 +266,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::MatchVariant(head, branches) => {
                 let head = head.eval(&scope);
                 for (pattern, _label, format) in branches {
-                    let mut pattern_scope = Scope::child(scope);
-                    if head.matches(&mut pattern_scope, pattern) {
+                    if let Some(pattern_scope) = head.matches(scope, pattern) {
                         if let Value::Variant(_label, value) = value {
                             frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
                         } else {
