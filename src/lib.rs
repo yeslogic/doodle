@@ -1001,47 +1001,38 @@ impl Expr {
                 }
                 _ => panic!("SubSeq: expected Seq"),
             },
-            Expr::FlatMap(expr, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.eval(scope).into_owned() {
-                    Value::Seq(values) => {
-                        let mut vs = Vec::new();
-                        for v in values {
-                            scope.push(name.clone(), v);
-                            if let Value::Seq(vn) = expr.eval(scope).into_owned() {
-                                vs.extend(vn);
-                            } else {
-                                panic!("FlatMap: expected Seq");
-                            }
-                            scope.pop();
+            Expr::FlatMap(expr, seq) => match seq.eval(scope).into_owned() {
+                Value::Seq(values) => {
+                    let mut vs = Vec::new();
+                    for v in values {
+                        if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
+                            vs.extend(vn);
+                        } else {
+                            panic!("FlatMap: expected Seq");
                         }
-                        Cow::Owned(Value::Seq(vs))
                     }
-                    _ => panic!("FlatMap: expected Seq"),
-                },
-                _ => panic!("FlatMap: expected Lambda"),
+                    Cow::Owned(Value::Seq(vs))
+                }
+                _ => panic!("FlatMap: expected Seq"),
             },
-            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.eval(scope).into_owned() {
-                    Value::Seq(values) => {
-                        let mut accum = accum.eval(scope).into_owned();
-                        let mut vs = Vec::new();
-                        for v in values {
-                            scope.push(name.clone(), Value::Tuple(vec![accum, v]));
-                            accum =
-                                match expr.eval(scope).into_owned().unwrap_tuple().as_mut_slice() {
-                                    [accum, Value::Seq(vn)] => {
-                                        vs.extend_from_slice(&vn);
-                                        accum.clone()
-                                    }
-                                    _ => panic!("FlatMapAccum: expected two values"),
-                                };
-                            scope.pop();
-                        }
-                        Cow::Owned(Value::Seq(vs))
+            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval(scope).into_owned()
+            {
+                Value::Seq(values) => {
+                    let mut accum = accum.eval(scope).into_owned();
+                    let mut vs = Vec::new();
+                    for v in values {
+                        let ret = expr.eval_lambda(scope, Value::Tuple(vec![accum, v]));
+                        accum = match ret.unwrap_tuple().as_mut_slice() {
+                            [accum, Value::Seq(vn)] => {
+                                vs.extend_from_slice(&vn);
+                                accum.clone()
+                            }
+                            _ => panic!("FlatMapAccum: expected two values"),
+                        };
                     }
-                    _ => panic!("FlatMapAccum: expected Seq"),
-                },
-                _ => panic!("FlatMapAccum: expected Lambda"),
+                    Cow::Owned(Value::Seq(vs))
+                }
+                _ => panic!("FlatMapAccum: expected Seq"),
             },
             Expr::Dup(count, expr) => {
                 let count = count.eval_value(scope).unwrap_usize();
