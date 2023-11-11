@@ -252,6 +252,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::WithRelativeOffset(_, format) => {
                 self.compile_decoded_value(scope, value, format)
             }
+            Format::Map(_format, _expr) => self.compile_value(scope, value),
             Format::Compute(_expr) => self.compile_value(scope, value),
             Format::Match(head, branches) => {
                 let head = head.eval(&scope);
@@ -1024,6 +1025,14 @@ impl<'module> MonoidalPrinter<'module> {
                         format,
                         prec,
                     ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::Map(format, expr) => {
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format("map", Some(&[expr_frag]), format, prec),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )

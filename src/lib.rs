@@ -481,6 +481,8 @@ pub enum Format {
     Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
     WithRelativeOffset(Expr, Box<Format>),
+    /// Map a value with a lambda expression
+    Map(Box<Format>, Expr),
     /// Compute a value
     Compute(Expr),
     /// Pattern match on an expression
@@ -672,6 +674,18 @@ impl FormatModule {
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
             Format::Bits(a) => self.infer_format_type(scope, a),
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
+            Format::Map(a, expr) => {
+                let arg_type = self.infer_format_type(scope, a)?;
+                match expr {
+                    Expr::Lambda(name, body) => {
+                        scope.push(name.clone(), arg_type);
+                        let t = body.infer_type(scope)?;
+                        scope.pop();
+                        Ok(t)
+                    }
+                    _ => Err(format!("Map: expected lambda")),
+                }
+            }
             Format::Compute(expr) => expr.infer_type(scope),
             Format::Match(head, branches) => {
                 if branches.is_empty() {
@@ -778,6 +792,7 @@ enum Decoder {
     Slice(Expr, Box<Decoder>),
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
+    Map(Box<Decoder>, Expr),
     Compute(Expr),
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Decoder)>),
@@ -1333,6 +1348,7 @@ impl Format {
             Format::Slice(expr, _) => expr.bounds(),
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
+            Format::Map(f, _expr) => f.match_bounds(module),
             Format::Compute(_) => Bounds::exact(0),
             Format::Match(_, branches) => branches
                 .iter()
@@ -1379,6 +1395,7 @@ impl Format {
             Format::Slice(_, _) => false,
             Format::Bits(_) => false,
             Format::WithRelativeOffset(_, _) => false,
+            Format::Map(f, _expr) => f.depends_on_next(module),
             Format::Compute(_) => false,
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::MatchVariant(_, branches) => {
@@ -1707,6 +1724,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::WithRelativeOffset(_expr, _a) => {
                 Self::accept() // FIXME
             }
+            Format::Map(f, _expr) => Self::add(module, f, next),
             Format::Compute(_expr) => Self::add_next(module, next),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
@@ -2409,6 +2427,10 @@ impl Decoder {
                 let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
                 Ok(Decoder::WithRelativeOffset(expr.clone(), da))
             }
+            Format::Map(a, expr) => {
+                let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
+                Ok(Decoder::Map(da, expr.clone()))
+            }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Match(head, branches) => {
                 let branches = branches
@@ -2636,6 +2658,11 @@ impl Decoder {
                     .split_at(offset)
                     .ok_or(ParseError::overrun(offset, input.offset))?;
                 let (v, _) = a.parse(program, scope, slice)?;
+                Ok((v, input))
+            }
+            Decoder::Map(d, expr) => {
+                let (v, input) = d.parse(program, scope, input)?;
+                let v = expr.eval_lambda(scope, v);
                 Ok((v, input))
             }
             Decoder::Compute(expr) => {
