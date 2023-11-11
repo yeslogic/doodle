@@ -2,6 +2,7 @@
 #![deny(rust_2018_idioms)]
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -171,7 +172,7 @@ impl Value {
 
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the scope
-    fn matches(&self, scope: &mut Scope, pattern: &Pattern) -> bool {
+    fn matches(&self, scope: &mut Scope<'_>, pattern: &Pattern) -> bool {
         match (pattern, self.coerce_record_to_value()) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
@@ -186,10 +187,8 @@ impl Value {
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
             {
-                let initial_len = scope.len();
                 for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
                     if !v.matches(scope, p) {
-                        scope.truncate(initial_len);
                         return false;
                     }
                 }
@@ -781,7 +780,7 @@ enum Decoder {
 }
 
 impl Expr {
-    fn eval<'a>(&'a self, scope: &'a mut Scope) -> Cow<'a, Value> {
+    fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
             Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
             Expr::Bool(b) => Cow::Owned(Value::Bool(*b)),
@@ -819,12 +818,9 @@ impl Expr {
             Expr::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, expr) in branches {
-                    let mut pattern_scope = Scope::new();
+                    let mut pattern_scope = Scope::child(scope);
                     if head.matches(&mut pattern_scope, pattern) {
-                        let initial_len = scope.len();
-                        scope.extend(pattern_scope);
-                        let value = expr.eval(scope).into_owned();
-                        scope.truncate(initial_len);
+                        let value = expr.eval(&pattern_scope).into_owned();
                         return Cow::Owned(value);
                     }
                 }
@@ -1053,17 +1049,16 @@ impl Expr {
         }
     }
 
-    fn eval_value(&self, scope: &mut Scope) -> Value {
+    fn eval_value<'a>(&self, scope: &'a Scope<'a>) -> Value {
         self.eval(scope).coerce_record_to_value().clone()
     }
 
-    fn eval_lambda(&self, scope: &mut Scope, arg: Value) -> Value {
+    fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: Value) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
-                scope.push(name.clone(), arg);
-                let v = expr.eval_value(scope);
-                scope.pop();
-                v
+                let mut child_scope = Scope::child(scope);
+                child_scope.push(name.clone(), arg);
+                expr.eval_value(&child_scope)
             }
             _ => panic!("expected Lambda"),
         }
@@ -1988,10 +1983,11 @@ pub struct TypeScope {
     types: Vec<ValueType>,
 }
 
-pub struct Scope {
+pub struct Scope<'a> {
+    parent: Option<&'a Scope<'a>>,
     names: Vec<Cow<'static, str>>,
     values: Vec<Value>,
-    decoders: Vec<Option<Decoder>>,
+    decoders: Vec<RefCell<Option<Decoder>>>,
 }
 
 pub struct ScopeIter {
@@ -2010,7 +2006,7 @@ impl Iterator for ScopeIter {
     }
 }
 
-impl IntoIterator for &Scope {
+impl<'a> IntoIterator for &Scope<'a> {
     type Item = (Cow<'static, str>, Value);
 
     type IntoIter = ScopeIter;
@@ -2023,7 +2019,7 @@ impl IntoIterator for &Scope {
     }
 }
 
-impl Scope {
+impl<'a> Scope<'a> {
     pub fn iter(&self) -> impl Iterator<Item = (Cow<'static, str>, Value)> {
         (&self).into_iter()
     }
@@ -2065,12 +2061,26 @@ impl TypeScope {
     }
 }
 
-impl Scope {
+impl<'a> Scope<'a> {
     fn new() -> Self {
+        let parent = None;
         let names = Vec::new();
         let values = Vec::new();
         let decoders = Vec::new();
         Scope {
+            parent,
+            names,
+            values,
+            decoders,
+        }
+    }
+
+    fn child(parent: &'a Scope<'a>) -> Self {
+        let names = Vec::new();
+        let values = Vec::new();
+        let decoders = Vec::new();
+        Scope {
+            parent: Some(parent),
             names,
             values,
             decoders,
@@ -2080,61 +2090,43 @@ impl Scope {
     fn push(&mut self, name: Cow<'static, str>, v: Value) {
         self.names.push(name);
         self.values.push(v);
-        self.decoders.push(None);
+        self.decoders.push(RefCell::new(None));
     }
 
-    fn pop(&mut self) -> Value {
-        self.names.pop();
-        self.decoders.pop();
-        self.values.pop().unwrap()
-    }
-
-    fn len(&self) -> usize {
-        self.values.len()
-    }
-
-    fn truncate(&mut self, len: usize) {
-        self.names.truncate(len);
-        self.values.truncate(len);
-        self.decoders.truncate(len);
-    }
-
-    fn extend(&mut self, other: Scope) {
-        self.names.extend(other.names);
-        self.values.extend(other.values);
-        self.decoders.extend(other.decoders);
-    }
-
-    fn get_index_by_name(&self, name: &str) -> usize {
+    fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
         for (i, n) in self.names.iter().enumerate().rev() {
             if n == name {
-                return i;
+                return (self, i);
             }
         }
-        panic!("variable not found: {name}");
+        if let Some(parent) = self.parent {
+            parent.get_index_by_name(name)
+        } else {
+            panic!("variable not found: {name}");
+        }
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {
-        &self.values[self.get_index_by_name(name)]
+        let (scope, index) = self.get_index_by_name(name);
+        &scope.values[index]
     }
 
     fn call_decoder_by_name<'input>(
-        &mut self,
+        &self,
         name: &str,
         program: &Program,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let i = self.get_index_by_name(name);
-        let mut od = std::mem::replace(&mut self.decoders[i], None);
+        let (scope, i) = self.get_index_by_name(name);
+        let mut od = scope.decoders[i].borrow_mut();
         if od.is_none() {
-            let d = match &self.values[i] {
+            let d = match &scope.values[i] {
                 Value::Format(f) => Decoder::compile_one(&*f).unwrap(),
                 _ => panic!("variable not format: {name}"),
             };
-            od = Some(d);
+            *od = Some(d);
         }
         let res = od.as_ref().unwrap().parse(program, self, input);
-        self.decoders[i] = od;
         res
     }
 }
@@ -2446,7 +2438,7 @@ impl Decoder {
     pub fn parse<'input>(
         &self,
         program: &Program,
-        scope: &mut Scope,
+        scope: &Scope<'_>,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         match self {
@@ -2486,12 +2478,10 @@ impl Decoder {
             }
             Decoder::Parallel(branches) => {
                 for (label, d) in branches {
-                    let initial_len = scope.len();
                     let res = d.parse(program, scope, input);
                     if let Ok((v, input)) = res {
                         return Ok((Value::Variant(label.clone(), Box::new(v)), input));
                     }
-                    scope.truncate(initial_len);
                 }
                 Err(ParseError::fail(scope, input))
             }
@@ -2523,14 +2513,12 @@ impl Decoder {
             Decoder::Record(fields) => {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
+                let mut record_scope = Scope::child(scope);
                 for (name, f) in fields {
-                    let (vf, next_input) = f.parse(program, scope, input)?;
+                    let (vf, next_input) = f.parse(program, &record_scope, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
-                    scope.push(name.clone(), vf);
-                }
-                for _ in fields {
-                    scope.pop();
+                    record_scope.push(name.clone(), vf);
                 }
                 Ok((Value::Record(v), input))
             }
@@ -2652,12 +2640,9 @@ impl Decoder {
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, decoder) in branches {
-                    let mut pattern_scope = Scope::new();
+                    let mut pattern_scope = Scope::child(scope);
                     if head.matches(&mut pattern_scope, pattern) {
-                        let initial_len = scope.len();
-                        scope.extend(pattern_scope);
-                        let (v, input) = decoder.parse(program, scope, input)?;
-                        scope.truncate(initial_len);
+                        let (v, input) = decoder.parse(program, &pattern_scope, input)?;
                         return Ok((v, input));
                     }
                 }
@@ -2666,12 +2651,9 @@ impl Decoder {
             Decoder::MatchVariant(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, label, decoder) in branches {
-                    let mut pattern_scope = Scope::new();
+                    let mut pattern_scope = Scope::child(scope);
                     if head.matches(&mut pattern_scope, pattern) {
-                        let initial_len = scope.len();
-                        scope.extend(pattern_scope);
-                        let (v, input) = decoder.parse(program, scope, input)?;
-                        scope.truncate(initial_len);
+                        let (v, input) = decoder.parse(program, &pattern_scope, input)?;
                         return Ok((Value::Variant(label.clone(), Box::new(v)), input));
                     }
                 }
