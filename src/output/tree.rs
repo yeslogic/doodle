@@ -142,6 +142,13 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                 }
             }
+            Value::Branch(n, value) => match format {
+                Some(Format::IsoUnion(branches)) => {
+                    let format = &branches[*n];
+                    self.is_atomic_value(value, Some(format))
+                }
+                _ => self.is_atomic_value(value, None),
+            },
             Value::Format(_) => false,
         }
     }
@@ -213,7 +220,13 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected variant, found {value:?}"),
             },
-            Format::IsoUnion(_branches) => self.compile_value(scope, value),
+            Format::IsoUnion(branches) => match value {
+                Value::Branch(n, value) => {
+                    let format = &branches[*n];
+                    self.compile_decoded_value(scope, value, format)
+                }
+                _ => panic!("expected branch value, found {value:?}"),
+            },
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
                     if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
@@ -322,6 +335,7 @@ impl<'module> MonoidalPrinter<'module> {
                     self.compile_value(scope, orig)
                 }
             }
+            Value::Branch(_n, value) => self.compile_value(scope, value),
             Value::Format(f) => self.compile_format(f, Default::default()),
         }
     }
