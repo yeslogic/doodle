@@ -1,15 +1,14 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::{Scope, ScopeEntry};
+use crate::etc::Label;
 use crate::read::ReadCtxt;
-
-use std::borrow::Cow;
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Debug)]
 pub enum ParseError {
     Fail {
-        bindings: Vec<(Cow<'static, str>, ScopeEntry)>,
+        bindings: Vec<(Label, ScopeEntry)>,
         buffer: Vec<u8>,
         offset: usize,
     },

@@ -16,13 +16,14 @@ pub mod bounds;
 pub mod byte_set;
 pub mod decoder;
 pub mod error;
+mod etc;
 pub mod output;
 pub mod read;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Pattern {
-    Binding(Cow<'static, str>),
+    Binding(etc::Label),
     Wildcard,
     Bool(bool),
     U8(u8),
@@ -30,7 +31,7 @@ pub enum Pattern {
     U32(u32),
     Char(char),
     Tuple(Vec<Pattern>),
-    Variant(Cow<'static, str>, Box<Pattern>),
+    Variant(etc::Label, Box<Pattern>),
     Seq(Vec<Pattern>),
 }
 
@@ -41,7 +42,7 @@ impl Pattern {
         Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
     }
 
-    pub fn variant(label: impl Into<Cow<'static, str>>, value: impl Into<Box<Pattern>>) -> Pattern {
+    pub fn variant(label: impl Into<etc::Label>, value: impl Into<Box<Pattern>>) -> Pattern {
         Pattern::Variant(label.into(), value.into())
     }
 
@@ -115,8 +116,8 @@ pub enum ValueType {
     U32,
     Char,
     Tuple(Vec<ValueType>),
-    Record(Vec<(Cow<'static, str>, ValueType)>),
-    Union(Vec<(Cow<'static, str>, ValueType)>),
+    Record(Vec<(etc::Label, ValueType)>),
+    Union(Vec<(etc::Label, ValueType)>),
     Seq(Box<ValueType>),
 }
 
@@ -179,7 +180,7 @@ impl ValueType {
                 Ok(ValueType::Record(fs))
             }
             (ValueType::Union(bs1), ValueType::Union(bs2)) => {
-                let mut bs: Vec<(Cow<'static, str>, ValueType)> = Vec::new();
+                let mut bs: Vec<(etc::Label, ValueType)> = Vec::new();
                 for (label, t2) in bs2 {
                     let t = if let Some((_l, t1)) = bs.iter().find(|(l, _)| label == l) {
                         t1.unify(t2)?
@@ -204,19 +205,19 @@ impl ValueType {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
-    Var(Cow<'static, str>),
+    Var(etc::Label),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
     Tuple(Vec<Expr>),
     TupleProj(Box<Expr>, usize),
-    Record(Vec<(Cow<'static, str>, Expr)>),
-    RecordProj(Box<Expr>, Cow<'static, str>),
-    Variant(Cow<'static, str>, Box<Expr>),
+    Record(Vec<(etc::Label, Expr)>),
+    RecordProj(Box<Expr>, etc::Label),
+    Variant(etc::Label, Box<Expr>),
     Seq(Vec<Expr>),
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
-    Lambda(Cow<'static, str>, Box<Expr>),
+    Lambda(etc::Label, Box<Expr>),
 
     BitAnd(Box<Expr>, Box<Expr>),
     BitOr(Box<Expr>, Box<Expr>),
@@ -255,7 +256,7 @@ pub enum Expr {
 impl Expr {
     pub const UNIT: Expr = Expr::Tuple(Vec::new());
 
-    pub fn record_proj(head: impl Into<Box<Expr>>, label: impl Into<Cow<'static, str>>) -> Expr {
+    pub fn record_proj(head: impl Into<Box<Expr>>, label: impl Into<etc::Label>) -> Expr {
         Expr::RecordProj(head.into(), label.into())
     }
 }
@@ -537,18 +538,18 @@ pub enum Format {
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Wraps the value from the inner format in a variant
-    Variant(Cow<'static, str>, Box<Format>),
+    Variant(etc::Label, Box<Format>),
     /// Matches the union of all the formats, which must have the same type
     Union(Vec<Format>),
     /// Matches the union of all the formats wrapped in variants
-    UnionVariant(Vec<(Cow<'static, str>, Format)>),
+    UnionVariant(Vec<(etc::Label, Format)>),
     /// Temporary hack for nondeterministic variant unions
-    UnionNondet(Vec<(Cow<'static, str>, Format)>),
+    UnionNondet(Vec<(etc::Label, Format)>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
     /// the decoded value of earlier formats
-    Record(Vec<(Cow<'static, str>, Format)>),
+    Record(Vec<(etc::Label, Format)>),
     /// Repeat a format zero-or-more times
     Repeat(Box<Format>),
     /// Repeat a format one-or-more times
@@ -578,7 +579,7 @@ pub enum Format {
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
     /// Pattern match on an expression and return a variant
-    MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Format)>),
+    MatchVariant(Expr, Vec<(Pattern, etc::Label, Format)>),
     /// Format generated dynamically
     Dynamic(Cow<'static, str>, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
@@ -588,7 +589,7 @@ pub enum Format {
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
-    pub fn alts<Label: Into<Cow<'static, str>>>(
+    pub fn alts<Label: Into<etc::Label>>(
         fields: impl IntoIterator<Item = (Label, Format)>,
     ) -> Format {
         Format::UnionVariant(
@@ -598,7 +599,7 @@ impl Format {
         )
     }
 
-    pub fn record<Label: Into<Cow<'static, str>>>(
+    pub fn record<Label: Into<etc::Label>>(
         fields: impl IntoIterator<Item = (Label, Format)>,
     ) -> Format {
         Format::Record(
@@ -790,8 +791,8 @@ impl FormatRef {
 
 #[derive(Debug, Serialize)]
 pub struct FormatModule {
-    names: Vec<Cow<'static, str>>,
-    args: Vec<Vec<(Cow<'static, str>, ValueType)>>,
+    names: Vec<etc::Label>,
+    args: Vec<Vec<(etc::Label, ValueType)>>,
     formats: Vec<Format>,
     format_types: Vec<ValueType>,
 }
@@ -806,18 +807,14 @@ impl FormatModule {
         }
     }
 
-    pub fn define_format(
-        &mut self,
-        name: impl Into<Cow<'static, str>>,
-        format: Format,
-    ) -> FormatRef {
+    pub fn define_format(&mut self, name: impl Into<etc::Label>, format: Format) -> FormatRef {
         self.define_format_args(name, vec![], format)
     }
 
     pub fn define_format_args(
         &mut self,
-        name: impl Into<Cow<'static, str>>,
-        args: Vec<(Cow<'static, str>, ValueType)>,
+        name: impl Into<etc::Label>,
+        args: Vec<(etc::Label, ValueType)>,
         format: Format,
     ) -> FormatRef {
         let mut scope = TypeScope::new();
@@ -840,7 +837,7 @@ impl FormatModule {
         &self.names[level]
     }
 
-    fn get_args(&self, level: usize) -> &[(Cow<'static, str>, ValueType)] {
+    fn get_args(&self, level: usize) -> &[(etc::Label, ValueType)] {
         &self.args[level]
     }
 
@@ -1002,7 +999,7 @@ enum Next<'a> {
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Tuple(&'a [Format], Rc<Next<'a>>),
-    Record(&'a [(Cow<'static, str>, Format)], Rc<Next<'a>>),
+    Record(&'a [(etc::Label, Format)], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
     RepeatCount(usize, &'a Format, Rc<Next<'a>>),
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
@@ -1168,7 +1165,7 @@ impl<'a> MatchTreeStep<'a> {
 
     fn add_record(
         module: &'a FormatModule,
-        fields: &'a [(Cow<'static, str>, Format)],
+        fields: &'a [(etc::Label, Format)],
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
@@ -1505,7 +1502,7 @@ impl<'a> TypeScope<'a> {
         }
     }
 
-    fn push(&mut self, name: Cow<'static, str>, t: ValueType) {
+    fn push(&mut self, name: etc::Label, t: ValueType) {
         self.names.push(name);
         self.types.push(ValueKind::Value(t));
     }
