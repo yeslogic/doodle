@@ -210,7 +210,7 @@ impl Value {
 
     fn coerce_mapped_value(&self) -> &Value {
         match self {
-            Value::Mapped(_orig, v) => v,
+            Value::Mapped(_orig, v) => v.coerce_mapped_value(),
             v => v,
         }
     }
