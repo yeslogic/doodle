@@ -120,16 +120,7 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) => true,
             Value::Tuple(values) => values.is_empty(),
-            Value::Record(fields) => {
-                fields.is_empty()
-                    || (self.flags.collapse_computed_values
-                        && fields
-                            .iter()
-                            .find_map(|(label, value)| {
-                                (label == "@value").then(|| self.is_atomic_value(value, None))
-                            })
-                            .unwrap_or(false))
-            }
+            Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
             Value::Variant(label, value) => match format {
                 Some(Format::Union(branches)) | Some(Format::NondetUnion(branches)) => {
@@ -542,8 +533,6 @@ impl<'module> MonoidalPrinter<'module> {
         };
         if value_fields.is_empty() {
             Fragment::String("{}".into())
-        } else if let Some((_, v)) = value_fields.iter().find(|(label, _)| label == "@value") {
-            self.compile_value(scope, v)
         } else {
             let mut frag = Fragment::new();
             let mut record_scope = Scope::child(scope);

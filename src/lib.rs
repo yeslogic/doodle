@@ -210,13 +210,6 @@ impl Value {
 
     fn coerce_mapped_value(&self) -> &Value {
         match self {
-            Value::Record(fields) => {
-                if let Some((_l, v)) = fields.iter().find(|(l, _)| l == "@value") {
-                    &v
-                } else {
-                    &self
-                }
-            }
             Value::Mapped(_orig, v) => v,
             v => v,
         }
@@ -655,11 +648,7 @@ impl FormatModule {
                     scope.push(label.clone(), t);
                 }
                 scope.truncate(initial_len);
-                if let Some((_l, t)) = ts.iter().find(|(l, _)| l == "@value") {
-                    Ok(t.clone())
-                } else {
-                    Ok(ValueType::Record(ts))
-                }
+                Ok(ValueType::Record(ts))
             }
             Format::Repeat(a) | Format::Repeat1(a) => {
                 let t = self.infer_format_type(scope, a)?;
@@ -693,7 +682,7 @@ impl FormatModule {
                 if branches.is_empty() {
                     return Err(format!("infer_format_type: empty Match"));
                 }
-                let head_type = head.infer_type_coerce_value(scope)?;
+                let head_type = head.infer_type(scope)?;
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
                     t = t.unify(
@@ -706,7 +695,7 @@ impl FormatModule {
                 if branches.is_empty() {
                     return Err(format!("infer_format_type: empty MatchVariant"));
                 }
-                let head_type = head.infer_type_coerce_value(scope)?;
+                let head_type = head.infer_type(scope)?;
                 let mut t = ValueType::Any;
                 for (pattern, label, branch) in branches {
                     t = t.unify(&ValueType::Union(vec![(
@@ -717,7 +706,7 @@ impl FormatModule {
                 Ok(t)
             }
             Format::Dynamic(DynFormat::Huffman(lengths_expr, _opt_values_expr)) => {
-                match lengths_expr.infer_type_coerce_value(scope)? {
+                match lengths_expr.infer_type(scope)? {
                     ValueType::Seq(t) => match &*t {
                         ValueType::U8 | ValueType::U16 => {}
                         _ => return Err(format!("Huffman: expected U8 or U16")),
@@ -1123,7 +1112,7 @@ impl Expr {
                 if branches.is_empty() {
                     return Err(format!("infer_type: empty Match"));
                 }
-                let head_type = head.infer_type_coerce_value(scope)?;
+                let head_type = head.infer_type(scope)?;
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
                     t = t.unify(&pattern.infer_expr_branch_type(scope, &head_type, branch)?)?;
@@ -1132,24 +1121,20 @@ impl Expr {
             }
             Expr::Lambda(_, _) => Err(format!("cannot infer_type lambda")),
 
-            Expr::BitAnd(x, y) | Expr::BitOr(x, y) => match (
-                x.infer_type_coerce_value(scope)?,
-                y.infer_type_coerce_value(scope)?,
-            ) {
-                (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
-                (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
-                (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
-                (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
-            },
+            Expr::BitAnd(x, y) | Expr::BitOr(x, y) => {
+                match (x.infer_type(scope)?, y.infer_type(scope)?) {
+                    (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
+                    (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
+                    (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+                    (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
+                }
+            }
             Expr::Eq(x, y)
             | Expr::Ne(x, y)
             | Expr::Lt(x, y)
             | Expr::Gt(x, y)
             | Expr::Lte(x, y)
-            | Expr::Gte(x, y) => match (
-                x.infer_type_coerce_value(scope)?,
-                y.infer_type_coerce_value(scope)?,
-            ) {
+            | Expr::Gte(x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::U8, ValueType::U8) => Ok(ValueType::Bool),
                 (ValueType::U16, ValueType::U16) => Ok(ValueType::Bool),
                 (ValueType::U32, ValueType::U32) => Ok(ValueType::Bool),
@@ -1161,35 +1146,32 @@ impl Expr {
             | Expr::Div(x, y)
             | Expr::Rem(x, y)
             | Expr::Shl(x, y)
-            | Expr::Shr(x, y) => match (
-                x.infer_type_coerce_value(scope)?,
-                y.infer_type_coerce_value(scope)?,
-            ) {
+            | Expr::Shr(x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
                 (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
                 (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
                 (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
             },
 
-            Expr::AsU8(x) => match x.infer_type_coerce_value(scope)? {
+            Expr::AsU8(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::U8),
                 ValueType::U16 => Ok(ValueType::U8),
                 ValueType::U32 => Ok(ValueType::U8),
                 x => Err(format!("cannot convert {x:?} to U8")),
             },
-            Expr::AsU16(x) => match x.infer_type_coerce_value(scope)? {
+            Expr::AsU16(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::U16),
                 ValueType::U16 => Ok(ValueType::U16),
                 ValueType::U32 => Ok(ValueType::U16),
                 x => Err(format!("cannot convert {x:?} to U16")),
             },
-            Expr::AsU32(x) => match x.infer_type_coerce_value(scope)? {
+            Expr::AsU32(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::U32),
                 ValueType::U16 => Ok(ValueType::U32),
                 ValueType::U32 => Ok(ValueType::U32),
                 x => Err(format!("cannot convert {x:?} to U32")),
             },
-            Expr::AsChar(x) => match x.infer_type_coerce_value(scope)? {
+            Expr::AsChar(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::Char),
                 ValueType::U16 => Ok(ValueType::Char),
                 ValueType::U32 => Ok(ValueType::Char),
@@ -1218,8 +1200,8 @@ impl Expr {
             },
             Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {
-                    let start_type = start.infer_type_coerce_value(scope)?;
-                    let length_type = length.infer_type_coerce_value(scope)?;
+                    let start_type = start.infer_type(scope)?;
+                    let length_type = length.infer_type(scope)?;
                     if !start_type.is_numeric_type() {
                         return Err(format!("SubSeq start must be numeric"));
                     }
@@ -1266,7 +1248,7 @@ impl Expr {
                 _ => Err(format!("FlatMapAccum: expected Lambda")),
             },
             Expr::Dup(count, expr) => {
-                if !count.infer_type_coerce_value(scope)?.is_numeric_type() {
+                if !count.infer_type(scope)?.is_numeric_type() {
                     return Err(format!("Dup count must be numeric"));
                 }
                 let t = expr.infer_type(scope)?;
@@ -1277,19 +1259,6 @@ impl Expr {
                 ValueType::Seq(_values) => Ok(ValueType::Seq(Box::new(ValueType::U8))),
                 _ => Err(format!("Inflate: expected Seq")),
             },
-        }
-    }
-
-    fn infer_type_coerce_value(&self, scope: &mut TypeScope) -> Result<ValueType, String> {
-        match self.infer_type(scope)? {
-            ValueType::Record(fields) => {
-                if let Some((_l, t)) = fields.iter().find(|(l, _)| l == "@value") {
-                    return Ok(t.clone());
-                } else {
-                    Ok(ValueType::Record(fields))
-                }
-            }
-            t => Ok(t),
         }
     }
 
