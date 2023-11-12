@@ -1,7 +1,7 @@
 use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
-use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
+use crate::{etc, DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -16,8 +16,8 @@ pub enum Value {
     U32(u32),
     Char(char),
     Tuple(Vec<Value>),
-    Record(Vec<(Cow<'static, str>, Value)>),
-    Variant(Cow<'static, str>, Box<Value>),
+    Record(Vec<(etc::Label, Value)>),
+    Variant(etc::Label, Box<Value>),
     Seq(Vec<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
@@ -26,7 +26,7 @@ pub enum Value {
 impl Value {
     pub const UNIT: Value = Value::Tuple(Vec::new());
 
-    pub fn record<Label: Into<Cow<'static, str>>>(
+    pub fn record<Label: Into<etc::Label>>(
         fields: impl IntoIterator<Item = (Label, Value)>,
     ) -> Value {
         Value::Record(
@@ -37,7 +37,7 @@ impl Value {
         )
     }
 
-    pub fn variant(label: impl Into<Cow<'static, str>>, value: impl Into<Box<Value>>) -> Value {
+    pub fn variant(label: impl Into<etc::Label>, value: impl Into<Box<Value>>) -> Value {
         Value::Variant(label.into(), value.into())
     }
 
@@ -417,16 +417,16 @@ impl Expr {
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub enum Decoder {
-    Call(usize, Vec<(Cow<'static, str>, Expr)>),
+    Call(usize, Vec<(etc::Label, Expr)>),
     Fail,
     EndOfInput,
     Align(usize),
     Byte(ByteSet),
-    Variant(Cow<'static, str>, Box<Decoder>),
-    Branch(MatchTree, Vec<Decoder>),
+    Variant(etc::Label, Box<Decoder>),
     Parallel(Vec<Decoder>),
+    Branch(MatchTree, Vec<Decoder>),
     Tuple(Vec<Decoder>),
-    Record(Vec<(Cow<'static, str>, Decoder)>),
+    Record(Vec<(etc::Label, Decoder)>),
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
@@ -441,8 +441,8 @@ pub enum Decoder {
     Compute(Expr),
     Let(Cow<'static, str>, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
-    Dynamic(Cow<'static, str>, DynFormat, Box<Decoder>),
-    Apply(Cow<'static, str>),
+    Dynamic(etc::Label, DynFormat, Box<Decoder>),
+    Apply(etc::Label),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -460,8 +460,8 @@ pub enum TypeRef {
 
 pub enum TypeDef {
     //Equiv(TypeRef),
-    Union(Vec<(Cow<'static, str>, TypeRef)>),
-    Record(Vec<(Cow<'static, str>, TypeRef)>),
+    Union(Vec<(etc::Label, TypeRef)>),
+    Record(Vec<(etc::Label, TypeRef)>),
 }
 
 pub struct Program {
@@ -484,8 +484,8 @@ impl Program {
 pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
-    record_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
-    union_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
+    record_map: HashMap<Vec<(etc::Label, TypeRef)>, usize>,
+    union_map: HashMap<Vec<(etc::Label, TypeRef)>, usize>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
     compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
 }
@@ -548,18 +548,18 @@ pub enum ScopeEntry {
 
 pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
-    names: Vec<Cow<'static, str>>,
+    names: Vec<etc::Label>,
     entries: Vec<ScopeEntry>,
 }
 
 pub struct ScopeIter<'a> {
     parent: Option<&'a Scope<'a>>,
-    name_iter: std::iter::Rev<std::slice::Iter<'a, Cow<'static, str>>>,
+    name_iter: std::iter::Rev<std::slice::Iter<'a, etc::Label>>,
     entry_iter: std::iter::Rev<std::slice::Iter<'a, ScopeEntry>>,
 }
 
 impl<'a> Iterator for ScopeIter<'a> {
-    type Item = (&'a Cow<'static, str>, &'a ScopeEntry);
+    type Item = (&'a etc::Label, &'a ScopeEntry);
 
     fn next(&mut self) -> Option<Self::Item> {
         match (self.name_iter.next(), self.entry_iter.next()) {
@@ -576,7 +576,7 @@ impl<'a> Iterator for ScopeIter<'a> {
 }
 
 impl<'a> IntoIterator for &'a Scope<'a> {
-    type Item = (&'a Cow<'static, str>, &'a ScopeEntry);
+    type Item = (&'a etc::Label, &'a ScopeEntry);
 
     type IntoIter = ScopeIter<'a>;
 
@@ -612,11 +612,11 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Cow<'static, str>, &ScopeEntry)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&etc::Label, &ScopeEntry)> {
         self.into_iter()
     }
 
-    pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
+    pub fn push(&mut self, name: etc::Label, v: Value) {
         self.names.push(name);
         self.entries.push(ScopeEntry::Value(v));
     }
@@ -1317,9 +1317,7 @@ fn inflate(codes: &[Value]) -> Vec<Value> {
 mod tests {
     use super::*;
 
-    fn alts<Label: Into<Cow<'static, str>>>(
-        fields: impl IntoIterator<Item = (Label, Format)>,
-    ) -> Format {
+    fn alts<Label: Into<etc::Label>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
         Format::UnionVariant(
             (fields.into_iter())
                 .map(|(label, format)| (label.into(), format))
@@ -1327,7 +1325,7 @@ mod tests {
         )
     }
 
-    fn record<Label: Into<Cow<'static, str>>>(
+    fn record<Label: Into<etc::Label>>(
         fields: impl IntoIterator<Item = (Label, Format)>,
     ) -> Format {
         Format::Record(

@@ -1,6 +1,7 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::decoder::{Scope, Value};
+use crate::etc;
 use crate::{DynFormat, Expr, Format, FormatModule};
 
 use super::{Fragment, FragmentBuilder, Symbol};
@@ -50,7 +51,7 @@ pub struct MonoidalPrinter<'module> {
     module: &'module FormatModule,
 }
 
-type Field<T> = (Cow<'static, str>, T);
+type Field<T> = (etc::Label, T);
 type FieldFormat = Field<Format>;
 type FieldValue = Field<Value>;
 
@@ -578,7 +579,7 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_table(
         &mut self,
         cols: &[usize],
-        header: &[Cow<'static, str>],
+        header: &[etc::Label],
         rows: &[Vec<String>],
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
