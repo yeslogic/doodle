@@ -138,6 +138,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => self.is_atomic_value(value, None),
             },
+            Value::Mapped(_orig, value) => self.is_atomic_value(value, None),
             Value::Format(_) => false,
         }
     }
@@ -299,6 +300,7 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Seq(vals) => self.compile_seq(scope, vals, None),
             Value::Record(fields) => self.compile_record(scope, fields, None),
             Value::Variant(label, value) => self.compile_variant(scope, label, value, None),
+            Value::Mapped(_orig, value) => self.compile_value(scope, value),
             Value::Format(f) => self.compile_format(f, Default::default()),
         }
     }
@@ -313,7 +315,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     pub fn compile_string(&self, value: &Value) -> Fragment {
-        let vs = match value.coerce_record_to_value() {
+        let vs = match value.coerce_mapped_value() {
             Value::Record(fields) => {
                 match self
                     .extract_string_field(fields)
@@ -330,7 +332,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     pub fn compile_ascii_string(&self, value: &Value) -> Fragment {
-        let vs = match value.coerce_record_to_value() {
+        let vs = match value.coerce_mapped_value() {
             Value::Record(fields) => {
                 match self
                     .extract_string_field(fields)
@@ -366,7 +368,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn compile_char(&self, v: &Value) -> Fragment {
-        let c = match v.coerce_record_to_value() {
+        let c = match v.coerce_mapped_value() {
             Value::U8(b) => *b as char,
             Value::Char(c) => *c,
             _ => panic!("expected U8 or Char value, found {v:?}"),

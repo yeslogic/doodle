@@ -132,6 +132,7 @@ pub enum Value {
     Record(Vec<(Cow<'static, str>, Value)>),
     Variant(Cow<'static, str>, Box<Value>),
     Seq(Vec<Value>),
+    Mapped(Box<Value>, Box<Value>),
     Format(Box<Format>),
 }
 
@@ -164,7 +165,7 @@ impl Value {
     }
 
     fn tuple_proj(&self, index: usize) -> &Value {
-        match self.coerce_record_to_value() {
+        match self.coerce_mapped_value() {
             Value::Tuple(vs) => &vs[index],
             _ => panic!("expected tuple"),
         }
@@ -179,7 +180,7 @@ impl Value {
     }
 
     fn matches_inner(&self, scope: &mut Scope<'_>, pattern: &Pattern) -> bool {
-        match (pattern, self.coerce_record_to_value()) {
+        match (pattern, self.coerce_mapped_value()) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
                 true
@@ -207,7 +208,7 @@ impl Value {
         }
     }
 
-    fn coerce_record_to_value(&self) -> &Value {
+    fn coerce_mapped_value(&self) -> &Value {
         match self {
             Value::Record(fields) => {
                 if let Some((_l, v)) = fields.iter().find(|(l, _)| l == "@value") {
@@ -216,6 +217,7 @@ impl Value {
                     &self
                 }
             }
+            Value::Mapped(_orig, v) => v,
             v => v,
         }
     }
@@ -1070,7 +1072,7 @@ impl Expr {
     }
 
     fn eval_value<'a>(&self, scope: &'a Scope<'a>) -> Value {
-        self.eval(scope).coerce_record_to_value().clone()
+        self.eval(scope).coerce_mapped_value().clone()
     }
 
     fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: Value) -> Value {
@@ -2661,9 +2663,9 @@ impl Decoder {
                 Ok((v, input))
             }
             Decoder::Map(d, expr) => {
-                let (v, input) = d.parse(program, scope, input)?;
-                let v = expr.eval_lambda(scope, v);
-                Ok((v, input))
+                let (orig, input) = d.parse(program, scope, input)?;
+                let v = expr.eval_lambda(scope, orig.clone());
+                Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
             }
             Decoder::Compute(expr) => {
                 let v = expr.eval(scope).into_owned();
@@ -2717,7 +2719,7 @@ fn value_to_vec_usize(v: &Value) -> Vec<usize> {
         _ => panic!("expected Seq"),
     };
     vs.iter()
-        .map(|v| match v.coerce_record_to_value() {
+        .map(|v| match v.coerce_mapped_value() {
             Value::U8(n) => *n as usize,
             Value::U16(n) => *n as usize,
             _ => panic!("expected U8 or U16"),
@@ -2780,7 +2782,7 @@ fn inflate(codes: &[Value]) -> Vec<Value> {
     for code in codes {
         match code {
             Value::Variant(name, v) => match (name.as_ref(), v.as_ref()) {
-                ("literal", v) => match v.coerce_record_to_value() {
+                ("literal", v) => match v.coerce_mapped_value() {
                     Value::U8(b) => vs.push(Value::U8(*b)),
                     _ => panic!("inflate: expected U8"),
                 },
