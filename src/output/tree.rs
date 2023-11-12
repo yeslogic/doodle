@@ -28,7 +28,7 @@ enum Column {
 }
 
 pub struct Flags {
-    collapse_computed_values: bool,
+    collapse_mapped_values: bool,
     omit_implied_values: bool,
     tables_for_record_sequences: bool,
     pretty_ascii_strings: bool,
@@ -129,7 +129,18 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => self.is_atomic_value(value, None),
             },
-            Value::Mapped(_orig, value) => self.is_atomic_value(value, None),
+            Value::Mapped(orig, value) => {
+                if self.flags.collapse_mapped_values {
+                    self.is_atomic_value(value, None)
+                } else {
+                    match format {
+                        Some(Format::Map(format, _expr)) => {
+                            self.is_atomic_value(orig, Some(format))
+                        }
+                        _ => self.is_atomic_value(orig, None),
+                    }
+                }
+            }
             Value::Format(_) => false,
         }
     }
@@ -138,7 +149,7 @@ impl<'module> MonoidalPrinter<'module> {
 impl<'module> MonoidalPrinter<'module> {
     pub fn new(module: &'module FormatModule) -> MonoidalPrinter<'module> {
         let flags = Flags {
-            collapse_computed_values: true,
+            collapse_mapped_values: true,
             omit_implied_values: true,
             tables_for_record_sequences: true,
             pretty_ascii_strings: true,
@@ -244,7 +255,18 @@ impl<'module> MonoidalPrinter<'module> {
             Format::WithRelativeOffset(_, format) => {
                 self.compile_decoded_value(scope, value, format)
             }
-            Format::Map(_format, _expr) => self.compile_value(scope, value),
+            Format::Map(format, _expr) => {
+                if self.flags.collapse_mapped_values {
+                    self.compile_value(scope, value)
+                } else {
+                    match value {
+                        Value::Mapped(orig, _value) => {
+                            self.compile_decoded_value(scope, orig, format)
+                        }
+                        _ => panic!("expected mapped value, found {value:?}"),
+                    }
+                }
+            }
             Format::Compute(_expr) => self.compile_value(scope, value),
             Format::Match(head, branches) => {
                 let head = head.eval(&scope);
@@ -291,7 +313,13 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Seq(vals) => self.compile_seq(scope, vals, None),
             Value::Record(fields) => self.compile_record(scope, fields, None),
             Value::Variant(label, value) => self.compile_variant(scope, label, value, None),
-            Value::Mapped(_orig, value) => self.compile_value(scope, value),
+            Value::Mapped(orig, value) => {
+                if self.flags.collapse_mapped_values {
+                    self.compile_value(scope, value)
+                } else {
+                    self.compile_value(scope, orig)
+                }
+            }
             Value::Format(f) => self.compile_format(f, Default::default()),
         }
     }
