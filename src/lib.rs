@@ -133,6 +133,7 @@ pub enum Value {
     Variant(Cow<'static, str>, Box<Value>),
     Seq(Vec<Value>),
     Mapped(Box<Value>, Box<Value>),
+    Branch(usize, Box<Value>),
     Format(Box<Format>),
 }
 
@@ -211,6 +212,7 @@ impl Value {
     fn coerce_mapped_value(&self) -> &Value {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
+            Value::Branch(_n, v) => v.coerce_mapped_value(),
             v => v,
         }
     }
@@ -2492,7 +2494,8 @@ impl Decoder {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
-                d.parse(program, scope, input)
+                let (v, input) = d.parse(program, scope, input)?;
+                Ok((Value::Branch(index, Box::new(v)), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
