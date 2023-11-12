@@ -54,47 +54,53 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         |len: u16| -> Format { Format::Slice(Expr::U16(len), Box::new(tar_asciiz.call())) };
     let magic = is_bytes(MAGIC);
     let size_field = {
-        let octal_digit = record([
-            ("bit", base.ascii_octal_digit()),
-            (
-                "@value",
-                Format::Compute(Expr::Sub(
+        let octal_digit = Format::Map(
+            Box::new(base.ascii_octal_digit()),
+            Expr::Lambda(
+                "bit".into(),
+                Box::new(Expr::Sub(
                     Box::new(Expr::AsU8(Box::new(var("bit")))),
                     Box::new(Expr::U8(b'0')),
                 )),
             ),
-        ]);
+        );
 
-        record([
-            ("oA", octal_digit.clone()),
-            ("o9", octal_digit.clone()),
-            ("o8", octal_digit.clone()),
-            ("o7", octal_digit.clone()),
-            ("o6", octal_digit.clone()),
-            ("o5", octal_digit.clone()),
-            ("o4", octal_digit.clone()),
-            ("o3", octal_digit.clone()),
-            ("o2", octal_digit.clone()),
-            ("o1", octal_digit.clone()),
-            ("o0", octal_digit.clone()),
-            ("__nil", nul_or_wsp.call()),
-            (
-                "@value",
-                Format::Compute(bitor(
-                    shl(
-                        o4u32(Expr::U8(0), var("oA"), var("o9"), var("o8")),
-                        Expr::U32(24),
-                    ),
-                    bitor(
+        Format::Map(
+            Box::new(record([
+                ("oA", octal_digit.clone()),
+                ("o9", octal_digit.clone()),
+                ("o8", octal_digit.clone()),
+                ("o7", octal_digit.clone()),
+                ("o6", octal_digit.clone()),
+                ("o5", octal_digit.clone()),
+                ("o4", octal_digit.clone()),
+                ("o3", octal_digit.clone()),
+                ("o2", octal_digit.clone()),
+                ("o1", octal_digit.clone()),
+                ("o0", octal_digit.clone()),
+                ("__nil", nul_or_wsp.call()),
+                (
+                    "value",
+                    Format::Compute(bitor(
                         shl(
-                            o4u32(var("o7"), var("o6"), var("o5"), var("o4")),
-                            Expr::U32(12),
+                            o4u32(Expr::U8(0), var("oA"), var("o9"), var("o8")),
+                            Expr::U32(24),
                         ),
-                        o4u32(var("o3"), var("o2"), var("o1"), var("o0")),
-                    ),
-                )),
+                        bitor(
+                            shl(
+                                o4u32(var("o7"), var("o6"), var("o5"), var("o4")),
+                                Expr::U32(12),
+                            ),
+                            o4u32(var("o3"), var("o2"), var("o1"), var("o0")),
+                        ),
+                    )),
+                ),
+            ])),
+            Expr::Lambda(
+                "rec".into(),
+                Box::new(Expr::record_proj(var("rec"), "value")),
             ),
-        ])
+        )
     };
 
     // USTAR allows `filename`, `linkname` and `prefix` to omit a trailing NUL if they fully occupy their respective array-fields
@@ -158,17 +164,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("header", header.call()),
             (
                 "file",
-                record([
-                    (
-                        "@value",
-                        repeat_count(
-                            Expr::RecordProj(Box::new(var("header")), "size".into()),
-                            base.u8(),
-                        ),
-                    ),
-                    ("__padding", Format::Align(512)),
-                ]),
+                repeat_count(
+                    Expr::RecordProj(Box::new(var("header")), "size".into()),
+                    base.u8(),
+                ),
             ),
+            ("__padding", Format::Align(512)),
         ]),
     );
 

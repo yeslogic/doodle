@@ -13,24 +13,24 @@
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- { ... } := 0
+│           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 0
 │           │   │       └── data <- match type { ... } :=
 │           │   │           ├── align <- align 8 := ()
-│           │   │           ├── len <- { ... } := 2048
-│           │   │           ├── nlen <- { ... } := 63487
-│           │   │           ├── bytes <- repeat-count len { ... } :=
-│           │   │           │   ├── 0 <- { ... } := 13
-│           │   │           │   ├── 1 <- { ... } := 60
-│           │   │           │   ├── 2 <- { ... } := 105
-│           │   │           │   ├── 3 <- { ... } := 200
-│           │   │           │   ├── 4 <- { ... } := 176
-│           │   │           │   ├── 5 <- { ... } := 100
-│           │   │           │   ├── 6 <- { ... } := 108
-│           │   │           │   ├── 7 <- { ... } := 167
-│           │   │           │   ├── 8 <- { ... } := 57
-│           │   │           │   ├── 9 <- { ... } := 17
+│           │   │           ├── len <- map (bits -> as-u16 (bits.15) << 15 | as-u16 (bits.14) << 14 | as-u16 (bits.13) << 13 | as-u16 (bits.12) << 12 | as-u16 (bits.11) << 11 | as-u16 (bits.10) << 10 | as-u16 (bits.9) << 9 | as-u16 (bits.8) << 8 | as-u16 (bits.7) << 7 | as-u16 (bits.6) << 6 | as-u16 (bits.5) << 5 | as-u16 (bits.4) << 4 | as-u16 (bits.3) << 3 | as-u16 (bits.2) << 2 | as-u16 (bits.1) << 1 | as-u16 (bits.0)) (...) := 2048
+│           │   │           ├── nlen <- map (bits -> as-u16 (bits.15) << 15 | as-u16 (bits.14) << 14 | as-u16 (bits.13) << 13 | as-u16 (bits.12) << 12 | as-u16 (bits.11) << 11 | as-u16 (bits.10) << 10 | as-u16 (bits.9) << 9 | as-u16 (bits.8) << 8 | as-u16 (bits.7) << 7 | as-u16 (bits.6) << 6 | as-u16 (bits.5) << 5 | as-u16 (bits.4) << 4 | as-u16 (bits.3) << 3 | as-u16 (bits.2) << 2 | as-u16 (bits.1) << 1 | as-u16 (bits.0)) (...) := 63487
+│           │   │           ├── bytes <- repeat-count len (map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │           │   ├── 0 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 13
+│           │   │           │   ├── 1 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 60
+│           │   │           │   ├── 2 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 105
+│           │   │           │   ├── 3 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 200
+│           │   │           │   ├── 4 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 176
+│           │   │           │   ├── 5 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 100
+│           │   │           │   ├── 6 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 108
+│           │   │           │   ├── 7 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 167
+│           │   │           │   ├── 8 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 57
+│           │   │           │   ├── 9 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 17
 │           │   │           │   ~
-│           │   │           │   └── 2047 <- { ... } := 194
+│           │   │           │   └── 2047 <- map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 194
 │           │   │           └── codes-values <- compute flat-map (x -> [..]) bytes :=
 │           │   │               ├── 0 := { literal := 13 }
 │           │   │               ├── 1 := { literal := 60 }

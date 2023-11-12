@@ -13,7 +13,7 @@
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- { ... } := 1
+│           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
 │           │   │       └── data <- match type { ... } :=
 │           │   │           ├── format <- dynamic := _ |...| _
 │           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
@@ -41,11 +41,11 @@
 │           │   │           │   ├── 7 <- { ... } :=
 │           │   │           │   │   ├── code <- apply := 258
 │           │   │           │   │   └── extra <- match code { ... } :=
-│           │   │           │   │       ├── length-extra-bits <- { ... } := 0
+│           │   │           │   │       ├── length-extra-bits <- compute 0 := 0
 │           │   │           │   │       ├── length <- compute 4 + as-u16 length-extra-bits := 4
-│           │   │           │   │       ├── distance-code <- { ... } := 4
+│           │   │           │   │       ├── distance-code <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 4
 │           │   │           │   │       └── distance-record <- match (as-u8 distance-code) { ... } :=
-│           │   │           │   │           ├── distance-extra-bits <- { ... } := 1
+│           │   │           │   │           ├── distance-extra-bits <- map (bits -> as-u16 (bits.0)) (...) := 1
 │           │   │           │   │           └── distance <- compute 5 + distance-extra-bits := 6
 │           │   │           │   ├── 8 <- { ... } :=
 │           │   │           │   │   ├── code <- apply := 10

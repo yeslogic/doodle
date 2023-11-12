@@ -353,26 +353,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // MCU: Minimum coded unit
     let mcu = module.define_format(
         "jpeg.mcu",
-        record([
-            (
-                "mcu",
-                (alts([
-                    ("byte", not_byte(0xFF)),
-                    ("zero", tuple([is_byte(0xFF), is_byte(0x00)])),
-                ])),
-            ),
-            (
-                "@value",
-                Format::Compute(Expr::Match(
-                    Box::new(var("mcu")),
-                    vec![
-                        (
-                            Pattern::variant("byte", Pattern::Binding("v".into())),
-                            var("v"),
-                        ),
-                        (Pattern::variant("zero", Pattern::Wildcard), Expr::U8(0xFF)),
-                    ],
-                )),
+        Format::IsoUnion(vec![
+            not_byte(0xFF),
+            Format::Map(
+                Box::new(tuple([is_byte(0xFF), is_byte(0x00)])),
+                Expr::Lambda("_".into(), Box::new(Expr::U8(0xFF))),
             ),
         ]),
     );

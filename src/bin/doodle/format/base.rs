@@ -184,46 +184,34 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
 
     let u16be = module.define_format(
         "base.u16be",
-        record([
-            ("bytes", tuple([u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U16Be(Box::new(var("bytes")))),
-            ),
-        ]),
+        Format::Map(
+            Box::new(tuple([u8.call(), u8.call()])),
+            Expr::Lambda("x".into(), Box::new(Expr::U16Be(Box::new(var("x"))))),
+        ),
     );
 
     let u16le = module.define_format(
         "base.u16le",
-        record([
-            ("bytes", tuple([u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U16Le(Box::new(var("bytes")))),
-            ),
-        ]),
+        Format::Map(
+            Box::new(tuple([u8.call(), u8.call()])),
+            Expr::Lambda("x".into(), Box::new(Expr::U16Le(Box::new(var("x"))))),
+        ),
     );
 
     let u32be = module.define_format(
         "base.u32be",
-        record([
-            ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U32Be(Box::new(var("bytes")))),
-            ),
-        ]),
+        Format::Map(
+            Box::new(tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
+            Expr::Lambda("x".into(), Box::new(Expr::U32Be(Box::new(var("x"))))),
+        ),
     );
 
     let u32le = module.define_format(
         "base.u32le",
-        record([
-            ("bytes", tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
-            (
-                "@value",
-                Format::Compute(Expr::U32Le(Box::new(var("bytes")))),
-            ),
-        ]),
+        Format::Map(
+            Box::new(tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
+            Expr::Lambda("x".into(), Box::new(Expr::U32Le(Box::new(var("x"))))),
+        ),
     );
 
     let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
