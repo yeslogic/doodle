@@ -15,158 +15,121 @@ const DROPMASKS: [u8; 6] = [
 ];
 
 fn drop_n_msb(n: usize, format: Format) -> Format {
-    record([
-        ("raw", format),
-        (
-            "@value",
-            Format::Compute(Expr::BitAnd(
+    Format::Map(
+        Box::new(format),
+        Expr::Lambda(
+            "raw".into(),
+            Box::new(Expr::BitAnd(
                 Box::new(var("raw")),
                 Box::new(Expr::U8(DROPMASKS[n])),
             )),
         ),
-    ])
+    )
 }
 
 pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
-    let utf8_1 = record([
-        ("byte", Format::Byte(VALID_ASCII)),
-        (
-            "@value",
-            Format::Compute(Expr::AsU32(Box::new(var("byte")))),
-        ),
-    ]);
-    let utf8_2 = record([
-        (
-            "bytes",
-            tuple([drop_n_msb(3, byte_in(0xC2..=0xDF)), utf8_tail.call()]),
-        ),
-        (
-            "@value",
-            Format::Match(
-                var("bytes"),
+    let utf8_1 = Format::Map(
+        Box::new(Format::Byte(VALID_ASCII)),
+        Expr::Lambda("byte".into(), Box::new(Expr::AsU32(Box::new(var("byte"))))),
+    );
+
+    let utf8_2 = Format::Map(
+        Box::new(tuple([
+            drop_n_msb(3, byte_in(0xC2..=0xDF)),
+            utf8_tail.call(),
+        ])),
+        Expr::Lambda(
+            "bytes".into(),
+            Box::new(Expr::Match(
+                Box::new(var("bytes")),
                 vec![(
                     Pattern::Tuple(vec![bind("x1"), bind("x0")]),
-                    Format::Compute(shift6_2(var("x1"), var("x0"))),
+                    shift6_2(var("x1"), var("x0")),
                 )],
-            ),
+            )),
         ),
-    ]);
+    );
 
-    let utf8_3 = record([
-        (
-            "bytes",
-            iso_alts([
-                tuple([
-                    drop_n_msb(4, is_byte(0xE0)),
-                    drop_n_msb(2, byte_in(0xA0..=0xBF)),
-                    utf8_tail.call(),
-                ]),
-                tuple([
-                    drop_n_msb(4, byte_in(0xE1..=0xEC)),
-                    utf8_tail.call(),
-                    utf8_tail.call(),
-                ]),
-                tuple([
-                    drop_n_msb(4, is_byte(0xED)),
-                    drop_n_msb(2, byte_in(0x80..=0x9F)),
-                    utf8_tail.call(),
-                ]),
-                tuple([
-                    drop_n_msb(4, byte_in(0xEE..=0xEF)),
-                    utf8_tail.call(),
-                    utf8_tail.call(),
-                ]),
+    let utf8_3 = Format::Map(
+        Box::new(iso_alts([
+            tuple([
+                drop_n_msb(4, is_byte(0xE0)),
+                drop_n_msb(2, byte_in(0xA0..=0xBF)),
+                utf8_tail.call(),
             ]),
-        ),
-        (
-            "@value",
-            Format::Match(
-                var("bytes"),
-                [(
+            tuple([
+                drop_n_msb(4, byte_in(0xE1..=0xEC)),
+                utf8_tail.call(),
+                utf8_tail.call(),
+            ]),
+            tuple([
+                drop_n_msb(4, is_byte(0xED)),
+                drop_n_msb(2, byte_in(0x80..=0x9F)),
+                utf8_tail.call(),
+            ]),
+            tuple([
+                drop_n_msb(4, byte_in(0xEE..=0xEF)),
+                utf8_tail.call(),
+                utf8_tail.call(),
+            ]),
+        ])),
+        Expr::Lambda(
+            "bytes".into(),
+            Box::new(Expr::Match(
+                Box::new(var("bytes")),
+                vec![(
                     Pattern::Tuple(vec![bind("x2"), bind("x1"), bind("x0")]),
-                    Format::Compute(shift6_3(var("x2"), var("x1"), var("x0"))),
-                )]
-                .to_vec(),
-            ),
+                    shift6_3(var("x2"), var("x1"), var("x0")),
+                )],
+            )),
         ),
-    ]);
+    );
 
-    let utf8_4 = record([
-        (
-            "bytes",
-            iso_alts([
-                tuple([
-                    drop_n_msb(5, is_byte(0xF0)),
-                    drop_n_msb(2, byte_in(0x90..=0xBF)),
-                    utf8_tail.call(),
-                    utf8_tail.call(),
-                ]),
-                tuple([
-                    drop_n_msb(5, byte_in(0xF1..=0xF3)),
-                    utf8_tail.call(),
-                    utf8_tail.call(),
-                    utf8_tail.call(),
-                ]),
-                tuple([
-                    drop_n_msb(5, is_byte(0xF4)),
-                    drop_n_msb(2, byte_in(0x80..=0x8F)),
-                    utf8_tail.call(),
-                    utf8_tail.call(),
-                ]),
+    let utf8_4 = Format::Map(
+        Box::new(iso_alts([
+            tuple([
+                drop_n_msb(5, is_byte(0xF0)),
+                drop_n_msb(2, byte_in(0x90..=0xBF)),
+                utf8_tail.call(),
+                utf8_tail.call(),
             ]),
-        ),
-        (
-            "@value",
-            Format::Match(
-                var("bytes"),
+            tuple([
+                drop_n_msb(5, byte_in(0xF1..=0xF3)),
+                utf8_tail.call(),
+                utf8_tail.call(),
+                utf8_tail.call(),
+            ]),
+            tuple([
+                drop_n_msb(5, is_byte(0xF4)),
+                drop_n_msb(2, byte_in(0x80..=0x8F)),
+                utf8_tail.call(),
+                utf8_tail.call(),
+            ]),
+        ])),
+        Expr::Lambda(
+            "bytes".into(),
+            Box::new(Expr::Match(
+                Box::new(var("bytes")),
                 vec![(
                     Pattern::Tuple(vec![bind("x3"), bind("x2"), bind("x1"), bind("x0")]),
-                    Format::Compute(shift6_4(var("x3"), var("x2"), var("x1"), var("x0"))),
+                    shift6_4(var("x3"), var("x2"), var("x1"), var("x0")),
                 )],
-            ),
+            )),
         ),
-    ]);
+    );
 
     // https://datatracker.ietf.org/doc/html/rfc3629#section-4
     let utf8_char = module.define_format(
         "utf8.char",
-        record([
-            (
-                "bytes",
-                alts([
-                    ("utf8-1", utf8_1),
-                    ("utf8-2", utf8_2),
-                    ("utf8-3", utf8_3),
-                    ("utf8-4", utf8_4),
-                ]),
+        Format::Map(
+            Box::new(iso_alts([utf8_1, utf8_2, utf8_3, utf8_4])),
+            Expr::Lambda(
+                "codepoint".into(),
+                Box::new(Expr::AsChar(Box::new(var("codepoint")))),
             ),
-            (
-                "@value",
-                Format::Match(
-                    var("bytes"),
-                    vec![
-                        (
-                            Pattern::variant("utf8-1", bind("x")),
-                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
-                        ),
-                        (
-                            Pattern::variant("utf8-2", bind("x")),
-                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
-                        ),
-                        (
-                            Pattern::variant("utf8-3", bind("x")),
-                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
-                        ),
-                        (
-                            Pattern::variant("utf8-4", bind("x")),
-                            Format::Compute(Expr::AsChar(Box::new(var("x")))),
-                        ),
-                    ],
-                ),
-            ),
-        ]),
+        ),
     );
 
     module.define_format("utf8.string", repeat(utf8_char.call()))

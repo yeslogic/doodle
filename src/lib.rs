@@ -725,11 +725,7 @@ impl FormatModule {
                     _ => return Err(format!("Huffman: expected Seq")),
                 }
                 // FIXME check opt_values_expr type
-                let ts = vec![
-                    // FIXME ("bits", alt???)
-                    ("@value".into(), ValueType::U16),
-                ];
-                Ok(ValueType::Format(Box::new(ValueType::Record(ts))))
+                Ok(ValueType::Format(Box::new(ValueType::U16)))
             }
             Format::Apply(name) => match scope.get_type_by_name(name) {
                 ValueType::Format(t) => Ok(*t.clone()),
@@ -2749,10 +2745,10 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
     for n in 0..lengths.len() {
         let len = lengths[n];
         if len != 0 {
-            codes.push(Format::record([
-                ("bits", bit_range(len, next_code[len])),
-                ("@value", Format::Compute(Expr::U16(n.try_into().unwrap()))),
-            ]));
+            codes.push(Format::Map(
+                Box::new(bit_range(len, next_code[len])),
+                Expr::Lambda("_".into(), Box::new(Expr::U16(n.try_into().unwrap()))),
+            ));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;
         } else {

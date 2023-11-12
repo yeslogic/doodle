@@ -13,7 +13,7 @@
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- { ... } := 1
+│           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
 │           │   │       └── data <- match type { ... } :=
 │           │   │           ├── format <- dynamic := _ |...| _
 │           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=

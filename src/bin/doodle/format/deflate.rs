@@ -18,36 +18,29 @@ fn shl_u16(x: Expr, r: u16) -> Expr {
     Expr::Shl(Box::new(Expr::AsU16(Box::new(x))), Box::new(Expr::U16(r)))
 }
 
-fn bit_or_u8(x: Expr, y: Expr) -> Expr {
+fn bit_or(x: Expr, y: Expr) -> Expr {
     Expr::BitOr(Box::new(x), Box::new(y))
 }
 
-fn bit_or_u16(x: Expr, y: Expr) -> Expr {
-    Expr::BitOr(
-        Box::new(Expr::AsU16(Box::new(x))),
-        Box::new(Expr::AsU16(Box::new(y))),
-    )
-}
-
-fn bits_value_u8(n: usize) -> Expr {
+fn bits_value_u8(name: &'static str, n: usize) -> Expr {
     if n > 1 {
-        bit_or_u8(
-            shl_u8(tuple_proj(var("bits"), n - 1), (n - 1).try_into().unwrap()),
-            bits_value_u8(n - 1),
+        bit_or(
+            shl_u8(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
+            bits_value_u8(name, n - 1),
         )
     } else {
-        tuple_proj(var("bits"), 0)
+        tuple_proj(var(name), 0)
     }
 }
 
-fn bits_value_u16(n: usize) -> Expr {
+fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     if n > 1 {
-        bit_or_u16(
-            shl_u16(tuple_proj(var("bits"), n - 1), (n - 1).try_into().unwrap()),
-            bits_value_u16(n - 1),
+        bit_or(
+            shl_u16(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
+            bits_value_u16(name, n - 1),
         )
     } else {
-        Expr::AsU16(Box::new(tuple_proj(var("bits"), 0)))
+        Expr::AsU16(Box::new(tuple_proj(var(name), 0)))
     }
 }
 
@@ -57,16 +50,13 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
         fs.push(base.bit());
     }
     if n > 0 {
-        record([
-            ("bits", tuple(fs)),
-            ("@value", Format::Compute(bits_value_u8(n))),
-        ])
+        Format::Map(
+            Box::new(tuple(fs)),
+            Expr::Lambda("bits".into(), Box::new(bits_value_u8("bits", n))),
+        )
     } else {
         /* if n == 0 */
-        record([
-            ("bits", tuple(fs)),
-            ("@value", Format::Compute(Expr::U8(0))),
-        ])
+        Format::Compute(Expr::U8(0))
     }
 }
 
@@ -76,15 +66,13 @@ fn bits16(n: usize, base: &BaseModule) -> Format {
         fs.push(base.bit());
     }
     if n > 0 {
-        record([
-            ("bits", tuple(fs)),
-            ("@value", Format::Compute(bits_value_u16(n))),
-        ])
+        Format::Map(
+            Box::new(tuple(fs)),
+            Expr::Lambda("bits".into(), Box::new(bits_value_u16("bits", n))),
+        )
     } else {
-        record([
-            ("bits", tuple(fs)),
-            ("@value", Format::Compute(Expr::U16(0))),
-        ])
+        /* if n == 0 */
+        Format::Compute(Expr::U16(0))
     }
 }
 
