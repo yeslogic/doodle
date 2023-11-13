@@ -1,6 +1,6 @@
 ├── data <- _ |...| _ :=
 │   └── gzip <- gzip.main :=
-│       ├── 0 <- { ... } :=
+│       ├── 0 :=
 │       │   ├── header <- gzip.header :=
 │       │   │   ├── magic <- (...)
 │       │   │   ├── method <- base.u8 := 8
@@ -11,44 +11,44 @@
 │       │   ├── fname <- match (header.file-flags & 8 != 0) { ... } := "test1"
 │       │   ├── data <- bits deflate.main :=
 │       │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
-│       │   │   │   └── 0 <- deflate.block :=
+│       │   │   │   └── 0 :=
 │       │   │   │       ├── final <- base.bit := 1
 │       │   │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
 │       │   │   │       └── data <- match type { ... } :=
 │       │   │   │           ├── format <- dynamic := _ |...| _
 │       │   │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
-│       │   │   │           │   ├── 0 <- { ... } :=
+│       │   │   │           │   ├── 0 :=
 │       │   │   │           │   │   ├── code <- apply := 72
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 1 <- { ... } :=
+│       │   │   │           │   ├── 1 :=
 │       │   │   │           │   │   ├── code <- apply := 101
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 2 <- { ... } :=
+│       │   │   │           │   ├── 2 :=
 │       │   │   │           │   │   ├── code <- apply := 108
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 3 <- { ... } :=
+│       │   │   │           │   ├── 3 :=
 │       │   │   │           │   │   ├── code <- apply := 108
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 4 <- { ... } :=
+│       │   │   │           │   ├── 4 :=
 │       │   │   │           │   │   ├── code <- apply := 111
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 5 <- { ... } :=
+│       │   │   │           │   ├── 5 :=
 │       │   │   │           │   │   ├── code <- apply := 44
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 6 <- { ... } :=
+│       │   │   │           │   ├── 6 :=
 │       │   │   │           │   │   ├── code <- apply := 32
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 7 <- { ... } :=
+│       │   │   │           │   ├── 7 :=
 │       │   │   │           │   │   ├── code <- apply := 119
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 8 <- { ... } :=
+│       │   │   │           │   ├── 8 :=
 │       │   │   │           │   │   ├── code <- apply := 111
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
-│       │   │   │           │   ├── 9 <- { ... } :=
+│       │   │   │           │   ├── 9 :=
 │       │   │   │           │   │   ├── code <- apply := 114
 │       │   │   │           │   │   └── extra <- match code { ... } := ()
 │       │   │   │           │   ~
-│       │   │   │           │   └── 14 <- { ... } :=
+│       │   │   │           │   └── 14 :=
 │       │   │   │           │       ├── code <- apply := 256
 │       │   │   │           │       └── extra <- match code { ... } := ()
 │       │   │   │           └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
@@ -93,7 +93,7 @@
 │       │   └── footer <- gzip.footer :=
 │       │       ├── crc <- base.u32le := 2069210904
 │       │       └── length <- base.u32le := 14
-│       └── 1 <- { ... } :=
+│       └── 1 :=
 │           ├── header <- gzip.header :=
 │           │   ├── magic <- (...)
 │           │   ├── method <- base.u8 := 8
@@ -104,34 +104,34 @@
 │           ├── fname <- match (header.file-flags & 8 != 0) { ... } := "test2"
 │           ├── data <- bits deflate.main :=
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
-│           │   │   └── 0 <- deflate.block :=
+│           │   │   └── 0 :=
 │           │   │       ├── final <- base.bit := 1
 │           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
 │           │   │       └── data <- match type { ... } :=
 │           │   │           ├── format <- dynamic := _ |...| _
 │           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
-│           │   │           │   ├── 0 <- { ... } :=
+│           │   │           │   ├── 0 :=
 │           │   │           │   │   ├── code <- apply := 104
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 1 <- { ... } :=
+│           │   │           │   ├── 1 :=
 │           │   │           │   │   ├── code <- apply := 101
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 2 <- { ... } :=
+│           │   │           │   ├── 2 :=
 │           │   │           │   │   ├── code <- apply := 108
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 3 <- { ... } :=
+│           │   │           │   ├── 3 :=
 │           │   │           │   │   ├── code <- apply := 108
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 4 <- { ... } :=
+│           │   │           │   ├── 4 :=
 │           │   │           │   │   ├── code <- apply := 111
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 5 <- { ... } :=
+│           │   │           │   ├── 5 :=
 │           │   │           │   │   ├── code <- apply := 32
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 6 <- { ... } :=
+│           │   │           │   ├── 6 :=
 │           │   │           │   │   ├── code <- apply := 104
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 7 <- { ... } :=
+│           │   │           │   ├── 7 :=
 │           │   │           │   │   ├── code <- apply := 258
 │           │   │           │   │   └── extra <- match code { ... } :=
 │           │   │           │   │       ├── length-extra-bits <- compute 0 := 0
@@ -140,10 +140,10 @@
 │           │   │           │   │       └── distance-record <- match (as-u8 distance-code) { ... } :=
 │           │   │           │   │           ├── distance-extra-bits <- map (bits -> as-u16 (bits.0)) (...) := 1
 │           │   │           │   │           └── distance <- compute 5 + distance-extra-bits := 6
-│           │   │           │   ├── 8 <- { ... } :=
+│           │   │           │   ├── 8 :=
 │           │   │           │   │   ├── code <- apply := 10
 │           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   └── 9 <- { ... } :=
+│           │   │           │   └── 9 :=
 │           │   │           │       ├── code <- apply := 256
 │           │   │           │       └── extra <- match code { ... } := ()
 │           │   │           └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
