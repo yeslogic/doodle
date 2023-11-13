@@ -218,13 +218,22 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected variant"),
             },
             Format::Union(branches) | Format::NondetUnion(branches) => match value {
-                Value::Variant(label, value) => {
-                    let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
+                Value::Branch(index, value) => {
+                    let format = &branches[*index].1;
+                    match value.as_ref() {
+                        Value::Variant(_label, value) => self.write_flat(scope, value, format),
+                        _ => panic!("expected variant"),
+                    }
+                }
+                _ => panic!("expected branch"),
+            },
+            Format::IsoUnion(branches) => match value {
+                Value::Branch(index, value) => {
+                    let format = &branches[*index];
                     self.write_flat(scope, value, format)
                 }
-                _ => panic!("expected variant"),
+                _ => panic!("expected branch"),
             },
-            Format::IsoUnion(_) => Ok(()), // FIXME
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
                     for (index, value) in values.iter().enumerate() {
