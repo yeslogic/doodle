@@ -11,7 +11,7 @@
 │           ├── fname <- match (header.file-flags & 8 != 0) { ... } := "test6"
 │           ├── data <- bits deflate.main :=
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
-│           │   │   └── 0 :=
+│           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
 │           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 0
 │           │   │       └── data <- match type { ... } :=

@@ -14,7 +14,7 @@
 │       │   │   └── interlace-method <- base.u8 := 1
 │       │   └── crc <- base.u32be := 1592150037
 │       ├── chunks <- repeat png.chunk(...) :=
-│       │   ├── 0 :=
+│       │   ├── 0 <- png.chunk(...) :=
 │       │   │   └── PLTE <- png.plte :=
 │       │   │       ├── length <- base.u32be := 87
 │       │   │       ├── tag <- (...)
@@ -50,7 +50,7 @@
 │       │   │       │        201 201 201
 │       │   │       │        138 138 138
 │       │   │       └── crc <- base.u32be := 1943707985
-│       │   ├── 1 :=
+│       │   ├── 1 <- png.chunk(...) :=
 │       │   │   └── tRNS <- png.trns(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
@@ -58,14 +58,14 @@
 │       │   │       │   └──  palette-index
 │       │   │       │                    0
 │       │   │       └── crc <- base.u32be := 1088870502
-│       │   ├── 2 :=
+│       │   ├── 2 <- png.chunk(...) :=
 │       │   │   └── bKGD <- png.bkgd(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └── palette-index <- base.u8 := 0
 │       │   │       └── crc <- base.u32be := 2282036552
-│       │   ├── 3 :=
+│       │   ├── 3 <- png.chunk(...) :=
 │       │   │   └── pHYs <- png.phys :=
 │       │   │       ├── length <- base.u32be := 9
 │       │   │       ├── tag <- (...)
@@ -74,7 +74,7 @@
 │       │   │       │   ├── pixels-per-unit-y <- base.u32be := 2835
 │       │   │       │   └── unit-specifier <- base.u8 := 1
 │       │   │       └── crc <- base.u32be := 10132504
-│       │   └── 4 :=
+│       │   └── 4 <- png.chunk(...) :=
 │       │       └── tIME <- png.time :=
 │       │           ├── length <- base.u32be := 7
 │       │           ├── tag <- (...)
@@ -87,7 +87,7 @@
 │       │           │   └── second <- base.u8 := 34
 │       │           └── crc <- base.u32be := 491070829
 │       ├── idat <- repeat1 png.idat :=
-│       │   └── 0 :=
+│       │   └── 0 <- png.idat :=
 │       │       ├── length <- base.u32be := 1168
 │       │       ├── tag <- png.idat-tag
 │       │       ├── data <- slice length png.idat-data :=
