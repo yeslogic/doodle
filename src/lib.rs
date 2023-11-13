@@ -176,12 +176,13 @@ impl Value {
     /// any values bound by the pattern onto the scope
     fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<Scope<'a>> {
         let mut pattern_scope = Scope::child(scope);
-        self.matches_inner(&mut pattern_scope, pattern)
+        self.coerce_mapped_value()
+            .matches_inner(&mut pattern_scope, pattern)
             .then_some(pattern_scope)
     }
 
     fn matches_inner(&self, scope: &mut Scope<'_>, pattern: &Pattern) -> bool {
-        match (pattern, self.coerce_mapped_value()) {
+        match (pattern, self) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
                 true
@@ -798,38 +799,32 @@ impl Expr {
             Expr::U16(i) => Cow::Owned(Value::U16(*i)),
             Expr::U32(i) => Cow::Owned(Value::U32(*i)),
             Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
-                exprs
-                    .iter()
-                    .map(|expr| expr.eval(scope).into_owned())
-                    .collect(),
+                exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
             Expr::TupleProj(head, index) => match head.eval(scope) {
-                Cow::Owned(v) => Cow::Owned(v.tuple_proj(*index).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.tuple_proj(*index)),
+                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
+                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
             },
-            Expr::Record(fields) => {
-                Cow::Owned(Value::record(fields.iter().map(|(label, expr)| {
-                    (label.clone(), expr.eval(scope).into_owned())
-                })))
-            }
+            Expr::Record(fields) => Cow::Owned(Value::record(
+                fields
+                    .iter()
+                    .map(|(label, expr)| (label.clone(), expr.eval_value(scope))),
+            )),
             Expr::RecordProj(head, label) => match head.eval(scope) {
-                Cow::Owned(v) => Cow::Owned(v.record_proj(label).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.record_proj(label)),
+                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().record_proj(label).clone()),
+                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().record_proj(label)),
             },
             Expr::Variant(label, expr) => {
-                Cow::Owned(Value::variant(label.clone(), expr.eval(scope).into_owned()))
+                Cow::Owned(Value::variant(label.clone(), expr.eval_value(scope)))
             }
             Expr::Seq(exprs) => Cow::Owned(Value::Seq(
-                exprs
-                    .iter()
-                    .map(|expr| expr.eval(scope).into_owned())
-                    .collect(),
+                exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
             Expr::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (pattern, expr) in branches {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let value = expr.eval(&pattern_scope).into_owned();
+                        let value = expr.eval_value(&pattern_scope);
                         return Cow::Owned(value);
                     }
                 }
@@ -989,14 +984,14 @@ impl Expr {
                 }
                 _ => panic!("AsChar: expected U8, U16, or U32"),
             }),
-            Expr::SeqLength(seq) => match &*seq.eval(scope) {
+            Expr::SeqLength(seq) => match seq.eval(scope).coerce_mapped_value() {
                 Value::Seq(values) => {
                     let len = values.len();
                     Cow::Owned(Value::U32(len as u32))
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
-            Expr::SubSeq(seq, start, length) => match seq.eval(scope).into_owned() {
+            Expr::SubSeq(seq, start, length) => match seq.eval(scope).coerce_mapped_value() {
                 Value::Seq(values) => {
                     let start = start.eval_value(scope).unwrap_usize();
                     let length = length.eval_value(scope).unwrap_usize();
@@ -1006,7 +1001,7 @@ impl Expr {
                 }
                 _ => panic!("SubSeq: expected Seq"),
             },
-            Expr::FlatMap(expr, seq) => match seq.eval(scope).into_owned() {
+            Expr::FlatMap(expr, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
@@ -1020,10 +1015,9 @@ impl Expr {
                 }
                 _ => panic!("FlatMap: expected Seq"),
             },
-            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval(scope).into_owned()
-            {
+            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
-                    let mut accum = accum.eval(scope).into_owned();
+                    let mut accum = accum.eval_value(scope);
                     let mut vs = Vec::new();
                     for v in values {
                         let ret = expr.eval_lambda(scope, Value::Tuple(vec![accum, v]));
@@ -1041,14 +1035,14 @@ impl Expr {
             },
             Expr::Dup(count, expr) => {
                 let count = count.eval_value(scope).unwrap_usize();
-                let v = expr.eval(scope).into_owned();
+                let v = expr.eval_value(scope);
                 let mut vs = Vec::new();
                 for _ in 0..count {
                     vs.push(v.clone());
                 }
                 Cow::Owned(Value::Seq(vs))
             }
-            Expr::Inflate(seq) => match &*seq.eval(scope) {
+            Expr::Inflate(seq) => match seq.eval(scope).coerce_mapped_value() {
                 Value::Seq(values) => {
                     let vs = inflate(&values);
                     Cow::Owned(Value::Seq(vs))
@@ -2441,7 +2435,7 @@ impl Decoder {
             Decoder::Call(n, es) => {
                 let mut new_scope = Scope::new();
                 for (name, e) in es {
-                    let v = e.eval(scope).into_owned();
+                    let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
                 program.decoders[*n].parse(program, &mut new_scope, input)
@@ -2645,7 +2639,7 @@ impl Decoder {
                 Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
             }
             Decoder::Compute(expr) => {
-                let v = expr.eval(scope).into_owned();
+                let v = expr.eval_value(scope);
                 Ok((v, input))
             }
             Decoder::Match(head, branches) => {
