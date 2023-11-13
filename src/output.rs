@@ -192,14 +192,14 @@ impl Fragment {
             Fragment::Empty => true,
             Fragment::Char('\n') => is_final,
             Fragment::Char(_) => true,
-            Fragment::String(s) =>  {
+            Fragment::String(s) => {
                 let ix_nl = s.find('\n');
                 match ix_nl {
                     Some(n) if n == s.len() - 1 => is_final,
                     None => true,
-                    _ => false
+                    _ => false,
                 }
-            },
+            }
             Fragment::Symbol(_) => true,
             Fragment::DisplayAtom(_) | Fragment::DebugAtom(_) => true,
             Fragment::Group(frag) => frag.is_single_line(is_final),
@@ -214,7 +214,10 @@ impl Fragment {
                     }
                 }
                 let l = items.len();
-                items.iter().enumerate().all(|(ix, frag)| frag.is_single_line(is_final && (ix == l - 1)))
+                items
+                    .iter()
+                    .enumerate()
+                    .all(|(ix, frag)| frag.is_single_line(is_final && (ix == l - 1)))
             }
         }
     }

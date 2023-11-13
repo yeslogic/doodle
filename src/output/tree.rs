@@ -4,7 +4,6 @@ use crate::{Expr, Format, FormatModule, Scope, Value};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
-
 fn atomic_value_to_string(value: &Value) -> String {
     match value {
         Value::U8(n) => n.to_string(),
@@ -470,7 +469,13 @@ impl<'module> MonoidalPrinter<'module> {
             if any_skipped {
                 frag.encat(self.compile_field_skipped());
             }
-            frag.encat(self.compile_field_value_last(scope, last_index, &vals[last_index], format, false));
+            frag.encat(self.compile_field_value_last(
+                scope,
+                last_index,
+                &vals[last_index],
+                format,
+                false,
+            ));
             frag
         }
     }
@@ -572,7 +577,13 @@ impl<'module> MonoidalPrinter<'module> {
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
-                frag.encat(self.compile_field_value_continue(&record_scope, label, value, format, true));
+                frag.encat(self.compile_field_value_continue(
+                    &record_scope,
+                    label,
+                    value,
+                    format,
+                    true,
+                ));
                 record_scope.push(label.clone(), value.clone());
             }
             let (label, value) = &value_fields[last_index];
@@ -618,13 +629,10 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn is_indirect_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(..)
-            | Format::Dynamic(..)
-            | Format::Apply(..) => true,
+            Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..) => true,
             _ => false,
         }
     }
-
 
     fn compile_field_value_continue(
         &mut self,
@@ -632,7 +640,7 @@ impl<'module> MonoidalPrinter<'module> {
         label: impl fmt::Display,
         value: &Value,
         format: Option<&Format>,
-        format_needed: bool
+        format_needed: bool,
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         frags.push(self.compile_gutter());
@@ -641,16 +649,20 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::String(format!("{label}").into()),
         ));
 
+        self.gutter.push(Column::Branch);
+        let frag_value = self.compile_field_value(scope, value, format);
+        self.gutter.pop();
+
         if let Some(format) = format {
-            let tmp = self.compile_field_value(scope, value, Some(format));
-            if (self.is_indirect_format(format) && !tmp.is_single_line(true)) || format_needed || self.flags.show_redundant_formats {
+            if format_needed
+                || self.flags.show_redundant_formats
+                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
+            {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
             }
         }
-        self.gutter.push(Column::Branch);
-        frags.push(self.compile_field_value(scope, value, format));
-        self.gutter.pop();
+        frags.push(frag_value);
         frags.finalize().group()
     }
 
@@ -669,17 +681,20 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::String(format!("{label}").into()),
         ));
 
+        self.gutter.push(Column::Space);
+        let frag_value = self.compile_field_value(scope, value, format);
+        self.gutter.pop();
 
-        if let Some(format) = format  {
-            let tmp = self.compile_field_value(scope, value, Some(format));
-            if (self.is_indirect_format(format) && !tmp.is_single_line(true)) || format_needed || self.flags.show_redundant_formats {
+        if let Some(format) = format {
+            if format_needed
+                || self.flags.show_redundant_formats
+                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
+            {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Default::default()));
             }
         }
-        self.gutter.push(Column::Space);
-        frags.push(self.compile_field_value(scope, value, format));
-        self.gutter.pop();
+        frags.push(frag_value);
         frags.finalize().group()
     }
 
