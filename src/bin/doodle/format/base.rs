@@ -124,11 +124,8 @@ pub struct BaseModule {
     ascii_octal_digit: FormatRef,
     #[allow(dead_code)]
     ascii_decimal_digit: FormatRef,
-    #[allow(dead_code)]
     ascii_hex_lower: FormatRef,
-    #[allow(dead_code)]
     ascii_hex_upper: FormatRef,
-    #[allow(dead_code)]
     ascii_hex_any: FormatRef,
 }
 
@@ -172,8 +169,11 @@ impl BaseModule {
         b'a', b'b', b'c', b'd', b'e', b'f'
     ];
 
+    #[allow(dead_code)]
     pub fn ascii_hex_lower(&self) -> Format { self.ascii_hex_lower.call() }
+    #[allow(dead_code)]
     pub fn ascii_hex_upper(&self) -> Format { self.ascii_hex_upper.call() }
+    #[allow(dead_code)]
     pub fn ascii_hex_any(&self) -> Format { self.ascii_hex_any.call() }
 }
 
