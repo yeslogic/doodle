@@ -2644,20 +2644,26 @@ impl Decoder {
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
-                for (pattern, decoder) in branches {
+                for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         let (v, input) = decoder.parse(program, &pattern_scope, input)?;
-                        return Ok((v, input));
+                        return Ok((Value::Branch(index, Box::new(v)), input));
                     }
                 }
                 panic!("non-exhaustive patterns");
             }
             Decoder::MatchVariant(head, branches) => {
                 let head = head.eval(scope);
-                for (pattern, label, decoder) in branches {
+                for (index, (pattern, label, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         let (v, input) = decoder.parse(program, &pattern_scope, input)?;
-                        return Ok((Value::Variant(label.clone(), Box::new(v)), input));
+                        return Ok((
+                            Value::Branch(
+                                index,
+                                Box::new(Value::Variant(label.clone(), Box::new(v))),
+                            ),
+                            input,
+                        ));
                     }
                 }
                 panic!("exhaustive patterns");

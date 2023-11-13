@@ -289,30 +289,34 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Format::Compute(_expr) => self.compile_value(scope, value),
-            Format::Match(head, branches) => {
-                let head = head.eval(&scope);
-                for (pattern, format) in branches {
+            Format::Match(head, branches) => match value {
+                Value::Branch(index, value) => {
+                    let head = head.eval(&scope);
+                    let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
                         return frag;
                     }
+                    panic!("pattern match failure");
                 }
-                panic!("non-exhaustive patterns");
-            }
-            Format::MatchVariant(head, branches) => {
-                let head = head.eval(&scope);
-                for (pattern, _label, format) in branches {
+                _ => panic!("expected branch value"),
+            },
+            Format::MatchVariant(head, branches) => match value {
+                Value::Branch(index, value) => {
+                    let head = head.eval(&scope);
+                    let (pattern, _label, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        if let Value::Variant(_label, value) = value {
+                        if let Value::Variant(_label, value) = value.as_ref() {
                             frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
                         } else {
                             panic!("expected variant value");
                         }
                         return frag;
                     }
+                    panic!("pattern match failure");
                 }
-                panic!("non-exhaustive patterns");
-            }
+                _ => panic!("expected branch value"),
+            },
             Format::Dynamic(_) => self.compile_value(scope, value),
             Format::Apply(_) => self.compile_value(scope, value),
         }
