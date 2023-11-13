@@ -2473,10 +2473,16 @@ impl Decoder {
                 Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Parallel(branches) => {
-                for (label, d) in branches {
+                for (index, (label, d)) in branches.iter().enumerate() {
                     let res = d.parse(program, scope, input);
                     if let Ok((v, input)) = res {
-                        return Ok((Value::Variant(label.clone(), Box::new(v)), input));
+                        return Ok((
+                            Value::Branch(
+                                index,
+                                Box::new(Value::Variant(label.clone(), Box::new(v))),
+                            ),
+                            input,
+                        ));
                     }
                 }
                 Err(ParseError::fail(scope, input))
@@ -2487,7 +2493,10 @@ impl Decoder {
                 })?;
                 let (label, d) = &branches[index];
                 let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Variant(label.clone(), Box::new(v)), input))
+                Ok((
+                    Value::Branch(index, Box::new(Value::Variant(label.clone(), Box::new(v)))),
+                    input,
+                ))
             }
             Decoder::IsoBranch(tree, branches) => {
                 let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
@@ -2898,8 +2907,18 @@ mod tests {
     fn compile_alt_byte() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0xFF))]);
         let d = Decoder::compile_one(&f).unwrap();
-        accepts(&d, &[0x00], &[], Value::variant("a", Value::U8(0x00)));
-        accepts(&d, &[0xFF], &[], Value::variant("b", Value::U8(0xFF)));
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Branch(0, Box::new(Value::variant("a", Value::U8(0x00)))),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Branch(1, Box::new(Value::variant("b", Value::U8(0xFF)))),
+        );
         rejects(&d, &[0x11]);
         rejects(&d, &[]);
     }
@@ -2916,8 +2935,18 @@ mod tests {
         let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0xFF)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
         let d = Decoder::compile_one(&f).unwrap();
-        accepts(&d, &[0x00], &[], Value::variant("a", Value::U8(0x00)));
-        accepts(&d, &[0xFF], &[], Value::variant("b", Value::U8(0xFF)));
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Branch(0, Box::new(Value::variant("a", Value::U8(0x00)))),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[],
+            Value::Branch(1, Box::new(Value::variant("b", Value::U8(0xFF)))),
+        );
         rejects(&d, &[0x11]);
         rejects(&d, &[]);
     }
@@ -2963,20 +2992,35 @@ mod tests {
     fn compile_alt_fail_end_of_input() {
         let f = alts([("a", Format::Fail), ("b", Format::EndOfInput)]);
         let d = Decoder::compile_one(&f).unwrap();
-        accepts(&d, &[], &[], Value::variant("b", Value::UNIT));
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Branch(1, Box::new(Value::variant("b", Value::UNIT))),
+        );
     }
 
     #[test]
     fn compile_alt_end_of_input_or_byte() {
         let f = alts([("a", Format::EndOfInput), ("b", is_byte(0x00))]);
         let d = Decoder::compile_one(&f).unwrap();
-        accepts(&d, &[], &[], Value::variant("a", Value::UNIT));
-        accepts(&d, &[0x00], &[], Value::variant("b", Value::U8(0x00)));
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Branch(0, Box::new(Value::variant("a", Value::UNIT))),
+        );
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Branch(1, Box::new(Value::variant("b", Value::U8(0x00)))),
+        );
         accepts(
             &d,
             &[0x00, 0x00],
             &[0x00],
-            Value::variant("b", Value::U8(0x00)),
+            Value::Branch(1, Box::new(Value::variant("b", Value::U8(0x00)))),
         );
         rejects(&d, &[0x11]);
     }
@@ -2985,9 +3029,24 @@ mod tests {
     fn compile_alt_opt() {
         let f = alts([("a", Format::EMPTY), ("b", is_byte(0x00))]);
         let d = Decoder::compile_one(&f).unwrap();
-        accepts(&d, &[0x00], &[], Value::variant("b", Value::U8(0x00)));
-        accepts(&d, &[], &[], Value::variant("a", Value::UNIT));
-        accepts(&d, &[0xFF], &[0xFF], Value::variant("a", Value::UNIT));
+        accepts(
+            &d,
+            &[0x00],
+            &[],
+            Value::Branch(1, Box::new(Value::variant("b", Value::U8(0x00)))),
+        );
+        accepts(
+            &d,
+            &[],
+            &[],
+            Value::Branch(0, Box::new(Value::variant("a", Value::UNIT))),
+        );
+        accepts(
+            &d,
+            &[0xFF],
+            &[0xFF],
+            Value::Branch(0, Box::new(Value::variant("a", Value::UNIT))),
+        );
     }
 
     #[test]
@@ -2998,13 +3057,19 @@ mod tests {
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Tuple(vec![Value::variant("some", Value::U8(0)), Value::U8(0xFF)]),
+            Value::Tuple(vec![
+                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0)))),
+                Value::U8(0xFF),
+            ]),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Tuple(vec![Value::variant("none", Value::UNIT), Value::U8(0xFF)]),
+            Value::Tuple(vec![
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::U8(0xFF),
+            ]),
         );
         rejects(&d, &[0x00]);
         rejects(&d, &[]);
@@ -3019,8 +3084,8 @@ mod tests {
             &[0x00, 0xFF],
             &[],
             Value::Tuple(vec![
-                Value::variant("some", Value::U8(0)),
-                Value::variant("some", Value::U8(0xFF)),
+                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0)))),
+                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0xFF)))),
             ]),
         );
         accepts(
@@ -3028,8 +3093,8 @@ mod tests {
             &[0x00],
             &[],
             Value::Tuple(vec![
-                Value::variant("some", Value::U8(0)),
-                Value::variant("none", Value::UNIT),
+                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0)))),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
             ]),
         );
         accepts(
@@ -3037,8 +3102,8 @@ mod tests {
             &[0xFF],
             &[],
             Value::Tuple(vec![
-                Value::variant("none", Value::UNIT),
-                Value::variant("some", Value::U8(0xFF)),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(0, Box::new(Value::variant("some", Value::U8(0xFF)))),
             ]),
         );
         accepts(
@@ -3046,8 +3111,8 @@ mod tests {
             &[],
             &[],
             Value::Tuple(vec![
-                Value::variant("none", Value::UNIT),
-                Value::variant("none", Value::UNIT),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
             ]),
         );
         accepts(
@@ -3055,8 +3120,8 @@ mod tests {
             &[],
             &[],
             Value::Tuple(vec![
-                Value::variant("none", Value::UNIT),
-                Value::variant("none", Value::UNIT),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
             ]),
         );
         accepts(
@@ -3064,8 +3129,8 @@ mod tests {
             &[0x7F],
             &[0x7F],
             Value::Tuple(vec![
-                Value::variant("none", Value::UNIT),
-                Value::variant("none", Value::UNIT),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
             ]),
         );
     }
@@ -3265,7 +3330,10 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![])),
-                ("second-and-third", Value::variant("none", Value::UNIT)),
+                (
+                    "second-and-third",
+                    Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                ),
             ]),
         );
         accepts(
@@ -3274,7 +3342,10 @@ mod tests {
             &[],
             Value::record([
                 ("first", Value::Seq(vec![Value::U8(0x00)])),
-                ("second-and-third", Value::variant("none", Value::UNIT)),
+                (
+                    "second-and-third",
+                    Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                ),
             ]),
         );
         accepts(
@@ -3285,15 +3356,18 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)])),
                 (
                     "second-and-third",
-                    Value::variant(
-                        "some",
-                        Value::record([
-                            (
-                                "second",
-                                Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
-                            ),
-                            ("third", Value::Seq(vec![])),
-                        ]),
+                    Value::Branch(
+                        0,
+                        Box::new(Value::variant(
+                            "some",
+                            Value::record([
+                                (
+                                    "second",
+                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
+                                ),
+                                ("third", Value::Seq(vec![])),
+                            ]),
+                        )),
                     ),
                 ),
             ]),
@@ -3306,15 +3380,18 @@ mod tests {
                 ("first", Value::Seq(vec![Value::U8(0x00)])),
                 (
                     "second-and-third",
-                    Value::variant(
-                        "some",
-                        Value::record(vec![
-                            (
-                                "second",
-                                Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
-                            ),
-                            ("third", Value::Seq(vec![Value::U8(0x00)])),
-                        ]),
+                    Value::Branch(
+                        0,
+                        Box::new(Value::variant(
+                            "some",
+                            Value::record(vec![
+                                (
+                                    "second",
+                                    Value::Tuple(vec![Value::U8(0xFF), Value::Seq(vec![])]),
+                                ),
+                                ("third", Value::Seq(vec![Value::U8(0x00)])),
+                            ]),
+                        )),
                     ),
                 ),
             ]),
@@ -3325,7 +3402,10 @@ mod tests {
             &[0x7F],
             Value::record(vec![
                 ("first", Value::Seq(vec![Value::U8(0x00)])),
-                ("second-and-third", Value::variant("none", Value::UNIT)),
+                (
+                    "second-and-third",
+                    Value::Branch(1, Box::new(Value::variant("none", Value::UNIT))),
+                ),
             ]),
         );
     }
@@ -3413,54 +3493,69 @@ mod tests {
             &d,
             &[],
             &[],
-            Value::Variant(
-                "a".into(),
-                Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![])])),
+            Value::Branch(
+                0,
+                Box::new(Value::Variant(
+                    "a".into(),
+                    Box::new(Value::Tuple(vec![Value::Tuple(vec![]), Value::Seq(vec![])])),
+                )),
             ),
         );
         accepts(
             &d,
             &[0xFF],
             &[],
-            Value::Variant(
-                "a".into(),
-                Box::new(Value::Tuple(vec![
-                    Value::Tuple(vec![]),
-                    Value::Seq(vec![Value::U8(0xFF)]),
-                ])),
+            Value::Branch(
+                0,
+                Box::new(Value::Variant(
+                    "a".into(),
+                    Box::new(Value::Tuple(vec![
+                        Value::Tuple(vec![]),
+                        Value::Seq(vec![Value::U8(0xFF)]),
+                    ])),
+                )),
             ),
         );
         accepts(
             &d,
             &[0x00, 0xFF],
             &[],
-            Value::Variant(
-                "a".into(),
-                Box::new(Value::Tuple(vec![
-                    Value::Tuple(vec![]),
-                    Value::Seq(vec![Value::U8(0x00), Value::U8(0xFF)]),
-                ])),
+            Value::Branch(
+                0,
+                Box::new(Value::Variant(
+                    "a".into(),
+                    Box::new(Value::Tuple(vec![
+                        Value::Tuple(vec![]),
+                        Value::Seq(vec![Value::U8(0x00), Value::U8(0xFF)]),
+                    ])),
+                )),
             ),
         );
         accepts(
             &d,
             &[0xFF, 0x00],
             &[],
-            Value::Variant(
-                "a".into(),
-                Box::new(Value::Tuple(vec![
-                    Value::Tuple(vec![]),
-                    Value::Seq(vec![Value::U8(0xFF), Value::U8(0x00)]),
-                ])),
+            Value::Branch(
+                0,
+                Box::new(Value::Variant(
+                    "a".into(),
+                    Box::new(Value::Tuple(vec![
+                        Value::Tuple(vec![]),
+                        Value::Seq(vec![Value::U8(0xFF), Value::U8(0x00)]),
+                    ])),
+                )),
             ),
         );
         accepts(
             &d,
             &[0xFF, 0xFF],
             &[],
-            Value::Variant(
-                "b".into(),
-                Box::new(Value::Tuple(vec![Value::U8(0xFF), Value::U8(0xFF)])),
+            Value::Branch(
+                1,
+                Box::new(Value::Variant(
+                    "b".into(),
+                    Box::new(Value::Tuple(vec![Value::U8(0xFF), Value::U8(0xFF)])),
+                )),
             ),
         );
     }
