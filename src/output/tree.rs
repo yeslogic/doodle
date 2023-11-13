@@ -123,11 +123,8 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
-            Value::Variant(label, value) => match format {
-                Some(Format::Union(branches)) | Some(Format::NondetUnion(branches)) => {
-                    let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
-                    self.is_atomic_value(value, Some(format))
-                }
+            Value::Variant(_label, value) => match format {
+                Some(Format::Variant(_label, format)) => self.is_atomic_value(value, Some(format)),
                 _ => self.is_atomic_value(value, None),
             },
             Value::Mapped(orig, value) => {
@@ -145,6 +142,10 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Branch(n, value) => match format {
                 Some(Format::IsoUnion(branches)) => {
                     let format = &branches[*n];
+                    self.is_atomic_value(value, Some(format))
+                }
+                Some(Format::Union(branches)) => {
+                    let format = &branches[*n].1;
                     self.is_atomic_value(value, Some(format))
                 }
                 _ => self.is_atomic_value(value, None),
@@ -214,11 +215,16 @@ impl<'module> MonoidalPrinter<'module> {
                 _ => panic!("expected variant, found {value:?}"),
             },
             Format::Union(branches) | Format::NondetUnion(branches) => match value {
-                Value::Variant(label, value) => {
-                    let (_, format) = branches.iter().find(|(l, _)| l == label).unwrap();
-                    self.compile_variant(scope, label, value, Some(format))
+                Value::Branch(index, value) => {
+                    let format = &branches[*index].1;
+                    match value.as_ref() {
+                        Value::Variant(label, value) => {
+                            self.compile_variant(scope, label, value, Some(format))
+                        }
+                        _ => panic!("expected variant, found {value:?}"),
+                    }
                 }
-                _ => panic!("expected variant, found {value:?}"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::IsoUnion(branches) => match value {
                 Value::Branch(n, value) => {
