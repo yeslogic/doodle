@@ -34,7 +34,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         record([
             (
                 "data",
-                Format::NondetUnion(vec![
+                Format::UnionNondet(vec![
                     ("gif".into(), gif.call()),
                     ("gzip".into(), gzip.call()),
                     ("jpeg".into(), jpeg.call()),
