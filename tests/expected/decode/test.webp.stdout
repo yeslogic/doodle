@@ -5,7 +5,7 @@
 │       ├── data <- slice length riff.subchunks :=
 │       │   ├── tag <- riff.tag := "WEBP"
 │       │   └── chunks <- repeat riff.chunk :=
-│       │       ├── 0 :=
+│       │       ├── 0 <- riff.chunk :=
 │       │       │   ├── tag <- riff.tag := "VP8X"
 │       │       │   ├── length <- base.u32le := 10
 │       │       │   ├── data <- slice length (repeat base.u8) :=
@@ -20,7 +20,7 @@
 │       │       │   │   ├── 8 := 0
 │       │       │   │   └── 9 := 0
 │       │       │   └── pad <- match (length % 2 == 0) { ... } := ()
-│       │       ├── 1 :=
+│       │       ├── 1 <- riff.chunk :=
 │       │       │   ├── tag <- riff.tag := "VP8L"
 │       │       │   ├── length <- base.u32le := 963
 │       │       │   ├── data <- slice length (repeat base.u8) :=
@@ -37,7 +37,7 @@
 │       │       │   │   ~
 │       │       │   │   └── 962 := 13
 │       │       │   └── pad <- match (length % 2 == 0) { ... } := 0
-│       │       └── 2 :=
+│       │       └── 2 <- riff.chunk :=
 │       │           ├── tag <- riff.tag := "EXIF"
 │       │           ├── length <- base.u32le := 138
 │       │           ├── data <- slice length (repeat base.u8) :=

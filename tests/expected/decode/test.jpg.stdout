@@ -18,7 +18,7 @@
 │       │   │               ├── thumbnail-height <- base.u8 := 0
 │       │   │               └── thumbnail-pixels <- repeat-count thumbnail-height (repeat-count thumbnail-width jpeg.thumbnail-pixel) := []
 │       │   ├── segments <- repeat jpeg.table-or-misc :=
-│       │   │   ├── 0 :=
+│       │   │   ├── 0 <- jpeg.table-or-misc :=
 │       │   │   │   └── dqt <- jpeg.dqt :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 67
@@ -37,7 +37,7 @@
 │       │   │   │               ├── 9 := 7
 │       │   │   │               ~
 │       │   │   │               └── 63 := 50
-│       │   │   └── 1 :=
+│       │   │   └── 1 <- jpeg.table-or-misc :=
 │       │   │       └── dqt <- jpeg.dqt :=
 │       │   │           ├── marker <- { ... }
 │       │   │           ├── length <- base.u16be := 67
@@ -72,7 +72,7 @@
 │       │   │                     3              17                     1
 │       │   ├── scan <- jpeg.scan :=
 │       │   │   ├── segments <- repeat jpeg.table-or-misc :=
-│       │   │   │   ├── 0 :=
+│       │   │   │   ├── 0 <- jpeg.table-or-misc :=
 │       │   │   │   │   └── dht <- jpeg.dht :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 27
@@ -100,7 +100,7 @@
 │       │   │   │   │               ├── 5 := 3
 │       │   │   │   │               ├── 6 := 4
 │       │   │   │   │               └── 7 := 1
-│       │   │   │   ├── 1 :=
+│       │   │   │   ├── 1 <- jpeg.table-or-misc :=
 │       │   │   │   │   └── dht <- jpeg.dht :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 58
@@ -132,7 +132,7 @@
 │       │   │   │   │               ├── 9 := 6
 │       │   │   │   │               ~
 │       │   │   │   │               └── 38 := 225
-│       │   │   │   ├── 2 :=
+│       │   │   │   ├── 2 <- jpeg.table-or-misc :=
 │       │   │   │   │   └── dht <- jpeg.dht :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 26
@@ -159,7 +159,7 @@
 │       │   │   │   │               ├── 4 := 5
 │       │   │   │   │               ├── 5 := 2
 │       │   │   │   │               └── 6 := 6
-│       │   │   │   └── 3 :=
+│       │   │   │   └── 3 <- jpeg.table-or-misc :=
 │       │   │   │       └── dht <- jpeg.dht :=
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 38

@@ -616,6 +616,16 @@ impl<'module> MonoidalPrinter<'module> {
         frags.finalize()
     }
 
+    fn is_indirect_format(&self, format: &Format) -> bool {
+        match format {
+            Format::ItemVar(..)
+            | Format::Dynamic(..)
+            | Format::Apply(..) => true,
+            _ => false,
+        }
+    }
+
+
     fn compile_field_value_continue(
         &mut self,
         scope: &Scope<'_>,
@@ -630,8 +640,10 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::Symbol(Symbol::Junction),
             Fragment::String(format!("{label}").into()),
         ));
-        if format_needed || self.flags.show_redundant_formats {
-            if let Some(format) = format {
+
+        if let Some(format) = format {
+            let tmp = self.compile_field_value(scope, value, Some(format));
+            if (self.is_indirect_format(format) && !tmp.is_single_line(true)) || format_needed || self.flags.show_redundant_formats {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
             }
@@ -656,8 +668,11 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::Symbol(Symbol::Elbow),
             Fragment::String(format!("{label}").into()),
         ));
-        if format_needed || self.flags.show_redundant_formats {
-            if let Some(format) = format  {
+
+
+        if let Some(format) = format  {
+            let tmp = self.compile_field_value(scope, value, Some(format));
+            if (self.is_indirect_format(format) && !tmp.is_single_line(true)) || format_needed || self.flags.show_redundant_formats {
                 frags.push(Fragment::String(" <- ".into()));
                 frags.push(self.compile_format(format, Default::default()));
             }

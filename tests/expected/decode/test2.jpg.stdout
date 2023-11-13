@@ -68,7 +68,7 @@
 │       │   │                           ~
 │       │   │                           └── 5319 := 217
 │       │   ├── segments <- repeat jpeg.table-or-misc :=
-│       │   │   ├── 0 :=
+│       │   │   ├── 0 <- jpeg.table-or-misc :=
 │       │   │   │   └── app13 <- jpeg.app13 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 10600
@@ -85,7 +85,7 @@
 │       │   │   │           ├── 9 := 32
 │       │   │   │           ~
 │       │   │   │           └── 10597 := 0
-│       │   │   ├── 1 :=
+│       │   │   ├── 1 <- jpeg.table-or-misc :=
 │       │   │   │   └── app1 <- jpeg.app1 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 4429
@@ -105,7 +105,7 @@
 │       │   │   │                   ├── 9 := 32
 │       │   │   │                   ~
 │       │   │   │                   └── 4397 := 62
-│       │   │   ├── 2 :=
+│       │   │   ├── 2 <- jpeg.table-or-misc :=
 │       │   │   │   └── app2 <- jpeg.app2 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 576
@@ -122,7 +122,7 @@
 │       │   │   │           ├── 9 := 76
 │       │   │   │           ~
 │       │   │   │           └── 573 := 156
-│       │   │   ├── 3 :=
+│       │   │   ├── 3 <- jpeg.table-or-misc :=
 │       │   │   │   └── app14 <- jpeg.app14 :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 14
@@ -139,7 +139,7 @@
 │       │   │   │           ├── 9 := 0
 │       │   │   │           ~
 │       │   │   │           └── 11 := 1
-│       │   │   └── 4 :=
+│       │   │   └── 4 <- jpeg.table-or-misc :=
 │       │   │       └── dqt <- jpeg.dqt :=
 │       │   │           ├── marker <- { ... }
 │       │   │           ├── length <- base.u16be := 132
@@ -174,13 +174,13 @@
 │       │   │                     3              17                     1
 │       │   ├── scan <- jpeg.scan :=
 │       │   │   ├── segments <- repeat jpeg.table-or-misc :=
-│       │   │   │   ├── 0 :=
+│       │   │   │   ├── 0 <- jpeg.table-or-misc :=
 │       │   │   │   │   └── dri <- jpeg.dri :=
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 4
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dri-data :=
 │       │   │   │   │           └── restart-interval <- base.u16be := 89
-│       │   │   │   └── 1 :=
+│       │   │   │   └── 1 <- jpeg.table-or-misc :=
 │       │   │   │       └── dht <- jpeg.dht :=
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 418

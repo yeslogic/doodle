@@ -75,6 +75,9 @@ impl Fragment {
         matches!(self, &Fragment::Empty)
     }
 
+    /// Joins two fragments with appropriate whitespace:
+    ///   - If `other` fits on a single line with no trailing newline, joins with `' '`
+    ///   - Otherwise, joins with `'\n'`
     fn join_with_wsp(self, other: Self) -> Self {
         if other.fits_inline() {
             self.cat(Self::Char(' ')).cat(other).cat_break()
@@ -83,6 +86,7 @@ impl Fragment {
         }
     }
 
+    /// Predicate for whether a fragment, when displayed, includes any line breaks
     fn fits_inline(&self) -> bool {
         match self {
             Fragment::Empty => true,
@@ -177,9 +181,46 @@ impl Fragment {
     fn new() -> Self {
         Self::Empty
     }
+
+    /// Similar to `fits_inline`, but determines whether more than one line is displayed
+    /// rather than whether inline concatenations are possible.
+    ///
+    /// Importantly, newline characters are permitted if only one appears at the very end,
+    /// and Symbols are legal
+    fn is_single_line(&self, is_final: bool) -> bool {
+        match self {
+            Fragment::Empty => true,
+            Fragment::Char('\n') => is_final,
+            Fragment::Char(_) => true,
+            Fragment::String(s) =>  {
+                let ix_nl = s.find('\n');
+                match ix_nl {
+                    Some(n) if n == s.len() - 1 => is_final,
+                    None => true,
+                    _ => false
+                }
+            },
+            Fragment::Symbol(_) => true,
+            Fragment::DisplayAtom(_) | Fragment::DebugAtom(_) => true,
+            Fragment::Group(frag) => frag.is_single_line(is_final),
+            Fragment::Cat(lhs, rhs) => lhs.is_single_line(false) && rhs.is_single_line(is_final),
+            Fragment::Sequence { sep, items } => {
+                match sep {
+                    None => (),
+                    Some(join) => {
+                        if items.len() >= 1 && !join.is_single_line(false) {
+                            return false;
+                        }
+                    }
+                }
+                let l = items.len();
+                items.iter().enumerate().all(|(ix, frag)| frag.is_single_line(is_final && (ix == l - 1)))
+            }
+        }
+    }
 }
 
-/// helper struct for building up longer sequences of [Fragment]s
+/// Builder pattern helper-struct for accumulating up longer sequences of [Fragment]s.
 struct FragmentBuilder {
     frozen: Vec<Fragment>,
     active: Fragment,

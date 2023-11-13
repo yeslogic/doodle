@@ -1,7 +1,7 @@
 ├── data <- _ |...| _ :=
 │   └── tar <- tar.main :=
 │       └── contents <- repeat1 tar.header_with_data :=
-│           ├── 0 :=
+│           ├── 0 <- tar.header_with_data :=
 │           │   ├── header <- tar.header :=
 │           │   │   ├── name <- slice 100 tar.ascii-string.opt0.nonempty := "._hello"
 │           │   │   ├── mode <- slice 8 { ... } :=
@@ -40,7 +40,7 @@
 │           │       ├── 9 := 97
 │           │       ~
 │           │       └── 162 := 185
-│           ├── 1 :=
+│           ├── 1 <- tar.header_with_data :=
 │           │   ├── header <- tar.header :=
 │           │   │   ├── name <- slice 100 tar.ascii-string.opt0.nonempty := "PaxHeader/hello"
 │           │   │   ├── mode <- slice 8 { ... } :=
@@ -79,7 +79,7 @@
 │           │       ├── 9 := 49
 │           │       ~
 │           │       └── 135 := 10
-│           └── 2 :=
+│           └── 2 <- tar.header_with_data :=
 │               ├── header <- tar.header :=
 │               │   ├── name <- slice 100 tar.ascii-string.opt0.nonempty := "hello"
 │               │   ├── mode <- slice 8 { ... } :=
