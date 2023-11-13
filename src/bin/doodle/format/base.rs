@@ -25,8 +25,8 @@ pub fn alts<Label: Into<Cow<'static, str>>>(
     )
 }
 
-pub fn iso_alts(branches: impl IntoIterator<Item = Format>) -> Format {
-    Format::IsoUnion(branches.into_iter().collect())
+pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
+    Format::Union(branches.into_iter().collect())
 }
 
 pub fn record<Label: Into<Cow<'static, str>>>(

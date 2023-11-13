@@ -140,7 +140,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Value::Branch(n, value) => match format {
-                Some(Format::IsoUnion(branches)) => {
+                Some(Format::Union(branches)) => {
                     let format = &branches[*n];
                     self.is_atomic_value(value, Some(format))
                 }
@@ -226,7 +226,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::IsoUnion(branches) => match value {
+            Format::Union(branches) => match value {
                 Value::Branch(n, value) => {
                     let format = &branches[*n];
                     self.compile_decoded_value(scope, value, format)
@@ -1024,7 +1024,7 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
-            Format::UnionVariant(_) | Format::UnionNondet(_) | Format::IsoUnion(_) => cond_paren(
+            Format::UnionVariant(_) | Format::UnionNondet(_) | Format::Union(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
                 prec,
                 Precedence::FORMAT_COMPOUND,

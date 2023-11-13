@@ -448,7 +448,7 @@ pub enum Format {
     /// Wraps the value from the inner format in a variant
     Variant(Cow<'static, str>, Box<Format>),
     /// Matches the union of all the formats, which must have the same type
-    IsoUnion(Vec<Format>),
+    Union(Vec<Format>),
     /// Matches the union of all the formats wrapped in variants
     UnionVariant(Vec<(Cow<'static, str>, Format)>),
     /// Temporary hack for nondeterministic variant unions
@@ -627,7 +627,7 @@ impl FormatModule {
                 }
                 Ok(ValueType::Union(ts))
             }
-            Format::IsoUnion(branches) => {
+            Format::Union(branches) => {
                 let mut t = ValueType::Any;
                 for f in branches {
                     t = t.unify(&self.infer_format_type(scope, f)?)?;
@@ -1292,7 +1292,7 @@ impl Format {
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
-            Format::IsoUnion(branches) => branches
+            Format::Union(branches) => branches
                 .iter()
                 .map(|f| f.match_bounds(module))
                 .reduce(Bounds::union)
@@ -1351,7 +1351,7 @@ impl Format {
             Format::UnionVariant(branches) | Format::UnionNondet(branches) => {
                 Format::union_depends_on_next(&branches, module)
             }
-            Format::IsoUnion(branches) => Format::iso_union_depends_on_next(&branches, module),
+            Format::Union(branches) => Format::iso_union_depends_on_next(&branches, module),
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Repeat(_) => true,
@@ -1640,7 +1640,7 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::IsoUnion(branches) => {
+            Format::Union(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
                     tree = tree.union(Self::add(module, f, next.clone()));
@@ -2288,7 +2288,7 @@ impl Decoder {
                 }
                 Ok(Decoder::Parallel(ds))
             }
-            Format::IsoUnion(branches) => {
+            Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for f in branches {
@@ -2737,7 +2737,7 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         }
     }
 
-    Format::IsoUnion(codes)
+    Format::Union(codes)
 }
 
 fn bit_range(n: usize, bits: usize) -> Format {

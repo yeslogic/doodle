@@ -131,7 +131,7 @@ fn check_covered(
                 path.pop();
             }
         }
-        Format::IsoUnion(branches) => {
+        Format::Union(branches) => {
             for format in branches {
                 check_covered(module, path, format)?;
             }
@@ -227,7 +227,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected branch"),
             },
-            Format::IsoUnion(branches) => match value {
+            Format::Union(branches) => match value {
                 Value::Branch(index, value) => {
                     let format = &branches[*index];
                     self.write_flat(scope, value, format)
