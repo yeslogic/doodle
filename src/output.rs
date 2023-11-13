@@ -71,12 +71,48 @@ impl fmt::Debug for Fragment {
 }
 
 impl Fragment {
+    /// Returns true if a [Fragment] directly matches [`Fragment::Empty`].
+    ///
+    /// Note that this predicate will fail on certain pathological cases that happen to
+    /// also render as zero-length strings. If a broader condition of vacuous rendering is
+    /// needed, [`Fragment::is_vacuous`] may be used instead.
+    ///
+    /// In most cases, `is_empty` will be good enough, as we will avoid constructing vacuous
+    /// Fragments other than [`Fragment::Empty`].
     fn is_empty(&self) -> bool {
         matches!(self, &Fragment::Empty)
     }
 
+    /// Returns true if a [Fragment] produces a zero-length string when rendered
+    ///
+    /// The set of Fragments that satisfy this predicate is a super-set of those that satisfy [`Fragment::is_empty`].
+    #[allow(dead_code)]
+    fn is_vacuous(&self) -> bool {
+        match self {
+            Fragment::Empty => true,
+            Fragment::Symbol(_) => false,
+            Fragment::Char(_) => false,
+            Fragment::String(s) => s.len() == 0,
+            // in practice, we will not use DisplayAtom or DebugAtom if they entail zero-length output
+            Fragment::DebugAtom(_) | Fragment::DisplayAtom(_) => false,
+            Fragment::Group(g) => g.is_vacuous(),
+            Fragment::Cat(x, y) => x.is_vacuous() && y.is_vacuous(),
+            Fragment::Sequence { sep, items } => {
+                match items.len() {
+                    0 => true,
+                    1 => items[0].is_vacuous(), // sep can be non-vacuous if there is only one item
+                    _ => {
+                        sep.as_ref().map_or(true, |frag| frag.is_vacuous())
+                            && items.iter().all(Fragment::is_vacuous)
+                    }
+                }
+            }
+        }
+    }
+
     /// Joins two fragments with appropriate whitespace:
-    ///   - If `other` fits on a single line with no trailing newline, joins with `' '`
+    ///   - If `self` is empty, returns `other` unconditionally
+    ///   - If `other` fits on a single line with no trailing newline, joins with `' '`, with a newline at the very end
     ///   - Otherwise, joins with `'\n'`
     fn join_with_wsp(self, other: Self) -> Self {
         if other.fits_inline() {
@@ -86,7 +122,12 @@ impl Fragment {
         }
     }
 
-    /// Predicate for whether a fragment, when displayed, includes any line breaks
+    /// Returns `true` if this fragment can be appended to another inline, i.e. without
+    /// introducing any line-breaks or potentially misaligned diagram glyphs
+    ///
+    /// In order to pass, the Display form of the Fragment in question cannot contain any newlines, even
+    /// just one at the very end. Symbols are also rejected, as they implicitly require that nothing comes
+    /// before them on the same line.
     fn fits_inline(&self) -> bool {
         match self {
             Fragment::Empty => true,
@@ -113,7 +154,7 @@ impl Fragment {
     /// Forms a compound fragment from a Fragment-valued iterable, with
     /// an optional Fragment separating each element in the output sequence.
     ///
-    /// It is more efficient to pass `sep := None` than `sep := Some(Fragment::Empty)`,
+    /// It is possibly more efficient to pass `sep := None` than `sep := Some(Fragment::Empty)`,
     /// but the resulting output will differ in performance alone, and not output.
     fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
         Self::Sequence {
@@ -136,9 +177,38 @@ impl Fragment {
         }
     }
 
+    /// Adds an intervening fragment between two others, but only if both the left and right halves are non-vacuous.
+    ///
+    /// This avoids situations where an empty fragment might otherwise enforce a separator to appear unnecessarily.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use doodle::output::Fragment;
+    /// let frg_hello = Fragment::String("hello".into());
+    /// let frg_world = Fragment::String("world".into());
+    /// let x = frg_hello.intervene(Fragment::Char(' '), frg_world);
+    /// assert_eq!(&format!("{x}"), "hello world")
+    /// ```
+    ///
+    /// ```
+    /// use doodle::output::Fragment;
+    /// let frg_hello = Fragment::String("hello".into());
+    /// let frg_nothing = Fragment::String("".into());
+    /// let x = frg_hello.intervene(Fragment::Char(' '), frg_nothing);
+    /// assert_eq!(&format!("{x}"), "hello")
+    /// ```
     #[allow(dead_code)]
-    fn opt(frag: Option<Fragment>) -> Fragment {
-        frag.unwrap_or(Fragment::Empty)
+    pub fn intervene(self, sep: Self, other: Self) -> Self {
+        if self.is_vacuous() {
+            other
+        } else if other.is_vacuous() {
+            self
+        } else if sep.is_vacuous() {
+            self.cat(other)
+        } else {
+            self.cat(sep).cat(other)
+        }
     }
 
     /// Appends a given fragment to the receiver.
@@ -186,7 +256,7 @@ impl Fragment {
     /// rather than whether inline concatenations are possible.
     ///
     /// Importantly, newline characters are permitted if only one appears at the very end,
-    /// and Symbols are legal
+    /// and Symbols are permitted in any position
     fn is_single_line(&self, is_final: bool) -> bool {
         match self {
             Fragment::Empty => true,
