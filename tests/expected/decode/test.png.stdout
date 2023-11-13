@@ -14,7 +14,7 @@
 │       │   │   └── interlace-method <- base.u8 := 1
 │       │   └── crc <- base.u32be := 1592150037
 │       ├── chunks <- repeat png.chunk(...) :=
-│       │   ├── 0 <- png.chunk(...) :=
+│       │   ├── 0 :=
 │       │   │   └── PLTE <- png.plte :=
 │       │   │       ├── length <- base.u32be := 87
 │       │   │       ├── tag <- (...)
@@ -50,7 +50,7 @@
 │       │   │       │        201 201 201
 │       │   │       │        138 138 138
 │       │   │       └── crc <- base.u32be := 1943707985
-│       │   ├── 1 <- png.chunk(...) :=
+│       │   ├── 1 :=
 │       │   │   └── tRNS <- png.trns(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
@@ -58,14 +58,14 @@
 │       │   │       │   └──  palette-index
 │       │   │       │                    0
 │       │   │       └── crc <- base.u32be := 1088870502
-│       │   ├── 2 <- png.chunk(...) :=
+│       │   ├── 2 :=
 │       │   │   └── bKGD <- png.bkgd(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └── palette-index <- base.u8 := 0
 │       │   │       └── crc <- base.u32be := 2282036552
-│       │   ├── 3 <- png.chunk(...) :=
+│       │   ├── 3 :=
 │       │   │   └── pHYs <- png.phys :=
 │       │   │       ├── length <- base.u32be := 9
 │       │   │       ├── tag <- (...)
@@ -74,7 +74,7 @@
 │       │   │       │   ├── pixels-per-unit-y <- base.u32be := 2835
 │       │   │       │   └── unit-specifier <- base.u8 := 1
 │       │   │       └── crc <- base.u32be := 10132504
-│       │   └── 4 <- png.chunk(...) :=
+│       │   └── 4 :=
 │       │       └── tIME <- png.time :=
 │       │           ├── length <- base.u32be := 7
 │       │           ├── tag <- (...)
@@ -87,22 +87,22 @@
 │       │           │   └── second <- base.u8 := 34
 │       │           └── crc <- base.u32be := 491070829
 │       ├── idat <- repeat1 png.idat :=
-│       │   └── 0 <- png.idat :=
+│       │   └── 0 :=
 │       │       ├── length <- base.u32be := 1168
 │       │       ├── tag <- png.idat-tag
 │       │       ├── data <- slice length png.idat-data :=
-│       │       │   ├── 0 <- base.u8 := 72
-│       │       │   ├── 1 <- base.u8 := 199
-│       │       │   ├── 2 <- base.u8 := 165
-│       │       │   ├── 3 <- base.u8 := 85
-│       │       │   ├── 4 <- base.u8 := 137
-│       │       │   ├── 5 <- base.u8 := 114
-│       │       │   ├── 6 <- base.u8 := 235
-│       │       │   ├── 7 <- base.u8 := 54
-│       │       │   ├── 8 <- base.u8 := 12
-│       │       │   ├── 9 <- base.u8 := 228
+│       │       │   ├── 0 := 72
+│       │       │   ├── 1 := 199
+│       │       │   ├── 2 := 165
+│       │       │   ├── 3 := 85
+│       │       │   ├── 4 := 137
+│       │       │   ├── 5 := 114
+│       │       │   ├── 6 := 235
+│       │       │   ├── 7 := 54
+│       │       │   ├── 8 := 12
+│       │       │   ├── 9 := 228
 │       │       │   ~
-│       │       │   └── 1167 <- base.u8 := 50
+│       │       │   └── 1167 := 50
 │       │       └── crc <- base.u32be := 3619834681
 │       ├── more-chunks <- repeat png.chunk := []
 │       └── iend <- png.iend :=

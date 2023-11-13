@@ -4,6 +4,7 @@ use crate::{Expr, Format, FormatModule, Scope, Value};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
+
 fn atomic_value_to_string(value: &Value) -> String {
     match value {
         Value::U8(n) => n.to_string(),
@@ -34,6 +35,7 @@ pub struct Flags {
     pretty_ascii_strings: bool,
     pretty_utf8_strings: bool,
     hide_double_underscore_fields: bool,
+    show_redundant_formats: bool,
 }
 
 #[inline]
@@ -155,6 +157,7 @@ impl<'module> MonoidalPrinter<'module> {
             pretty_ascii_strings: true,
             pretty_utf8_strings: true,
             hide_double_underscore_fields: true,
+            show_redundant_formats: false,
         };
         MonoidalPrinter {
             gutter: Vec::new(),
@@ -430,6 +433,7 @@ impl<'module> MonoidalPrinter<'module> {
                     index,
                     &vals[index],
                     formats.map(|fs| &fs[index]),
+                    true,
                 ));
             }
             frag.encat(self.compile_field_value_last(
@@ -437,6 +441,7 @@ impl<'module> MonoidalPrinter<'module> {
                 last_index,
                 &vals[last_index],
                 formats.map(|fs| &fs[last_index]),
+                true,
             ));
             frag
         }
@@ -460,12 +465,12 @@ impl<'module> MonoidalPrinter<'module> {
                 Some(_) | None => (last_index, false),
             };
             for (index, val) in vals[0..upper_bound].iter().enumerate() {
-                frag.encat(self.compile_field_value_continue(scope, index, val, format));
+                frag.encat(self.compile_field_value_continue(scope, index, val, format, false));
             }
             if any_skipped {
                 frag.encat(self.compile_field_skipped());
             }
-            frag.encat(self.compile_field_value_last(scope, last_index, &vals[last_index], format));
+            frag.encat(self.compile_field_value_last(scope, last_index, &vals[last_index], format, false));
             frag
         }
     }
@@ -567,12 +572,12 @@ impl<'module> MonoidalPrinter<'module> {
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
-                frag.encat(self.compile_field_value_continue(&record_scope, label, value, format));
+                frag.encat(self.compile_field_value_continue(&record_scope, label, value, format, true));
                 record_scope.push(label.clone(), value.clone());
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
-            frag.encat(self.compile_field_value_last(&record_scope, label, value, format));
+            frag.encat(self.compile_field_value_last(&record_scope, label, value, format, true));
             frag
         }
     }
@@ -596,7 +601,7 @@ impl<'module> MonoidalPrinter<'module> {
             frag.engroup();
             frag
         } else {
-            self.compile_field_value_last(scope, label, value, format)
+            self.compile_field_value_last(scope, label, value, format, true)
         }
     }
 
@@ -617,6 +622,7 @@ impl<'module> MonoidalPrinter<'module> {
         label: impl fmt::Display,
         value: &Value,
         format: Option<&Format>,
+        format_needed: bool
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         frags.push(self.compile_gutter());
@@ -624,9 +630,11 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::Symbol(Symbol::Junction),
             Fragment::String(format!("{label}").into()),
         ));
-        if let Some(format) = format {
-            frags.push(Fragment::String(" <- ".into()));
-            frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
+        if format_needed || self.flags.show_redundant_formats {
+            if let Some(format) = format {
+                frags.push(Fragment::String(" <- ".into()));
+                frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
+            }
         }
         self.gutter.push(Column::Branch);
         frags.push(self.compile_field_value(scope, value, format));
@@ -640,6 +648,7 @@ impl<'module> MonoidalPrinter<'module> {
         label: impl fmt::Display,
         value: &Value,
         format: Option<&Format>,
+        format_needed: bool,
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
         frags.push(self.compile_gutter());
@@ -647,9 +656,11 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::Symbol(Symbol::Elbow),
             Fragment::String(format!("{label}").into()),
         ));
-        if let Some(format) = format {
-            frags.push(Fragment::String(" <- ".into()));
-            frags.push(self.compile_format(format, Default::default()));
+        if format_needed || self.flags.show_redundant_formats {
+            if let Some(format) = format  {
+                frags.push(Fragment::String(" <- ".into()));
+                frags.push(self.compile_format(format, Default::default()));
+            }
         }
         self.gutter.push(Column::Space);
         frags.push(self.compile_field_value(scope, value, format));
