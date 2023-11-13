@@ -93,8 +93,16 @@ fn is_show_format(name: &str) -> Option<&'static str> {
         "jpeg.scan-data" => Some("Entropy-Coded Segment"),
 
         // Tar
+        "tar.main" => Some("tar.main"),
         "tar.header" => Some("Tar Header"),
         "tar.header_with_data" => Some("Tar File Entry"),
+
+        // Text
+        "text" => Some("ASCII text"),
+
+        // UTF-8
+        "utf8.string" => Some("UTF-8"),
+
         _ => None,
     }
 }
@@ -165,7 +173,7 @@ fn check_covered(
             check_covered(module, path, format)?;
         }
         Format::WithRelativeOffset(_, _) => {} // FIXME
-        Format::Map(_format, _expr) => {}
+        Format::Map(format, _expr) => check_covered(module, path, format)?,
         Format::Compute(_expr) => {}
         Format::Match(_head, branches) => {
             for (_pattern, format) in branches {
@@ -276,30 +284,34 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_flat(scope, value, format),
             Format::Map(_format, _expr) => Ok(()),
             Format::Compute(_expr) => Ok(()),
-            Format::Match(head, branches) => {
-                let head = head.eval(scope);
-                for (pattern, format) in branches {
+            Format::Match(head, branches) => match value {
+                Value::Branch(index, value) => {
+                    let head = head.eval(scope);
+                    let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         self.write_flat(&pattern_scope, value, format)?;
                         return Ok(());
                     }
+                    panic!("pattern match failure");
                 }
-                panic!("non-exhaustive patterns");
-            }
-            Format::MatchVariant(head, branches) => {
-                let head = head.eval(scope);
-                for (pattern, _label, format) in branches {
+                _ => panic!("expected branch value"),
+            },
+            Format::MatchVariant(head, branches) => match value {
+                Value::Branch(index, value) => {
+                    let head = head.eval(scope);
+                    let (pattern, _label, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        if let Value::Variant(_label, value) = value {
+                        if let Value::Variant(_label, value) = value.as_ref() {
                             self.write_flat(&pattern_scope, value, format)?;
                         } else {
                             panic!("expected variant value");
                         }
                         return Ok(());
                     }
+                    panic!("pattern match failure");
                 }
-                panic!("non-exhaustive patterns");
-            }
+                _ => panic!("expected branch value"),
+            },
             Format::Dynamic(_) => Ok(()), // FIXME
             Format::Apply(_) => Ok(()),   // FIXME
         }
