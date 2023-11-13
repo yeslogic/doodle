@@ -18,7 +18,7 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
 pub fn alts<Label: Into<Cow<'static, str>>>(
     fields: impl IntoIterator<Item = (Label, Format)>,
 ) -> Format {
-    Format::Union(
+    Format::UnionVariant(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
             .collect(),

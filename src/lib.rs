@@ -447,12 +447,12 @@ pub enum Format {
     Byte(ByteSet),
     /// Wraps the value from the inner format in a variant
     Variant(Cow<'static, str>, Box<Format>),
-    /// Matches the union of all the formats and returns a variant
-    Union(Vec<(Cow<'static, str>, Format)>),
-    /// Temporary hack for nondeterministic unions
-    NondetUnion(Vec<(Cow<'static, str>, Format)>),
     /// Matches the union of all the formats, which must have the same type
     IsoUnion(Vec<Format>),
+    /// Matches the union of all the formats wrapped in variants
+    UnionVariant(Vec<(Cow<'static, str>, Format)>),
+    /// Temporary hack for nondeterministic variant unions
+    NondetUnion(Vec<(Cow<'static, str>, Format)>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
@@ -503,7 +503,7 @@ impl Format {
     pub fn alts<Label: Into<Cow<'static, str>>>(
         fields: impl IntoIterator<Item = (Label, Format)>,
     ) -> Format {
-        Format::Union(
+        Format::UnionVariant(
             (fields.into_iter())
                 .map(|(label, format)| (label.into(), format))
                 .collect(),
@@ -620,7 +620,7 @@ impl FormatModule {
                 label.clone(),
                 self.infer_format_type(scope, f)?,
             )])),
-            Format::Union(branches) | Format::NondetUnion(branches) => {
+            Format::UnionVariant(branches) | Format::NondetUnion(branches) => {
                 let mut ts = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
                     ts.push((label.clone(), self.infer_format_type(scope, f)?));
@@ -1287,7 +1287,7 @@ impl Format {
             Format::Align(n) => Bounds::new(0, Some(n - 1)),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
-            Format::Union(branches) | Format::NondetUnion(branches) => branches
+            Format::UnionVariant(branches) | Format::NondetUnion(branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
@@ -1348,7 +1348,7 @@ impl Format {
             Format::Align(_) => false,
             Format::Byte(_) => false,
             Format::Variant(_label, f) => f.depends_on_next(module),
-            Format::Union(branches) | Format::NondetUnion(branches) => {
+            Format::UnionVariant(branches) | Format::NondetUnion(branches) => {
                 Format::union_depends_on_next(&branches, module)
             }
             Format::IsoUnion(branches) => Format::iso_union_depends_on_next(&branches, module),
@@ -1633,7 +1633,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::add(module, f, next.clone()),
-            Format::Union(branches) | Format::NondetUnion(branches) => {
+            Format::UnionVariant(branches) | Format::NondetUnion(branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
                     tree = tree.union(Self::add(module, f, next.clone()));
@@ -2262,7 +2262,7 @@ impl Decoder {
                 let d = Decoder::compile_next(compiler, f, next.clone())?;
                 Ok(Decoder::Variant(label.clone(), Box::new(d)))
             }
-            Format::Union(branches) => {
+            Format::UnionVariant(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
@@ -2808,7 +2808,7 @@ mod tests {
     fn alts<Label: Into<Cow<'static, str>>>(
         fields: impl IntoIterator<Item = (Label, Format)>,
     ) -> Format {
-        Format::Union(
+        Format::UnionVariant(
             (fields.into_iter())
                 .map(|(label, format)| (label.into(), format))
                 .collect(),
