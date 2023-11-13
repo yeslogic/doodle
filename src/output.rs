@@ -111,7 +111,6 @@ impl Fragment {
     }
 
     /// Joins two fragments with appropriate whitespace:
-    ///   - If `self` is empty, returns `other` unconditionally
     ///   - If `other` fits on a single line with no trailing newline, joins with `' '`, with a newline at the very end
     ///   - Otherwise, joins with `'\n'`
     fn join_with_wsp(self, other: Self) -> Self {
