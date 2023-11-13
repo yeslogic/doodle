@@ -353,7 +353,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // MCU: Minimum coded unit
     let mcu = module.define_format(
         "jpeg.mcu",
-        Format::IsoUnion(vec![
+        Format::Union(vec![
             not_byte(0xFF),
             Format::Map(
                 Box::new(tuple([is_byte(0xFF), is_byte(0x00)])),

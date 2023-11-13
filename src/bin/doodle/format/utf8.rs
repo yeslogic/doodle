@@ -53,7 +53,7 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     );
 
     let utf8_3 = Format::Map(
-        Box::new(iso_alts([
+        Box::new(union([
             tuple([
                 drop_n_msb(4, is_byte(0xE0)),
                 drop_n_msb(2, byte_in(0xA0..=0xBF)),
@@ -88,7 +88,7 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     );
 
     let utf8_4 = Format::Map(
-        Box::new(iso_alts([
+        Box::new(union([
             tuple([
                 drop_n_msb(5, is_byte(0xF0)),
                 drop_n_msb(2, byte_in(0x90..=0xBF)),
@@ -124,7 +124,7 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     let utf8_char = module.define_format(
         "utf8.char",
         Format::Map(
-            Box::new(iso_alts([utf8_1, utf8_2, utf8_3, utf8_4])),
+            Box::new(union([utf8_1, utf8_2, utf8_3, utf8_4])),
             Expr::Lambda(
                 "codepoint".into(),
                 Box::new(Expr::AsChar(Box::new(var("codepoint")))),
