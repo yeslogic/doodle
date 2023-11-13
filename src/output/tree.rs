@@ -144,7 +144,7 @@ impl<'module> MonoidalPrinter<'module> {
                     let format = &branches[*n];
                     self.is_atomic_value(value, Some(format))
                 }
-                Some(Format::UnionVariant(branches)) => {
+                Some(Format::UnionVariant(branches)) | Some(Format::UnionNondet(branches)) => {
                     let format = &branches[*n].1;
                     self.is_atomic_value(value, Some(format))
                 }
