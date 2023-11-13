@@ -1260,11 +1260,14 @@ enum BitwiseLevel {
 /// Intransitive partial relation over operator subclasses
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Relation {
+    /// `.<`
     Inferior,
-    /// .<
-    Congruent, // .=
-    Superior, // .>
-    Disjoint, // ><
+    /// `.=`
+    Congruent,
+    /// ``.>`
+    Superior,
+    /// ``><``
+    Disjoint,
 }
 
 trait IntransitiveOrd {
