@@ -217,7 +217,7 @@ impl<'module> MonoidalPrinter<'module> {
                 let fmt_name = self.module.get_name(*level);
 
                 // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
-                if self.flags.pretty_utf8_strings && fmt_name == "utf8.string" {
+                if self.flags.pretty_utf8_strings && fmt_name == "text.string.utf8" {
                     self.compile_string(value)
                 } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
                     self.compile_ascii_string(value)
@@ -420,6 +420,7 @@ impl<'module> MonoidalPrinter<'module> {
                     v => panic!("expected sequence value, found {v:?}"),
                 }
             }
+            Value::Seq(vs) => vs,
             _ => panic!("expected record value, found {value:?}"),
         };
         self.compile_ascii_seq(vs)

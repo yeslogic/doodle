@@ -1,2 +1,3 @@
-├── data <- _ |...| _ := { text := "GIF89a is a popular format\n" }
+├── data <- _ |...| _ :=
+│   └── text <- text.string := { ascii := "GIF89a is a popular format\n" }
 └── end <- end-of-input
