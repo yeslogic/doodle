@@ -13,7 +13,6 @@ mod riff;
 mod tar;
 mod text;
 mod tiff;
-mod utf8;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
@@ -26,7 +25,6 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let png = png::main(module, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
-    let utf8 = utf8::main(module, &base);
     let text = text::main(module, &base);
 
     module.define_format(
@@ -42,7 +40,6 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("riff".into(), riff.call()),
                     ("tar".into(), tar.call()),
                     ("text".into(), text.call()),
-                    ("utf8".into(), utf8.call()),
                 ]),
             ),
             ("end", Format::EndOfInput),
