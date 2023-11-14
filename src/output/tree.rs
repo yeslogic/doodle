@@ -124,6 +124,13 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Char(_) => true,
             Value::Bool(_) => true,
             Value::U8(_) | Value::U16(_) | Value::U32(_) => true,
+            Value::Fallback(is_fallback, v) => match format {
+                Some(Format::RepeatFallback(a, b)) => {
+                    let format = if *is_fallback { b } else { a };
+                    self.is_atomic_value(v, Some(format))
+                }
+                _ => self.is_atomic_value(v, None),
+            },
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
@@ -305,6 +312,30 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
+            Format::RepeatFallback(narrow, wide) => match value {
+                Value::Fallback(is_wide, v) => match v.deref() {
+                    Value::Seq(values) => {
+                        let format = if *is_wide { wide } else { narrow };
+                        if self.flags.tables_for_record_sequences
+                            && self.is_record_with_atomic_fields(format).is_some()
+                        {
+                            self.compile_seq_records(values, format)
+                        } else if self.flags.pretty_ascii_strings
+                            && format.is_ascii_char_format(self.module)
+                        {
+                            self.compile_ascii_seq(values)
+                        } else if self.flags.pretty_utf8_strings
+                            && format.is_char_format(self.module)
+                        {
+                            self.compile_char_seq(values)
+                        } else {
+                            self.compile_seq(scope, values, Some(format))
+                        }
+                    }
+                    _ => panic!("expected sequence, found {v:?}"),
+                },
+                _ => panic!("expected Fallback, found {value:?}"),
+            },
             Format::Peek(format) => self.compile_decoded_value(scope, value, format),
             Format::PeekNot(_format) => self.compile_value(scope, value),
             Format::Slice(_, format) => self.compile_decoded_value(scope, value, format),
@@ -375,6 +406,7 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Seq(vals) => self.compile_seq(scope, vals, None),
             Value::Record(fields) => self.compile_record(scope, fields, None),
             Value::Variant(label, value) => self.compile_variant(scope, label, value, None),
+            Value::Fallback(_, value) => self.compile_value(scope, value),
             Value::Mapped(orig, value) => {
                 if self.flags.collapse_mapped_values {
                     self.compile_value(scope, value)
@@ -1068,6 +1100,15 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::RepeatFallback(narrow, wide) => {
+                let wide_frag = self.compile_format(wide, Precedence::FORMAT_ATOM);
+
+                cond_paren(
+                    self.compile_nested_format("repeat_fallback", Some(&[wide_frag]), narrow, prec),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
             Format::Repeat(format) => cond_paren(
                 self.compile_nested_format("repeat", None, format, prec),
                 prec,

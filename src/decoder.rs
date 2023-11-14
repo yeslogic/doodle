@@ -23,6 +23,7 @@ pub enum Value {
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
     Format(Box<Format>),
+    Fallback(bool, Box<Value>),
 }
 
 impl Value {
@@ -431,6 +432,7 @@ enum Decoder {
     Record(Vec<(Cow<'static, str>, Decoder)>),
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
+    RepeatFallback(MatchTree, Box<Decoder>, Box<Decoder>),
     RepeatCount(Expr, Box<Decoder>),
     RepeatUntilLast(Expr, Box<Decoder>),
     RepeatUntilSeq(Expr, Box<Decoder>),
@@ -858,6 +860,38 @@ impl Decoder {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
             }
+            Format::RepeatFallback(narrow, wide) => {
+                if narrow.is_nullable(compiler.module) || wide.is_nullable(compiler.module) {
+                    return Err(format!(
+                        "Cannot repeat nullable format: Repeat({narrow:?} ⊂ {wide:?})"
+                    ));
+                }
+
+                let dnarrow = Box::new(Decoder::compile_next(
+                    compiler,
+                    narrow,
+                    Rc::new(Next::Repeat(narrow, next.clone())),
+                )?);
+
+                let dwide = Box::new(Decoder::compile_next(
+                    compiler,
+                    wide,
+                    Rc::new(Next::Repeat(wide, next.clone())),
+                )?);
+
+                // Under the precondition that narrow is a subset of wide, the union of the two matchtrees is just the
+                // matchtree for wide
+
+                let wide_star = Format::Repeat(wide.clone());
+                let f_wide = Format::Tuple(vec![(**wide).clone(), wide_star]);
+                let f_empty = Format::EMPTY;
+
+                if let Some(tree) = MatchTree::build(compiler.module, &[f_wide, f_empty], next) {
+                    Ok(Decoder::RepeatFallback(tree, dnarrow, dwide))
+                } else {
+                    Err(format!("Cannot build match tree for {format:?}"))
+                }
+            }
             Format::Repeat1(a) => {
                 if a.is_nullable(compiler.module) {
                     return Err(format!("cannot repeat nullable format: {a:?}"));
@@ -1078,6 +1112,34 @@ impl Decoder {
                     }
                 }
                 Ok((Value::Seq(v), input))
+            }
+            Decoder::RepeatFallback(tree, subset, superset) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                let mut decoder = subset;
+                let mut fellback = false;
+
+                while tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    offset: input.offset,
+                })? == 0
+                {
+                    match decoder.parse(program, scope, input) {
+                        Ok((va, next_input)) => {
+                            input = next_input;
+                            v.push(va);
+                        }
+                        err @ Err(_) => {
+                            if fellback {
+                                return err;
+                            } else {
+                                decoder = superset;
+                                fellback = true;
+                            }
+                        }
+                    }
+                }
+
+                Ok((Value::Fallback(fellback, Box::new(Value::Seq(v))), input))
             }
             Decoder::RepeatCount(expr, a) => {
                 let mut input = input;
