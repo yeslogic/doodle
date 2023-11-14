@@ -123,8 +123,11 @@ impl<'module> MonoidalPrinter<'module> {
             Value::Tuple(values) => values.is_empty(),
             Value::Record(fields) => fields.is_empty(),
             Value::Seq(values) => values.is_empty(),
-            Value::Variant(_label, value) => match format {
-                Some(Format::Variant(_label, format)) => self.is_atomic_value(value, Some(format)),
+            Value::Variant(label, value) => match format {
+                Some(Format::Variant(label2, format)) => {
+                    assert_eq!(label, label2);
+                    self.is_atomic_value(value, Some(format))
+                }
                 _ => self.is_atomic_value(value, None),
             },
             Value::Mapped(orig, value) => {
@@ -139,18 +142,46 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                 }
             }
-            Value::Branch(n, value) => match format {
+            Value::Branch(n, value) => match format.map(|f| self.unwrap_itemvars(f)) {
                 Some(Format::Union(branches)) => {
                     let format = &branches[*n];
                     self.is_atomic_value(value, Some(format))
                 }
                 Some(Format::UnionVariant(branches)) | Some(Format::UnionNondet(branches)) => {
-                    let format = &branches[*n].1;
+                    let (label, format) = &branches[*n];
+                    match value.as_ref() {
+                        Value::Variant(label2, value) => {
+                            assert_eq!(label, label2);
+                            self.is_atomic_value(value, Some(format))
+                        }
+                        _ => panic!("expected variant value"),
+                    }
+                }
+                Some(Format::Match(_head, branches)) => {
+                    let (_pattern, format) = &branches[*n];
                     self.is_atomic_value(value, Some(format))
                 }
-                _ => self.is_atomic_value(value, None),
+                Some(Format::MatchVariant(_head, branches)) => {
+                    let (_pattern, label, format) = &branches[*n];
+                    match value.as_ref() {
+                        Value::Variant(label2, value) => {
+                            assert_eq!(label, label2);
+                            self.is_atomic_value(value, Some(format))
+                        }
+                        _ => panic!("expected variant value"),
+                    }
+                }
+                None => self.is_atomic_value(value, None),
+                f => panic!("expected format suitable for branch: {f:?}"),
             },
             Value::Format(_) => false,
+        }
+    }
+
+    fn unwrap_itemvars<'a>(&'a self, format: &'a Format) -> &'a Format {
+        match format {
+            Format::ItemVar(level, _args) => self.unwrap_itemvars(self.module.get_format(*level)),
+            _ => format,
         }
     }
 }
@@ -216,9 +247,10 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::UnionVariant(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
-                    let format = &branches[*index].1;
+                    let (label, format) = &branches[*index];
                     match value.as_ref() {
-                        Value::Variant(label, value) => {
+                        Value::Variant(label2, value) => {
+                            assert_eq!(label, label2);
                             self.compile_variant(scope, label, value, Some(format))
                         }
                         _ => panic!("expected variant, found {value:?}"),
@@ -304,9 +336,10 @@ impl<'module> MonoidalPrinter<'module> {
             Format::MatchVariant(head, branches) => match value {
                 Value::Branch(index, value) => {
                     let head = head.eval(&scope);
-                    let (pattern, _label, format) = &branches[*index];
+                    let (pattern, label, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        if let Value::Variant(_label, value) = value.as_ref() {
+                        if let Value::Variant(label2, value) = value.as_ref() {
+                            assert_eq!(label, label2);
                             frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
                         } else {
                             panic!("expected variant value");

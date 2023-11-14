@@ -227,9 +227,12 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::UnionVariant(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
-                    let format = &branches[*index].1;
+                    let (label, format) = &branches[*index];
                     match value.as_ref() {
-                        Value::Variant(_label, value) => self.write_flat(scope, value, format),
+                        Value::Variant(label2, value) => {
+                            assert_eq!(label, label2);
+                            self.write_flat(scope, value, format)
+                        }
                         _ => panic!("expected variant"),
                     }
                 }
@@ -299,9 +302,10 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::MatchVariant(head, branches) => match value {
                 Value::Branch(index, value) => {
                     let head = head.eval(scope);
-                    let (pattern, _label, format) = &branches[*index];
+                    let (pattern, label, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        if let Value::Variant(_label, value) = value.as_ref() {
+                        if let Value::Variant(label2, value) = value.as_ref() {
+                            assert_eq!(label, label2);
                             self.write_flat(&pattern_scope, value, format)?;
                         } else {
                             panic!("expected variant value");
