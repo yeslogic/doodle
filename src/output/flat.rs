@@ -223,7 +223,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                         panic!("expected variant label {label}, found {label2}");
                     }
                 }
-                _ => panic!("expected variant"),
+                _ => panic!("expected variant, found {value:?}"),
             },
             Format::UnionVariant(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
@@ -233,17 +233,17 @@ impl<'module, W: io::Write> Context<'module, W> {
                             assert_eq!(label, label2);
                             self.write_flat(scope, value, format)
                         }
-                        _ => panic!("expected variant"),
+                        _ => panic!("expected variant, found {value:?}"),
                     }
                 }
-                _ => panic!("expected branch"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::Union(branches) => match value {
                 Value::Branch(index, value) => {
                     let format = &branches[*index];
                     self.write_flat(scope, value, format)
                 }
-                _ => panic!("expected branch"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
@@ -253,7 +253,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     }
                     Ok(())
                 }
-                _ => panic!("expected tuple"),
+                _ => panic!("expected tuple, found {value:?}"),
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
@@ -265,7 +265,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     }
                     Ok(())
                 }
-                _ => panic!("expected record"),
+                _ => panic!("expected record, found {value:?}"),
             },
             Format::Repeat(format)
             | Format::Repeat1(format)
@@ -278,7 +278,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     }
                     Ok(())
                 }
-                _ => panic!("expected sequence"),
+                _ => panic!("expected sequence, found {value:?}"),
             },
             Format::Peek(format) => self.write_flat(scope, value, format),
             Format::PeekNot(format) => self.write_flat(scope, value, format),
@@ -297,7 +297,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     }
                     panic!("pattern match failure");
                 }
-                _ => panic!("expected branch value"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::MatchVariant(head, branches) => match value {
                 Value::Branch(index, value) => {
@@ -308,13 +308,13 @@ impl<'module, W: io::Write> Context<'module, W> {
                             assert_eq!(label, label2);
                             self.write_flat(&pattern_scope, value, format)?;
                         } else {
-                            panic!("expected variant value");
+                            panic!("expected variant, found {value:?}");
                         }
                         return Ok(());
                     }
                     panic!("pattern match failure");
                 }
-                _ => panic!("expected branch value"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::Dynamic(_) => Ok(()), // FIXME
             Format::Apply(_) => Ok(()),   // FIXME
