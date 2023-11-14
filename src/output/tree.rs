@@ -263,7 +263,7 @@ impl<'module> MonoidalPrinter<'module> {
                     let format = &branches[*n];
                     self.compile_decoded_value(scope, value, format)
                 }
-                _ => panic!("expected branch value, found {value:?}"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::Tuple(formats) => match value {
                 Value::Tuple(values) => {
@@ -331,7 +331,7 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                     panic!("pattern match failure");
                 }
-                _ => panic!("expected branch value"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::MatchVariant(head, branches) => match value {
                 Value::Branch(index, value) => {
@@ -342,13 +342,13 @@ impl<'module> MonoidalPrinter<'module> {
                             assert_eq!(label, label2);
                             frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
                         } else {
-                            panic!("expected variant value");
+                            panic!("expected variant, found {value:?}");
                         }
                         return frag;
                     }
                     panic!("pattern match failure");
                 }
-                _ => panic!("expected branch value"),
+                _ => panic!("expected branch, found {value:?}"),
             },
             Format::Dynamic(_) => self.compile_value(scope, value),
             Format::Apply(_) => self.compile_value(scope, value),
