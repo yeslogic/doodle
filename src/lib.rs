@@ -1247,8 +1247,26 @@ impl<'a> MatchTreeStep<'a> {
             Format::Bits(_a) => {
                 Self::accept() // FIXME
             }
-            Format::WithRelativeOffset(_expr, _a) => {
-                Self::accept() // FIXME
+            Format::WithRelativeOffset(expr, a) => {
+                let bounds = expr.bounds();
+                // REVIEW - this is a hack but it is at least somewhat better than before
+                if let Some(0) = bounds.is_exact() {
+                    let tree = Self::add_next(module, next.clone());
+                    let peek = Self::add(module, a, Rc::new(Next::Empty));
+                    tree.peek(peek)
+                } else {
+                    let tree = Self::add_next(module, next.clone());
+                    let peek = {
+                        let bounds = expr.bounds();
+                        Self::add_slice(
+                            module,
+                            bounds.min,
+                            Rc::new(Next::Empty),
+                            Rc::new(Next::Tuple(std::slice::from_ref(a.as_ref()), next)),
+                        )
+                    };
+                    tree.peek(peek)
+                }
             }
             Format::Map(f, _expr) => Self::add(module, f, next),
             Format::Compute(_expr) => Self::add_next(module, next),
