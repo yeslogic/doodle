@@ -15,7 +15,7 @@
 │       │   │   │       ├── final <- base.bit := 1
 │       │   │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
 │       │   │   │       └── data <- match type { ... } :=
-│       │   │   │           ├── format <- dynamic := _ |...| _
+│       │   │   │           ├── format <- compute huffman [..] := _ |...| _
 │       │   │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │       │   │   │           │   ├── 0 :=
 │       │   │   │           │   │   ├── code <- apply := 72
@@ -108,7 +108,7 @@
 │           │   │       ├── final <- base.bit := 1
 │           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
 │           │   │       └── data <- match type { ... } :=
-│           │   │           ├── format <- dynamic := _ |...| _
+│           │   │           ├── format <- compute huffman [..] := _ |...| _
 │           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
 │           │   │           │   ├── 0 :=
 │           │   │           │   │   ├── code <- apply := 104

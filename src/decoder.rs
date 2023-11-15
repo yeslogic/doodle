@@ -1,7 +1,7 @@
 use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
-use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
+use crate::{Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -397,6 +397,23 @@ impl Expr {
                 }
                 _ => panic!("Inflate: expected Seq"),
             },
+            Expr::Huffman(lengths_expr, opt_values_expr) => {
+                let lengths_val = lengths_expr.eval(scope);
+                let lengths = value_to_vec_usize(&lengths_val);
+                let lengths = match opt_values_expr {
+                    None => lengths,
+                    Some(e) => {
+                        let values = value_to_vec_usize(&e.eval(scope));
+                        let mut new_lengths = [0].repeat(values.len());
+                        for i in 0..lengths.len() {
+                            new_lengths[values[i]] = lengths[i];
+                        }
+                        new_lengths
+                    }
+                };
+                let f = make_huffman_codes(&lengths);
+                Cow::Owned(Value::Format(Box::new(f)))
+            }
         }
     }
 
@@ -444,7 +461,6 @@ enum Decoder {
     Let(Cow<'static, str>, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Decoder)>),
-    Dynamic(DynFormat),
     Apply(Cow<'static, str>),
 }
 
@@ -951,7 +967,6 @@ impl Decoder {
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
-            Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
             Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
         }
     }
@@ -1204,23 +1219,6 @@ impl Decoder {
                     }
                 }
                 panic!("exhaustive patterns");
-            }
-            Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
-                let lengths_val = lengths_expr.eval(scope);
-                let lengths = value_to_vec_usize(&lengths_val);
-                let lengths = match opt_values_expr {
-                    None => lengths,
-                    Some(e) => {
-                        let values = value_to_vec_usize(&e.eval(scope));
-                        let mut new_lengths = [0].repeat(values.len());
-                        for i in 0..lengths.len() {
-                            new_lengths[values[i]] = lengths[i];
-                        }
-                        new_lengths
-                    }
-                };
-                let f = make_huffman_codes(&lengths);
-                Ok((Value::Format(Box::new(f)), input))
             }
             Decoder::Apply(name) => scope.call_decoder_by_name(name, program, input),
         }

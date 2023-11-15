@@ -357,7 +357,6 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(_) => self.compile_value(scope, value),
             Format::Apply(_) => self.compile_value(scope, value),
         }
     }
@@ -694,7 +693,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn is_indirect_format(&self, format: &Format) -> bool {
         match format {
-            Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..) => true,
+            Format::ItemVar(..) | Format::Apply(..) => true,
             _ => false,
         }
     }
@@ -1003,6 +1002,22 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FUNAPP,
             ),
+            Expr::Huffman(lengths_expr, opt_values_expr) => match opt_values_expr {
+                None => cond_paren(
+                    self.compile_prefix("huffman", None, lengths_expr),
+                    prec,
+                    Precedence::FUNAPP,
+                ),
+                Some(expr) => cond_paren(
+                    self.compile_prefix(
+                        "huffman",
+                        Some(std::slice::from_ref(&expr.as_ref())),
+                        lengths_expr,
+                    ),
+                    prec,
+                    Precedence::FUNAPP,
+                ),
+            },
 
             Expr::TupleProj(head, index) => cond_paren(
                 self.compile_expr(head, Precedence::PROJ)
@@ -1191,7 +1206,6 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
-            Format::Dynamic(_) => Fragment::String("dynamic".into()),
             Format::Apply(_) => Fragment::String("apply".into()),
 
             Format::ItemVar(var, args) => {

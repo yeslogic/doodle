@@ -185,8 +185,7 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
-        Format::Dynamic(_) => {} // FIXME
-        Format::Apply(_) => {}   // FIXME
+        Format::Apply(_) => {} // FIXME
     }
     Ok(())
 }
@@ -322,8 +321,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(_) => Ok(()), // FIXME
-            Format::Apply(_) => Ok(()),   // FIXME
+            Format::Apply(_) => Ok(()), // FIXME
         }
     }
 }

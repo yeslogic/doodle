@@ -249,6 +249,7 @@ pub enum Expr {
     FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
     Dup(Box<Expr>, Box<Expr>),
     Inflate(Box<Expr>),
+    Huffman(Box<Expr>, Option<Box<Expr>>),
 }
 
 impl Expr {
@@ -355,15 +356,8 @@ pub enum Format {
     Match(Expr, Vec<(Pattern, Format)>),
     /// Pattern match on an expression and return a variant
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Format)>),
-    /// Format generated dynamically
-    Dynamic(DynFormat),
     /// Apply a dynamic format from a named variable in the scope
     Apply(Cow<'static, str>),
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-pub enum DynFormat {
-    Huffman(Expr, Option<Expr>),
 }
 
 impl Format {
@@ -583,17 +577,6 @@ impl FormatModule {
                     )]))?;
                 }
                 Ok(t)
-            }
-            Format::Dynamic(DynFormat::Huffman(lengths_expr, _opt_values_expr)) => {
-                match lengths_expr.infer_type(scope)? {
-                    ValueType::Seq(t) => match &*t {
-                        ValueType::U8 | ValueType::U16 => {}
-                        _ => return Err(format!("Huffman: expected U8 or U16")),
-                    },
-                    _ => return Err(format!("Huffman: expected Seq")),
-                }
-                // FIXME check opt_values_expr type
-                Ok(ValueType::Format(Box::new(ValueType::U16)))
             }
             Format::Apply(name) => match scope.get_type_by_name(name) {
                 ValueType::Format(t) => Ok(*t.clone()),
@@ -827,6 +810,17 @@ impl Expr {
                 ValueType::Seq(_values) => Ok(ValueType::Seq(Box::new(ValueType::U8))),
                 _ => Err(format!("Inflate: expected Seq")),
             },
+            Expr::Huffman(lengths_expr, _opt_values_expr) => {
+                match lengths_expr.infer_type(scope)? {
+                    ValueType::Seq(t) => match &*t {
+                        ValueType::U8 | ValueType::U16 => {}
+                        _ => return Err(format!("Huffman: expected U8 or U16")),
+                    },
+                    _ => return Err(format!("Huffman: expected Seq")),
+                }
+                // FIXME check opt_values_expr type
+                Ok(ValueType::Format(Box::new(ValueType::U16)))
+            }
         }
     }
 
@@ -896,7 +890,6 @@ impl Format {
                 .map(|(_, _, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
-            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::exact(0),
             Format::Apply(_) => Bounds::new(1, None),
         }
     }
@@ -938,7 +931,6 @@ impl Format {
             Format::MatchVariant(_, branches) => {
                 branches.iter().any(|(_, _, f)| f.depends_on_next(module))
             }
-            Format::Dynamic(_) => false,
             Format::Apply(_) => false,
         }
     }
@@ -1278,7 +1270,6 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => Self::add_next(module, next),
             Format::Apply(_name) => Self::accept(),
         }
     }

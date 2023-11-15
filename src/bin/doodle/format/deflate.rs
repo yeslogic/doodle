@@ -1,4 +1,4 @@
-use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 use crate::format::base::*;
 
@@ -240,7 +240,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             (
                 "format",
-                Format::Dynamic(DynFormat::Huffman(fixed_code_lengths(), None)),
+                Format::Compute(Expr::Huffman(Box::new(fixed_code_lengths()), None)),
             ),
             (
                 "codes",
@@ -483,9 +483,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "code-length-alphabet-format",
-                Format::Dynamic(DynFormat::Huffman(
-                    var("code-length-alphabet-code-lengths"),
-                    Some(Expr::Seq(vec![
+                Format::Compute(Expr::Huffman(
+                    Box::new(var("code-length-alphabet-code-lengths")),
+                    Some(Box::new(Expr::Seq(vec![
                         Expr::U8(16),
                         Expr::U8(17),
                         Expr::U8(18),
@@ -505,7 +505,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         Expr::U8(14),
                         Expr::U8(1),
                         Expr::U8(15),
-                    ])),
+                    ]))),
                 )),
             ),
             (
@@ -750,15 +750,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "distance-alphabet-format",
-                Format::Dynamic(DynFormat::Huffman(
-                    var("distance-alphabet-code-lengths-value"),
+                Format::Compute(Expr::Huffman(
+                    Box::new(var("distance-alphabet-code-lengths-value")),
                     None,
                 )),
             ),
             (
                 "literal-length-alphabet-format",
-                Format::Dynamic(DynFormat::Huffman(
-                    var("literal-length-alphabet-code-lengths-value"),
+                Format::Compute(Expr::Huffman(
+                    Box::new(var("literal-length-alphabet-code-lengths-value")),
                     None,
                 )),
             ),
