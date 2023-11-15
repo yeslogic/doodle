@@ -1248,33 +1248,25 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::WithRelativeOffset(expr, a) => {
-                let bounds = expr.bounds();
                 // REVIEW - this is a hack but it is at least somewhat better than before
-                match bounds.is_exact() {
-                    Some(0) => {
-                        let tree = Self::add_next(module, next.clone());
-                        let peek = Self::add(module, a, Rc::new(Next::Empty));
-                        tree.peek(peek)
-                    }
-                    Some(n) => {
-                        let tree = Self::add_next(module, next.clone());
-                        let peek = {
-                            Self::add_slice(
-                                module,
-                                n,
-                                Rc::new(Next::Empty),
-                                Rc::new(Next::Tuple(std::slice::from_ref(a.as_ref()), next)),
-                            )
-                        };
-                        tree.peek(peek)
-                    }
+                let tree = Self::add_next(module, next.clone());
+                let bounds = expr.bounds();
+                let peek = match bounds.is_exact() {
+                    Some(0) => Self::add(module, a, Rc::new(Next::Empty)),
+                    Some(n) => Self::add_slice(
+                        module,
+                        n,
+                        Rc::new(Next::Empty),
+                        Rc::new(Next::Tuple(std::slice::from_ref(a.as_ref()), next)),
+                    ),
                     None => Self::add_slice(
                         module,
                         bounds.min,
                         Rc::new(Next::Empty),
                         Rc::new(Next::Empty),
                     ),
-                }
+                };
+                tree.peek(peek)
             }
             Format::Map(f, _expr) => Self::add(module, f, next),
             Format::Compute(_expr) => Self::add_next(module, next),
