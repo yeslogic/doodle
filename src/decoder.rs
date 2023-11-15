@@ -400,7 +400,7 @@ impl Expr {
         }
     }
 
-    fn eval_value<'a>(&self, scope: &'a Scope<'a>) -> Value {
+    pub fn eval_value<'a>(&self, scope: &'a Scope<'a>) -> Value {
         self.eval(scope).coerce_mapped_value().clone()
     }
 
@@ -441,6 +441,7 @@ enum Decoder {
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Box<Decoder>, Expr),
     Compute(Expr),
+    Let(Cow<'static, str>, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Decoder)>),
     Dynamic(DynFormat),
@@ -921,6 +922,10 @@ impl Decoder {
                 Ok(Decoder::Map(da, expr.clone()))
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
+            Format::Let(name, expr, a) => {
+                let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
+                Ok(Decoder::Let(name.clone(), expr.clone(), da))
+            }
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
@@ -1167,6 +1172,12 @@ impl Decoder {
             Decoder::Compute(expr) => {
                 let v = expr.eval_value(scope);
                 Ok((v, input))
+            }
+            Decoder::Let(name, expr, d) => {
+                let v = expr.eval_value(scope);
+                let mut let_scope = Scope::child(scope);
+                let_scope.push(name.clone(), v);
+                d.parse(program, &let_scope, input)
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);

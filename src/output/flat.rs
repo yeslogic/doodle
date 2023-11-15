@@ -174,6 +174,7 @@ fn check_covered(
         Format::WithRelativeOffset(_, _) => {} // FIXME
         Format::Map(format, _expr) => check_covered(module, path, format)?,
         Format::Compute(_expr) => {}
+        Format::Let(_name, _expr, format) => check_covered(module, path, format)?,
         Format::Match(_head, branches) => {
             for (_pattern, format) in branches {
                 check_covered(module, path, format)?;
@@ -286,6 +287,12 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::WithRelativeOffset(_, format) => self.write_flat(scope, value, format),
             Format::Map(_format, _expr) => Ok(()),
             Format::Compute(_expr) => Ok(()),
+            Format::Let(name, expr, format) => {
+                let v = expr.eval_value(&scope);
+                let mut let_scope = Scope::child(scope);
+                let_scope.push(name.clone(), v);
+                self.write_flat(&let_scope, value, format)
+            }
             Format::Match(head, branches) => match value {
                 Value::Branch(index, value) => {
                     let head = head.eval(scope);
