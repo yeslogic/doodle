@@ -45,7 +45,7 @@ impl Pattern {
         Pattern::Variant(label.into(), value.into())
     }
 
-    fn build_scope(&self, scope: &mut TypeScope, t: &ValueType) {
+    fn build_scope(&self, scope: &mut TypeScope<'_>, t: &ValueType) {
         match (self, t) {
             (Pattern::Binding(name), t) => {
                 scope.push(name.clone(), t.clone());
@@ -78,29 +78,25 @@ impl Pattern {
 
     fn infer_expr_branch_type(
         &self,
-        scope: &mut TypeScope,
+        scope: &TypeScope<'_>,
         head_type: &ValueType,
         expr: &Expr,
     ) -> Result<ValueType, String> {
-        let initial_len = scope.len();
-        self.build_scope(scope, head_type);
-        let t = expr.infer_type(scope)?;
-        scope.truncate(initial_len);
-        Ok(t)
+        let mut pattern_scope = TypeScope::child(scope);
+        self.build_scope(&mut pattern_scope, head_type);
+        expr.infer_type(&pattern_scope)
     }
 
     fn infer_format_branch_type(
         &self,
-        scope: &mut TypeScope,
+        scope: &TypeScope<'_>,
         head_type: &ValueType,
         module: &FormatModule,
         format: &Format,
     ) -> Result<ValueType, String> {
-        let initial_len = scope.len();
-        self.build_scope(scope, head_type);
-        let t = module.infer_format_type(scope, format)?;
-        scope.truncate(initial_len);
-        Ok(t)
+        let mut pattern_scope = TypeScope::child(scope);
+        self.build_scope(&mut pattern_scope, head_type);
+        module.infer_format_type(&pattern_scope, format)
     }
 }
 
@@ -473,7 +469,7 @@ impl FormatModule {
         &self.format_types[level]
     }
 
-    fn infer_format_type(&self, scope: &mut TypeScope, f: &Format) -> Result<ValueType, String> {
+    fn infer_format_type(&self, scope: &TypeScope<'_>, f: &Format) -> Result<ValueType, String> {
         match f {
             Format::ItemVar(level, arg_exprs) => {
                 let arg_names = self.get_args(*level);
@@ -514,13 +510,12 @@ impl FormatModule {
             }
             Format::Record(fields) => {
                 let mut ts = Vec::with_capacity(fields.len());
-                let initial_len = scope.len();
+                let mut record_scope = TypeScope::child(scope);
                 for (label, f) in fields {
-                    let t = self.infer_format_type(scope, f)?;
+                    let t = self.infer_format_type(&record_scope, f)?;
                     ts.push((label.clone(), t.clone()));
-                    scope.push(label.clone(), t);
+                    record_scope.push(label.clone(), t);
                 }
-                scope.truncate(initial_len);
                 Ok(ValueType::Record(ts))
             }
             Format::Repeat(a) | Format::Repeat1(a) => {
@@ -542,10 +537,9 @@ impl FormatModule {
                 let arg_type = self.infer_format_type(scope, a)?;
                 match expr {
                     Expr::Lambda(name, body) => {
-                        scope.push(name.clone(), arg_type);
-                        let t = body.infer_type(scope)?;
-                        scope.pop();
-                        Ok(t)
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(name.clone(), arg_type);
+                        body.infer_type(&child_scope)
                     }
                     _ => Err(format!("Map: expected lambda")),
                 }
@@ -630,7 +624,7 @@ pub struct MatchTree {
 }
 
 impl Expr {
-    fn infer_type(&self, scope: &mut TypeScope) -> Result<ValueType, String> {
+    fn infer_type(&self, scope: &TypeScope<'_>) -> Result<ValueType, String> {
         match self {
             Expr::Var(name) => Ok(scope.get_type_by_name(name).clone()),
             Expr::Bool(_b) => Ok(ValueType::Bool),
@@ -774,14 +768,13 @@ impl Expr {
             Expr::FlatMap(expr, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
-                        scope.push(name.clone(), *t);
-                        let t2 = if let ValueType::Seq(t2) = expr.infer_type(scope)? {
-                            t2
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(name.clone(), *t);
+                        if let ValueType::Seq(t2) = expr.infer_type(&child_scope)? {
+                            Ok(ValueType::Seq(t2))
                         } else {
                             return Err(format!("FlatMap: expected Seq"));
-                        };
-                        scope.pop();
-                        Ok(ValueType::Seq(t2))
+                        }
                     }
                     _ => Err(format!("FlatMap: expected Seq")),
                 },
@@ -791,16 +784,20 @@ impl Expr {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
                         let accum_type = accum.infer_type(scope)?.unify(&accum_type)?;
-                        scope.push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
-                        let t2 = match expr.infer_type(scope)?.unwrap_tuple_type().as_mut_slice() {
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope
+                            .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
+                        match expr
+                            .infer_type(&child_scope)?
+                            .unwrap_tuple_type()
+                            .as_mut_slice()
+                        {
                             [accum_result, ValueType::Seq(t2)] => {
                                 accum_result.unify(&accum_type)?;
-                                t2.clone()
+                                Ok(ValueType::Seq(t2.clone()))
                             }
                             _ => panic!("FlatMapAccum: expected two values"),
-                        };
-                        scope.pop();
-                        Ok(ValueType::Seq(t2))
+                        }
                     }
                     _ => Err(format!("FlatMapAccum: expected Seq")),
                 },
@@ -1393,35 +1390,38 @@ impl MatchTree {
     }
 }
 
-pub struct TypeScope {
+pub struct TypeScope<'a> {
+    parent: Option<&'a TypeScope<'a>>,
     names: Vec<Cow<'static, str>>,
     types: Vec<ValueType>,
 }
 
-impl TypeScope {
+impl<'a> TypeScope<'a> {
     fn new() -> Self {
+        let parent = None;
         let names = Vec::new();
         let types = Vec::new();
-        TypeScope { names, types }
+        TypeScope {
+            parent,
+            names,
+            types,
+        }
+    }
+
+    fn child(parent: &'a TypeScope<'a>) -> Self {
+        let parent = Some(parent);
+        let names = Vec::new();
+        let types = Vec::new();
+        TypeScope {
+            parent,
+            names,
+            types,
+        }
     }
 
     fn push(&mut self, name: Cow<'static, str>, t: ValueType) {
         self.names.push(name);
         self.types.push(t);
-    }
-
-    fn pop(&mut self) -> ValueType {
-        self.names.pop();
-        self.types.pop().unwrap()
-    }
-
-    fn len(&self) -> usize {
-        self.types.len()
-    }
-
-    fn truncate(&mut self, len: usize) {
-        self.names.truncate(len);
-        self.types.truncate(len);
     }
 
     fn get_type_by_name(&self, name: &str) -> &ValueType {
@@ -1430,6 +1430,10 @@ impl TypeScope {
                 return &self.types[i];
             }
         }
-        panic!("variable not found: {name}");
+        if let Some(scope) = self.parent {
+            scope.get_type_by_name(name)
+        } else {
+            panic!("variable not found: {name}");
+        }
     }
 }
