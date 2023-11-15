@@ -1,4 +1,6 @@
-use crate::{byte_set::ByteSet, ReadCtxt, Scope, Value};
+use crate::byte_set::ByteSet;
+use crate::decoder::{Scope, Value};
+use crate::read::ReadCtxt;
 
 use std::borrow::Cow;
 

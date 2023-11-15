@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 use std::io;
 
-use crate::{Format, FormatModule, Scope, Value};
+use crate::decoder::{Scope, Value};
+use crate::{Format, FormatModule};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();

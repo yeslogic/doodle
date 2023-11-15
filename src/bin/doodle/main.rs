@@ -5,7 +5,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use doodle::{Compiler, FormatModule, ReadCtxt};
+use doodle::decoder::Compiler;
+use doodle::read::ReadCtxt;
+use doodle::FormatModule;
 
 mod format;
 
