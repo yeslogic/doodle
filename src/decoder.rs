@@ -4,7 +4,6 @@ use crate::read::ReadCtxt;
 use crate::{Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
 use serde::Serialize;
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -461,7 +460,7 @@ enum Decoder {
     Let(Cow<'static, str>, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Decoder)>),
-    Apply(Cow<'static, str>),
+    Apply(usize),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -497,14 +496,16 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
+        let mut dynstack = Vec::new();
         let mut scope = Scope::new();
-        self.decoders[0].parse(self, &mut scope, input)
+        self.decoders[0].parse(self, &mut dynstack, &mut scope, input)
     }
 }
 
 pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
+    dynstack: Vec<Cow<'static, str>>,
     record_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
     union_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
@@ -513,12 +514,14 @@ pub struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
         let program = Program::new();
+        let dynstack = Vec::new();
         let record_map = HashMap::new();
         let union_map = HashMap::new();
         let decoder_map = HashMap::new();
         Compiler {
             module,
             program,
+            dynstack,
             record_map,
             union_map,
             decoder_map,
@@ -554,7 +557,6 @@ pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
     names: Vec<Cow<'static, str>>,
     values: Vec<Value>,
-    decoders: Vec<RefCell<Option<Decoder>>>,
 }
 
 pub struct ScopeIter {
@@ -591,24 +593,20 @@ impl<'a> Scope<'a> {
         let parent = None;
         let names = Vec::new();
         let values = Vec::new();
-        let decoders = Vec::new();
         Scope {
             parent,
             names,
             values,
-            decoders,
         }
     }
 
     pub fn child(parent: &'a Scope<'a>) -> Self {
         let names = Vec::new();
         let values = Vec::new();
-        let decoders = Vec::new();
         Scope {
             parent: Some(parent),
             names,
             values,
-            decoders,
         }
     }
 
@@ -619,7 +617,6 @@ impl<'a> Scope<'a> {
     pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
         self.names.push(name);
         self.values.push(v);
-        self.decoders.push(RefCell::new(None));
     }
 
     fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
@@ -638,25 +635,6 @@ impl<'a> Scope<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         let (scope, index) = self.get_index_by_name(name);
         &scope.values[index]
-    }
-
-    fn call_decoder_by_name<'input>(
-        &self,
-        name: &str,
-        program: &Program,
-        input: ReadCtxt<'input>,
-    ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let (scope, i) = self.get_index_by_name(name);
-        let mut od = scope.decoders[i].borrow_mut();
-        if od.is_none() {
-            let d = match &scope.values[i] {
-                Value::Format(f) => Decoder::compile_one(&*f).unwrap(),
-                _ => panic!("variable not format: {name}"),
-            };
-            *od = Some(d);
-        }
-        let res = od.as_ref().unwrap().parse(program, self, input);
-        res
     }
 }
 
@@ -939,7 +917,9 @@ impl Decoder {
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Let(name, expr, a) => {
+                compiler.dynstack.push(name.clone());
                 let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
+                compiler.dynstack.pop();
                 Ok(Decoder::Let(name.clone(), expr.clone(), da))
             }
             Format::Match(head, branches) => {
@@ -967,24 +947,29 @@ impl Decoder {
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
-            Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
+            Format::Apply(name) => {
+                let index = compiler.dynstack.iter().position(|n| n == name).unwrap();
+                Ok(Decoder::Apply(index))
+            }
         }
     }
 
     pub fn parse<'input>(
         &self,
         program: &Program,
+        dynstack: &mut Vec<Decoder>,
         scope: &Scope<'_>,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es) => {
+                let mut new_dynstack = Vec::new();
                 let mut new_scope = Scope::new();
                 for (name, e) in es {
                     let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n].parse(program, &mut new_scope, input)
+                program.decoders[*n].parse(program, &mut new_dynstack, &mut new_scope, input)
             }
             Decoder::Fail => Err(ParseError::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
@@ -1009,12 +994,12 @@ impl Decoder {
                 }
             }
             Decoder::Variant(label, d) => {
-                let (v, input) = d.parse(program, scope, input)?;
+                let (v, input) = d.parse(program, dynstack, scope, input)?;
                 Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Parallel(branches) => {
                 for (index, (label, d)) in branches.iter().enumerate() {
-                    let res = d.parse(program, scope, input);
+                    let res = d.parse(program, dynstack, scope, input);
                     if let Ok((v, input)) = res {
                         return Ok((
                             Value::Branch(
@@ -1032,7 +1017,7 @@ impl Decoder {
                     offset: input.offset,
                 })?;
                 let (label, d) = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
+                let (v, input) = d.parse(program, dynstack, scope, input)?;
                 Ok((
                     Value::Branch(index, Box::new(Value::Variant(label.clone(), Box::new(v)))),
                     input,
@@ -1043,14 +1028,14 @@ impl Decoder {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
+                let (v, input) = d.parse(program, dynstack, scope, input)?;
                 Ok((Value::Branch(index, Box::new(v)), input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for f in fields {
-                    let (vf, next_input) = f.parse(program, scope, input)?;
+                    let (vf, next_input) = f.parse(program, dynstack, scope, input)?;
                     input = next_input;
                     v.push(vf.clone());
                 }
@@ -1061,7 +1046,7 @@ impl Decoder {
                 let mut v = Vec::with_capacity(fields.len());
                 let mut record_scope = Scope::child(scope);
                 for (name, f) in fields {
-                    let (vf, next_input) = f.parse(program, &record_scope, input)?;
+                    let (vf, next_input) = f.parse(program, dynstack, &record_scope, input)?;
                     input = next_input;
                     v.push((name.clone(), vf.clone()));
                     record_scope.push(name.clone(), vf);
@@ -1075,7 +1060,7 @@ impl Decoder {
                     offset: input.offset,
                 })? == 0
                 {
-                    let (va, next_input) = a.parse(program, scope, input)?;
+                    let (va, next_input) = a.parse(program, dynstack, scope, input)?;
                     input = next_input;
                     v.push(va);
                 }
@@ -1085,7 +1070,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
+                    let (va, next_input) = a.parse(program, dynstack, scope, input)?;
                     input = next_input;
                     v.push(va);
                     if tree.matches(input).ok_or(ParseError::NoValidBranch {
@@ -1102,7 +1087,7 @@ impl Decoder {
                 let count = expr.eval_value(scope).unwrap_usize();
                 let mut v = Vec::with_capacity(count);
                 for _ in 0..count {
-                    let (va, next_input) = a.parse(program, scope, input)?;
+                    let (va, next_input) = a.parse(program, dynstack, scope, input)?;
                     input = next_input;
                     v.push(va);
                 }
@@ -1112,7 +1097,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
+                    let (va, next_input) = a.parse(program, dynstack, scope, input)?;
                     input = next_input;
                     let done = expr.eval_lambda(scope, va.clone()).unwrap_bool();
                     v.push(va);
@@ -1126,7 +1111,7 @@ impl Decoder {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
+                    let (va, next_input) = a.parse(program, dynstack, scope, input)?;
                     input = next_input;
                     v.push(va);
                     let vs = Value::Seq(v.clone());
@@ -1138,11 +1123,11 @@ impl Decoder {
                 Ok((Value::Seq(v), input))
             }
             Decoder::Peek(a) => {
-                let (v, _next_input) = a.parse(program, scope, input)?;
+                let (v, _next_input) = a.parse(program, dynstack, scope, input)?;
                 Ok((v, input))
             }
             Decoder::PeekNot(a) => {
-                if a.parse(program, scope, input).is_ok() {
+                if a.parse(program, dynstack, scope, input).is_ok() {
                     Err(ParseError::fail(scope, input))
                 } else {
                     Ok((Value::Tuple(vec![]), input))
@@ -1153,7 +1138,7 @@ impl Decoder {
                 let (slice, input) = input
                     .split_at(size)
                     .ok_or(ParseError::overrun(size, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
+                let (v, _) = a.parse(program, dynstack, scope, slice)?;
                 Ok((v, input))
             }
             Decoder::Bits(a) => {
@@ -1163,7 +1148,7 @@ impl Decoder {
                         bits.push((b & (1 << i)) >> i);
                     }
                 }
-                let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
+                let (v, bits) = a.parse(program, dynstack, scope, ReadCtxt::new(&bits))?;
                 let bytes_remain = bits.remaining().len() >> 3;
                 let bytes_read = input.remaining().len() - bytes_remain;
                 let (_, input) = input
@@ -1176,11 +1161,11 @@ impl Decoder {
                 let (_, slice) = input
                     .split_at(offset)
                     .ok_or(ParseError::overrun(offset, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
+                let (v, _) = a.parse(program, dynstack, scope, slice)?;
                 Ok((v, input))
             }
             Decoder::Map(d, expr) => {
-                let (orig, input) = d.parse(program, scope, input)?;
+                let (orig, input) = d.parse(program, dynstack, scope, input)?;
                 let v = expr.eval_lambda(scope, orig.clone());
                 Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
             }
@@ -1190,15 +1175,23 @@ impl Decoder {
             }
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
-                let mut let_scope = Scope::child(scope);
-                let_scope.push(name.clone(), v);
-                d.parse(program, &let_scope, input)
+                if let Value::Format(f) = &v {
+                    let df = Decoder::compile_one(f.as_ref()).unwrap();
+                    dynstack.push(df);
+                    let mut let_scope = Scope::child(scope);
+                    let_scope.push(name.clone(), v);
+                    let res = d.parse(program, dynstack, &let_scope, input);
+                    dynstack.pop();
+                    res
+                } else {
+                    panic!("Let only works for formats!");
+                }
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) = decoder.parse(program, &pattern_scope, input)?;
+                        let (v, input) = decoder.parse(program, dynstack, &pattern_scope, input)?;
                         return Ok((Value::Branch(index, Box::new(v)), input));
                     }
                 }
@@ -1208,7 +1201,7 @@ impl Decoder {
                 let head = head.eval(scope);
                 for (index, (pattern, label, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) = decoder.parse(program, &pattern_scope, input)?;
+                        let (v, input) = decoder.parse(program, dynstack, &pattern_scope, input)?;
                         return Ok((
                             Value::Branch(
                                 index,
@@ -1220,7 +1213,10 @@ impl Decoder {
                 }
                 panic!("exhaustive patterns");
             }
-            Decoder::Apply(name) => scope.call_decoder_by_name(name, program, input),
+            Decoder::Apply(index) => {
+                let mut new_dynstack = Vec::new();
+                dynstack[*index].parse(program, &mut new_dynstack, &scope, input)
+            }
         }
     }
 }
@@ -1382,16 +1378,22 @@ mod tests {
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
+        let mut dynstack = Vec::new();
         let mut scope = Scope::new();
-        let (val, remain) = d.parse(&program, &mut scope, ReadCtxt::new(input)).unwrap();
+        let (val, remain) = d
+            .parse(&program, &mut dynstack, &mut scope, ReadCtxt::new(input))
+            .unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
+        let mut dynstack = Vec::new();
         let mut scope = Scope::new();
-        assert!(d.parse(&program, &mut scope, ReadCtxt::new(input)).is_err());
+        assert!(d
+            .parse(&program, &mut dynstack, &mut scope, ReadCtxt::new(input))
+            .is_err());
     }
 
     #[test]

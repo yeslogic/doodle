@@ -509,6 +509,9 @@ impl FormatModule {
                 let mut record_scope = TypeScope::child(scope);
                 for (label, f) in fields {
                     let t = self.infer_format_type(&record_scope, f)?;
+                    if let ValueType::Format(_) = &t {
+                        return Err(format!("cannot put Format in Record"));
+                    }
                     ts.push((label.clone(), t.clone()));
                     record_scope.push(label.clone(), t);
                 }
