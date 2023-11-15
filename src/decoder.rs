@@ -541,8 +541,9 @@ pub struct Scope<'a> {
 }
 
 pub struct ScopeIter<'a> {
-    name_iter: std::slice::Iter<'a, Cow<'static, str>>,
-    value_iter: std::slice::Iter<'a, Value>,
+    parent: Option<&'a Scope<'a>>,
+    name_iter: std::iter::Rev<std::slice::Iter<'a, Cow<'static, str>>>,
+    value_iter: std::iter::Rev<std::slice::Iter<'a, Value>>,
 }
 
 impl<'a> Iterator for ScopeIter<'a> {
@@ -551,7 +552,13 @@ impl<'a> Iterator for ScopeIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         match (self.name_iter.next(), self.value_iter.next()) {
             (Some(name), Some(value)) => Some((name, value)),
-            _ => None,
+            _ => match self.parent {
+                Some(parent) => {
+                    *self = parent.into_iter();
+                    self.next()
+                }
+                None => None,
+            },
         }
     }
 }
@@ -563,8 +570,9 @@ impl<'a> IntoIterator for &'a Scope<'a> {
 
     fn into_iter(self) -> Self::IntoIter {
         ScopeIter {
-            name_iter: self.names.iter(),
-            value_iter: self.values.iter(),
+            parent: self.parent,
+            name_iter: self.names.iter().rev(),
+            value_iter: self.values.iter().rev(),
         }
     }
 }
