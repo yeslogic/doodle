@@ -1248,25 +1248,24 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::WithRelativeOffset(expr, a) => {
-                // REVIEW - this is a hack but it is at least somewhat better than before
+                // REVIEW - this is a bit hackish but it is at least somewhat better than before
                 let tree = Self::add_next(module, next.clone());
                 let bounds = expr.bounds();
-                let peek = match bounds.is_exact() {
-                    Some(0) => Self::add(module, a, Rc::new(Next::Empty)),
-                    Some(n) => Self::add_slice(
-                        module,
-                        n,
-                        Rc::new(Next::Empty),
-                        Rc::new(Next::Tuple(std::slice::from_ref(a.as_ref()), next)),
-                    ),
-                    None => Self::add_slice(
-                        module,
-                        bounds.min,
-                        Rc::new(Next::Empty),
-                        Rc::new(Next::Empty),
-                    ),
-                };
-                tree.peek(peek)
+                match bounds.is_exact() {
+                    None => tree, // if the lookahead is indeterminate, ignore it
+                    Some(n) => {
+                        let peek = match n {
+                            0 => Self::add(module, a, Rc::new(Next::Empty)),
+                            _ => Self::add_slice(
+                                module,
+                                n,
+                                Rc::new(Next::Empty),
+                                Rc::new(Next::Tuple(std::slice::from_ref(a.as_ref()), next)),
+                            ),
+                        };
+                        tree.peek(peek)
+                    }
+                }
             }
             Format::Map(f, _expr) => Self::add(module, f, next),
             Format::Compute(_expr) => Self::add_next(module, next),
