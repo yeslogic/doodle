@@ -98,8 +98,8 @@ fn is_show_format(name: &str) -> Option<&'static str> {
         "tar.header_with_data" => Some("Tar File Entry"),
 
         // Text
-        "text.string.ascii" => Some("ASCII String"),
-        "text.string.utf8" => Some("UTF-8 String"),
+        "text.string.ascii" => Some("ASCII Text"),
+        "text.string.utf8" => Some("UTF-8 Text"),
 
         _ => None,
     }
