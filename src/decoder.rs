@@ -603,7 +603,7 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn iter(&'a self) -> impl Iterator<Item = (&'a Cow<'static, str>, &'a Value)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Cow<'static, str>, &Value)> {
         (&self).into_iter()
     }
 
