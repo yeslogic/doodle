@@ -31,8 +31,7 @@
 │           │   │   │       │   ├── 9 := 3
 │           │   │   │       │   ~
 │           │   │   │       │   └── 13 := 5
-│           │   │   │       ├── code-length-alphabet-format <- compute huffman ([..]) code-length-alphabet-code-lengths := _ |...| _
-│           │   │   │       ├── literal-length-distance-alphabet-code-lengths <- repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... } :=
+│           │   │   │       ├── literal-length-distance-alphabet-code-lengths <- let code-length-alphabet-format (huffman ([..]) code-length-alphabet-code-lengths) (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │           │   │   │       │   ├── 0 :=
 │           │   │   │       │   │   ├── code <- apply := 17
 │           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 7
@@ -106,9 +105,7 @@
 │           │   │   │       │   ├── 9 := 7
 │           │   │   │       │   ~
 │           │   │   │       │   └── 27 := 6
-│           │   │   │       ├── distance-alphabet-format <- compute huffman distance-alphabet-code-lengths-value := _ |...| _
-│           │   │   │       ├── literal-length-alphabet-format <- compute huffman literal-length-alphabet-code-lengths-value := _ |...| _
-│           │   │   │       ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
+│           │   │   │       ├── codes <- let distance-alphabet-format (huffman distance-alphabet-code-lengths-value) (let literal-length-alphabet-format (huffman literal-length-alphabet-code-lengths-value) (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
 │           │   │   │       │   ├── 0 :=
 │           │   │   │       │   │   ├── code <- apply := 35
 │           │   │   │       │   │   └── extra <- match code { ... } := ()
@@ -176,8 +173,7 @@
 │           │   │           │   ├── 9 := 3
 │           │   │           │   ~
 │           │   │           │   └── 13 := 5
-│           │   │           ├── code-length-alphabet-format <- compute huffman ([..]) code-length-alphabet-code-lengths := _ |...| _
-│           │   │           ├── literal-length-distance-alphabet-code-lengths <- repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... } :=
+│           │   │           ├── literal-length-distance-alphabet-code-lengths <- let code-length-alphabet-format (huffman ([..]) code-length-alphabet-code-lengths) (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │           │   │           │   ├── 0 :=
 │           │   │           │   │   ├── code <- apply := 18
 │           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 37
@@ -251,9 +247,7 @@
 │           │   │           │   ├── 9 := 0
 │           │   │           │   ~
 │           │   │           │   └── 28 := 5
-│           │   │           ├── distance-alphabet-format <- compute huffman distance-alphabet-code-lengths-value := _ |...| _
-│           │   │           ├── literal-length-alphabet-format <- compute huffman literal-length-alphabet-code-lengths-value := _ |...| _
-│           │   │           ├── codes <- repeat-until-last (x -> as-u16 (x.code) == 256) { ... } :=
+│           │   │           ├── codes <- let distance-alphabet-format (huffman distance-alphabet-code-lengths-value) (let literal-length-alphabet-format (huffman literal-length-alphabet-code-lengths-value) (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
 │           │   │           │   ├── 0 :=
 │           │   │           │   │   ├── code <- apply := 50
 │           │   │           │   │   └── extra <- match code { ... } := ()

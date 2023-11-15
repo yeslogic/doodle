@@ -239,179 +239,179 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "deflate.fixed_huffman",
         record([
             (
-                "format",
-                Format::Compute(Expr::Huffman(Box::new(fixed_code_lengths()), None)),
-            ),
-            (
                 "codes",
-                repeat_until_last(
-                    Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Eq(
-                            Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
-                                Box::new(var("x")),
-                                "code".into(),
-                            )))),
-                            Box::new(Expr::U16(256)),
-                        )),
-                    ),
-                    record([
-                        ("code", Format::Apply("format".into())),
-                        (
-                            "extra",
-                            Format::MatchVariant(
-                                var("code"),
-                                vec![
-                                    (
-                                        Pattern::U16(257),
-                                        "some".into(),
-                                        length_record_fixed(3, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(258),
-                                        "some".into(),
-                                        length_record_fixed(4, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(259),
-                                        "some".into(),
-                                        length_record_fixed(5, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(260),
-                                        "some".into(),
-                                        length_record_fixed(6, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(261),
-                                        "some".into(),
-                                        length_record_fixed(7, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(262),
-                                        "some".into(),
-                                        length_record_fixed(8, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(263),
-                                        "some".into(),
-                                        length_record_fixed(9, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(264),
-                                        "some".into(),
-                                        length_record_fixed(10, base, 0),
-                                    ),
-                                    (
-                                        Pattern::U16(265),
-                                        "some".into(),
-                                        length_record_fixed(11, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(266),
-                                        "some".into(),
-                                        length_record_fixed(13, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(267),
-                                        "some".into(),
-                                        length_record_fixed(15, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(268),
-                                        "some".into(),
-                                        length_record_fixed(17, base, 1),
-                                    ),
-                                    (
-                                        Pattern::U16(269),
-                                        "some".into(),
-                                        length_record_fixed(19, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(270),
-                                        "some".into(),
-                                        length_record_fixed(23, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(271),
-                                        "some".into(),
-                                        length_record_fixed(27, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(272),
-                                        "some".into(),
-                                        length_record_fixed(31, base, 2),
-                                    ),
-                                    (
-                                        Pattern::U16(273),
-                                        "some".into(),
-                                        length_record_fixed(35, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(274),
-                                        "some".into(),
-                                        length_record_fixed(43, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(275),
-                                        "some".into(),
-                                        length_record_fixed(51, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(276),
-                                        "some".into(),
-                                        length_record_fixed(59, base, 3),
-                                    ),
-                                    (
-                                        Pattern::U16(277),
-                                        "some".into(),
-                                        length_record_fixed(67, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(278),
-                                        "some".into(),
-                                        length_record_fixed(83, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(279),
-                                        "some".into(),
-                                        length_record_fixed(99, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(280),
-                                        "some".into(),
-                                        length_record_fixed(115, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(281),
-                                        "some".into(),
-                                        length_record_fixed(131, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(282),
-                                        "some".into(),
-                                        length_record_fixed(163, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(283),
-                                        "some".into(),
-                                        length_record_fixed(195, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(284),
-                                        "some".into(),
-                                        length_record_fixed(227, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(285),
-                                        "some".into(),
-                                        length_record_fixed(258, base, 0),
-                                    ),
-                                    (Pattern::Wildcard, "none".into(), Format::EMPTY),
-                                ],
-                            ),
+                Format::Let(
+                    "format".into(),
+                    Expr::Huffman(Box::new(fixed_code_lengths()), None),
+                    Box::new(repeat_until_last(
+                        Expr::Lambda(
+                            "x".into(),
+                            Box::new(Expr::Eq(
+                                Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
+                                    Box::new(var("x")),
+                                    "code".into(),
+                                )))),
+                                Box::new(Expr::U16(256)),
+                            )),
                         ),
-                    ]),
+                        record([
+                            ("code", Format::Apply("format".into())),
+                            (
+                                "extra",
+                                Format::MatchVariant(
+                                    var("code"),
+                                    vec![
+                                        (
+                                            Pattern::U16(257),
+                                            "some".into(),
+                                            length_record_fixed(3, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(258),
+                                            "some".into(),
+                                            length_record_fixed(4, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(259),
+                                            "some".into(),
+                                            length_record_fixed(5, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(260),
+                                            "some".into(),
+                                            length_record_fixed(6, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(261),
+                                            "some".into(),
+                                            length_record_fixed(7, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(262),
+                                            "some".into(),
+                                            length_record_fixed(8, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(263),
+                                            "some".into(),
+                                            length_record_fixed(9, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(264),
+                                            "some".into(),
+                                            length_record_fixed(10, base, 0),
+                                        ),
+                                        (
+                                            Pattern::U16(265),
+                                            "some".into(),
+                                            length_record_fixed(11, base, 1),
+                                        ),
+                                        (
+                                            Pattern::U16(266),
+                                            "some".into(),
+                                            length_record_fixed(13, base, 1),
+                                        ),
+                                        (
+                                            Pattern::U16(267),
+                                            "some".into(),
+                                            length_record_fixed(15, base, 1),
+                                        ),
+                                        (
+                                            Pattern::U16(268),
+                                            "some".into(),
+                                            length_record_fixed(17, base, 1),
+                                        ),
+                                        (
+                                            Pattern::U16(269),
+                                            "some".into(),
+                                            length_record_fixed(19, base, 2),
+                                        ),
+                                        (
+                                            Pattern::U16(270),
+                                            "some".into(),
+                                            length_record_fixed(23, base, 2),
+                                        ),
+                                        (
+                                            Pattern::U16(271),
+                                            "some".into(),
+                                            length_record_fixed(27, base, 2),
+                                        ),
+                                        (
+                                            Pattern::U16(272),
+                                            "some".into(),
+                                            length_record_fixed(31, base, 2),
+                                        ),
+                                        (
+                                            Pattern::U16(273),
+                                            "some".into(),
+                                            length_record_fixed(35, base, 3),
+                                        ),
+                                        (
+                                            Pattern::U16(274),
+                                            "some".into(),
+                                            length_record_fixed(43, base, 3),
+                                        ),
+                                        (
+                                            Pattern::U16(275),
+                                            "some".into(),
+                                            length_record_fixed(51, base, 3),
+                                        ),
+                                        (
+                                            Pattern::U16(276),
+                                            "some".into(),
+                                            length_record_fixed(59, base, 3),
+                                        ),
+                                        (
+                                            Pattern::U16(277),
+                                            "some".into(),
+                                            length_record_fixed(67, base, 4),
+                                        ),
+                                        (
+                                            Pattern::U16(278),
+                                            "some".into(),
+                                            length_record_fixed(83, base, 4),
+                                        ),
+                                        (
+                                            Pattern::U16(279),
+                                            "some".into(),
+                                            length_record_fixed(99, base, 4),
+                                        ),
+                                        (
+                                            Pattern::U16(280),
+                                            "some".into(),
+                                            length_record_fixed(115, base, 4),
+                                        ),
+                                        (
+                                            Pattern::U16(281),
+                                            "some".into(),
+                                            length_record_fixed(131, base, 5),
+                                        ),
+                                        (
+                                            Pattern::U16(282),
+                                            "some".into(),
+                                            length_record_fixed(163, base, 5),
+                                        ),
+                                        (
+                                            Pattern::U16(283),
+                                            "some".into(),
+                                            length_record_fixed(195, base, 5),
+                                        ),
+                                        (
+                                            Pattern::U16(284),
+                                            "some".into(),
+                                            length_record_fixed(227, base, 5),
+                                        ),
+                                        (
+                                            Pattern::U16(285),
+                                            "some".into(),
+                                            length_record_fixed(258, base, 0),
+                                        ),
+                                        (Pattern::Wildcard, "none".into(), Format::EMPTY),
+                                    ],
+                                ),
+                            ),
+                        ]),
+                    )),
                 ),
             ),
             (
@@ -482,159 +482,159 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 repeat_count(add(var("hclen"), Expr::U8(4)), bits3.clone()),
             ),
             (
-                "code-length-alphabet-format",
-                Format::Compute(Expr::Huffman(
-                    Box::new(var("code-length-alphabet-code-lengths")),
-                    Some(Box::new(Expr::Seq(vec![
-                        Expr::U8(16),
-                        Expr::U8(17),
-                        Expr::U8(18),
-                        Expr::U8(0),
-                        Expr::U8(8),
-                        Expr::U8(7),
-                        Expr::U8(9),
-                        Expr::U8(6),
-                        Expr::U8(10),
-                        Expr::U8(5),
-                        Expr::U8(11),
-                        Expr::U8(4),
-                        Expr::U8(12),
-                        Expr::U8(3),
-                        Expr::U8(13),
-                        Expr::U8(2),
-                        Expr::U8(14),
-                        Expr::U8(1),
-                        Expr::U8(15),
-                    ]))),
-                )),
-            ),
-            (
                 "literal-length-distance-alphabet-code-lengths",
-                repeat_until_seq(
-                    Expr::Lambda(
-                        "y".into(),
-                        Box::new(Expr::Gte(
-                            Box::new(Expr::SeqLength(Box::new(Expr::FlatMapAccum(
-                                Box::new(Expr::Lambda(
-                                    "x".into(),
-                                    Box::new(Expr::Match(
-                                        Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
-                                            Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
-                                            "code".into(),
-                                        )))),
-                                        vec![
-                                            (
-                                                Pattern::U8(16),
-                                                Expr::Tuple(vec![
-                                                    Expr::TupleProj(Box::new(var("x")), 0),
-                                                    Expr::Dup(
-                                                        Box::new(add(
-                                                            Expr::RecordProj(
-                                                                Box::new(Expr::TupleProj(
-                                                                    Box::new(var("x")),
-                                                                    1,
-                                                                )),
-                                                                "extra".into(),
-                                                            ),
-                                                            Expr::U8(3),
-                                                        )),
-                                                        Box::new(Expr::Match(
-                                                            Box::new(Expr::TupleProj(
-                                                                Box::new(var("x")),
-                                                                0,
-                                                            )),
-                                                            vec![(
-                                                                Pattern::Variant(
-                                                                    "some".into(),
-                                                                    Box::new(Pattern::Binding(
-                                                                        "y".into(),
-                                                                    )),
-                                                                ),
-                                                                Expr::Var("y".into()),
-                                                            )],
-                                                        )),
-                                                    ),
-                                                ]),
-                                            ),
-                                            (
-                                                Pattern::U8(17),
-                                                Expr::Tuple(vec![
-                                                    Expr::TupleProj(Box::new(var("x")), 0),
-                                                    Expr::Dup(
-                                                        Box::new(add(
-                                                            Expr::RecordProj(
-                                                                Box::new(Expr::TupleProj(
-                                                                    Box::new(var("x")),
-                                                                    1,
-                                                                )),
-                                                                "extra".into(),
-                                                            ),
-                                                            Expr::U8(3),
-                                                        )),
-                                                        Box::new(Expr::U8(0)),
-                                                    ),
-                                                ]),
-                                            ),
-                                            (
-                                                Pattern::U8(18),
-                                                Expr::Tuple(vec![
-                                                    Expr::TupleProj(Box::new(var("x")), 0),
-                                                    Expr::Dup(
-                                                        Box::new(add(
-                                                            Expr::RecordProj(
-                                                                Box::new(Expr::TupleProj(
-                                                                    Box::new(var("x")),
-                                                                    1,
-                                                                )),
-                                                                "extra".into(),
-                                                            ),
-                                                            Expr::U8(11),
-                                                        )),
-                                                        Box::new(Expr::U8(0)),
-                                                    ),
-                                                ]),
-                                            ),
-                                            (
-                                                Pattern::Binding("v".into()),
-                                                Expr::Tuple(vec![
-                                                    Expr::Variant(
-                                                        "some".into(),
-                                                        Box::new(var("v")),
-                                                    ),
-                                                    Expr::Seq(vec![var("v")]),
-                                                ]),
-                                            ),
-                                        ],
-                                    )),
-                                )),
-                                Box::new(Expr::Variant("none".into(), Box::new(Expr::UNIT))),
-                                ValueType::Union(vec![
-                                    ("none".into(), ValueType::Tuple(vec![])),
-                                    ("some".into(), ValueType::U8),
-                                ]),
-                                Box::new(var("y")),
-                            )))),
-                            Box::new(add(
-                                Expr::AsU32(Box::new(add(var("hlit"), var("hdist")))),
-                                Expr::U32(258),
-                            )),
-                        )),
+                Format::Let(
+                    "code-length-alphabet-format".into(),
+                    Expr::Huffman(
+                        Box::new(var("code-length-alphabet-code-lengths")),
+                        Some(Box::new(Expr::Seq(vec![
+                            Expr::U8(16),
+                            Expr::U8(17),
+                            Expr::U8(18),
+                            Expr::U8(0),
+                            Expr::U8(8),
+                            Expr::U8(7),
+                            Expr::U8(9),
+                            Expr::U8(6),
+                            Expr::U8(10),
+                            Expr::U8(5),
+                            Expr::U8(11),
+                            Expr::U8(4),
+                            Expr::U8(12),
+                            Expr::U8(3),
+                            Expr::U8(13),
+                            Expr::U8(2),
+                            Expr::U8(14),
+                            Expr::U8(1),
+                            Expr::U8(15),
+                        ]))),
                     ),
-                    record([
-                        ("code", Format::Apply("code-length-alphabet-format".into())),
-                        (
-                            "extra",
-                            Format::Match(
-                                Expr::AsU8(Box::new(var("code"))),
-                                vec![
-                                    (Pattern::U8(16), bits2.clone()),
-                                    (Pattern::U8(17), bits3.clone()),
-                                    (Pattern::U8(18), bits7.clone()),
-                                    (Pattern::Wildcard, Format::Compute(Expr::U8(0))),
-                                ],
-                            ),
+                    Box::new(repeat_until_seq(
+                        Expr::Lambda(
+                            "y".into(),
+                            Box::new(Expr::Gte(
+                                Box::new(Expr::SeqLength(Box::new(Expr::FlatMapAccum(
+                                    Box::new(Expr::Lambda(
+                                        "x".into(),
+                                        Box::new(Expr::Match(
+                                            Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
+                                                Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
+                                                "code".into(),
+                                            )))),
+                                            vec![
+                                                (
+                                                    Pattern::U8(16),
+                                                    Expr::Tuple(vec![
+                                                        Expr::TupleProj(Box::new(var("x")), 0),
+                                                        Expr::Dup(
+                                                            Box::new(add(
+                                                                Expr::RecordProj(
+                                                                    Box::new(Expr::TupleProj(
+                                                                        Box::new(var("x")),
+                                                                        1,
+                                                                    )),
+                                                                    "extra".into(),
+                                                                ),
+                                                                Expr::U8(3),
+                                                            )),
+                                                            Box::new(Expr::Match(
+                                                                Box::new(Expr::TupleProj(
+                                                                    Box::new(var("x")),
+                                                                    0,
+                                                                )),
+                                                                vec![(
+                                                                    Pattern::Variant(
+                                                                        "some".into(),
+                                                                        Box::new(Pattern::Binding(
+                                                                            "y".into(),
+                                                                        )),
+                                                                    ),
+                                                                    Expr::Var("y".into()),
+                                                                )],
+                                                            )),
+                                                        ),
+                                                    ]),
+                                                ),
+                                                (
+                                                    Pattern::U8(17),
+                                                    Expr::Tuple(vec![
+                                                        Expr::TupleProj(Box::new(var("x")), 0),
+                                                        Expr::Dup(
+                                                            Box::new(add(
+                                                                Expr::RecordProj(
+                                                                    Box::new(Expr::TupleProj(
+                                                                        Box::new(var("x")),
+                                                                        1,
+                                                                    )),
+                                                                    "extra".into(),
+                                                                ),
+                                                                Expr::U8(3),
+                                                            )),
+                                                            Box::new(Expr::U8(0)),
+                                                        ),
+                                                    ]),
+                                                ),
+                                                (
+                                                    Pattern::U8(18),
+                                                    Expr::Tuple(vec![
+                                                        Expr::TupleProj(Box::new(var("x")), 0),
+                                                        Expr::Dup(
+                                                            Box::new(add(
+                                                                Expr::RecordProj(
+                                                                    Box::new(Expr::TupleProj(
+                                                                        Box::new(var("x")),
+                                                                        1,
+                                                                    )),
+                                                                    "extra".into(),
+                                                                ),
+                                                                Expr::U8(11),
+                                                            )),
+                                                            Box::new(Expr::U8(0)),
+                                                        ),
+                                                    ]),
+                                                ),
+                                                (
+                                                    Pattern::Binding("v".into()),
+                                                    Expr::Tuple(vec![
+                                                        Expr::Variant(
+                                                            "some".into(),
+                                                            Box::new(var("v")),
+                                                        ),
+                                                        Expr::Seq(vec![var("v")]),
+                                                    ]),
+                                                ),
+                                            ],
+                                        )),
+                                    )),
+                                    Box::new(Expr::Variant("none".into(), Box::new(Expr::UNIT))),
+                                    ValueType::Union(vec![
+                                        ("none".into(), ValueType::Tuple(vec![])),
+                                        ("some".into(), ValueType::U8),
+                                    ]),
+                                    Box::new(var("y")),
+                                )))),
+                                Box::new(add(
+                                    Expr::AsU32(Box::new(add(var("hlit"), var("hdist")))),
+                                    Expr::U32(258),
+                                )),
+                            )),
                         ),
-                    ]),
+                        record([
+                            ("code", Format::Apply("code-length-alphabet-format".into())),
+                            (
+                                "extra",
+                                Format::Match(
+                                    Expr::AsU8(Box::new(var("code"))),
+                                    vec![
+                                        (Pattern::U8(16), bits2.clone()),
+                                        (Pattern::U8(17), bits3.clone()),
+                                        (Pattern::U8(18), bits7.clone()),
+                                        (Pattern::Wildcard, Format::Compute(Expr::U8(0))),
+                                    ],
+                                ),
+                            ),
+                        ]),
+                    )),
                 ),
             ),
             (
@@ -749,100 +749,189 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )),
             ),
             (
-                "distance-alphabet-format",
-                Format::Compute(Expr::Huffman(
-                    Box::new(var("distance-alphabet-code-lengths-value")),
-                    None,
-                )),
-            ),
-            (
-                "literal-length-alphabet-format",
-                Format::Compute(Expr::Huffman(
-                    Box::new(var("literal-length-alphabet-code-lengths-value")),
-                    None,
-                )),
-            ),
-            (
                 "codes",
-                repeat_until_last(
-                    Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Eq(
-                            Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
-                                Box::new(var("x")),
-                                "code".into(),
-                            )))),
-                            Box::new(Expr::U16(256)),
-                        )),
-                    ),
-                    record([
-                        (
-                            "code",
-                            Format::Apply("literal-length-alphabet-format".into()),
+                Format::Let(
+                    "distance-alphabet-format".into(),
+                    Expr::Huffman(Box::new(var("distance-alphabet-code-lengths-value")), None),
+                    Box::new(Format::Let(
+                        "literal-length-alphabet-format".into(),
+                        Expr::Huffman(
+                            Box::new(var("literal-length-alphabet-code-lengths-value")),
+                            None,
                         ),
-                        (
-                            "extra",
-                            Format::MatchVariant(
-                                var("code"),
-                                vec![
-                                    (Pattern::U16(257), "some".into(), length_record(3, base, 0)),
-                                    (Pattern::U16(258), "some".into(), length_record(4, base, 0)),
-                                    (Pattern::U16(259), "some".into(), length_record(5, base, 0)),
-                                    (Pattern::U16(260), "some".into(), length_record(6, base, 0)),
-                                    (Pattern::U16(261), "some".into(), length_record(7, base, 0)),
-                                    (Pattern::U16(262), "some".into(), length_record(8, base, 0)),
-                                    (Pattern::U16(263), "some".into(), length_record(9, base, 0)),
-                                    (Pattern::U16(264), "some".into(), length_record(10, base, 0)),
-                                    (Pattern::U16(265), "some".into(), length_record(11, base, 1)),
-                                    (Pattern::U16(266), "some".into(), length_record(13, base, 1)),
-                                    (Pattern::U16(267), "some".into(), length_record(15, base, 1)),
-                                    (Pattern::U16(268), "some".into(), length_record(17, base, 1)),
-                                    (Pattern::U16(269), "some".into(), length_record(19, base, 2)),
-                                    (Pattern::U16(270), "some".into(), length_record(23, base, 2)),
-                                    (Pattern::U16(271), "some".into(), length_record(27, base, 2)),
-                                    (Pattern::U16(272), "some".into(), length_record(31, base, 2)),
-                                    (Pattern::U16(273), "some".into(), length_record(35, base, 3)),
-                                    (Pattern::U16(274), "some".into(), length_record(43, base, 3)),
-                                    (Pattern::U16(275), "some".into(), length_record(51, base, 3)),
-                                    (Pattern::U16(276), "some".into(), length_record(59, base, 3)),
-                                    (Pattern::U16(277), "some".into(), length_record(67, base, 4)),
-                                    (Pattern::U16(278), "some".into(), length_record(83, base, 4)),
-                                    (Pattern::U16(279), "some".into(), length_record(99, base, 4)),
-                                    (
-                                        Pattern::U16(280),
-                                        "some".into(),
-                                        length_record(115, base, 4),
-                                    ),
-                                    (
-                                        Pattern::U16(281),
-                                        "some".into(),
-                                        length_record(131, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(282),
-                                        "some".into(),
-                                        length_record(163, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(283),
-                                        "some".into(),
-                                        length_record(195, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(284),
-                                        "some".into(),
-                                        length_record(227, base, 5),
-                                    ),
-                                    (
-                                        Pattern::U16(285),
-                                        "some".into(),
-                                        length_record(258, base, 0),
-                                    ),
-                                    (Pattern::Wildcard, "none".into(), Format::EMPTY),
-                                ],
+                        Box::new(repeat_until_last(
+                            Expr::Lambda(
+                                "x".into(),
+                                Box::new(Expr::Eq(
+                                    Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
+                                        Box::new(var("x")),
+                                        "code".into(),
+                                    )))),
+                                    Box::new(Expr::U16(256)),
+                                )),
                             ),
-                        ),
-                    ]),
+                            record([
+                                (
+                                    "code",
+                                    Format::Apply("literal-length-alphabet-format".into()),
+                                ),
+                                (
+                                    "extra",
+                                    Format::MatchVariant(
+                                        var("code"),
+                                        vec![
+                                            (
+                                                Pattern::U16(257),
+                                                "some".into(),
+                                                length_record(3, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(258),
+                                                "some".into(),
+                                                length_record(4, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(259),
+                                                "some".into(),
+                                                length_record(5, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(260),
+                                                "some".into(),
+                                                length_record(6, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(261),
+                                                "some".into(),
+                                                length_record(7, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(262),
+                                                "some".into(),
+                                                length_record(8, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(263),
+                                                "some".into(),
+                                                length_record(9, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(264),
+                                                "some".into(),
+                                                length_record(10, base, 0),
+                                            ),
+                                            (
+                                                Pattern::U16(265),
+                                                "some".into(),
+                                                length_record(11, base, 1),
+                                            ),
+                                            (
+                                                Pattern::U16(266),
+                                                "some".into(),
+                                                length_record(13, base, 1),
+                                            ),
+                                            (
+                                                Pattern::U16(267),
+                                                "some".into(),
+                                                length_record(15, base, 1),
+                                            ),
+                                            (
+                                                Pattern::U16(268),
+                                                "some".into(),
+                                                length_record(17, base, 1),
+                                            ),
+                                            (
+                                                Pattern::U16(269),
+                                                "some".into(),
+                                                length_record(19, base, 2),
+                                            ),
+                                            (
+                                                Pattern::U16(270),
+                                                "some".into(),
+                                                length_record(23, base, 2),
+                                            ),
+                                            (
+                                                Pattern::U16(271),
+                                                "some".into(),
+                                                length_record(27, base, 2),
+                                            ),
+                                            (
+                                                Pattern::U16(272),
+                                                "some".into(),
+                                                length_record(31, base, 2),
+                                            ),
+                                            (
+                                                Pattern::U16(273),
+                                                "some".into(),
+                                                length_record(35, base, 3),
+                                            ),
+                                            (
+                                                Pattern::U16(274),
+                                                "some".into(),
+                                                length_record(43, base, 3),
+                                            ),
+                                            (
+                                                Pattern::U16(275),
+                                                "some".into(),
+                                                length_record(51, base, 3),
+                                            ),
+                                            (
+                                                Pattern::U16(276),
+                                                "some".into(),
+                                                length_record(59, base, 3),
+                                            ),
+                                            (
+                                                Pattern::U16(277),
+                                                "some".into(),
+                                                length_record(67, base, 4),
+                                            ),
+                                            (
+                                                Pattern::U16(278),
+                                                "some".into(),
+                                                length_record(83, base, 4),
+                                            ),
+                                            (
+                                                Pattern::U16(279),
+                                                "some".into(),
+                                                length_record(99, base, 4),
+                                            ),
+                                            (
+                                                Pattern::U16(280),
+                                                "some".into(),
+                                                length_record(115, base, 4),
+                                            ),
+                                            (
+                                                Pattern::U16(281),
+                                                "some".into(),
+                                                length_record(131, base, 5),
+                                            ),
+                                            (
+                                                Pattern::U16(282),
+                                                "some".into(),
+                                                length_record(163, base, 5),
+                                            ),
+                                            (
+                                                Pattern::U16(283),
+                                                "some".into(),
+                                                length_record(195, base, 5),
+                                            ),
+                                            (
+                                                Pattern::U16(284),
+                                                "some".into(),
+                                                length_record(227, base, 5),
+                                            ),
+                                            (
+                                                Pattern::U16(285),
+                                                "some".into(),
+                                                length_record(258, base, 0),
+                                            ),
+                                            (Pattern::Wildcard, "none".into(), Format::EMPTY),
+                                        ],
+                                    ),
+                                ),
+                            ]),
+                        )),
+                    )),
                 ),
             ),
             (
