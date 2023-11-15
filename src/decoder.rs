@@ -2,14 +2,12 @@ use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
 use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
-use serde::Serialize;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-#[serde(tag = "tag", content = "data")]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Bool(bool),
     U8(u8),
@@ -22,7 +20,7 @@ pub enum Value {
     Seq(Vec<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
-    Format(Box<Format>),
+    Format(Box<Format>, RefCell<Option<Decoder>>),
 }
 
 impl Value {
@@ -417,7 +415,8 @@ impl Expr {
 }
 
 /// Decoders with a fixed amount of lookahead
-enum Decoder {
+#[derive(Clone, PartialEq, Debug)]
+pub enum Decoder {
     Call(usize, Vec<(Cow<'static, str>, Expr)>),
     Fail,
     EndOfInput,
@@ -447,7 +446,7 @@ enum Decoder {
     Apply(Cow<'static, str>),
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeRef {
     Var(usize),
     Empty,
@@ -537,7 +536,6 @@ pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
     names: Vec<Cow<'static, str>>,
     values: Vec<Value>,
-    decoders: Vec<RefCell<Option<Decoder>>>,
 }
 
 pub struct ScopeIter {
@@ -574,24 +572,20 @@ impl<'a> Scope<'a> {
         let parent = None;
         let names = Vec::new();
         let values = Vec::new();
-        let decoders = Vec::new();
         Scope {
             parent,
             names,
             values,
-            decoders,
         }
     }
 
     pub fn child(parent: &'a Scope<'a>) -> Self {
         let names = Vec::new();
         let values = Vec::new();
-        let decoders = Vec::new();
         Scope {
             parent: Some(parent),
             names,
             values,
-            decoders,
         }
     }
 
@@ -602,7 +596,6 @@ impl<'a> Scope<'a> {
     pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
         self.names.push(name);
         self.values.push(v);
-        self.decoders.push(RefCell::new(None));
     }
 
     fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
@@ -621,25 +614,6 @@ impl<'a> Scope<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         let (scope, index) = self.get_index_by_name(name);
         &scope.values[index]
-    }
-
-    fn call_decoder_by_name<'input>(
-        &self,
-        name: &str,
-        program: &Program,
-        input: ReadCtxt<'input>,
-    ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let (scope, i) = self.get_index_by_name(name);
-        let mut od = scope.decoders[i].borrow_mut();
-        if od.is_none() {
-            let d = match &scope.values[i] {
-                Value::Format(f) => Decoder::compile_one(&*f).unwrap(),
-                _ => panic!("variable not format: {name}"),
-            };
-            *od = Some(d);
-        }
-        let res = od.as_ref().unwrap().parse(program, self, input);
-        res
     }
 }
 
@@ -1209,9 +1183,20 @@ impl Decoder {
                     }
                 };
                 let f = make_huffman_codes(&lengths);
-                Ok((Value::Format(Box::new(f)), input))
+                Ok((Value::Format(Box::new(f), RefCell::new(None)), input))
             }
-            Decoder::Apply(name) => scope.call_decoder_by_name(name, program, input),
+            Decoder::Apply(name) => {
+                if let Value::Format(format, cell) = scope.get_value_by_name(name) {
+                    let mut od = cell.borrow_mut();
+                    if od.is_none() {
+                        let d = Decoder::compile_one(format).unwrap();
+                        *od = Some(d);
+                    }
+                    od.as_ref().unwrap().parse(program, scope, input)
+                } else {
+                    panic!("expected format value")
+                }
+            }
         }
     }
 }

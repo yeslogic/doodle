@@ -175,7 +175,7 @@ impl<'module> MonoidalPrinter<'module> {
                 None => self.is_atomic_value(value, None),
                 f => panic!("expected format suitable for branch: {f:?}"),
             },
-            Value::Format(_) => false,
+            Value::Format(_, _) => false,
         }
     }
 
@@ -380,7 +380,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Value::Branch(_n, value) => self.compile_value(scope, value),
-            Value::Format(f) => self.compile_format(f, Default::default()),
+            Value::Format(f, _cell) => self.compile_format(f, Default::default()),
         }
     }
 

@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
             match output {
                 FileOutput::Debug => println!("{value:?}"),
-                FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
+                FileOutput::Json => unimplemented!(),
                 FileOutput::Tree => {
                     doodle::output::tree::print_decoded_value(&module, &value, &format)
                 }

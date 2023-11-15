@@ -623,7 +623,7 @@ struct MatchTreeLevel<'a> {
     branches: Vec<(ByteSet, HashSet<(usize, Rc<Next<'a>>)>)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct MatchTree {
     accept: Option<usize>,
     branches: Vec<(ByteSet, MatchTree)>,
