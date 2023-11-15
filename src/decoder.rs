@@ -540,13 +540,13 @@ pub struct Scope<'a> {
     decoders: Vec<RefCell<Option<Decoder>>>,
 }
 
-pub struct ScopeIter {
-    name_iter: std::vec::IntoIter<Cow<'static, str>>,
-    value_iter: std::vec::IntoIter<Value>,
+pub struct ScopeIter<'a> {
+    name_iter: std::slice::Iter<'a, Cow<'static, str>>,
+    value_iter: std::slice::Iter<'a, Value>,
 }
 
-impl Iterator for ScopeIter {
-    type Item = (Cow<'static, str>, Value);
+impl<'a> Iterator for ScopeIter<'a> {
+    type Item = (&'a Cow<'static, str>, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         match (self.name_iter.next(), self.value_iter.next()) {
@@ -556,15 +556,15 @@ impl Iterator for ScopeIter {
     }
 }
 
-impl<'a> IntoIterator for &Scope<'a> {
-    type Item = (Cow<'static, str>, Value);
+impl<'a> IntoIterator for &'a Scope<'a> {
+    type Item = (&'a Cow<'static, str>, &'a Value);
 
-    type IntoIter = ScopeIter;
+    type IntoIter = ScopeIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         ScopeIter {
-            name_iter: self.names.clone().into_iter(),
-            value_iter: self.values.clone().into_iter(),
+            name_iter: self.names.iter(),
+            value_iter: self.values.iter(),
         }
     }
 }
@@ -595,7 +595,7 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (Cow<'static, str>, Value)> {
+    pub fn iter(&'a self) -> impl Iterator<Item = (&'a Cow<'static, str>, &'a Value)> {
         (&self).into_iter()
     }
 
