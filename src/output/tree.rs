@@ -599,8 +599,8 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_record(
         &mut self,
         scope: &Scope<'_>,
-        value_fields: &[(Cow<'static, str>, Value)],
-        format_fields: Option<&[(Cow<'static, str>, Format)]>,
+        value_fields: &[FieldValue],
+        format_fields: Option<&[FieldFormat]>,
     ) -> Fragment {
         let mut value_fields_filt = Vec::new();
         let mut format_fields_filt = format_fields.map(|_| Vec::new());
