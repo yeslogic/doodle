@@ -387,10 +387,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn extract_string_field<'a>(
-        &self,
-        fields: &'a [FieldValue],
-    ) -> Option<&'a Value> {
+    fn extract_string_field<'a>(&self, fields: &'a [FieldValue]) -> Option<&'a Value> {
         fields
             .iter()
             .find_map(|(label, value)| (label == "string").then_some(value))
@@ -690,7 +687,10 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn is_indirect_format(&self, format: &Format) -> bool {
-        matches!(format, Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..))
+        matches!(
+            format,
+            Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..)
+        )
     }
 
     fn compile_field_value_continue(

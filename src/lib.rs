@@ -374,11 +374,15 @@ impl Expr {
             },
             Expr::U32Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
                 [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(ValueType::U32),
-                other => Err(format!("U32Be: expected (U8, U8, U8, U8), found {other:#?}")),
+                other => Err(format!(
+                    "U32Be: expected (U8, U8, U8, U8), found {other:#?}"
+                )),
             },
             Expr::U32Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
                 [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(ValueType::U32),
-                other => Err(format!("U32Le: expected (U8, U8, U8, U8), found {other:#?}")),
+                other => Err(format!(
+                    "U32Le: expected (U8, U8, U8, U8), found {other:#?}"
+                )),
             },
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
                 ValueType::Seq(_t) => Ok(ValueType::U32),
@@ -389,10 +393,14 @@ impl Expr {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
                     if !start_type.is_numeric_type() {
-                        return Err(format!("SubSeq start must be numeric, found {start_type:?}"));
+                        return Err(format!(
+                            "SubSeq start must be numeric, found {start_type:?}"
+                        ));
                     }
                     if !length_type.is_numeric_type() {
-                        return Err(format!("SubSeq length must be numeric, found {length_type:?}"));
+                        return Err(format!(
+                            "SubSeq length must be numeric, found {length_type:?}"
+                        ));
                     }
                     Ok(ValueType::Seq(t))
                 }
@@ -462,7 +470,6 @@ impl Expr {
         }
     }
 }
-
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum DynFormat {
@@ -568,7 +575,6 @@ pub enum Format {
     /// Apply a dynamic format from a named variable in the scope
     Apply(Cow<'static, str>),
 }
-
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
@@ -753,7 +759,6 @@ impl Format {
         }
     }
 }
-
 
 #[derive(Copy, Clone)]
 pub struct FormatRef(usize);
@@ -943,7 +948,9 @@ impl FormatModule {
                 match lengths_expr.infer_type(scope)? {
                     ValueType::Seq(t) => match &*t {
                         ValueType::U8 | ValueType::U16 => {}
-                        other => return Err(format!("Huffman: expected U8 or U16, found {other:?}")),
+                        other => {
+                            return Err(format!("Huffman: expected U8 or U16, found {other:?}"))
+                        }
                     },
                     other => return Err(format!("Huffman: expected Seq, found {other:?}")),
                 }
@@ -1003,7 +1010,6 @@ struct MatchTreeLevel<'a> {
 }
 
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
-
 
 /// A byte-level prefix-tree evaluated to a fixed depth.
 ///
