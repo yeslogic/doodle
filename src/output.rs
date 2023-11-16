@@ -140,7 +140,7 @@ impl Fragment {
                 match sep {
                     None => (),
                     Some(join) => {
-                        if items.len() >= 1 && !join.fits_inline() {
+                        if !items.is_empty() && !join.fits_inline() {
                             return false;
                         }
                     }
@@ -277,7 +277,7 @@ impl Fragment {
                 match sep {
                     None => (),
                     Some(join) => {
-                        if items.len() >= 1 && !join.is_single_line(false) {
+                        if !items.is_empty() && !join.is_single_line(false) {
                             return false;
                         }
                     }
