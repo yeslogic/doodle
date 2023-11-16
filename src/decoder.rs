@@ -4,7 +4,7 @@ use crate::read::ReadCtxt;
 use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
 use serde::Serialize;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -536,7 +536,7 @@ pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
     names: Vec<Cow<'static, str>>,
     values: Vec<Value>,
-    decoders: Vec<RefCell<Option<Decoder>>>,
+    decoders: Vec<OnceCell<Decoder>>,
 }
 
 pub struct ScopeIter<'a> {
@@ -609,7 +609,7 @@ impl<'a> Scope<'a> {
     pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
         self.names.push(name);
         self.values.push(v);
-        self.decoders.push(RefCell::new(None));
+        self.decoders.push(OnceCell::new());
     }
 
     fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
@@ -637,16 +637,11 @@ impl<'a> Scope<'a> {
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         let (scope, i) = self.get_index_by_name(name);
-        let mut od = scope.decoders[i].borrow_mut();
-        if od.is_none() {
-            let d = match &scope.values[i] {
-                Value::Format(f) => Decoder::compile_one(f).unwrap(),
-                _ => panic!("variable not format: {name}"),
-            };
-            *od = Some(d);
-        }
-        let res = od.as_ref().unwrap().parse(program, self, input);
-        res
+        let decoder = scope.decoders[i].get_or_init(|| match &scope.values[i] {
+            Value::Format(f) => Decoder::compile_one(f).unwrap(),
+            _ => panic!("variable not format: {name}"),
+        });
+        decoder.parse(program, self, input)
     }
 }
 
