@@ -1081,12 +1081,14 @@ impl<'a> MatchTreeStep<'a> {
     /// Returns a modified version of `self` that rejects any input that is not
     /// accepted by `peek`.
     fn peek(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
-        self.accept = self.accept && peek.accept;
         if peek.accept {
-            // do nothing
+            // can ignore peek as it has already accepted
         } else if self.accept {
+            // can ignore self as it has already accepted
+            self.accept = peek.accept;
             self.branches = peek.branches;
         } else {
+            // take the intersection of peek and self branches
             let mut branches = Vec::new();
             for (bs1, next1) in self.branches {
                 for (bs2, next2) in &peek.branches {
@@ -1105,8 +1107,8 @@ impl<'a> MatchTreeStep<'a> {
     /// Returns a modified version of `self` that rejects any input that is
     /// accepted by `peek`.
     fn peek_not(mut self, peek: MatchTreeStep<'a>) -> MatchTreeStep<'a> {
-        self.accept = self.accept && !peek.accept;
         if peek.accept {
+            self.accept = false;
             self.branches = Vec::new();
         } else {
             let mut branches = Vec::new();
