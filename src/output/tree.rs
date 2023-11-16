@@ -50,6 +50,10 @@ pub struct MonoidalPrinter<'module> {
     module: &'module FormatModule,
 }
 
+type Field<T> = (Cow<'static, str>, T);
+type FieldFormat = Field<Format>;
+type FieldValue = Field<Value>;
+
 impl<'module> MonoidalPrinter<'module> {
     fn is_implied_value_format(&self, format: &Format) -> bool {
         match format {
@@ -81,7 +85,7 @@ impl<'module> MonoidalPrinter<'module> {
     fn is_record_with_atomic_fields<'a>(
         &'a self,
         format: &'a Format,
-    ) -> Option<Cow<'a, [(Cow<'static, str>, Format)]>> {
+    ) -> Option<Cow<'a, [FieldFormat]>> {
         match format {
             Format::ItemVar(level, _args) => {
                 self.is_record_with_atomic_fields(self.module.get_format(*level))
@@ -93,9 +97,8 @@ impl<'module> MonoidalPrinter<'module> {
                     Cow::Owned(
                         fields
                             .iter()
-                            .filter_map(|(l, x)| {
-                                (!l.starts_with("__")).then(|| (l.clone(), x.clone()))
-                            })
+                            .filter(|(l, _)| !l.starts_with("__"))
+                            .map(|(l, x)| (l.clone(), x.clone()))
                             .collect::<Vec<_>>(),
                     )
                 } else {
@@ -324,7 +327,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Compute(_expr) => self.compile_value(scope, value),
             Format::Match(head, branches) => match value {
                 Value::Branch(index, value) => {
-                    let head = head.eval(&scope);
+                    let head = head.eval(scope);
                     let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
@@ -336,7 +339,7 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::MatchVariant(head, branches) => match value {
                 Value::Branch(index, value) => {
-                    let head = head.eval(&scope);
+                    let head = head.eval(scope);
                     let (pattern, label, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         if let Value::Variant(label2, value) = value.as_ref() {
@@ -386,7 +389,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn extract_string_field<'a>(
         &self,
-        fields: &'a Vec<(Cow<'static, str>, Value)>,
+        fields: &'a [FieldValue],
     ) -> Option<&'a Value> {
         fields
             .iter()
@@ -615,7 +618,7 @@ impl<'module> MonoidalPrinter<'module> {
                     .cloned(),
             );
             // we can unwrap below because format_fields_filt is only Some (and the closure will only be called) if format_fields is Some
-            format_fields_filt.as_mut().map(|v: &mut Vec<_>| {
+            if let Some(v) = format_fields_filt.as_mut() {
                 v.extend(
                     format_fields
                         .unwrap()
@@ -623,7 +626,7 @@ impl<'module> MonoidalPrinter<'module> {
                         .filter(|(lab, _)| !lab.starts_with("__"))
                         .cloned(),
                 )
-            });
+            }
             (value_fields_filt.deref(), format_fields_filt.as_deref())
         } else {
             (value_fields, format_fields)
@@ -687,10 +690,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn is_indirect_format(&self, format: &Format) -> bool {
-        match format {
-            Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..) => true,
-            _ => false,
-        }
+        matches!(format, Format::ItemVar(..) | Format::Dynamic(..) | Format::Apply(..))
     }
 
     fn compile_field_value_continue(
@@ -822,7 +822,7 @@ impl<'module> MonoidalPrinter<'module> {
                 let frag = frags.active_mut();
                 frag.encat(Fragment::Char('('));
                 frag.encat(Fragment::seq(
-                    args.into_iter()
+                    args.iter()
                         .map(|arg| self.compile_expr(arg, Precedence::default()))
                         .collect::<Vec<_>>(),
                     Some(Fragment::String(", ".into())),
@@ -845,7 +845,7 @@ impl<'module> MonoidalPrinter<'module> {
                 Precedence::MATCH,
             ),
             Expr::Lambda(name, expr) => cond_paren(
-                Fragment::String(name.clone().into())
+                Fragment::String(name.clone())
                     .cat(Fragment::String(" -> ".into()))
                     .cat(self.compile_expr(expr, Precedence::ARROW))
                     .group(),
@@ -1009,12 +1009,12 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::RecordProj(head, label) => cond_paren(
                 self.compile_expr(head, Precedence::PROJ)
                     .cat(Fragment::Char('.'))
-                    .cat(Fragment::String(label.clone().into()))
+                    .cat(Fragment::String(label.clone()))
                     .group(),
                 prec,
                 Precedence::PROJ,
             ),
-            Expr::Var(name) => Fragment::String(name.clone().into()),
+            Expr::Var(name) => Fragment::String(name.clone()),
             Expr::Bool(b) => Fragment::DisplayAtom(Rc::new(*b)),
             Expr::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Expr::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
@@ -1022,7 +1022,7 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::Tuple(..) => Fragment::String("(...)".into()),
             Expr::Record(..) => Fragment::String("{ ... }".into()),
             Expr::Variant(label, expr) => Fragment::String("{ ".into())
-                .cat(Fragment::String(label.clone().into()))
+                .cat(Fragment::String(label.clone()))
                 .cat(Fragment::String(" := ".into()))
                 .cat(self.compile_expr(expr, Default::default()))
                 .cat(Fragment::String(" }".into()))
@@ -1043,7 +1043,7 @@ impl<'module> MonoidalPrinter<'module> {
         let mut frags = FragmentBuilder::new();
         frags.push(Fragment::String(label.into()));
         if let Some(args) = args {
-            for arg in args.into_iter() {
+            for arg in args.iter() {
                 frags.push(arg.clone());
             }
         }

@@ -78,7 +78,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
 
     // 19. Global Color Table
-    let global_color_table = color_table.clone();
+    let global_color_table = color_table;
 
     // 20. Image Descriptor
     let image_descriptor = module.define_format(
@@ -100,7 +100,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
 
     // 21. Local Color Table
-    let local_color_table = color_table.clone();
+    let local_color_table = color_table;
 
     // 22. Table Based Image Data
     let table_based_image_data = module.define_format(

@@ -371,7 +371,7 @@ impl Expr {
                         let ret = expr.eval_lambda(scope, Value::Tuple(vec![accum, v]));
                         accum = match ret.unwrap_tuple().as_mut_slice() {
                             [accum, Value::Seq(vn)] => {
-                                vs.extend_from_slice(&vn);
+                                vs.extend_from_slice(vn);
                                 accum.clone()
                             }
                             _ => panic!("FlatMapAccum: expected two values"),
@@ -392,7 +392,7 @@ impl Expr {
             }
             Expr::Inflate(seq) => match seq.eval(scope).coerce_mapped_value() {
                 Value::Seq(values) => {
-                    let vs = inflate(&values);
+                    let vs = inflate(values);
                     Cow::Owned(Value::Seq(vs))
                 }
                 _ => panic!("Inflate: expected Seq"),
@@ -480,8 +480,7 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let mut scope = Scope::new();
-        self.decoders[0].parse(self, &mut scope, input)
+        self.decoders[0].parse(self, &Scope::new(), input)
     }
 }
 
@@ -604,7 +603,7 @@ impl<'a> Scope<'a> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Cow<'static, str>, &Value)> {
-        (&self).into_iter()
+        self.into_iter()
     }
 
     pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
@@ -641,7 +640,7 @@ impl<'a> Scope<'a> {
         let mut od = scope.decoders[i].borrow_mut();
         if od.is_none() {
             let d = match &scope.values[i] {
-                Value::Format(f) => Decoder::compile_one(&*f).unwrap(),
+                Value::Format(f) => Decoder::compile_one(f).unwrap(),
                 _ => panic!("variable not format: {name}"),
             };
             *od = Some(d);
@@ -653,7 +652,7 @@ impl<'a> Scope<'a> {
 
 impl TypeRef {
     #[allow(dead_code)]
-    fn from_value_type<'a>(compiler: &mut Compiler<'a>, t: &ValueType) -> Self {
+    fn from_value_type(compiler: &mut Compiler<'_>, t: &ValueType) -> Self {
         match t {
             ValueType::Any => panic!("ValueType::Any"),
             ValueType::Empty => TypeRef::Empty,
@@ -699,8 +698,8 @@ impl TypeRef {
                 };
                 TypeRef::Var(n)
             }
-            ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, &*t))),
-            ValueType::Format(t) => TypeRef::Format(Box::new(Self::from_value_type(compiler, &*t))),
+            ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, t))),
+            ValueType::Format(t) => TypeRef::Format(Box::new(Self::from_value_type(compiler, t))),
         }
     }
 
@@ -795,7 +794,7 @@ impl Decoder {
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
                     ds.push((
-                        label.clone().into(),
+                        label.clone(),
                         Decoder::compile_next(compiler, f, next.clone())?,
                     ));
                     fs.push(f.clone());
@@ -810,7 +809,7 @@ impl Decoder {
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
                     ds.push((
-                        label.clone().into(),
+                        label.clone(),
                         Decoder::compile_next(compiler, f, next.clone())?,
                     ));
                 }
@@ -901,7 +900,7 @@ impl Decoder {
             Format::PeekNot(a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
                 match a.match_bounds(compiler.module).max {
-                    None => return Err(format!("PeekNot cannot require unbounded lookahead")),
+                    None => return Err("PeekNot cannot require unbounded lookahead".to_string()),
                     Some(n) if n > MAX_LOOKAHEAD => {
                         return Err(format!(
                             "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
@@ -947,7 +946,7 @@ impl Decoder {
                     .map(|(pattern, label, f)| {
                         Ok((
                             pattern.clone(),
-                            label.clone().into(),
+                            label.clone(),
                             Decoder::compile_next(compiler, f, next.clone())?,
                         ))
                     })
@@ -972,7 +971,7 @@ impl Decoder {
                     let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n].parse(program, &mut new_scope, input)
+                program.decoders[*n].parse(program, &new_scope, input)
             }
             Decoder::Fail => Err(ParseError::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
@@ -993,7 +992,7 @@ impl Decoder {
                 if bs.contains(b) {
                     Ok((Value::U8(b), input))
                 } else {
-                    Err(ParseError::unexpected(b, bs.clone(), input.offset))
+                    Err(ParseError::unexpected(b, *bs, input.offset))
                 }
             }
             Decoder::Variant(label, d) => {
@@ -1257,8 +1256,7 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
 
     let mut codes = Vec::with_capacity(lengths.len());
 
-    for n in 0..lengths.len() {
-        let len = lengths[n];
+    for (n, &len) in lengths.iter().enumerate() {
         if len != 0 {
             codes.push(Format::Map(
                 Box::new(bit_range(len, next_code[len])),

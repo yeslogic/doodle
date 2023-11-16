@@ -157,10 +157,10 @@ impl From<RangeInclusive<u8>> for ByteSet {
         // because the values are adjacent, we can optimize if they are within the same quadrant
         let lo = value.start();
         let hi = value.end();
-        if hi < lo {
-            return ByteSet::empty();
-        } else if hi == lo {
-            return ByteSet::from([*lo]);
+        match lo.cmp(hi) {
+            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Equal => return ByteSet::from([*lo]),
+            std::cmp::Ordering::Greater => return ByteSet::empty(),
         }
         let start_ix = *lo >> 6;
         let end_ix = *hi >> 6;
