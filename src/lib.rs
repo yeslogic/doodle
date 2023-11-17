@@ -566,6 +566,8 @@ pub enum Format {
     Map(Box<Format>, Expr),
     /// Compute a value
     Compute(Expr),
+    /// Let binding
+    Let(Cow<'static, str>, Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
     /// Pattern match on an expression and return a variant
@@ -642,6 +644,7 @@ impl Format {
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
             Format::Map(f, _expr) => f.match_bounds(module),
             Format::Compute(_) => Bounds::exact(0),
+            Format::Let(_name, _expr, f) => f.match_bounds(module),
             Format::Match(_, branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
@@ -689,6 +692,7 @@ impl Format {
             Format::WithRelativeOffset(_, _) => false,
             Format::Map(f, _expr) => f.depends_on_next(module),
             Format::Compute(_) => false,
+            Format::Let(_name, _expr, f) => f.depends_on_next(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::MatchVariant(_, branches) => {
                 branches.iter().any(|(_, _, f)| f.depends_on_next(module))
@@ -917,6 +921,12 @@ impl FormatModule {
                 }
             }
             Format::Compute(expr) => expr.infer_type(scope),
+            Format::Let(name, expr, format) => {
+                let t = expr.infer_type(scope)?;
+                let mut child_scope = TypeScope::child(scope);
+                child_scope.push(name.clone(), t);
+                self.infer_format_type(&child_scope, format)
+            }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
                     return Err("infer_format_type: empty Match".to_string());
@@ -1309,6 +1319,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Map(f, _expr) => Self::add(module, f, next),
             Format::Compute(_expr) => Self::add_next(module, next),
+            Format::Let(_name, _expr, f) => Self::add(module, f, next),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {

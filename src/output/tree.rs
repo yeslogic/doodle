@@ -325,6 +325,12 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Format::Compute(_expr) => self.compile_value(scope, value),
+            Format::Let(name, expr, format) => {
+                let v = expr.eval_value(&scope);
+                let mut let_scope = Scope::child(scope);
+                let_scope.push(name.clone(), v);
+                self.compile_decoded_value(&let_scope, value, format)
+            }
             Format::Match(head, branches) => match value {
                 Value::Branch(index, value) => {
                     let head = head.eval(scope);
@@ -1164,6 +1170,19 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::Let(name, expr, format) => {
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "let",
+                        Some(&[Fragment::String(name.clone()), expr_frag]),
+                        format,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
             Format::Match(head, _) | Format::MatchVariant(head, _) => cond_paren(
                 Fragment::String("match ".into())
                     .cat(self.compile_expr(head, Precedence::PROJ))
