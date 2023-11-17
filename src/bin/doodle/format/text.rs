@@ -132,15 +132,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ),
     );
 
-    let ascii_str = module.define_format("text.string.ascii", repeat1(base.ascii_char_strict()));
-    let utf8_str = module.define_format("text.string.utf8", repeat(utf8_char.call()));
+    let ascii_char = module.define_format(
+        "text.char.ascii",
+        Format::Map(
+            Box::new(base.ascii_char_strict()),
+            Expr::Lambda("byte".into(), Box::new(Expr::AsChar(Box::new(var("byte"))))),
+        ),
+    );
 
     module.define_format(
         "text.string",
-        Format::UnionNondet(vec![
-            ("ascii".into(), ascii_str.call()),
-            ("utf8".into(), utf8_str.call()),
-        ]),
+        Format::RepeatFallback(Box::new(ascii_char.call()), Box::new(utf8_char.call())),
     )
 }
 

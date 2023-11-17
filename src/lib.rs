@@ -552,6 +552,8 @@ pub enum Format {
     RepeatUntilLast(Expr, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
     RepeatUntilSeq(Expr, Box<Format>),
+    /// Repeat an eager narrow format, but continue with a broader item if necessary upon recoverable failure
+    RepeatFallback(Box<Format>, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
     /// Attempt to parse a format and fail if it succeeds
@@ -630,7 +632,7 @@ impl Format {
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
-            Format::Repeat(_) => Bounds::new(0, None),
+            Format::Repeat(_) | Format::RepeatFallback(_, _) => Bounds::new(0, None),
             Format::Repeat1(f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
@@ -677,7 +679,7 @@ impl Format {
             Format::Union(branches) => Format::iso_union_depends_on_next(branches, module),
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
-            Format::Repeat(_) => true,
+            Format::Repeat(_) | Format::RepeatFallback(_, _) => true,
             Format::Repeat1(_) => true,
             Format::RepeatCount(_, _f) => false,
             Format::RepeatUntilLast(_, _f) => false,
@@ -733,6 +735,16 @@ impl Format {
             _ => false,
         }
     }
+
+    pub fn is_char_format(&self, module: &FormatModule) -> bool {
+        match self {
+            // NOTE - currently only true for named formats matching `/.*char.*/`
+            Format::ItemVar(level, _args) => module.get_name(*level).contains("char"),
+            _ => false,
+        }
+    }
+
+
 
     /// Returns `true` if values associated to this format should be handled as multi-character ASCII strings
     pub fn is_ascii_string_format(&self, module: &FormatModule) -> bool {
@@ -898,6 +910,11 @@ impl FormatModule {
             | Format::RepeatUntilLast(_expr, a)
             | Format::RepeatUntilSeq(_expr, a) => {
                 let t = self.infer_format_type(scope, a)?;
+                Ok(ValueType::Seq(Box::new(t)))
+            }
+            Format::RepeatFallback(narrow, wide) => {
+                let mut t = self.infer_format_type(scope, narrow)?;
+                t = t.unify(&self.infer_format_type(scope, wide)?)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
             Format::Peek(a) => self.infer_format_type(scope, a),
@@ -1264,6 +1281,19 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::RepeatUntilSeq(_expr, _a) => {
                 Self::accept() // FIXME
+            }
+            Format::RepeatFallback(narrow, wide) => {
+                let tree = Self::add_next(module, next.clone());
+                tree.union(Self::add(
+                    module,
+                    narrow,
+                    Rc::new(Next::Repeat(narrow, next.clone())),
+                ))
+                .union(Self::add(
+                    module,
+                  wide,
+                    Rc::new(Next::Repeat(wide, next.clone())),
+                ))
             }
             Format::Peek(a) => {
                 let tree = Self::add_next(module, next.clone());

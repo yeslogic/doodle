@@ -162,6 +162,10 @@ fn check_covered(
         | Format::RepeatUntilSeq(_, format) => {
             check_covered(module, path, format)?;
         }
+        Format::RepeatFallback(narrow, wide) => {
+            check_covered(module, path, narrow)?;
+            check_covered(module, path, wide)?;
+        }
         Format::Peek(_) => {}    // FIXME
         Format::PeekNot(_) => {} // FIXME
         Format::Slice(_, format) => {
@@ -278,6 +282,15 @@ impl<'module, W: io::Write> Context<'module, W> {
                     Ok(())
                 }
                 _ => panic!("expected sequence, found {value:?}"),
+            },
+            Format::RepeatFallback(_narrow, _wide) => match value {
+                Value::Seq(values) => {
+                    for _v in values {
+                        (); // FIXME
+                    }
+                    Ok(())
+                }
+                _ => panic!("expected sequence"),
             },
             Format::Peek(format) => self.write_flat(scope, value, format),
             Format::PeekNot(format) => self.write_flat(scope, value, format),
