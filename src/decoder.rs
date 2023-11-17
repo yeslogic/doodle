@@ -423,9 +423,8 @@ pub enum Decoder {
     Align(usize),
     Byte(ByteSet),
     Variant(Cow<'static, str>, Box<Decoder>),
-    Parallel(Vec<(Cow<'static, str>, Decoder)>),
-    Branch(MatchTree, Vec<(Cow<'static, str>, Decoder)>),
-    IsoBranch(MatchTree, Vec<Decoder>),
+    Branch(MatchTree, Vec<Decoder>),
+    Parallel(Vec<Decoder>),
     Tuple(Vec<Decoder>),
     Record(Vec<(Cow<'static, str>, Decoder)>),
     While(MatchTree, Box<Decoder>),
@@ -787,14 +786,25 @@ impl Decoder {
                 let d = Decoder::compile_next(compiler, f, next.clone())?;
                 Ok(Decoder::Variant(label.clone(), Box::new(d)))
             }
+            Format::Union(branches) => {
+                let mut fs = Vec::with_capacity(branches.len());
+                let mut ds = Vec::with_capacity(branches.len());
+                for f in branches {
+                    ds.push(Decoder::compile_next(compiler, f, next.clone())?);
+                    fs.push(f.clone());
+                }
+                if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
+                    Ok(Decoder::Branch(tree, ds))
+                } else {
+                    Err(format!("cannot build match tree for {:?}", format))
+                }
+            }
             Format::UnionVariant(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
-                    ds.push((
-                        label.clone(),
-                        Decoder::compile_next(compiler, f, next.clone())?,
-                    ));
+                    let d = Decoder::compile_next(compiler, f, next.clone())?;
+                    ds.push(Decoder::Variant(label.clone(), Box::new(d)));
                     fs.push(f.clone());
                 }
                 if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
@@ -806,25 +816,10 @@ impl Decoder {
             Format::UnionNondet(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
-                    ds.push((
-                        label.clone(),
-                        Decoder::compile_next(compiler, f, next.clone())?,
-                    ));
+                    let d = Decoder::compile_next(compiler, f, next.clone())?;
+                    ds.push(Decoder::Variant(label.clone(), Box::new(d)));
                 }
                 Ok(Decoder::Parallel(ds))
-            }
-            Format::Union(branches) => {
-                let mut fs = Vec::with_capacity(branches.len());
-                let mut ds = Vec::with_capacity(branches.len());
-                for f in branches {
-                    ds.push(Decoder::compile_next(compiler, f, next.clone())?);
-                    fs.push(f.clone());
-                }
-                if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
-                    Ok(Decoder::IsoBranch(tree, ds))
-                } else {
-                    Err(format!("cannot build match tree for {:?}", format))
-                }
             }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
@@ -1004,39 +999,22 @@ impl Decoder {
                 let (v, input) = d.parse(program, scope, input)?;
                 Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
-            Decoder::Parallel(branches) => {
-                for (index, (label, d)) in branches.iter().enumerate() {
-                    let res = d.parse(program, scope, input);
-                    if let Ok((v, input)) = res {
-                        return Ok((
-                            Value::Branch(
-                                index,
-                                Box::new(Value::Variant(label.clone(), Box::new(v))),
-                            ),
-                            input,
-                        ));
-                    }
-                }
-                Err(ParseError::fail(scope, input))
-            }
             Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
-                    offset: input.offset,
-                })?;
-                let (label, d) = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((
-                    Value::Branch(index, Box::new(Value::Variant(label.clone(), Box::new(v)))),
-                    input,
-                ))
-            }
-            Decoder::IsoBranch(tree, branches) => {
                 let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
                 let (v, input) = d.parse(program, scope, input)?;
                 Ok((Value::Branch(index, Box::new(v)), input))
+            }
+            Decoder::Parallel(branches) => {
+                for (index, d) in branches.iter().enumerate() {
+                    let res = d.parse(program, scope, input);
+                    if let Ok((v, input)) = res {
+                        return Ok((Value::Branch(index, Box::new(v)), input));
+                    }
+                }
+                Err(ParseError::fail(scope, input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
