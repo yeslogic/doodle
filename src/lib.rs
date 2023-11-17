@@ -100,6 +100,11 @@ impl Pattern {
     }
 }
 
+pub enum ValueKind {
+    Value(ValueType),
+    Format(ValueType),
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ValueType {
     Any,
@@ -113,7 +118,6 @@ pub enum ValueType {
     Record(Vec<(Cow<'static, str>, ValueType)>),
     Union(Vec<(Cow<'static, str>, ValueType)>),
     Seq(Box<ValueType>),
-    Format(Box<ValueType>),
 }
 
 impl ValueType {
@@ -259,7 +263,10 @@ impl Expr {
 impl Expr {
     fn infer_type(&self, scope: &TypeScope<'_>) -> Result<ValueType, String> {
         match self {
-            Expr::Var(name) => Ok(scope.get_type_by_name(name).clone()),
+            Expr::Var(name) => match scope.get_type_by_name(name) {
+                ValueKind::Value(t) => Ok(t.clone()),
+                ValueKind::Format(_t) => Err("expected value type".to_string()),
+            },
             Expr::Bool(_b) => Ok(ValueType::Bool),
             Expr::U8(_i) => Ok(ValueType::U8),
             Expr::U16(_i) => Ok(ValueType::U16),
@@ -573,7 +580,7 @@ pub enum Format {
     /// Pattern match on an expression and return a variant
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Format)>),
     /// Format generated dynamically
-    Dynamic(DynFormat),
+    Dynamic(Cow<'static, str>, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
     Apply(Cow<'static, str>),
 }
@@ -655,7 +662,7 @@ impl Format {
                 .map(|(_, _, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
-            Format::Dynamic(DynFormat::Huffman(_, _)) => Bounds::exact(0),
+            Format::Dynamic(_name, _dynformat, f) => f.match_bounds(module),
             Format::Apply(_) => Bounds::new(1, None),
         }
     }
@@ -697,7 +704,7 @@ impl Format {
             Format::MatchVariant(_, branches) => {
                 branches.iter().any(|(_, _, f)| f.depends_on_next(module))
             }
-            Format::Dynamic(_) => false,
+            Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(_) => false,
         }
     }
@@ -954,22 +961,30 @@ impl FormatModule {
                 }
                 Ok(t)
             }
-            Format::Dynamic(DynFormat::Huffman(lengths_expr, _opt_values_expr)) => {
-                match lengths_expr.infer_type(scope)? {
-                    ValueType::Seq(t) => match &*t {
-                        ValueType::U8 | ValueType::U16 => {}
-                        other => {
-                            return Err(format!("Huffman: expected U8 or U16, found {other:?}"))
+            Format::Dynamic(name, dynformat, format) => {
+                match dynformat {
+                    DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
+                        match lengths_expr.infer_type(scope)? {
+                            ValueType::Seq(t) => match &*t {
+                                ValueType::U8 | ValueType::U16 => {}
+                                other => {
+                                    return Err(format!(
+                                        "Huffman: expected U8 or U16, found {other:?}"
+                                    ))
+                                }
+                            },
+                            other => return Err(format!("Huffman: expected Seq, found {other:?}")),
                         }
-                    },
-                    other => return Err(format!("Huffman: expected Seq, found {other:?}")),
+                        // FIXME check opt_values_expr type
+                    }
                 }
-                // FIXME check opt_values_expr type
-                Ok(ValueType::Format(Box::new(ValueType::U16)))
+                let mut child_scope = TypeScope::child(scope);
+                child_scope.push_format(name.clone(), ValueType::U16);
+                self.infer_format_type(&child_scope, format)
             }
             Format::Apply(name) => match scope.get_type_by_name(name) {
-                ValueType::Format(t) => Ok(*t.clone()),
-                other => Err(format!("Apply: expected format, found {other:?}")),
+                ValueKind::Format(t) => Ok(t.clone()),
+                ValueKind::Value(t) => Err(format!("Apply: expected format, found {t:?}")),
             },
         }
     }
@@ -1334,7 +1349,7 @@ impl<'a> MatchTreeStep<'a> {
                 }
                 tree
             }
-            Format::Dynamic(DynFormat::Huffman(_, _)) => Self::add_next(module, next),
+            Format::Dynamic(_name, _expr, f) => Self::add(module, f, next),
             Format::Apply(_name) => Self::accept(),
         }
     }
@@ -1464,7 +1479,7 @@ impl MatchTree {
 pub struct TypeScope<'a> {
     parent: Option<&'a TypeScope<'a>>,
     names: Vec<Cow<'static, str>>,
-    types: Vec<ValueType>,
+    types: Vec<ValueKind>,
 }
 
 impl<'a> TypeScope<'a> {
@@ -1492,10 +1507,15 @@ impl<'a> TypeScope<'a> {
 
     fn push(&mut self, name: Cow<'static, str>, t: ValueType) {
         self.names.push(name);
-        self.types.push(t);
+        self.types.push(ValueKind::Value(t));
     }
 
-    fn get_type_by_name(&self, name: &str) -> &ValueType {
+    fn push_format(&mut self, name: Cow<'static, str>, t: ValueType) {
+        self.names.push(name);
+        self.types.push(ValueKind::Format(t));
+    }
+
+    fn get_type_by_name(&self, name: &str) -> &ValueKind {
         for (i, n) in self.names.iter().enumerate().rev() {
             if n == name {
                 return &self.types[i];

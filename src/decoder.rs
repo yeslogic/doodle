@@ -4,7 +4,6 @@ use crate::read::ReadCtxt;
 use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
 use serde::Serialize;
 use std::borrow::Cow;
-use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -444,7 +443,7 @@ enum Decoder {
     Let(Cow<'static, str>, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
     MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Decoder)>),
-    Dynamic(DynFormat),
+    Dynamic(Cow<'static, str>, DynFormat, Box<Decoder>),
     Apply(Cow<'static, str>),
 }
 
@@ -459,7 +458,6 @@ pub enum TypeRef {
     Tuple(Vec<TypeRef>),
     Seq(Box<TypeRef>),
     Char,
-    Format(Box<TypeRef>),
 }
 
 pub enum TypeDef {
@@ -537,7 +535,7 @@ pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
     names: Vec<Cow<'static, str>>,
     values: Vec<Value>,
-    decoders: Vec<OnceCell<Decoder>>,
+    decoders: Vec<Decoder>,
 }
 
 pub struct ScopeIter<'a> {
@@ -610,7 +608,13 @@ impl<'a> Scope<'a> {
     pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
         self.names.push(name);
         self.values.push(v);
-        self.decoders.push(OnceCell::new());
+        self.decoders.push(Decoder::Fail);
+    }
+
+    fn push_decoder(&mut self, name: Cow<'static, str>, d: Decoder) {
+        self.names.push(name);
+        self.values.push(Value::Tuple(vec![]));
+        self.decoders.push(d);
     }
 
     fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
@@ -631,18 +635,9 @@ impl<'a> Scope<'a> {
         &scope.values[index]
     }
 
-    fn call_decoder_by_name<'input>(
-        &self,
-        name: &str,
-        program: &Program,
-        input: ReadCtxt<'input>,
-    ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let (scope, i) = self.get_index_by_name(name);
-        let decoder = scope.decoders[i].get_or_init(|| match &scope.values[i] {
-            Value::Format(f) => Decoder::compile_one(f).unwrap(),
-            _ => panic!("variable not format: {name}"),
-        });
-        decoder.parse(program, self, input)
+    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
+        let (scope, index) = self.get_index_by_name(name);
+        &scope.decoders[index]
     }
 }
 
@@ -695,7 +690,6 @@ impl TypeRef {
                 TypeRef::Var(n)
             }
             ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, t))),
-            ValueType::Format(t) => TypeRef::Format(Box::new(Self::from_value_type(compiler, t))),
         }
     }
 
@@ -725,7 +719,6 @@ impl TypeRef {
                 ValueType::Tuple(ts.iter().map(|t| t.to_value_type(typedefs)).collect())
             }
             TypeRef::Seq(t) => ValueType::Seq(Box::new(t.to_value_type(typedefs))),
-            TypeRef::Format(t) => ValueType::Format(Box::new(t.to_value_type(typedefs))),
         }
     }
 }
@@ -953,7 +946,10 @@ impl Decoder {
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::MatchVariant(head.clone(), branches))
             }
-            Format::Dynamic(d) => Ok(Decoder::Dynamic(d.clone())),
+            Format::Dynamic(name, dynformat, a) => {
+                let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
+                Ok(Decoder::Dynamic(name.clone(), dynformat.clone(), da))
+            }
             Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
         }
     }
@@ -1207,7 +1203,7 @@ impl Decoder {
                 }
                 panic!("exhaustive patterns");
             }
-            Decoder::Dynamic(DynFormat::Huffman(lengths_expr, opt_values_expr)) => {
+            Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval(scope);
                 let lengths = value_to_vec_usize(&lengths_val);
                 let lengths = match opt_values_expr {
@@ -1222,9 +1218,15 @@ impl Decoder {
                     }
                 };
                 let f = make_huffman_codes(&lengths);
-                Ok((Value::Format(Box::new(f)), input))
+                let dyn_d = Decoder::compile_one(&f).unwrap();
+                let mut child_scope = Scope::child(scope);
+                child_scope.push_decoder(name.clone(), dyn_d);
+                d.parse(program, &child_scope, input)
             }
-            Decoder::Apply(name) => scope.call_decoder_by_name(name, program, input),
+            Decoder::Apply(name) => {
+                let d = scope.get_decoder_by_name(name);
+                d.parse(program, &scope, input)
+            }
         }
     }
 }
