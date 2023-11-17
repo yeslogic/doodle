@@ -1,5 +1,5 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::{Scope, Value};
+use crate::decoder::{Scope, ScopeEntry};
 use crate::read::ReadCtxt;
 
 use std::borrow::Cow;
@@ -9,7 +9,7 @@ pub type ParseResult<T> = Result<T, ParseError>;
 #[derive(Debug)]
 pub enum ParseError {
     Fail {
-        bindings: Vec<(Cow<'static, str>, Value)>,
+        bindings: Vec<(Cow<'static, str>, ScopeEntry)>,
         buffer: Vec<u8>,
         offset: usize,
     },
@@ -91,7 +91,7 @@ impl ParseError {
     pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> Self {
         let bindings = scope
             .iter()
-            .map(|(name, value)| (name.clone(), value.clone()))
+            .map(|(name, entry)| (name.clone(), entry.clone()))
             .collect::<Vec<_>>();
         let buffer = input.input.to_owned();
         let offset = input.offset;
