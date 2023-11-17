@@ -361,8 +361,11 @@ impl<'module> MonoidalPrinter<'module> {
                 _ => panic!("expected branch, found {value:?}"),
             },
             Format::Dynamic(name, _dynformat, format) => {
+                // TODO this scope entry should never be accessed while printing.
+                // In future we could potentially save the generated dynamic format
+                // as a new type of value if we wanted to optionally display it.
                 let mut child_scope = Scope::child(scope);
-                child_scope.push(name.clone(), Value::Tuple(vec![])); // FIXME?
+                child_scope.push(name.clone(), Value::Tuple(vec![]));
                 self.compile_decoded_value(&child_scope, value, format)
             }
             Format::Apply(_) => self.compile_value(scope, value),
