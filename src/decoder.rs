@@ -416,7 +416,8 @@ impl Expr {
 }
 
 /// Decoders with a fixed amount of lookahead
-enum Decoder {
+#[derive(Clone, Debug)]
+pub enum Decoder {
     Call(usize, Vec<(Cow<'static, str>, Expr)>),
     Fail,
     EndOfInput,
@@ -531,25 +532,30 @@ impl<'a> Compiler<'a> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum ScopeEntry {
+    Value(Value),
+    Decoder(Decoder),
+}
+
 pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
     names: Vec<Cow<'static, str>>,
-    values: Vec<Value>,
-    decoders: Vec<Decoder>,
+    entries: Vec<ScopeEntry>,
 }
 
 pub struct ScopeIter<'a> {
     parent: Option<&'a Scope<'a>>,
     name_iter: std::iter::Rev<std::slice::Iter<'a, Cow<'static, str>>>,
-    value_iter: std::iter::Rev<std::slice::Iter<'a, Value>>,
+    entry_iter: std::iter::Rev<std::slice::Iter<'a, ScopeEntry>>,
 }
 
 impl<'a> Iterator for ScopeIter<'a> {
-    type Item = (&'a Cow<'static, str>, &'a Value);
+    type Item = (&'a Cow<'static, str>, &'a ScopeEntry);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (self.name_iter.next(), self.value_iter.next()) {
-            (Some(name), Some(value)) => Some((name, value)),
+        match (self.name_iter.next(), self.entry_iter.next()) {
+            (Some(name), Some(entry)) => Some((name, entry)),
             _ => match self.parent {
                 Some(parent) => {
                     *self = parent.into_iter();
@@ -562,7 +568,7 @@ impl<'a> Iterator for ScopeIter<'a> {
 }
 
 impl<'a> IntoIterator for &'a Scope<'a> {
-    type Item = (&'a Cow<'static, str>, &'a Value);
+    type Item = (&'a Cow<'static, str>, &'a ScopeEntry);
 
     type IntoIter = ScopeIter<'a>;
 
@@ -570,7 +576,7 @@ impl<'a> IntoIterator for &'a Scope<'a> {
         ScopeIter {
             parent: self.parent,
             name_iter: self.names.iter().rev(),
-            value_iter: self.values.iter().rev(),
+            entry_iter: self.entries.iter().rev(),
         }
     }
 }
@@ -579,42 +585,37 @@ impl<'a> Scope<'a> {
     pub fn new() -> Self {
         let parent = None;
         let names = Vec::new();
-        let values = Vec::new();
-        let decoders = Vec::new();
+        let entries = Vec::new();
         Scope {
             parent,
             names,
-            values,
-            decoders,
+            entries,
         }
     }
 
     pub fn child(parent: &'a Scope<'a>) -> Self {
+        let parent = Some(parent);
         let names = Vec::new();
-        let values = Vec::new();
-        let decoders = Vec::new();
+        let entries = Vec::new();
         Scope {
-            parent: Some(parent),
+            parent,
             names,
-            values,
-            decoders,
+            entries,
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Cow<'static, str>, &Value)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Cow<'static, str>, &ScopeEntry)> {
         self.into_iter()
     }
 
     pub fn push(&mut self, name: Cow<'static, str>, v: Value) {
         self.names.push(name);
-        self.values.push(v);
-        self.decoders.push(Decoder::Fail);
+        self.entries.push(ScopeEntry::Value(v));
     }
 
     fn push_decoder(&mut self, name: Cow<'static, str>, d: Decoder) {
         self.names.push(name);
-        self.values.push(Value::Tuple(vec![]));
-        self.decoders.push(d);
+        self.entries.push(ScopeEntry::Decoder(d));
     }
 
     fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
@@ -630,14 +631,23 @@ impl<'a> Scope<'a> {
         }
     }
 
-    fn get_value_by_name(&self, name: &str) -> &Value {
+    fn get_entry_by_name(&self, name: &str) -> &ScopeEntry {
         let (scope, index) = self.get_index_by_name(name);
-        &scope.values[index]
+        &scope.entries[index]
+    }
+
+    fn get_value_by_name(&self, name: &str) -> &Value {
+        match self.get_entry_by_name(name) {
+            ScopeEntry::Value(v) => v,
+            ScopeEntry::Decoder(_d) => panic!("expected value"),
+        }
     }
 
     fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        let (scope, index) = self.get_index_by_name(name);
-        &scope.decoders[index]
+        match self.get_entry_by_name(name) {
+            ScopeEntry::Value(_v) => panic!("expected decoder"),
+            ScopeEntry::Decoder(d) => d,
+        }
     }
 }
 
