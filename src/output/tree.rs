@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::decoder::{Scope, Value};
-use crate::{Expr, Format, FormatModule};
+use crate::{DynFormat, Expr, Format, FormatModule};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
@@ -360,7 +360,11 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(_) => self.compile_value(scope, value),
+            Format::Dynamic(name, _dynformat, format) => {
+                let mut child_scope = Scope::child(scope);
+                child_scope.push(name.clone(), Value::Tuple(vec![])); // FIXME?
+                self.compile_decoded_value(&child_scope, value, format)
+            }
             Format::Apply(_) => self.compile_value(scope, value),
         }
     }
@@ -1191,7 +1195,21 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
-            Format::Dynamic(_) => Fragment::String("dynamic".into()),
+            Format::Dynamic(name, dynformat, format) => {
+                let dyn_frag = match dynformat {
+                    DynFormat::Huffman(_, _) => Fragment::String("huffman".into()),
+                };
+                cond_paren(
+                    self.compile_nested_format(
+                        "dynamic",
+                        Some(&[Fragment::String(name.clone()), dyn_frag]),
+                        format,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
             Format::Apply(_) => Fragment::String("apply".into()),
 
             Format::ItemVar(var, args) => {

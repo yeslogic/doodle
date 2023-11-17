@@ -185,8 +185,8 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
-        Format::Dynamic(_) => {} // FIXME
-        Format::Apply(_) => {}   // FIXME
+        Format::Dynamic(_name, _dynformat, format) => check_covered(module, path, format)?,
+        Format::Apply(_) => {}
     }
     Ok(())
 }
@@ -322,8 +322,12 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(_) => Ok(()), // FIXME
-            Format::Apply(_) => Ok(()),   // FIXME
+            Format::Dynamic(name, _dynformat, format) => {
+                let mut child_scope = Scope::child(scope);
+                child_scope.push(name.clone(), Value::Tuple(vec![]));
+                self.write_flat(&child_scope, value, format)
+            }
+            Format::Apply(_) => Ok(()), // FIXME
         }
     }
 }
