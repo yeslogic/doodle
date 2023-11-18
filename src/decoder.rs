@@ -98,14 +98,14 @@ impl Value {
 
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the scope
-    pub fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<Scope<'a>> {
-        let mut pattern_scope = Scope::child(scope);
+    pub fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<NormalScope<'a>> {
+        let mut pattern_scope = NormalScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
             .then_some(pattern_scope)
     }
 
-    fn matches_inner(&self, scope: &mut Scope<'_>, pattern: &Pattern) -> bool {
+    fn matches_inner(&self, scope: &mut NormalScope<'_>, pattern: &Pattern) -> bool {
         match (pattern, self) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
@@ -169,7 +169,7 @@ impl Expr {
                 let head = head.eval(scope);
                 for (pattern, expr) in branches {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let value = expr.eval_value(&pattern_scope);
+                        let value = expr.eval_value(&Scope::Normal(&pattern_scope));
                         return Cow::Owned(value);
                     }
                 }
@@ -346,11 +346,11 @@ impl Expr {
                 }
                 _ => panic!("SubSeq: expected Seq"),
             },
-            Expr::FlatMap(expr, seq) => match seq.eval_value(scope) {
+            Expr::FlatMap(expr, seq) => match seq.eval(scope).coerce_mapped_value() {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
-                        if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
+                        if let Value::Seq(vn) = expr.eval_lambda(scope, &v) {
                             vs.extend(vn);
                         } else {
                             panic!("FlatMap: expected Seq");
@@ -365,7 +365,7 @@ impl Expr {
                     let mut accum = accum.eval_value(scope);
                     let mut vs = Vec::new();
                     for v in values {
-                        let ret = expr.eval_lambda(scope, Value::Tuple(vec![accum, v]));
+                        let ret = expr.eval_lambda(scope, &Value::Tuple(vec![accum, v]));
                         accum = match ret.unwrap_tuple().as_mut_slice() {
                             [accum, Value::Seq(vn)] => {
                                 vs.extend_from_slice(vn);
@@ -401,12 +401,11 @@ impl Expr {
         self.eval(scope).coerce_mapped_value().clone()
     }
 
-    fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: Value) -> Value {
+    fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: &Value) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
-                let mut child_scope = Scope::child(scope);
-                child_scope.push(name.clone(), arg);
-                expr.eval_value(&child_scope)
+                let child_scope = SingleScope::new(scope, name.clone(), arg);
+                expr.eval_value(&Scope::Single(child_scope))
             }
             _ => panic!("expected Lambda"),
         }
@@ -476,7 +475,7 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        self.decoders[0].parse(self, &Scope::new(), input)
+        self.decoders[0].parse(self, &Scope::Empty, input)
     }
 }
 
@@ -545,116 +544,138 @@ pub enum ScopeEntry {
     Decoder(Decoder),
 }
 
-pub struct Scope<'a> {
-    parent: Option<&'a Scope<'a>>,
-    names: Vec<Label>,
-    entries: Vec<ScopeEntry>,
+pub enum Scope<'a> {
+    Empty,
+    Normal(&'a NormalScope<'a>),
+    Single(SingleScope<'a>),
+    Decoder(DecoderScope<'a>),
 }
 
-pub struct ScopeIter<'a> {
-    parent: Option<&'a Scope<'a>>,
-    name_iter: std::iter::Rev<std::slice::Iter<'a, Label>>,
-    entry_iter: std::iter::Rev<std::slice::Iter<'a, ScopeEntry>>,
+pub struct NormalScope<'a> {
+    parent: &'a Scope<'a>,
+    entries: Vec<(Label, Value)>,
 }
 
-impl<'a> Iterator for ScopeIter<'a> {
-    type Item = (&'a Label, &'a ScopeEntry);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match (self.name_iter.next(), self.entry_iter.next()) {
-            (Some(name), Some(entry)) => Some((name, entry)),
-            _ => match self.parent {
-                Some(parent) => {
-                    *self = parent.into_iter();
-                    self.next()
-                }
-                None => None,
-            },
-        }
-    }
+pub struct SingleScope<'a> {
+    parent: &'a Scope<'a>,
+    name: Label,
+    value: &'a Value,
 }
 
-impl<'a> IntoIterator for &'a Scope<'a> {
-    type Item = (&'a Label, &'a ScopeEntry);
-
-    type IntoIter = ScopeIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ScopeIter {
-            parent: self.parent,
-            name_iter: self.names.iter().rev(),
-            entry_iter: self.entries.iter().rev(),
-        }
-    }
+pub struct DecoderScope<'a> {
+    parent: &'a Scope<'a>,
+    name: Label,
+    decoder: Decoder,
 }
 
 impl<'a> Scope<'a> {
-    pub fn new() -> Self {
-        let parent = None;
-        let names = Vec::new();
-        let entries = Vec::new();
-        Scope {
-            parent,
-            names,
-            entries,
-        }
-    }
-
-    pub fn child(parent: &'a Scope<'a>) -> Self {
-        let parent = Some(parent);
-        let names = Vec::new();
-        let entries = Vec::new();
-        Scope {
-            parent,
-            names,
-            entries,
-        }
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&Label, &ScopeEntry)> {
-        self.into_iter()
-    }
-
-    pub fn push(&mut self, name: Label, v: Value) {
-        self.names.push(name);
-        self.entries.push(ScopeEntry::Value(v));
-    }
-
-    fn push_decoder(&mut self, name: Label, d: Decoder) {
-        self.names.push(name);
-        self.entries.push(ScopeEntry::Decoder(d));
-    }
-
-    fn get_index_by_name(&self, name: &str) -> (&Self, usize) {
-        for (i, n) in self.names.iter().enumerate().rev() {
-            if n == name {
-                return (self, i);
-            }
-        }
-        if let Some(parent) = self.parent {
-            parent.get_index_by_name(name)
-        } else {
-            panic!("variable not found: {name}");
-        }
-    }
-
-    fn get_entry_by_name(&self, name: &str) -> &ScopeEntry {
-        let (scope, index) = self.get_index_by_name(name);
-        &scope.entries[index]
-    }
-
     fn get_value_by_name(&self, name: &str) -> &Value {
-        match self.get_entry_by_name(name) {
-            ScopeEntry::Value(v) => v,
-            ScopeEntry::Decoder(_d) => panic!("expected value"),
+        match self {
+            Scope::Empty => panic!("value not found: {name}"),
+            Scope::Normal(normal) => normal.get_value_by_name(name),
+            Scope::Single(single) => single.get_value_by_name(name),
+            Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
         }
     }
 
     fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        match self.get_entry_by_name(name) {
-            ScopeEntry::Value(_v) => panic!("expected decoder"),
-            ScopeEntry::Decoder(d) => d,
+        match self {
+            Scope::Empty => panic!("decoder not found: {name}"),
+            Scope::Normal(normal) => normal.parent.get_decoder_by_name(name),
+            Scope::Single(single) => single.parent.get_decoder_by_name(name),
+            Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
         }
+    }
+
+    pub fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
+        match self {
+            Scope::Empty => {}
+            Scope::Normal(normal) => normal.get_bindings(bindings),
+            Scope::Single(single) => single.get_bindings(bindings),
+            Scope::Decoder(decoder) => decoder.get_bindings(bindings),
+        }
+    }
+}
+
+impl<'a> NormalScope<'a> {
+    fn new(parent: &'a Scope<'a>) -> NormalScope<'a> {
+        let entries = Vec::new();
+        NormalScope { parent, entries }
+    }
+
+    pub fn with_capacity(parent: &'a Scope<'a>, capacity: usize) -> NormalScope<'a> {
+        let entries = Vec::with_capacity(capacity);
+        NormalScope { parent, entries }
+    }
+
+    pub fn into_record(self) -> Value {
+        Value::Record(self.entries)
+    }
+
+    pub fn push(&mut self, name: Label, v: Value) {
+        self.entries.push((name, v));
+    }
+
+    fn get_value_by_name(&self, name: &str) -> &Value {
+        for (n, v) in self.entries.iter().rev() {
+            if n == name {
+                return v;
+            }
+        }
+        self.parent.get_value_by_name(name)
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
+        for (name, value) in self.entries.iter().rev() {
+            bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
+        }
+        self.parent.get_bindings(bindings);
+    }
+}
+
+impl<'a> SingleScope<'a> {
+    pub fn new(parent: &'a Scope<'a>, name: Label, value: &'a Value) -> SingleScope<'a> {
+        SingleScope {
+            parent,
+            name,
+            value,
+        }
+    }
+
+    fn get_value_by_name(&self, name: &str) -> &Value {
+        if self.name == name {
+            self.value
+        } else {
+            self.parent.get_value_by_name(name)
+        }
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
+        bindings.push((self.name.clone(), ScopeEntry::Value(self.value.clone())));
+        self.parent.get_bindings(bindings);
+    }
+}
+
+impl<'a> DecoderScope<'a> {
+    fn new(parent: &'a Scope<'a>, name: Label, decoder: Decoder) -> DecoderScope<'a> {
+        DecoderScope {
+            parent,
+            name,
+            decoder,
+        }
+    }
+
+    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
+        if self.name == name {
+            &self.decoder
+        } else {
+            self.parent.get_decoder_by_name(name)
+        }
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
+        bindings.push((self.name.clone(), ScopeEntry::Decoder(self.decoder.clone())));
+        self.parent.get_bindings(bindings);
     }
 }
 
@@ -966,12 +987,12 @@ impl Decoder {
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es) => {
-                let mut new_scope = Scope::new();
+                let mut new_scope = NormalScope::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n].parse(program, &new_scope, input)
+                program.decoders[*n].parse(program, &Scope::Normal(&new_scope), input)
             }
             Decoder::Fail => Err(ParseError::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
@@ -1028,15 +1049,14 @@ impl Decoder {
             }
             Decoder::Record(fields) => {
                 let mut input = input;
-                let mut v = Vec::with_capacity(fields.len());
-                let mut record_scope = Scope::child(scope);
+                let mut record_scope = NormalScope::with_capacity(scope, fields.len());
                 for (name, f) in fields {
-                    let (vf, next_input) = f.parse(program, &record_scope, input)?;
-                    input = next_input;
-                    v.push((name.clone(), vf.clone()));
+                    let (vf, next_input) =
+                        f.parse(program, &Scope::Normal(&record_scope), input)?;
                     record_scope.push(name.clone(), vf);
+                    input = next_input;
                 }
-                Ok((Value::Record(v), input))
+                Ok((record_scope.into_record(), input))
             }
             Decoder::While(tree, a) => {
                 let mut input = input;
@@ -1084,7 +1104,7 @@ impl Decoder {
                 loop {
                     let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
-                    let done = expr.eval_lambda(scope, va.clone()).unwrap_bool();
+                    let done = expr.eval_lambda(scope, &va).unwrap_bool();
                     v.push(va);
                     if done {
                         break;
@@ -1099,8 +1119,13 @@ impl Decoder {
                     let (va, next_input) = a.parse(program, scope, input)?;
                     input = next_input;
                     v.push(va);
-                    let vs = Value::Seq(v.clone());
-                    let done = expr.eval_lambda(scope, vs).unwrap_bool();
+                    let vs = Value::Seq(v);
+                    let done = expr.eval_lambda(scope, &vs).unwrap_bool();
+                    v = if let Value::Seq(v) = vs {
+                        v
+                    } else {
+                        panic!("wut");
+                    };
                     if done {
                         break;
                     }
@@ -1151,7 +1176,7 @@ impl Decoder {
             }
             Decoder::Map(d, expr) => {
                 let (orig, input) = d.parse(program, scope, input)?;
-                let v = expr.eval_lambda(scope, orig.clone());
+                let v = expr.eval_lambda(scope, &orig);
                 Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
             }
             Decoder::Compute(expr) => {
@@ -1160,15 +1185,15 @@ impl Decoder {
             }
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
-                let mut let_scope = Scope::child(scope);
-                let_scope.push(name.clone(), v);
-                d.parse(program, &let_scope, input)
+                let let_scope = SingleScope::new(scope, name.clone(), &v);
+                d.parse(program, &Scope::Single(let_scope), input)
             }
             Decoder::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) = decoder.parse(program, &pattern_scope, input)?;
+                        let (v, input) =
+                            decoder.parse(program, &Scope::Normal(&pattern_scope), input)?;
                         return Ok((Value::Branch(index, Box::new(v)), input));
                     }
                 }
@@ -1190,9 +1215,8 @@ impl Decoder {
                 };
                 let f = make_huffman_codes(&lengths);
                 let dyn_d = Decoder::compile_one(&f).unwrap();
-                let mut child_scope = Scope::child(scope);
-                child_scope.push_decoder(name.clone(), dyn_d);
-                d.parse(program, &child_scope, input)
+                let child_scope = DecoderScope::new(scope, name.clone(), dyn_d);
+                d.parse(program, &Scope::Decoder(child_scope), input)
             }
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
@@ -1356,16 +1380,16 @@ mod tests {
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
-        let mut scope = Scope::new();
-        let (val, remain) = d.parse(&program, &mut scope, ReadCtxt::new(input)).unwrap();
+        let scope = Scope::Empty;
+        let (val, remain) = d.parse(&program, &scope, ReadCtxt::new(input)).unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
-        let mut scope = Scope::new();
-        assert!(d.parse(&program, &mut scope, ReadCtxt::new(input)).is_err());
+        let scope = Scope::Empty;
+        assert!(d.parse(&program, &scope, ReadCtxt::new(input)).is_err());
     }
 
     #[test]

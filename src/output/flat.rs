@@ -1,13 +1,13 @@
 use std::io;
 
-use crate::decoder::{Scope, Value};
+use crate::decoder::{NormalScope, Scope, SingleScope, Value};
 use crate::Label;
 use crate::{Format, FormatModule};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();
     check_covered(module, &mut path, format).unwrap();
-    let scope = Scope::new();
+    let scope = Scope::Empty;
     Context::new(io::stdout(), module)
         .write_flat(&scope, value, format)
         .unwrap()
@@ -257,10 +257,10 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
-                    let mut record_scope = Scope::child(scope);
+                    let mut record_scope = NormalScope::with_capacity(scope, value_fields.len());
                     for (index, (label, value)) in value_fields.iter().enumerate() {
                         let format = &format_fields[index].1;
-                        self.write_flat(&record_scope, value, format)?;
+                        self.write_flat(&Scope::Normal(&record_scope), value, format)?;
                         record_scope.push(label.clone(), value.clone());
                     }
                     Ok(())
@@ -289,16 +289,15 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Compute(_expr) => Ok(()),
             Format::Let(name, expr, format) => {
                 let v = expr.eval_value(scope);
-                let mut let_scope = Scope::child(scope);
-                let_scope.push(name.clone(), v);
-                self.write_flat(&let_scope, value, format)
+                let let_scope = SingleScope::new(scope, name.clone(), &v);
+                self.write_flat(&Scope::Single(let_scope), value, format)
             }
             Format::Match(head, branches) => match value {
                 Value::Branch(index, value) => {
                     let head = head.eval(scope);
                     let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        self.write_flat(&pattern_scope, value, format)?;
+                        self.write_flat(&Scope::Normal(&pattern_scope), value, format)?;
                         return Ok(());
                     }
                     panic!("pattern match failure");
@@ -312,7 +311,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         if let Value::Variant(label2, value) = value.as_ref() {
                             assert_eq!(label, label2);
-                            self.write_flat(&pattern_scope, value, format)?;
+                            self.write_flat(&Scope::Normal(&pattern_scope), value, format)?;
                         } else {
                             panic!("expected variant, found {value:?}");
                         }
@@ -323,9 +322,9 @@ impl<'module, W: io::Write> Context<'module, W> {
                 _ => panic!("expected branch, found {value:?}"),
             },
             Format::Dynamic(name, _dynformat, format) => {
-                let mut child_scope = Scope::child(scope);
-                child_scope.push(name.clone(), Value::Tuple(vec![]));
-                self.write_flat(&child_scope, value, format)
+                let v = Value::Tuple(vec![]);
+                let child_scope = SingleScope::new(scope, name.clone(), &v);
+                self.write_flat(&Scope::Single(child_scope), value, format)
             }
             Format::Apply(_) => Ok(()), // FIXME
         }

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
-use crate::decoder::{Scope, Value};
+use crate::decoder::{NormalScope, Scope, SingleScope, Value};
 use crate::Label;
 use crate::{DynFormat, Expr, Format, FormatModule};
 
@@ -15,7 +15,7 @@ fn atomic_value_to_string(value: &Value) -> String {
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     use std::io::Write;
-    let scope = Scope::new();
+    let scope = Scope::Empty;
     let frag = MonoidalPrinter::new(module).compile_decoded_value(&scope, value, format);
     let mut lock = io::stdout().lock();
     match write!(&mut lock, "{}", frag) {
@@ -327,16 +327,19 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Compute(_expr) => self.compile_value(scope, value),
             Format::Let(name, expr, format) => {
                 let v = expr.eval_value(scope);
-                let mut let_scope = Scope::child(scope);
-                let_scope.push(name.clone(), v);
-                self.compile_decoded_value(&let_scope, value, format)
+                let let_scope = SingleScope::new(scope, name.clone(), &v);
+                self.compile_decoded_value(&Scope::Single(let_scope), value, format)
             }
             Format::Match(head, branches) => match value {
                 Value::Branch(index, value) => {
                     let head = head.eval(scope);
                     let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
+                        frag.encat(self.compile_decoded_value(
+                            &Scope::Normal(&pattern_scope),
+                            value,
+                            format,
+                        ));
                         return frag;
                     }
                     panic!("pattern match failure");
@@ -350,7 +353,11 @@ impl<'module> MonoidalPrinter<'module> {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         if let Value::Variant(label2, value) = value.as_ref() {
                             assert_eq!(label, label2);
-                            frag.encat(self.compile_decoded_value(&pattern_scope, value, format));
+                            frag.encat(self.compile_decoded_value(
+                                &Scope::Normal(&pattern_scope),
+                                value,
+                                format,
+                            ));
                         } else {
                             panic!("expected variant, found {value:?}");
                         }
@@ -364,9 +371,9 @@ impl<'module> MonoidalPrinter<'module> {
                 // TODO this scope entry should never be accessed while printing.
                 // In future we could potentially save the generated dynamic format
                 // as a new type of value if we wanted to optionally display it.
-                let mut child_scope = Scope::child(scope);
-                child_scope.push(name.clone(), Value::Tuple(vec![]));
-                self.compile_decoded_value(&child_scope, value, format)
+                let v = Value::Tuple(vec![]);
+                let child_scope = SingleScope::new(scope, name.clone(), &v);
+                self.compile_decoded_value(&Scope::Single(child_scope), value, format)
             }
             Format::Apply(_) => self.compile_value(scope, value),
         }
@@ -644,12 +651,12 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::String("{}".into())
         } else {
             let mut frag = Fragment::new();
-            let mut record_scope = Scope::child(scope);
+            let mut record_scope = NormalScope::with_capacity(scope, value_fields.len());
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
                 frag.encat(self.compile_field_value_continue(
-                    &record_scope,
+                    &Scope::Normal(&record_scope),
                     label,
                     value,
                     format,
@@ -659,7 +666,13 @@ impl<'module> MonoidalPrinter<'module> {
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
-            frag.encat(self.compile_field_value_last(&record_scope, label, value, format, true));
+            frag.encat(self.compile_field_value_last(
+                &Scope::Normal(&record_scope),
+                label,
+                value,
+                format,
+                true,
+            ));
             frag
         }
     }
