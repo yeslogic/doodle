@@ -21,7 +21,6 @@ pub enum Value {
     Seq(Vec<Value>),
     Mapped(Box<Value>, Box<Value>),
     Branch(usize, Box<Value>),
-    Format(Box<Format>),
 }
 
 impl Value {
