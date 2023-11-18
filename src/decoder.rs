@@ -441,7 +441,6 @@ pub enum Decoder {
     Compute(Expr),
     Let(Cow<'static, str>, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
-    MatchVariant(Expr, Vec<(Pattern, Cow<'static, str>, Decoder)>),
     Dynamic(Cow<'static, str>, DynFormat, Box<Decoder>),
     Apply(Cow<'static, str>),
 }
@@ -941,14 +940,14 @@ impl Decoder {
                 let branches = branches
                     .iter()
                     .map(|(pattern, label, f)| {
+                        let d = Decoder::compile_next(compiler, f, next.clone())?;
                         Ok((
                             pattern.clone(),
-                            label.clone(),
-                            Decoder::compile_next(compiler, f, next.clone())?,
+                            Decoder::Variant(label.clone(), Box::new(d)),
                         ))
                     })
                     .collect::<Result<_, String>>()?;
-                Ok(Decoder::MatchVariant(head.clone(), branches))
+                Ok(Decoder::Match(head.clone(), branches))
             }
             Format::Dynamic(name, dynformat, a) => {
                 let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
@@ -1173,22 +1172,6 @@ impl Decoder {
                     }
                 }
                 panic!("non-exhaustive patterns");
-            }
-            Decoder::MatchVariant(head, branches) => {
-                let head = head.eval(scope);
-                for (index, (pattern, label, decoder)) in branches.iter().enumerate() {
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) = decoder.parse(program, &pattern_scope, input)?;
-                        return Ok((
-                            Value::Branch(
-                                index,
-                                Box::new(Value::Variant(label.clone(), Box::new(v))),
-                            ),
-                            input,
-                        ));
-                    }
-                }
-                panic!("exhaustive patterns");
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval(scope);
