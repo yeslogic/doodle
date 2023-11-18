@@ -88,10 +88,8 @@ impl std::error::Error for ParseError {}
 
 impl ParseError {
     pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> Self {
-        let bindings = scope
-            .iter()
-            .map(|(name, entry)| (name.clone(), entry.clone()))
-            .collect::<Vec<_>>();
+        let mut bindings = Vec::new();
+        scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();
         let offset = input.offset;
         Self::Fail {
