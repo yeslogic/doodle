@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::decoder::{MultiScope, Scope, SingleScope, Value};
+use crate::decoder::{MultiScope, Scope, ScopeBinding, SingleScope, Value};
 use crate::Label;
 use crate::{Format, FormatModule};
 

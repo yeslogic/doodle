@@ -1,5 +1,5 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::{Scope, ScopeEntry};
+use crate::decoder::{Scope, ScopeEntry, ScopeLookup};
 use crate::read::ReadCtxt;
 use crate::Label;
 
