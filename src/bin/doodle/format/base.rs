@@ -1,6 +1,6 @@
 use doodle::byte_set::ByteSet;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 use doodle::etc;
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 pub fn var<Name: Into<etc::Label>>(name: Name) -> Expr {
     Expr::Var(name.into())
@@ -14,9 +14,7 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
 
-pub fn alts<Label: Into<etc::Label>>(
-    fields: impl IntoIterator<Item = (Label, Format)>,
-) -> Format {
+pub fn alts<Label: Into<etc::Label>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
     Format::UnionVariant(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
