@@ -709,10 +709,7 @@ impl Format {
         }
     }
 
-    fn union_depends_on_next(
-        branches: &[(etc::Label, Format)],
-        module: &FormatModule,
-    ) -> bool {
+    fn union_depends_on_next(branches: &[(etc::Label, Format)], module: &FormatModule) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for (_label, f) in branches {
             if f.depends_on_next(module) {
