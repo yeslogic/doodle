@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::decoder::{Scope, Value};
-use crate::etc;
+use crate::etc::Label;
 use crate::{Format, FormatModule};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
@@ -108,7 +108,7 @@ fn is_show_format(name: &str) -> Option<&'static str> {
 
 fn check_covered(
     module: &FormatModule,
-    path: &mut Vec<etc::Label>,
+    path: &mut Vec<Label>,
     format: &Format,
 ) -> Result<(), String> {
     match format {
