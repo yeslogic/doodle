@@ -326,7 +326,7 @@ impl<'module> MonoidalPrinter<'module> {
             }
             Format::Compute(_expr) => self.compile_value(scope, value),
             Format::Let(name, expr, format) => {
-                let v = expr.eval_value(&scope);
+                let v = expr.eval_value(scope);
                 let mut let_scope = Scope::child(scope);
                 let_scope.push(name.clone(), v);
                 self.compile_decoded_value(&let_scope, value, format)

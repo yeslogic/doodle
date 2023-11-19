@@ -1,8 +1,9 @@
 use std::{
-    borrow::{Borrow, Cow},
     fmt::{self, Write},
     rc::Rc,
 };
+
+use crate::etc;
 
 pub mod flat;
 pub mod tree;
@@ -33,7 +34,7 @@ pub enum Fragment {
     Empty,
     Symbol(Symbol),
     Char(char),
-    String(Cow<'static, str>),
+    String(etc::Label),
     DebugAtom(Rc<dyn fmt::Debug>),
     DisplayAtom(Rc<dyn fmt::Display>),
     Group(Box<Fragment>),
@@ -353,7 +354,7 @@ impl fmt::Display for Fragment {
             Fragment::Empty => Ok(()),
             Fragment::Char(c) => f.write_char(*c),
             Fragment::Symbol(symb) => symb.fmt(f),
-            Fragment::String(s) => f.write_str(s.borrow()),
+            Fragment::String(s) => f.write_str(s.as_ref()),
             Fragment::DebugAtom(atom) => fmt::Debug::fmt(&atom, f),
             Fragment::DisplayAtom(atom) => fmt::Display::fmt(&atom, f),
             Fragment::Group(frag) => frag.fmt(f),

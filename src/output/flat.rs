@@ -1,7 +1,7 @@
-use std::borrow::Cow;
 use std::io;
 
 use crate::decoder::{Scope, Value};
+use crate::etc;
 use crate::{Format, FormatModule};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
@@ -108,7 +108,7 @@ fn is_show_format(name: &str) -> Option<&'static str> {
 
 fn check_covered(
     module: &FormatModule,
-    path: &mut Vec<Cow<'static, str>>,
+    path: &mut Vec<etc::Label>,
     format: &Format,
 ) -> Result<(), String> {
     match format {
@@ -288,7 +288,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Map(_format, _expr) => Ok(()),
             Format::Compute(_expr) => Ok(()),
             Format::Let(name, expr, format) => {
-                let v = expr.eval_value(&scope);
+                let v = expr.eval_value(scope);
                 let mut let_scope = Scope::child(scope);
                 let_scope.push(name.clone(), v);
                 self.write_flat(&let_scope, value, format)
