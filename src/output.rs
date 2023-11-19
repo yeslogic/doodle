@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::etc::Label;
+use crate::Label;
 
 pub mod flat;
 pub mod tree;

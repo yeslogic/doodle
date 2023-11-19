@@ -5,7 +5,6 @@ use std::collections::HashSet;
 use std::ops::Add;
 use std::rc::Rc;
 
-use etc::{Label, IntoLabel};
 use serde::Serialize;
 
 use crate::bounds::Bounds;
@@ -16,9 +15,15 @@ pub mod bounds;
 pub mod byte_set;
 pub mod decoder;
 pub mod error;
-pub mod etc;
+
 pub mod output;
 pub mod read;
+
+pub type Label = std::borrow::Cow<'static, str>;
+
+pub trait IntoLabel: Into<Label> {}
+
+impl<T> IntoLabel for T where T: Into<Label> {}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
@@ -589,9 +594,7 @@ pub enum Format {
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
-    pub fn alts<Name: IntoLabel>(
-        fields: impl IntoIterator<Item = (Name, Format)>,
-    ) -> Format {
+    pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
         Format::UnionVariant(
             (fields.into_iter())
                 .map(|(label, format)| (label.into(), format))
@@ -599,9 +602,7 @@ impl Format {
         )
     }
 
-    pub fn record<Name: IntoLabel>(
-        fields: impl IntoIterator<Item = (Name, Format)>,
-    ) -> Format {
+    pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
         Format::Record(
             (fields.into_iter())
                 .map(|(label, format)| (label.into(), format))

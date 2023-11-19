@@ -1,5 +1,5 @@
 use doodle::byte_set::ByteSet;
-use doodle::etc::IntoLabel;
+use doodle::IntoLabel;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 pub fn var<Name: IntoLabel>(name: Name) -> Expr {
@@ -26,9 +26,7 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::Union(branches.into_iter().collect())
 }
 
-pub fn record<Name: IntoLabel>(
-    fields: impl IntoIterator<Item = (Name, Format)>,
-) -> Format {
+pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::Record(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
