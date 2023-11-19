@@ -1,7 +1,6 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ops::Add;
 use std::rc::Rc;
@@ -16,7 +15,7 @@ pub mod bounds;
 pub mod byte_set;
 pub mod decoder;
 pub mod error;
-mod etc;
+pub mod etc;
 pub mod output;
 pub mod read;
 
@@ -575,15 +574,15 @@ pub enum Format {
     /// Compute a value
     Compute(Expr),
     /// Let binding
-    Let(Cow<'static, str>, Expr, Box<Format>),
+    Let(etc::Label, Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
     /// Pattern match on an expression and return a variant
     MatchVariant(Expr, Vec<(Pattern, etc::Label, Format)>),
     /// Format generated dynamically
-    Dynamic(Cow<'static, str>, DynFormat, Box<Format>),
+    Dynamic(etc::Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
-    Apply(Cow<'static, str>),
+    Apply(etc::Label),
 }
 
 impl Format {
@@ -711,7 +710,7 @@ impl Format {
     }
 
     fn union_depends_on_next(
-        branches: &[(Cow<'static, str>, Format)],
+        branches: &[(etc::Label, Format)],
         module: &FormatModule,
     ) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
@@ -1475,7 +1474,7 @@ impl MatchTree {
 
 pub struct TypeScope<'a> {
     parent: Option<&'a TypeScope<'a>>,
-    names: Vec<Cow<'static, str>>,
+    names: Vec<etc::Label>,
     types: Vec<ValueKind>,
 }
 
@@ -1507,7 +1506,7 @@ impl<'a> TypeScope<'a> {
         self.types.push(ValueKind::Value(t));
     }
 
-    fn push_format(&mut self, name: Cow<'static, str>, t: ValueType) {
+    fn push_format(&mut self, name: etc::Label, t: ValueType) {
         self.names.push(name);
         self.types.push(ValueKind::Format(t));
     }

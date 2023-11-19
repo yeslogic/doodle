@@ -439,7 +439,7 @@ pub enum Decoder {
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Box<Decoder>, Expr),
     Compute(Expr),
-    Let(Cow<'static, str>, Expr, Box<Decoder>),
+    Let(etc::Label, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
     Dynamic(etc::Label, DynFormat, Box<Decoder>),
     Apply(etc::Label),
@@ -520,7 +520,7 @@ impl<'a> Compiler<'a> {
         // decoder
         compiler.queue_compile(format, Rc::new(Next::Empty));
         while let Some((f, next, n)) = compiler.compile_queue.pop() {
-            let d = Decoder::compile_next(&mut compiler, &f, next)?;
+            let d = Decoder::compile_next(&mut compiler, f, next)?;
             compiler.program.decoders[n] = d;
         }
         Ok(compiler.program)
@@ -621,7 +621,7 @@ impl<'a> Scope<'a> {
         self.entries.push(ScopeEntry::Value(v));
     }
 
-    fn push_decoder(&mut self, name: Cow<'static, str>, d: Decoder) {
+    fn push_decoder(&mut self, name: etc::Label, d: Decoder) {
         self.names.push(name);
         self.entries.push(ScopeEntry::Decoder(d));
     }
@@ -1197,7 +1197,7 @@ impl Decoder {
             }
             Decoder::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
-                d.parse(program, &scope, input)
+                d.parse(program, scope, input)
             }
         }
     }

@@ -1,13 +1,12 @@
 use doodle::byte_set::ByteSet;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::etc;
 
-use std::borrow::Cow;
-
-pub fn var<Name: Into<Cow<'static, str>>>(name: Name) -> Expr {
+pub fn var<Name: Into<etc::Label>>(name: Name) -> Expr {
     Expr::Var(name.into())
 }
 
-pub fn bind<Name: Into<Cow<'static, str>>>(name: Name) -> Pattern {
+pub fn bind<Name: Into<etc::Label>>(name: Name) -> Pattern {
     Pattern::Binding(name.into())
 }
 
@@ -15,7 +14,7 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
 
-pub fn alts<Label: Into<Cow<'static, str>>>(
+pub fn alts<Label: Into<etc::Label>>(
     fields: impl IntoIterator<Item = (Label, Format)>,
 ) -> Format {
     Format::UnionVariant(
@@ -29,7 +28,7 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::Union(branches.into_iter().collect())
 }
 
-pub fn record<Label: Into<Cow<'static, str>>>(
+pub fn record<Label: Into<etc::Label>>(
     fields: impl IntoIterator<Item = (Label, Format)>,
 ) -> Format {
     Format::Record(
