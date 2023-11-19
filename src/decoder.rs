@@ -107,7 +107,7 @@ impl Value {
             .then_some(pattern_scope)
     }
 
-    fn matches_inner(&self, scope: &mut MultiScope<'_>, pattern: &Pattern) -> bool {
+    pub fn matches_inner(&self, scope: &mut dyn ScopeBinding, pattern: &Pattern) -> bool {
         match (pattern, self) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
@@ -696,6 +696,7 @@ pub enum Scope<'a> {
     Multi(&'a MultiScope<'a>),
     Single(SingleScope<'a>),
     Decoder(DecoderScope<'a>),
+    Other(&'a dyn ScopeLookup),
 }
 
 pub struct MultiScope<'a> {
@@ -715,13 +716,24 @@ pub struct DecoderScope<'a> {
     decoder: Decoder,
 }
 
-impl<'a> Scope<'a> {
+pub trait ScopeLookup {
+    fn get_value_by_name(&self, name: &str) -> &Value;
+    fn get_decoder_by_name(&self, name: &str) -> &Decoder;
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>);
+}
+
+pub trait ScopeBinding {
+    fn push(&mut self, name: Label, v: Value);
+}
+
+impl<'a> ScopeLookup for Scope<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         match self {
             Scope::Empty => panic!("value not found: {name}"),
             Scope::Multi(multi) => multi.get_value_by_name(name),
             Scope::Single(single) => single.get_value_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
+            Scope::Other(other) => other.get_value_by_name(name),
         }
     }
 
@@ -731,16 +743,24 @@ impl<'a> Scope<'a> {
             Scope::Multi(multi) => multi.parent.get_decoder_by_name(name),
             Scope::Single(single) => single.parent.get_decoder_by_name(name),
             Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
+            Scope::Other(other) => other.get_decoder_by_name(name),
         }
     }
 
-    pub fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
         match self {
             Scope::Empty => {}
             Scope::Multi(multi) => multi.get_bindings(bindings),
             Scope::Single(single) => single.get_bindings(bindings),
             Scope::Decoder(decoder) => decoder.get_bindings(bindings),
+            Scope::Other(other) => other.get_bindings(bindings),
         }
+    }
+}
+
+impl<'a> ScopeBinding for MultiScope<'a> {
+    fn push(&mut self, name: Label, v: Value) {
+        self.entries.push((name, v));
     }
 }
 
@@ -757,10 +777,6 @@ impl<'a> MultiScope<'a> {
 
     pub fn into_record(self) -> Value {
         Value::Record(self.entries)
-    }
-
-    pub fn push(&mut self, name: Label, v: Value) {
-        self.entries.push((name, v));
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {
