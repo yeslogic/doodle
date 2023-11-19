@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::etc;
+use crate::etc::Label;
 
 pub mod flat;
 pub mod tree;
@@ -34,7 +34,7 @@ pub enum Fragment {
     Empty,
     Symbol(Symbol),
     Char(char),
-    String(etc::Label),
+    String(Label),
     DebugAtom(Rc<dyn fmt::Debug>),
     DisplayAtom(Rc<dyn fmt::Display>),
     Group(Box<Fragment>),

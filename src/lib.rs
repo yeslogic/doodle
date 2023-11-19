@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::ops::Add;
 use std::rc::Rc;
 
+use etc::{Label, IntoLabel};
 use serde::Serialize;
 
 use crate::bounds::Bounds;
@@ -22,7 +23,7 @@ pub mod read;
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Pattern {
-    Binding(etc::Label),
+    Binding(Label),
     Wildcard,
     Bool(bool),
     U8(u8),
@@ -30,7 +31,7 @@ pub enum Pattern {
     U32(u32),
     Char(char),
     Tuple(Vec<Pattern>),
-    Variant(etc::Label, Box<Pattern>),
+    Variant(Label, Box<Pattern>),
     Seq(Vec<Pattern>),
 }
 
@@ -41,7 +42,7 @@ impl Pattern {
         Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
     }
 
-    pub fn variant(label: impl Into<etc::Label>, value: impl Into<Box<Pattern>>) -> Pattern {
+    pub fn variant(label: impl IntoLabel, value: impl Into<Box<Pattern>>) -> Pattern {
         Pattern::Variant(label.into(), value.into())
     }
 
@@ -115,8 +116,8 @@ pub enum ValueType {
     U32,
     Char,
     Tuple(Vec<ValueType>),
-    Record(Vec<(etc::Label, ValueType)>),
-    Union(Vec<(etc::Label, ValueType)>),
+    Record(Vec<(Label, ValueType)>),
+    Union(Vec<(Label, ValueType)>),
     Seq(Box<ValueType>),
 }
 
@@ -179,7 +180,7 @@ impl ValueType {
                 Ok(ValueType::Record(fs))
             }
             (ValueType::Union(bs1), ValueType::Union(bs2)) => {
-                let mut bs: Vec<(etc::Label, ValueType)> = Vec::new();
+                let mut bs: Vec<(Label, ValueType)> = Vec::new();
                 for (label, t2) in bs2 {
                     let t = if let Some((_l, t1)) = bs.iter().find(|(l, _)| label == l) {
                         t1.unify(t2)?
@@ -204,19 +205,19 @@ impl ValueType {
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
-    Var(etc::Label),
+    Var(Label),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
     Tuple(Vec<Expr>),
     TupleProj(Box<Expr>, usize),
-    Record(Vec<(etc::Label, Expr)>),
-    RecordProj(Box<Expr>, etc::Label),
-    Variant(etc::Label, Box<Expr>),
+    Record(Vec<(Label, Expr)>),
+    RecordProj(Box<Expr>, Label),
+    Variant(Label, Box<Expr>),
     Seq(Vec<Expr>),
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
-    Lambda(etc::Label, Box<Expr>),
+    Lambda(Label, Box<Expr>),
 
     BitAnd(Box<Expr>, Box<Expr>),
     BitOr(Box<Expr>, Box<Expr>),
@@ -255,7 +256,7 @@ pub enum Expr {
 impl Expr {
     pub const UNIT: Expr = Expr::Tuple(Vec::new());
 
-    pub fn record_proj(head: impl Into<Box<Expr>>, label: impl Into<etc::Label>) -> Expr {
+    pub fn record_proj(head: impl Into<Box<Expr>>, label: impl IntoLabel) -> Expr {
         Expr::RecordProj(head.into(), label.into())
     }
 }
@@ -537,18 +538,18 @@ pub enum Format {
     /// Matches a byte in the given byte set
     Byte(ByteSet),
     /// Wraps the value from the inner format in a variant
-    Variant(etc::Label, Box<Format>),
+    Variant(Label, Box<Format>),
     /// Matches the union of all the formats, which must have the same type
     Union(Vec<Format>),
     /// Matches the union of all the formats wrapped in variants
-    UnionVariant(Vec<(etc::Label, Format)>),
+    UnionVariant(Vec<(Label, Format)>),
     /// Temporary hack for nondeterministic variant unions
-    UnionNondet(Vec<(etc::Label, Format)>),
+    UnionNondet(Vec<(Label, Format)>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
     /// the decoded value of earlier formats
-    Record(Vec<(etc::Label, Format)>),
+    Record(Vec<(Label, Format)>),
     /// Repeat a format zero-or-more times
     Repeat(Box<Format>),
     /// Repeat a format one-or-more times
@@ -574,22 +575,22 @@ pub enum Format {
     /// Compute a value
     Compute(Expr),
     /// Let binding
-    Let(etc::Label, Expr, Box<Format>),
+    Let(Label, Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
     /// Pattern match on an expression and return a variant
-    MatchVariant(Expr, Vec<(Pattern, etc::Label, Format)>),
+    MatchVariant(Expr, Vec<(Pattern, Label, Format)>),
     /// Format generated dynamically
-    Dynamic(etc::Label, DynFormat, Box<Format>),
+    Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
-    Apply(etc::Label),
+    Apply(Label),
 }
 
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
-    pub fn alts<Label: Into<etc::Label>>(
-        fields: impl IntoIterator<Item = (Label, Format)>,
+    pub fn alts<Name: IntoLabel>(
+        fields: impl IntoIterator<Item = (Name, Format)>,
     ) -> Format {
         Format::UnionVariant(
             (fields.into_iter())
@@ -598,8 +599,8 @@ impl Format {
         )
     }
 
-    pub fn record<Label: Into<etc::Label>>(
-        fields: impl IntoIterator<Item = (Label, Format)>,
+    pub fn record<Name: IntoLabel>(
+        fields: impl IntoIterator<Item = (Name, Format)>,
     ) -> Format {
         Format::Record(
             (fields.into_iter())
@@ -709,7 +710,7 @@ impl Format {
         }
     }
 
-    fn union_depends_on_next(branches: &[(etc::Label, Format)], module: &FormatModule) -> bool {
+    fn union_depends_on_next(branches: &[(Label, Format)], module: &FormatModule) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for (_label, f) in branches {
             if f.depends_on_next(module) {
@@ -787,8 +788,8 @@ impl FormatRef {
 
 #[derive(Debug, Serialize)]
 pub struct FormatModule {
-    names: Vec<etc::Label>,
-    args: Vec<Vec<(etc::Label, ValueType)>>,
+    names: Vec<Label>,
+    args: Vec<Vec<(Label, ValueType)>>,
     formats: Vec<Format>,
     format_types: Vec<ValueType>,
 }
@@ -803,14 +804,14 @@ impl FormatModule {
         }
     }
 
-    pub fn define_format(&mut self, name: impl Into<etc::Label>, format: Format) -> FormatRef {
+    pub fn define_format(&mut self, name: impl IntoLabel, format: Format) -> FormatRef {
         self.define_format_args(name, vec![], format)
     }
 
     pub fn define_format_args(
         &mut self,
-        name: impl Into<etc::Label>,
-        args: Vec<(etc::Label, ValueType)>,
+        name: impl IntoLabel,
+        args: Vec<(Label, ValueType)>,
         format: Format,
     ) -> FormatRef {
         let mut scope = TypeScope::new();
@@ -833,7 +834,7 @@ impl FormatModule {
         &self.names[level]
     }
 
-    fn get_args(&self, level: usize) -> &[(etc::Label, ValueType)] {
+    fn get_args(&self, level: usize) -> &[(Label, ValueType)] {
         &self.args[level]
     }
 
@@ -995,7 +996,7 @@ enum Next<'a> {
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
     Cat(&'a Format, Rc<Next<'a>>),
     Tuple(&'a [Format], Rc<Next<'a>>),
-    Record(&'a [(etc::Label, Format)], Rc<Next<'a>>),
+    Record(&'a [(Label, Format)], Rc<Next<'a>>),
     Repeat(&'a Format, Rc<Next<'a>>),
     RepeatCount(usize, &'a Format, Rc<Next<'a>>),
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
@@ -1161,7 +1162,7 @@ impl<'a> MatchTreeStep<'a> {
 
     fn add_record(
         module: &'a FormatModule,
-        fields: &'a [(etc::Label, Format)],
+        fields: &'a [(Label, Format)],
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
@@ -1471,7 +1472,7 @@ impl MatchTree {
 
 pub struct TypeScope<'a> {
     parent: Option<&'a TypeScope<'a>>,
-    names: Vec<etc::Label>,
+    names: Vec<Label>,
     types: Vec<ValueKind>,
 }
 
@@ -1498,12 +1499,12 @@ impl<'a> TypeScope<'a> {
         }
     }
 
-    fn push(&mut self, name: etc::Label, t: ValueType) {
+    fn push(&mut self, name: Label, t: ValueType) {
         self.names.push(name);
         self.types.push(ValueKind::Value(t));
     }
 
-    fn push_format(&mut self, name: etc::Label, t: ValueType) {
+    fn push_format(&mut self, name: Label, t: ValueType) {
         self.names.push(name);
         self.types.push(ValueKind::Format(t));
     }

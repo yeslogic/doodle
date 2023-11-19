@@ -1,12 +1,12 @@
 use doodle::byte_set::ByteSet;
-use doodle::etc;
+use doodle::etc::IntoLabel;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
-pub fn var<Name: Into<etc::Label>>(name: Name) -> Expr {
+pub fn var<Name: IntoLabel>(name: Name) -> Expr {
     Expr::Var(name.into())
 }
 
-pub fn bind<Name: Into<etc::Label>>(name: Name) -> Pattern {
+pub fn bind<Name: IntoLabel>(name: Name) -> Pattern {
     Pattern::Binding(name.into())
 }
 
@@ -14,7 +14,7 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
 
-pub fn alts<Label: Into<etc::Label>>(fields: impl IntoIterator<Item = (Label, Format)>) -> Format {
+pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::UnionVariant(
         (fields.into_iter())
             .map(|(label, format)| (label.into(), format))
@@ -26,8 +26,8 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::Union(branches.into_iter().collect())
 }
 
-pub fn record<Label: Into<etc::Label>>(
-    fields: impl IntoIterator<Item = (Label, Format)>,
+pub fn record<Name: IntoLabel>(
+    fields: impl IntoIterator<Item = (Name, Format)>,
 ) -> Format {
     Format::Record(
         (fields.into_iter())
