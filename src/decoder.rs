@@ -1,8 +1,8 @@
 use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
-use crate::etc::{Label, IntoLabel};
 use crate::read::ReadCtxt;
 use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
+use crate::{IntoLabel, Label};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -27,9 +27,7 @@ pub enum Value {
 impl Value {
     pub const UNIT: Value = Value::Tuple(Vec::new());
 
-    pub fn record<Name: IntoLabel>(
-        fields: impl IntoIterator<Item = (Name, Value)>,
-    ) -> Value {
+    pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Value)>) -> Value {
         Value::Record(
             fields
                 .into_iter()
@@ -1316,7 +1314,7 @@ fn inflate(codes: &[Value]) -> Vec<Value> {
 #[cfg(test)]
 #[allow(clippy::redundant_clone)]
 mod tests {
-    use crate::etc::IntoLabel;
+    use crate::IntoLabel;
 
     use super::*;
 
@@ -1328,9 +1326,7 @@ mod tests {
         )
     }
 
-    fn record<Name: IntoLabel>(
-        fields: impl IntoIterator<Item = (Name, Format)>,
-    ) -> Format {
+    fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
         Format::Record(
             (fields.into_iter())
                 .map(|(label, format)| (label.into(), format))

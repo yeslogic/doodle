@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::decoder::{Scope, Value};
-use crate::etc::Label;
+use crate::Label;
 use crate::{DynFormat, Expr, Format, FormatModule};
 
 use super::{Fragment, FragmentBuilder, Symbol};

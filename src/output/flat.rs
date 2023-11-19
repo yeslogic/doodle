@@ -1,7 +1,7 @@
 use std::io;
 
 use crate::decoder::{Scope, Value};
-use crate::etc::Label;
+use crate::Label;
 use crate::{Format, FormatModule};
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
