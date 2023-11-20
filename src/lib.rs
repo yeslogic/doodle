@@ -1029,6 +1029,15 @@ struct MatchTreeLevel<'a> {
     branches: Vec<(ByteSet, LevelBranch<'a>)>,
 }
 
+/// A bundle of follow-sets with an externally significant index, e.g. into an array of decoders
+///
+/// While the choice-points along any given descent of a [`MatchTree`] are fully informed
+/// by sets of mutually disjoint [`ByteSet`]s, the superposition of choice-points across
+/// all descents of a fixed depth (i.e. a [`MatchTreeLevel`]) will almost invariably encompass
+/// multiple original choice-points with non-disjoint [`ByteSet`]s. In such cases, it may be necessary
+/// to create multiple virtual branches that represent a deterministic superposition in the otherwise
+/// nondeterministic single-byte-descent at that level. In such cases, we cross-reference an original index
+/// across all entries stemming from the same [MatchTreeStep].
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 
 /// A byte-level prefix-tree evaluated to a fixed depth.
@@ -1150,49 +1159,61 @@ impl<'a> MatchTreeStep<'a> {
         self
     }
 
-    fn add_tuple(
+    /// Constructs a [MatchTreeStep] that accepts a given tuple of sequential formats, with a trailing sequence of partially-consumed formats ([`Next`]s).
+    fn from_tuple(
         module: &'a FormatModule,
         fields: &'a [Format],
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
-            None => Self::add_next(module, next),
-            Some((f, fs)) => Self::add(module, f, Rc::new(Next::Tuple(fs, next))),
+            None => Self::from_next(module, next),
+            Some((f, fs)) => Self::from_format(module, f, Rc::new(Next::Tuple(fs, next))),
         }
     }
 
-    fn add_record(
+    /// Constructs a [MatchTreeStep] that accepts a given record of sequential formats, with a trailing sequence of partially-consumed formats ([`Next`]s).
+    ///
+    /// This is mostly equivalent to `from_tuple`, as the name of a given field does not have implications on the prefix tree of the overall format.
+    fn from_record(
         module: &'a FormatModule,
         fields: &'a [(Label, Format)],
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
-            None => Self::add_next(module, next),
-            Some(((_label, f), fs)) => Self::add(module, f, Rc::new(Next::Record(fs, next))),
+            None => Self::from_next(module, next),
+            Some(((_label, f), fs)) => Self::from_format(module, f, Rc::new(Next::Record(fs, next))),
         }
     }
 
-    fn add_repeat_count(
+    /// Constructs a [MatchTreeStep] that accepts a fixed-count repetition of a given format, with a trailing sequence of partially-consumed formats ([`Next`s]).
+    fn from_repeat_count(
         module: &'a FormatModule,
         n: usize,
-        f: &'a Format,
+        format: &'a Format,
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         if n > 0 {
-            Self::add(module, f, Rc::new(Next::RepeatCount(n - 1, f, next)))
+            Self::from_format(module, format, Rc::new(Next::RepeatCount(n - 1, format, next)))
         } else {
-            Self::add_next(module, next)
+            Self::from_next(module, next)
         }
     }
 
-    pub fn add_slice(
+
+    /// Constructs a [MatchTreeStep] from a given (partial) format `inner` and a slice-length `n`, mandating that the prefix-tree for the inner format
+    /// can be no more than `n` bytes deep; however many bytes are accepted for the inner format in question, the entire slice is always consumed as a unit
+    /// of `n` bytes.
+    ///
+    /// Note that the parameter `next` value specifies the trailing content after the slice, not what remains to process within the slice following `inner`. Instead,
+    /// an unconditional descent on any byte is followed for as many bytes would remain after each accepting branch of `inner` within the slice's length.
+    pub fn from_slice(
         module: &'a FormatModule,
         n: usize,
-        inside: Rc<Next<'a>>,
+        inner: Rc<Next<'a>>,
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         if n > 0 {
-            let mut tree = Self::add_next(module, inside);
+            let mut tree = Self::from_next(module, inner);
             tree.accept = false;
             if tree.branches.is_empty() {
                 let next = Rc::new(Next::Slice(n - 1, Rc::new(Next::Empty), next.clone()));
@@ -1204,79 +1225,81 @@ impl<'a> MatchTreeStep<'a> {
             }
             tree
         } else {
-            Self::add_next(module, next.clone())
+            Self::from_next(module, next.clone())
         }
     }
 
-    fn add_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+    /// Constructs a [MatchTreeStep] from a `Next` (a sequence of simplified, partially consumed [Format]s).
+    fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
-                let tree1 = Self::add_next(module, next1.clone());
-                let tree2 = Self::add_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone());
+                let tree2 = Self::from_next(module, next2.clone());
                 tree1.union(tree2)
             }
-            Next::Cat(f, next) => Self::add(module, f, next.clone()),
-            Next::Tuple(fields, next) => Self::add_tuple(module, fields, next.clone()),
-            Next::Record(fields, next) => Self::add_record(module, fields, next.clone()),
+            Next::Cat(f, next) => Self::from_format(module, f, next.clone()),
+            Next::Tuple(fields, next) => Self::from_tuple(module, fields, next.clone()),
+            Next::Record(fields, next) => Self::from_record(module, fields, next.clone()),
             Next::Repeat(a, next0) => {
-                let tree = Self::add_next(module, next0.clone());
-                tree.union(Self::add(module, a, next))
+                let tree = Self::from_next(module, next0.clone());
+                tree.union(Self::from_format(module, a, next))
             }
-            Next::RepeatCount(n, a, next0) => Self::add_repeat_count(module, *n, a, next0.clone()),
+            Next::RepeatCount(n, a, next0) => Self::from_repeat_count(module, *n, a, next0.clone()),
             Next::Slice(n, inside, next0) => {
-                Self::add_slice(module, *n, inside.clone(), next0.clone())
+                Self::from_slice(module, *n, inside.clone(), next0.clone())
             }
             Next::Peek(next1, next2) => {
-                let tree1 = Self::add_next(module, next1.clone());
-                let tree2 = Self::add_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone());
+                let tree2 = Self::from_next(module, next2.clone());
                 tree1.peek(tree2)
             }
             Next::PeekNot(next1, next2) => {
-                let tree1 = Self::add_next(module, next1.clone());
-                let tree2 = Self::add_next(module, next2.clone());
+                let tree1 = Self::from_next(module, next1.clone());
+                let tree2 = Self::from_next(module, next2.clone());
                 tree1.peek_not(tree2)
             }
         }
     }
 
-    pub fn add(module: &'a FormatModule, f: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+    /// Constructs a [MatchTreeStep] from an immediate format an an ensuing [`Next`] value
+    pub fn from_format(module: &'a FormatModule, f: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         match f {
-            Format::ItemVar(level, _args) => Self::add(module, module.get_format(*level), next),
+            Format::ItemVar(level, _args) => Self::from_format(module, module.get_format(*level), next),
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::Align(_) => {
                 Self::accept() // FIXME
             }
             Format::Byte(bs) => Self::branch(*bs, next),
-            Format::Variant(_label, f) => Self::add(module, f, next.clone()),
+            Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
             Format::UnionVariant(branches) | Format::UnionNondet(branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
-                    tree = tree.union(Self::add(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone()));
                 }
                 tree
             }
             Format::Union(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
-                    tree = tree.union(Self::add(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone()));
                 }
                 tree
             }
-            Format::Tuple(fields) => Self::add_tuple(module, fields, next),
-            Format::Record(fields) => Self::add_record(module, fields, next),
+            Format::Tuple(fields) => Self::from_tuple(module, fields, next),
+            Format::Record(fields) => Self::from_record(module, fields, next),
             Format::Repeat(a) => {
-                let tree = Self::add_next(module, next.clone());
-                tree.union(Self::add(module, a, Rc::new(Next::Repeat(a, next.clone()))))
+                let tree = Self::from_next(module, next.clone());
+                tree.union(Self::from_format(module, a, Rc::new(Next::Repeat(a, next.clone()))))
             }
-            Format::Repeat1(a) => Self::add(module, a, Rc::new(Next::Repeat(a, next.clone()))),
+            Format::Repeat1(a) => Self::from_format(module, a, Rc::new(Next::Repeat(a, next.clone()))),
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
-                    Self::add_repeat_count(module, n, a, next.clone())
+                    Self::from_repeat_count(module, n, a, next.clone())
                 } else {
-                    Self::add_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
+                    Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
                 }
             }
             Format::RepeatUntilLast(_expr, _a) => {
@@ -1286,22 +1309,22 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::Peek(a) => {
-                let tree = Self::add_next(module, next.clone());
-                let peek = Self::add(module, a, Rc::new(Next::Empty));
+                let tree = Self::from_next(module, next.clone());
+                let peek = Self::from_format(module, a, Rc::new(Next::Empty));
                 tree.peek(peek)
             }
             Format::PeekNot(a) => {
-                let tree = Self::add_next(module, next.clone());
-                let peek = Self::add(module, a, Rc::new(Next::Empty));
+                let tree = Self::from_next(module, next.clone());
+                let peek = Self::from_format(module, a, Rc::new(Next::Empty));
                 tree.peek_not(peek)
             }
             Format::Slice(expr, f) => {
                 let inside = Rc::new(Next::Cat(f, Rc::new(Next::Empty)));
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
-                    Self::add_slice(module, n, inside, next)
+                    Self::from_slice(module, n, inside, next)
                 } else {
-                    Self::add_slice(module, bounds.min, inside, Rc::new(Next::Empty))
+                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
                 }
             }
             Format::Bits(_a) => {
@@ -1309,14 +1332,14 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::WithRelativeOffset(expr, a) => {
                 // REVIEW - this is a bit hackish but it is at least somewhat better than before
-                let tree = Self::add_next(module, next.clone());
+                let tree = Self::from_next(module, next.clone());
                 let bounds = expr.bounds();
                 match bounds.is_exact() {
                     None => tree, // if the lookahead is indeterminate, ignore it
                     Some(n) => {
                         let peek = match n {
-                            0 => Self::add(module, a, Rc::new(Next::Empty)),
-                            _ => Self::add_slice(
+                            0 => Self::from_format(module, a, Rc::new(Next::Empty)),
+                            _ => Self::from_slice(
                                 module,
                                 n,
                                 Rc::new(Next::Empty),
@@ -1327,30 +1350,31 @@ impl<'a> MatchTreeStep<'a> {
                     }
                 }
             }
-            Format::Map(f, _expr) => Self::add(module, f, next),
-            Format::Compute(_expr) => Self::add_next(module, next),
-            Format::Let(_name, _expr, f) => Self::add(module, f, next),
+            Format::Map(f, _expr) => Self::from_format(module, f, next),
+            Format::Compute(_expr) => Self::from_next(module, next),
+            Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
-                    tree = tree.union(Self::add(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone()));
                 }
                 tree
             }
             Format::MatchVariant(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, _, f) in branches {
-                    tree = tree.union(Self::add(module, f, next.clone()));
+                    tree = tree.union(Self::from_format(module, f, next.clone()));
                 }
                 tree
             }
-            Format::Dynamic(_name, _expr, f) => Self::add(module, f, next),
+            Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Apply(_name) => Self::accept(),
         }
     }
 }
 
 impl<'a> MatchTreeLevel<'a> {
+    /// Constructs a `MatchTreeLevel` that unconditionally rejects all inputs without branching.
     fn reject() -> MatchTreeLevel<'a> {
         MatchTreeLevel {
             accept: None,
@@ -1358,6 +1382,17 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
+    /// Attempts to modify `self` such that `index` is marked as the unique (external) index of acceptance.
+    ///
+    /// Will return `Ok(())` if said index was already marked as such, or no index was.
+    ///
+    /// Returns `Err(())` if any other index was already marked as accepting.
+    ///
+    /// # Safety
+    ///
+    /// There is no way to tell whether `index` is properly in-range within this method.
+    /// The caller must therefore either ensure it does not pass in an improper index, or
+    /// sanitizes the index returned from methods that access it further down the line.
     fn merge_accept(&mut self, index: usize) -> Result<(), ()> {
         match self.accept {
             None => {
@@ -1369,45 +1404,65 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
+    /// Adds a new branch to `self` using a predicate byte-set and its associated follow-set,
+    /// as well as the externally significant index that should be associated with input that
+    /// the new branch would accept.
     fn merge_branch(
         &mut self,
         index: usize,
         mut bs: ByteSet,
         next: Rc<Next<'a>>,
-    ) -> Result<(), ()> {
+    ) {
         let mut new_branches = Vec::new();
+        // For each bs0, nexts in the extant branches of `self`:
         for (bs0, nexts) in self.branches.iter_mut() {
             let common = bs0.intersection(&bs);
+            // If bs and bs0 are not disjoint:
             if !common.is_empty() {
                 let orig = bs0.difference(&bs);
                 if !orig.is_empty() {
+                    // 1. Enqueue a branch predicated on `bs0 - bs` with an inherited follow-set
                     new_branches.push((orig, nexts.clone()));
                 }
+                // 2. Leave behind a branch predicated on `bs0 & bs`
                 *bs0 = common;
+                // 2a. Add the `next` parameter to the follow-set of the existing branch we modified in-place
                 nexts.insert((index, next.clone()));
+                // 3. Remove all bytes from `bs` that are now covered by the branch we modified in-place
                 bs = bs.difference(bs0);
             }
         }
+        // If any bytes of bs were completely unique among all extant branches:
         if !bs.is_empty() {
+            // 1. Create a novel branch with the follow-set implied by the `next` parameter
             let mut nexts = HashSet::new();
             nexts.insert((index, next.clone()));
             self.branches.push((bs, nexts));
         }
+        // Append all enqueued branches from the iteration above
         self.branches.append(&mut new_branches);
-        Ok(())
     }
 
-    fn merge(mut self, index: usize, other: MatchTreeStep<'a>) -> Result<MatchTreeLevel<'a>, ()> {
-        if other.accept {
+    /// Extends the set of choice-points and follow-sets of `self` with a provided [`MatchTreeStep`].
+    ///
+    /// Takes a novel index to identify the new branch across possible segmentation into overlapping
+    /// and non-overlapping subsets (relative to the existing branches). This index is externally significant
+    /// only, but will be maintained internally without modification.
+    fn merge_step(mut self, index: usize, step: MatchTreeStep<'a>) -> Result<MatchTreeLevel<'a>, ()> {
+        if step.accept {
             self.merge_accept(index)?;
         }
-        for (bs, next) in other.branches {
-            self.merge_branch(index, bs, next)?;
+        for (bs, next) in step.branches {
+            self.merge_branch(index, bs, next);
         }
         Ok(self)
     }
 
-    fn accepts(nexts: &HashSet<(usize, Rc<Next<'a>>)>) -> Option<MatchTree> {
+    /// Attempts to resolve an indexed bundle of follow-sets (i.e. a [`LevelBranch`]) into
+    /// a [`MatchTree`] that unconditionally yields a unique external branch-identifying index.
+    ///
+    /// Will return `None` if this cannot be done, i.e. more than one candidate index is found.
+    fn accepts(nexts: &LevelBranch<'a>) -> Option<MatchTree> {
         let mut tree = Self::reject();
         for (i, _next) in nexts.iter() {
             tree.merge_accept(*i).ok()?;
@@ -1418,9 +1473,16 @@ impl<'a> MatchTreeLevel<'a> {
         })
     }
 
+    /// Attempts to accumulate a `MatchTree` recursively up to an overall depth of `depth` layers,
+    /// with the immediate layer constructed based on a bundle of indexed choice-points ([`LevelBranch`]).
+    ///
+    /// If the depth limit has been reached without a decisive choice of which index to accept, returns None.
+    ///
+    /// Otherwise, returns a `Some`-wrapped `MatchTree` that is guaranteed to decide on a unique branch for
+    /// all input within at most `depth` bytes of lookahead.
     fn grow(
         module: &'a FormatModule,
-        nexts: HashSet<(usize, Rc<Next<'a>>)>,
+        nexts: LevelBranch<'a>,
         depth: usize,
     ) -> Option<MatchTree> {
         if let Some(tree) = Self::accepts(&nexts) {
@@ -1428,8 +1490,8 @@ impl<'a> MatchTreeLevel<'a> {
         } else if depth > 0 {
             let mut tree = Self::reject();
             for (i, next) in nexts {
-                let subtree = MatchTreeStep::add_next(module, next);
-                tree = tree.merge(i, subtree).ok()?;
+                let subtree = MatchTreeStep::from_next(module, next);
+                tree = tree.merge_step(i, subtree).ok()?;
             }
             let mut branches = Vec::new();
             for (bs, nexts) in tree.branches {
@@ -1447,6 +1509,10 @@ impl<'a> MatchTreeLevel<'a> {
 }
 
 impl MatchTree {
+    /// Returns the accepting index associated with the input-sequence starting from the current offset of `input`,
+    /// looking ahead as many bytes as necessary until a definitive index is found or the lookahead limit is reached.
+    ///
+    /// Returns `None` if not enough lookahead remains to disambiguate multiple candidate indices.
     fn matches(&self, input: ReadCtxt<'_>) -> Option<usize> {
         match input.read_byte() {
             None => self.accept,
@@ -1461,6 +1527,10 @@ impl MatchTree {
         }
     }
 
+    /// Constructs a new `MatchTreeLevel` from an alternation of branches and a follow-set of partially decomposed formats,
+    /// to within a fixed but externally opaque lookahead-depth.
+    ///
+    /// A `FormatModule` is also accepted to contextualize any contextually dependent formats, e.g. [`Format::ItemVar`]
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
