@@ -289,7 +289,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Compute(_expr) => Ok(()),
             Format::Let(name, expr, format) => {
                 let v = expr.eval_value(scope);
-                let let_scope = SingleScope::new(scope, name.clone(), &v);
+                let let_scope = SingleScope::new(scope, name, &v);
                 self.write_flat(&Scope::Single(let_scope), value, format)
             }
             Format::Match(head, branches) => match value {
@@ -323,7 +323,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Dynamic(name, _dynformat, format) => {
                 let v = Value::Tuple(vec![]);
-                let child_scope = SingleScope::new(scope, name.clone(), &v);
+                let child_scope = SingleScope::new(scope, name, &v);
                 self.write_flat(&Scope::Single(child_scope), value, format)
             }
             Format::Apply(_) => Ok(()), // FIXME

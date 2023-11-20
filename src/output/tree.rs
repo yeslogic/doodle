@@ -327,7 +327,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Compute(_expr) => self.compile_value(scope, value),
             Format::Let(name, expr, format) => {
                 let v = expr.eval_value(scope);
-                let let_scope = SingleScope::new(scope, name.clone(), &v);
+                let let_scope = SingleScope::new(scope, name, &v);
                 self.compile_decoded_value(&Scope::Single(let_scope), value, format)
             }
             Format::Match(head, branches) => match value {
@@ -372,7 +372,7 @@ impl<'module> MonoidalPrinter<'module> {
                 // In future we could potentially save the generated dynamic format
                 // as a new type of value if we wanted to optionally display it.
                 let v = Value::Tuple(vec![]);
-                let child_scope = SingleScope::new(scope, name.clone(), &v);
+                let child_scope = SingleScope::new(scope, name, &v);
                 self.compile_decoded_value(&Scope::Single(child_scope), value, format)
             }
             Format::Apply(_) => self.compile_value(scope, value),
