@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
-use crate::decoder::{NormalScope, Scope, SingleScope, Value};
+use crate::decoder::{MultiScope, Scope, SingleScope, Value};
 use crate::Label;
 use crate::{DynFormat, Expr, Format, FormatModule};
 
@@ -336,7 +336,7 @@ impl<'module> MonoidalPrinter<'module> {
                     let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         frag.encat(self.compile_decoded_value(
-                            &Scope::Normal(&pattern_scope),
+                            &Scope::Multi(&pattern_scope),
                             value,
                             format,
                         ));
@@ -354,7 +354,7 @@ impl<'module> MonoidalPrinter<'module> {
                         if let Value::Variant(label2, value) = value.as_ref() {
                             assert_eq!(label, label2);
                             frag.encat(self.compile_decoded_value(
-                                &Scope::Normal(&pattern_scope),
+                                &Scope::Multi(&pattern_scope),
                                 value,
                                 format,
                             ));
@@ -651,12 +651,12 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::String("{}".into())
         } else {
             let mut frag = Fragment::new();
-            let mut record_scope = NormalScope::with_capacity(scope, value_fields.len());
+            let mut record_scope = MultiScope::with_capacity(scope, value_fields.len());
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
                 frag.encat(self.compile_field_value_continue(
-                    &Scope::Normal(&record_scope),
+                    &Scope::Multi(&record_scope),
                     label,
                     value,
                     format,
@@ -667,7 +667,7 @@ impl<'module> MonoidalPrinter<'module> {
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
             frag.encat(self.compile_field_value_last(
-                &Scope::Normal(&record_scope),
+                &Scope::Multi(&record_scope),
                 label,
                 value,
                 format,
