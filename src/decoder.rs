@@ -404,7 +404,7 @@ impl Expr {
     fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: &Value) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
-                let child_scope = SingleScope::new(scope, name.clone(), arg);
+                let child_scope = SingleScope::new(scope, name, arg);
                 expr.eval_value(&Scope::Single(child_scope))
             }
             _ => panic!("expected Lambda"),
@@ -558,13 +558,13 @@ pub struct NormalScope<'a> {
 
 pub struct SingleScope<'a> {
     parent: &'a Scope<'a>,
-    name: Label,
+    name: &'a str,
     value: &'a Value,
 }
 
 pub struct DecoderScope<'a> {
     parent: &'a Scope<'a>,
-    name: Label,
+    name: &'a str,
     decoder: Decoder,
 }
 
@@ -634,7 +634,7 @@ impl<'a> NormalScope<'a> {
 }
 
 impl<'a> SingleScope<'a> {
-    pub fn new(parent: &'a Scope<'a>, name: Label, value: &'a Value) -> SingleScope<'a> {
+    pub fn new(parent: &'a Scope<'a>, name: &'a str, value: &'a Value) -> SingleScope<'a> {
         SingleScope {
             parent,
             name,
@@ -651,13 +651,16 @@ impl<'a> SingleScope<'a> {
     }
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
-        bindings.push((self.name.clone(), ScopeEntry::Value(self.value.clone())));
+        bindings.push((
+            self.name.to_string().into(),
+            ScopeEntry::Value(self.value.clone()),
+        ));
         self.parent.get_bindings(bindings);
     }
 }
 
 impl<'a> DecoderScope<'a> {
-    fn new(parent: &'a Scope<'a>, name: Label, decoder: Decoder) -> DecoderScope<'a> {
+    fn new(parent: &'a Scope<'a>, name: &'a str, decoder: Decoder) -> DecoderScope<'a> {
         DecoderScope {
             parent,
             name,
@@ -674,7 +677,10 @@ impl<'a> DecoderScope<'a> {
     }
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
-        bindings.push((self.name.clone(), ScopeEntry::Decoder(self.decoder.clone())));
+        bindings.push((
+            self.name.to_string().into(),
+            ScopeEntry::Decoder(self.decoder.clone()),
+        ));
         self.parent.get_bindings(bindings);
     }
 }
@@ -1185,7 +1191,7 @@ impl Decoder {
             }
             Decoder::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
-                let let_scope = SingleScope::new(scope, name.clone(), &v);
+                let let_scope = SingleScope::new(scope, name, &v);
                 d.parse(program, &Scope::Single(let_scope), input)
             }
             Decoder::Match(head, branches) => {
@@ -1215,7 +1221,7 @@ impl Decoder {
                 };
                 let f = make_huffman_codes(&lengths);
                 let dyn_d = Decoder::compile_one(&f).unwrap();
-                let child_scope = DecoderScope::new(scope, name.clone(), dyn_d);
+                let child_scope = DecoderScope::new(scope, name, dyn_d);
                 d.parse(program, &Scope::Decoder(child_scope), input)
             }
             Decoder::Apply(name) => {
