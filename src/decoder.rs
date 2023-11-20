@@ -98,14 +98,14 @@ impl Value {
 
     /// Returns `true` if the pattern successfully matches the value, pushing
     /// any values bound by the pattern onto the scope
-    pub fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<NormalScope<'a>> {
-        let mut pattern_scope = NormalScope::new(scope);
+    pub fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
+        let mut pattern_scope = MultiScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
             .then_some(pattern_scope)
     }
 
-    fn matches_inner(&self, scope: &mut NormalScope<'_>, pattern: &Pattern) -> bool {
+    fn matches_inner(&self, scope: &mut MultiScope<'_>, pattern: &Pattern) -> bool {
         match (pattern, self) {
             (Pattern::Binding(name), head) => {
                 scope.push(name.clone(), head.clone());
@@ -169,7 +169,7 @@ impl Expr {
                 let head = head.eval(scope);
                 for (pattern, expr) in branches {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let value = expr.eval_value(&Scope::Normal(&pattern_scope));
+                        let value = expr.eval_value(&Scope::Multi(&pattern_scope));
                         return Cow::Owned(value);
                     }
                 }
@@ -546,12 +546,12 @@ pub enum ScopeEntry {
 
 pub enum Scope<'a> {
     Empty,
-    Normal(&'a NormalScope<'a>),
+    Multi(&'a MultiScope<'a>),
     Single(SingleScope<'a>),
     Decoder(DecoderScope<'a>),
 }
 
-pub struct NormalScope<'a> {
+pub struct MultiScope<'a> {
     parent: &'a Scope<'a>,
     entries: Vec<(Label, Value)>,
 }
@@ -572,7 +572,7 @@ impl<'a> Scope<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         match self {
             Scope::Empty => panic!("value not found: {name}"),
-            Scope::Normal(normal) => normal.get_value_by_name(name),
+            Scope::Multi(normal) => normal.get_value_by_name(name),
             Scope::Single(single) => single.get_value_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
         }
@@ -581,7 +581,7 @@ impl<'a> Scope<'a> {
     fn get_decoder_by_name(&self, name: &str) -> &Decoder {
         match self {
             Scope::Empty => panic!("decoder not found: {name}"),
-            Scope::Normal(normal) => normal.parent.get_decoder_by_name(name),
+            Scope::Multi(normal) => normal.parent.get_decoder_by_name(name),
             Scope::Single(single) => single.parent.get_decoder_by_name(name),
             Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
         }
@@ -590,22 +590,22 @@ impl<'a> Scope<'a> {
     pub fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
         match self {
             Scope::Empty => {}
-            Scope::Normal(normal) => normal.get_bindings(bindings),
+            Scope::Multi(normal) => normal.get_bindings(bindings),
             Scope::Single(single) => single.get_bindings(bindings),
             Scope::Decoder(decoder) => decoder.get_bindings(bindings),
         }
     }
 }
 
-impl<'a> NormalScope<'a> {
-    fn new(parent: &'a Scope<'a>) -> NormalScope<'a> {
+impl<'a> MultiScope<'a> {
+    fn new(parent: &'a Scope<'a>) -> MultiScope<'a> {
         let entries = Vec::new();
-        NormalScope { parent, entries }
+        MultiScope { parent, entries }
     }
 
-    pub fn with_capacity(parent: &'a Scope<'a>, capacity: usize) -> NormalScope<'a> {
+    pub fn with_capacity(parent: &'a Scope<'a>, capacity: usize) -> MultiScope<'a> {
         let entries = Vec::with_capacity(capacity);
-        NormalScope { parent, entries }
+        MultiScope { parent, entries }
     }
 
     pub fn into_record(self) -> Value {
@@ -993,12 +993,12 @@ impl Decoder {
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         match self {
             Decoder::Call(n, es) => {
-                let mut new_scope = NormalScope::with_capacity(&Scope::Empty, es.len());
+                let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n].parse(program, &Scope::Normal(&new_scope), input)
+                program.decoders[*n].parse(program, &Scope::Multi(&new_scope), input)
             }
             Decoder::Fail => Err(ParseError::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
@@ -1055,10 +1055,9 @@ impl Decoder {
             }
             Decoder::Record(fields) => {
                 let mut input = input;
-                let mut record_scope = NormalScope::with_capacity(scope, fields.len());
+                let mut record_scope = MultiScope::with_capacity(scope, fields.len());
                 for (name, f) in fields {
-                    let (vf, next_input) =
-                        f.parse(program, &Scope::Normal(&record_scope), input)?;
+                    let (vf, next_input) = f.parse(program, &Scope::Multi(&record_scope), input)?;
                     record_scope.push(name.clone(), vf);
                     input = next_input;
                 }
@@ -1199,7 +1198,7 @@ impl Decoder {
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         let (v, input) =
-                            decoder.parse(program, &Scope::Normal(&pattern_scope), input)?;
+                            decoder.parse(program, &Scope::Multi(&pattern_scope), input)?;
                         return Ok((Value::Branch(index, Box::new(v)), input));
                     }
                 }

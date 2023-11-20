@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::decoder::{NormalScope, Scope, SingleScope, Value};
+use crate::decoder::{MultiScope, Scope, SingleScope, Value};
 use crate::Label;
 use crate::{Format, FormatModule};
 
@@ -257,10 +257,10 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
-                    let mut record_scope = NormalScope::with_capacity(scope, value_fields.len());
+                    let mut record_scope = MultiScope::with_capacity(scope, value_fields.len());
                     for (index, (label, value)) in value_fields.iter().enumerate() {
                         let format = &format_fields[index].1;
-                        self.write_flat(&Scope::Normal(&record_scope), value, format)?;
+                        self.write_flat(&Scope::Multi(&record_scope), value, format)?;
                         record_scope.push(label.clone(), value.clone());
                     }
                     Ok(())
@@ -297,7 +297,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     let head = head.eval(scope);
                     let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        self.write_flat(&Scope::Normal(&pattern_scope), value, format)?;
+                        self.write_flat(&Scope::Multi(&pattern_scope), value, format)?;
                         return Ok(());
                     }
                     panic!("pattern match failure");
@@ -311,7 +311,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         if let Value::Variant(label2, value) = value.as_ref() {
                             assert_eq!(label, label2);
-                            self.write_flat(&Scope::Normal(&pattern_scope), value, format)?;
+                            self.write_flat(&Scope::Multi(&pattern_scope), value, format)?;
                         } else {
                             panic!("expected variant, found {value:?}");
                         }
