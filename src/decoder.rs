@@ -1384,16 +1384,18 @@ mod tests {
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
-        let scope = Scope::Empty;
-        let (val, remain) = d.parse(&program, &scope, ReadCtxt::new(input)).unwrap();
+        let (val, remain) = d
+            .parse(&program, &Scope::Empty, ReadCtxt::new(input))
+            .unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
 
     fn rejects(d: &Decoder, input: &[u8]) {
         let program = Program::new();
-        let scope = Scope::Empty;
-        assert!(d.parse(&program, &scope, ReadCtxt::new(input)).is_err());
+        assert!(d
+            .parse(&program, &Scope::Empty, ReadCtxt::new(input))
+            .is_err());
     }
 
     #[test]
