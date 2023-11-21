@@ -572,7 +572,7 @@ impl<'a> Scope<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         match self {
             Scope::Empty => panic!("value not found: {name}"),
-            Scope::Multi(normal) => normal.get_value_by_name(name),
+            Scope::Multi(multi) => multi.get_value_by_name(name),
             Scope::Single(single) => single.get_value_by_name(name),
             Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
         }
@@ -581,7 +581,7 @@ impl<'a> Scope<'a> {
     fn get_decoder_by_name(&self, name: &str) -> &Decoder {
         match self {
             Scope::Empty => panic!("decoder not found: {name}"),
-            Scope::Multi(normal) => normal.parent.get_decoder_by_name(name),
+            Scope::Multi(multi) => multi.parent.get_decoder_by_name(name),
             Scope::Single(single) => single.parent.get_decoder_by_name(name),
             Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
         }
@@ -590,7 +590,7 @@ impl<'a> Scope<'a> {
     pub fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
         match self {
             Scope::Empty => {}
-            Scope::Multi(normal) => normal.get_bindings(bindings),
+            Scope::Multi(multi) => multi.get_bindings(bindings),
             Scope::Single(single) => single.get_bindings(bindings),
             Scope::Decoder(decoder) => decoder.get_bindings(bindings),
         }
