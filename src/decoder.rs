@@ -1,7 +1,9 @@
 use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
-use crate::{DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, ValueType};
+use crate::{
+    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType,
+};
 use crate::{IntoLabel, Label};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -443,47 +445,24 @@ pub enum Decoder {
     Apply(Label),
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-pub enum TypeRef {
-    Var(usize),
-    Empty,
-    Bool,
-    U8,
-    U16,
-    U32,
-    Tuple(Vec<TypeRef>),
-    Seq(Box<TypeRef>),
-    Char,
-}
-
-pub enum TypeDef {
-    //Equiv(TypeRef),
-    Union(Vec<(Label, TypeRef)>),
-    Record(Vec<(Label, TypeRef)>),
-}
-
 pub struct Program {
-    typedefs: Vec<TypeDef>,
-    decoders: Vec<Decoder>,
+    pub decoders: Vec<(Decoder, ValueType)>,
 }
 
 impl Program {
     fn new() -> Self {
-        let typedefs = Vec::new();
         let decoders = Vec::new();
-        Program { typedefs, decoders }
+        Program { decoders }
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        self.decoders[0].parse(self, &Scope::Empty, input)
+        self.decoders[0].0.parse(self, &Scope::Empty, input)
     }
 }
 
 pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
-    record_map: HashMap<Vec<(Label, TypeRef)>, usize>,
-    union_map: HashMap<Vec<(Label, TypeRef)>, usize>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
     compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
 }
@@ -491,15 +470,11 @@ pub struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
         let program = Program::new();
-        let record_map = HashMap::new();
-        let union_map = HashMap::new();
         let decoder_map = HashMap::new();
         let compile_queue = Vec::new();
         Compiler {
             module,
             program,
-            record_map,
-            union_map,
             decoder_map,
             compile_queue,
         }
@@ -508,33 +483,22 @@ impl<'a> Compiler<'a> {
     pub fn compile(module: &FormatModule, format: &Format) -> Result<Program, String> {
         let mut compiler = Compiler::new(module);
         // type
-        /*
         let mut scope = TypeScope::new();
-        let t = TypeRef::from_value_type(
-            &mut compiler,
-            &module.infer_format_type(&mut scope, format)?,
-        );
-        */
+        let t = module.infer_format_type(&mut scope, format)?;
         // decoder
-        compiler.queue_compile(format, Rc::new(Next::Empty));
+        compiler.queue_compile(t, format, Rc::new(Next::Empty));
         while let Some((f, next, n)) = compiler.compile_queue.pop() {
             let d = Decoder::compile_next(&mut compiler, f, next)?;
-            compiler.program.decoders[n] = d;
+            compiler.program.decoders[n].0 = d;
         }
         Ok(compiler.program)
     }
 
-    fn queue_compile(&mut self, f: &'a Format, next: Rc<Next<'a>>) -> usize {
+    fn queue_compile(&mut self, t: ValueType, f: &'a Format, next: Rc<Next<'a>>) -> usize {
         let n = self.program.decoders.len();
-        self.program.decoders.push(Decoder::Fail);
+        self.program.decoders.push((Decoder::Fail, t));
         self.compile_queue.push((f, next, n));
         n
-    }
-
-    pub fn add_typedef(&mut self, t: TypeDef) -> TypeRef {
-        let n = self.program.typedefs.len();
-        self.program.typedefs.push(t);
-        TypeRef::Var(n)
     }
 }
 
@@ -685,88 +649,6 @@ impl<'a> DecoderScope<'a> {
     }
 }
 
-impl TypeRef {
-    #[allow(dead_code)]
-    fn from_value_type(compiler: &mut Compiler<'_>, t: &ValueType) -> Self {
-        match t {
-            ValueType::Any => panic!("ValueType::Any"),
-            ValueType::Empty => TypeRef::Empty,
-            ValueType::Bool => TypeRef::Bool,
-            ValueType::U8 => TypeRef::U8,
-            ValueType::Char => TypeRef::Char,
-            ValueType::U16 => TypeRef::U16,
-            ValueType::U32 => TypeRef::U32,
-            ValueType::Tuple(ts) => TypeRef::Tuple(
-                ts.iter()
-                    .map(|t| Self::from_value_type(compiler, t))
-                    .collect(),
-            ),
-            ValueType::Record(fields) => {
-                let fs: Vec<_> = fields
-                    .iter()
-                    .map(|(label, t)| (label.clone(), Self::from_value_type(compiler, t)))
-                    .collect();
-                let n = if let Some(n) = compiler.record_map.get(&fs) {
-                    *n
-                } else {
-                    let t = TypeDef::Record(fs.clone());
-                    let n = compiler.program.typedefs.len();
-                    compiler.program.typedefs.push(t);
-                    compiler.record_map.insert(fs, n);
-                    n
-                };
-                TypeRef::Var(n)
-            }
-            ValueType::Union(branches) => {
-                let bs: Vec<_> = branches
-                    .iter()
-                    .map(|(label, t)| (label.clone(), Self::from_value_type(compiler, t)))
-                    .collect();
-                let n = if let Some(n) = compiler.union_map.get(&bs) {
-                    *n
-                } else {
-                    let t = TypeDef::Union(bs.clone());
-                    let n = compiler.program.typedefs.len();
-                    compiler.program.typedefs.push(t);
-                    compiler.union_map.insert(bs, n);
-                    n
-                };
-                TypeRef::Var(n)
-            }
-            ValueType::Seq(t) => TypeRef::Seq(Box::new(Self::from_value_type(compiler, t))),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn to_value_type(&self, typedefs: &[TypeDef]) -> ValueType {
-        match self {
-            TypeRef::Var(n) => match &typedefs[*n] {
-                //TypeDef::Equiv(t) => t.to_value_type(typedefs),
-                TypeDef::Union(ts) => ValueType::Union(
-                    ts.iter()
-                        .map(|(name, t)| (name.clone(), t.to_value_type(typedefs)))
-                        .collect(),
-                ),
-                TypeDef::Record(ts) => ValueType::Record(
-                    ts.iter()
-                        .map(|(name, t)| (name.clone(), t.to_value_type(typedefs)))
-                        .collect(),
-                ),
-            },
-            TypeRef::Empty => ValueType::Empty,
-            TypeRef::Bool => ValueType::Bool,
-            TypeRef::U8 => ValueType::U8,
-            TypeRef::U16 => ValueType::U16,
-            TypeRef::U32 => ValueType::U32,
-            TypeRef::Char => ValueType::Char,
-            TypeRef::Tuple(ts) => {
-                ValueType::Tuple(ts.iter().map(|t| t.to_value_type(typedefs)).collect())
-            }
-            TypeRef::Seq(t) => ValueType::Seq(Box::new(t.to_value_type(typedefs))),
-        }
-    }
-}
-
 impl Decoder {
     pub fn compile_one(format: &Format) -> Result<Decoder, String> {
         let module = FormatModule::new();
@@ -794,7 +676,8 @@ impl Decoder {
                 let n = if let Some(n) = compiler.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
-                    let n = compiler.queue_compile(f, next.clone());
+                    let t = compiler.module.get_format_type(*level).clone();
+                    let n = compiler.queue_compile(t, f, next.clone());
                     compiler.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
@@ -998,7 +881,9 @@ impl Decoder {
                     let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n].parse(program, &Scope::Multi(&new_scope), input)
+                program.decoders[*n]
+                    .0
+                    .parse(program, &Scope::Multi(&new_scope), input)
             }
             Decoder::Fail => Err(ParseError::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
