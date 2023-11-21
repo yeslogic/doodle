@@ -1126,10 +1126,9 @@ impl Decoder {
                     v.push(va);
                     let vs = Value::Seq(v);
                     let done = expr.eval_lambda(scope, &vs).unwrap_bool();
-                    v = if let Value::Seq(v) = vs {
-                        v
-                    } else {
-                        panic!("wut");
+                    v = match vs {
+                        Value::Seq(v) => v,
+                        _ => unreachable!(),
                     };
                     if done {
                         break;
