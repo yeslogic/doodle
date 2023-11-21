@@ -13,6 +13,7 @@ use crate::read::ReadCtxt;
 
 pub mod bounds;
 pub mod byte_set;
+pub mod codegen;
 pub mod decoder;
 pub mod error;
 
