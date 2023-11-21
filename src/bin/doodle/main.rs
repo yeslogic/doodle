@@ -17,6 +17,8 @@ enum FormatOutput {
     Debug,
     /// Serialize to JSON
     Json,
+    /// Generate Rust code
+    Rust,
 }
 
 #[derive(Copy, Clone, ValueEnum)]
@@ -53,11 +55,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match Command::parse() {
         Command::Format { output } => {
             let mut module = FormatModule::new();
-            let _ = format::main(&mut module);
+            let format = format::main(&mut module).call();
 
             match output {
                 FormatOutput::Debug => println!("{module:?}"),
                 FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
+                FormatOutput::Rust => {
+                    doodle::codegen::print_program(&module, &format);
+                }
             }
 
             Ok(())
