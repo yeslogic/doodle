@@ -15,8 +15,7 @@ fn atomic_value_to_string(value: &Value) -> String {
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     use std::io::Write;
-    let scope = Scope::Empty;
-    let frag = MonoidalPrinter::new(module).compile_decoded_value(&scope, value, format);
+    let frag = MonoidalPrinter::new(module).compile_decoded_value(&Scope::Empty, value, format);
     let mut lock = io::stdout().lock();
     match write!(&mut lock, "{}", frag) {
         Ok(_) => (),

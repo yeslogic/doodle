@@ -7,9 +7,8 @@ use crate::{Format, FormatModule};
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     let mut path = Vec::new();
     check_covered(module, &mut path, format).unwrap();
-    let scope = Scope::Empty;
     Context::new(io::stdout(), module)
-        .write_flat(&scope, value, format)
+        .write_flat(&Scope::Empty, value, format)
         .unwrap()
 }
 
