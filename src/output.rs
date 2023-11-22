@@ -156,7 +156,7 @@ impl Fragment {
     ///
     /// It is possibly more efficient to pass `sep := None` than `sep := Some(Fragment::Empty)`,
     /// but the resulting output will differ in performance alone, and not output.
-    fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
+    pub fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
         Self::Sequence {
             items: items.into_iter().collect(),
             sep: sep.map(Box::new),
@@ -167,7 +167,7 @@ impl Fragment {
     ///
     /// If either fragment is empty, will short-circuit to the other
     /// to avoid needless allocation.
-    fn cat(self, frag1: Self) -> Self {
+    pub fn cat(self, frag1: Self) -> Self {
         if self.is_empty() {
             frag1
         } else if frag1.is_empty() {
