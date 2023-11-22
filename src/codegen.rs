@@ -1,3 +1,5 @@
+mod rust_ast;
+
 use crate::decoder::{Decoder, Program};
 use crate::ValueType;
 use std::borrow::Cow;
