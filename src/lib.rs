@@ -1006,10 +1006,6 @@ enum Next<'a> {
 }
 
 /// A single choice-point in a conceptual [MatchTree] structure.
-///
-/// A [MatchTreeStep] is a single step along an arbitrary descent into a [MatchTree].
-/// It may either accept (or otherwise reject) input that either fails to yield any
-/// more bytes, or yields a byte that does not constitute a match for any branch.
 #[derive(Clone, Debug)]
 struct MatchTreeStep<'a> {
     accept: bool,
@@ -1017,12 +1013,6 @@ struct MatchTreeStep<'a> {
 }
 
 /// The superposition of choice-points at a common descent-depth into a conceptual [MatchTree] structure.
-///
-/// A [MatchTreeLevel] is a theoretical cross-section of all choice-points at the same, unknown depth,
-/// of a [MatchTree]. In conceptual terms, it is an aggregation of common-depth [MatchTreeStep]s, though
-/// the implementation does not necessarily conform to this model; in practice, any two such choice-points
-/// can accept non-disjoint byte-sets, and it is much more efficient to pre-merge into an intersection branch,
-/// with novel branches for each half of the symmetric difference.
 #[derive(Clone, Debug)]
 struct MatchTreeLevel<'a> {
     accept: Option<usize>,
@@ -1030,22 +1020,9 @@ struct MatchTreeLevel<'a> {
 }
 
 /// A bundle of follow-sets with an externally significant index, e.g. into an array of decoders
-///
-/// While the choice-points along any given descent of a [`MatchTree`] are fully informed
-/// by sets of mutually disjoint [`ByteSet`]s, the superposition of choice-points across
-/// all descents of a fixed depth (i.e. a [`MatchTreeLevel`]) will almost invariably encompass
-/// multiple original choice-points with non-disjoint [`ByteSet`]s. In such cases, it may be necessary
-/// to create multiple virtual branches that represent a deterministic superposition in the otherwise
-/// nondeterministic single-byte-descent at that level. In such cases, we cross-reference an original index
-/// across all entries stemming from the same [MatchTreeStep].
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 
 /// A byte-level prefix-tree evaluated to a fixed depth.
-///
-/// A [MatchTree] can either be thought of as a self-sufficient structure, or as a fused
-/// collection of [`MatchTreeLevel`]s at every depth in the range `0..=N`, where N is the maximum lookahead
-/// depth to which the tree is evaluated. In the former case, the converse may be used to define what a
-/// [MatchTreeLevel] represents.
 #[derive(Clone, Debug)]
 pub struct MatchTree {
     accept: Option<usize>,
@@ -1200,12 +1177,7 @@ impl<'a> MatchTreeStep<'a> {
     }
 
 
-    /// Constructs a [MatchTreeStep] from a given (partial) format `inner` and a slice-length `n`, mandating that the prefix-tree for the inner format
-    /// can be no more than `n` bytes deep; however many bytes are accepted for the inner format in question, the entire slice is always consumed as a unit
-    /// of `n` bytes.
-    ///
-    /// Note that the parameter `next` value specifies the trailing content after the slice, not what remains to process within the slice following `inner`. Instead,
-    /// an unconditional descent on any byte is followed for as many bytes would remain after each accepting branch of `inner` within the slice's length.
+    /// Constructs a [MatchTreeStep] from a given (partial) format `inner` and a slice-length `n`
     pub fn from_slice(
         module: &'a FormatModule,
         n: usize,
@@ -1229,7 +1201,7 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
-    /// Constructs a [MatchTreeStep] from a `Next` (a sequence of simplified, partially consumed [Format]s).
+    /// Constructs a [MatchTreeStep] from a [`Next`]
     fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         match next.as_ref() {
             Next::Empty => Self::accept(),
@@ -1262,7 +1234,7 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
-    /// Constructs a [MatchTreeStep] from an immediate format an an ensuing [`Next`] value
+    /// Constructs a [MatchTreeStep] from an Format and a trailing [`Next`] value
     pub fn from_format(module: &'a FormatModule, f: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
         match f {
             Format::ItemVar(level, _args) => Self::from_format(module, module.get_format(*level), next),
@@ -1382,17 +1354,9 @@ impl<'a> MatchTreeLevel<'a> {
         }
     }
 
-    /// Attempts to modify `self` such that `index` is marked as the unique (external) index of acceptance.
+    /// Attempts to modify `self` such that `index` is marked as the unique index of the accepting format.
     ///
-    /// Will return `Ok(())` if said index was already marked as such, or no index was.
-    ///
-    /// Returns `Err(())` if any other index was already marked as accepting.
-    ///
-    /// # Safety
-    ///
-    /// There is no way to tell whether `index` is properly in-range within this method.
-    /// The caller must therefore either ensure it does not pass in an improper index, or
-    /// sanitizes the index returned from methods that access it further down the line.
+    /// Returns `Err(())` if a different index was already marked as accepting, and `Ok(())` otherwise.
     fn merge_accept(&mut self, index: usize) -> Result<(), ()> {
         match self.accept {
             None => {
@@ -1405,8 +1369,6 @@ impl<'a> MatchTreeLevel<'a> {
     }
 
     /// Adds a new branch to `self` using a predicate byte-set and its associated follow-set,
-    /// as well as the externally significant index that should be associated with input that
-    /// the new branch would accept.
     fn merge_branch(
         &mut self,
         index: usize,
@@ -1444,10 +1406,6 @@ impl<'a> MatchTreeLevel<'a> {
     }
 
     /// Extends the set of choice-points and follow-sets of `self` with a provided [`MatchTreeStep`].
-    ///
-    /// Takes a novel index to identify the new branch across possible segmentation into overlapping
-    /// and non-overlapping subsets (relative to the existing branches). This index is externally significant
-    /// only, but will be maintained internally without modification.
     fn merge_step(mut self, index: usize, step: MatchTreeStep<'a>) -> Result<MatchTreeLevel<'a>, ()> {
         if step.accept {
             self.merge_accept(index)?;
@@ -1458,10 +1416,12 @@ impl<'a> MatchTreeLevel<'a> {
         Ok(self)
     }
 
-    /// Attempts to resolve an indexed bundle of follow-sets (i.e. a [`LevelBranch`]) into
-    /// a [`MatchTree`] that unconditionally yields a unique external branch-identifying index.
+    /// Attempt to construct and return a `MatchTree` that unconditionally accepts
+    /// the same, common format-index as all elements of the set `nexts`.
     ///
-    /// Will return `None` if this cannot be done, i.e. more than one candidate index is found.
+    /// If `nexts` is empty, the `MatchTree` returned will instead reject all input
+    ///
+    /// If `nexts` contains multiple associated indices, returns `None`
     fn accepts(nexts: &LevelBranch<'a>) -> Option<MatchTree> {
         let mut tree = Self::reject();
         for (i, _next) in nexts.iter() {
