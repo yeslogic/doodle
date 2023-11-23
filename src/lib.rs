@@ -1159,7 +1159,9 @@ impl<'a> MatchTreeStep<'a> {
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
             None => Self::from_next(module, next),
-            Some(((_label, f), fs)) => Self::from_format(module, f, Rc::new(Next::Record(fs, next))),
+            Some(((_label, f), fs)) => {
+                Self::from_format(module, f, Rc::new(Next::Record(fs, next)))
+            }
         }
     }
 
@@ -1171,12 +1173,15 @@ impl<'a> MatchTreeStep<'a> {
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
         if n > 0 {
-            Self::from_format(module, format, Rc::new(Next::RepeatCount(n - 1, format, next)))
+            Self::from_format(
+                module,
+                format,
+                Rc::new(Next::RepeatCount(n - 1, format, next)),
+            )
         } else {
             Self::from_next(module, next)
         }
     }
-
 
     /// Constructs a [MatchTreeStep] from a given (partial) format `inner` and a slice-length `n`
     pub fn from_slice(
@@ -1236,9 +1241,15 @@ impl<'a> MatchTreeStep<'a> {
     }
 
     /// Constructs a [MatchTreeStep] from an Format and a trailing [`Next`] value
-    pub fn from_format(module: &'a FormatModule, f: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+    pub fn from_format(
+        module: &'a FormatModule,
+        f: &'a Format,
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
         match f {
-            Format::ItemVar(level, _args) => Self::from_format(module, module.get_format(*level), next),
+            Format::ItemVar(level, _args) => {
+                Self::from_format(module, module.get_format(*level), next)
+            }
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::Align(_) => {
@@ -1264,9 +1275,15 @@ impl<'a> MatchTreeStep<'a> {
             Format::Record(fields) => Self::from_record(module, fields, next),
             Format::Repeat(a) => {
                 let tree = Self::from_next(module, next.clone());
-                tree.union(Self::from_format(module, a, Rc::new(Next::Repeat(a, next.clone()))))
+                tree.union(Self::from_format(
+                    module,
+                    a,
+                    Rc::new(Next::Repeat(a, next.clone())),
+                ))
             }
-            Format::Repeat1(a) => Self::from_format(module, a, Rc::new(Next::Repeat(a, next.clone()))),
+            Format::Repeat1(a) => {
+                Self::from_format(module, a, Rc::new(Next::Repeat(a, next.clone())))
+            }
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
@@ -1370,12 +1387,7 @@ impl<'a> MatchTreeLevel<'a> {
     }
 
     /// Adds a new branch to `self` using a predicate byte-set and its associated follow-set,
-    fn merge_branch(
-        &mut self,
-        index: usize,
-        mut bs: ByteSet,
-        next: Rc<Next<'a>>,
-    ) {
+    fn merge_branch(&mut self, index: usize, mut bs: ByteSet, next: Rc<Next<'a>>) {
         let mut new_branches = Vec::new();
         // For each bs0, nexts in the extant branches of `self`:
         for (bs0, nexts) in self.branches.iter_mut() {
@@ -1407,7 +1419,11 @@ impl<'a> MatchTreeLevel<'a> {
     }
 
     /// Extends the set of choice-points and follow-sets of `self` with a provided [`MatchTreeStep`].
-    fn merge_step(mut self, index: usize, step: MatchTreeStep<'a>) -> Result<MatchTreeLevel<'a>, ()> {
+    fn merge_step(
+        mut self,
+        index: usize,
+        step: MatchTreeStep<'a>,
+    ) -> Result<MatchTreeLevel<'a>, ()> {
         if step.accept {
             self.merge_accept(index)?;
         }
@@ -1441,11 +1457,7 @@ impl<'a> MatchTreeLevel<'a> {
     ///
     /// Otherwise, returns a `MatchTree` that is guaranteed to decide on a unique branch for
     /// all input within at most `depth` bytes of lookahead.
-    fn grow(
-        module: &'a FormatModule,
-        nexts: LevelBranch<'a>,
-        depth: usize,
-    ) -> Option<MatchTree> {
+    fn grow(module: &'a FormatModule, nexts: LevelBranch<'a>, depth: usize) -> Option<MatchTree> {
         if let Some(tree) = Self::accepts(&nexts) {
             Some(tree)
         } else if depth > 0 {
