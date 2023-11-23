@@ -236,7 +236,7 @@ impl Fragment {
     ///
     /// Returns the same mutable reference as was passed in, to allow chaining of similar operations.
     #[inline]
-    fn encat(&mut self, other: Self) -> &mut Self {
+    pub fn encat(&mut self, other: Self) -> &mut Self {
         let this = std::mem::take(self);
         *self = Self::cat(this, other);
         self
