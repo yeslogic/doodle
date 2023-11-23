@@ -177,6 +177,27 @@ impl Fragment {
         }
     }
 
+    /// Returns a new Fragment circumfixed by two other Fragments
+    ///
+    /// Useful for parentheses, quoted strings, and other such cases.
+    pub fn delimit(self, before: Self, after: Self) -> Self {
+        Self::cat(before, self).cat(after)
+    }
+
+    /// Shorthand for [`Fragment::String`] usable on `String` and `&'static str`.
+    pub fn string(s: impl Into<Label>) -> Self {
+        Self::String(s.into())
+    }
+
+    /// Apply a Fragment-producing closure to an `Option`, or return `Fragment::Empty` if `None`
+    pub fn opt<T>(o_val: Option<T>, f: impl FnOnce(T) -> Self) -> Self {
+        if let Some(val) = o_val {
+            f(val)
+        } else {
+            Self::Empty
+        }
+    }
+
     /// Adds an intervening fragment between two others, but only if both the left and right halves are non-vacuous.
     ///
     /// This avoids situations where an empty fragment might otherwise enforce a separator to appear unnecessarily.
