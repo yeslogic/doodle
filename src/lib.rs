@@ -1438,7 +1438,7 @@ impl<'a> MatchTreeLevel<'a> {
     ///
     /// If the depth limit has been reached without a decisive choice of which index to accept, returns None.
     ///
-    /// Otherwise, returns a `Some`-wrapped `MatchTree` that is guaranteed to decide on a unique branch for
+    /// Otherwise, returns a `MatchTree` that is guaranteed to decide on a unique branch for
     /// all input within at most `depth` bytes of lookahead.
     fn grow(
         module: &'a FormatModule,
