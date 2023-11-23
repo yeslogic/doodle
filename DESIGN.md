@@ -118,7 +118,7 @@ must have mutually disjoint branching-predicates. That is, for all well-formed `
 
 However, the same does not hold for `MatchTreeLevels`, as they represent the superposition of all choice-points at a common depth. If that depth is non-zero, the `MatchTree` may still be well-formed even if two choice-points within the `MatchTreeLevel` have some non-null intersection among the cartesian product of their respective lists of branching-predicates.
 
-For this reason, a `MatchTreeLevel` cannot represent a single, unambiguous descent into a follow-set for any given byte of input, but rather, must form a disjunction over the smallest set of mutually disjoint subsets of all the branching predicates of its constituent choice-points, such as in the following algorithm (in pseud-ocode):
+For this reason, a `MatchTreeLevel` cannot represent a single, unambiguous descent into a follow-set for any given byte of input, but rather, must form a disjunction over the smallest set of mutually disjoint subsets of all the branching predicates of its constituent choice-points, such as in the following algorithm (in pseudo-code):
 
 ```none
 UnifySteps(Steps: [(FormatIx, MatchTreeStep)]):
