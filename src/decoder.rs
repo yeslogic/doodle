@@ -445,6 +445,7 @@ pub enum Decoder {
     Apply(Label),
 }
 
+#[derive(Clone, Debug)]
 pub struct Program {
     pub decoders: Vec<(Decoder, ValueType)>,
 }
