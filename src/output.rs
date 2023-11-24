@@ -256,7 +256,7 @@ impl Fragment {
 
     /// Return a new Fragment consisting of `self` with a newline appended to the end.
     #[inline]
-    fn cat_break(self) -> Self {
+    pub fn cat_break(self) -> Self {
         Self::cat(self, Fragment::Char('\n'))
     }
 
@@ -315,7 +315,7 @@ impl Fragment {
 }
 
 /// Builder pattern helper-struct for accumulating up longer sequences of [Fragment]s.
-struct FragmentBuilder {
+pub(crate) struct FragmentBuilder {
     frozen: Vec<Fragment>,
     active: Fragment,
 }

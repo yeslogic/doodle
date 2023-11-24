@@ -1,8 +1,7 @@
 mod rust_ast;
 
 use crate::decoder::{Decoder, Program};
-use crate::ValueType;
-use std::borrow::Cow;
+use crate::{Label, ValueType};
 use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -18,16 +17,22 @@ pub enum TypeRef {
     Char,
 }
 
+// NOTE - same rhs but different semantics
+type TypeUnion = Vec<(Label, TypeRef)>;
+type TypeRecord = Vec<(Label, TypeRef)>;
+
 pub enum TypeDef {
-    Union(Vec<(Cow<'static, str>, TypeRef)>),
-    Record(Vec<(Cow<'static, str>, TypeRef)>),
+    Union(TypeUnion),
+    Record(TypeRecord),
 }
+
+type IndexMap<T> = HashMap<T, usize>;
 
 pub struct Codegen {
     typedefs: Vec<TypeDef>,
     typerefs: Vec<TypeRef>,
-    record_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
-    union_map: HashMap<Vec<(Cow<'static, str>, TypeRef)>, usize>,
+    record_map: IndexMap<TypeRecord>,
+    union_map: IndexMap<TypeUnion>,
 }
 
 impl TypeRef {
