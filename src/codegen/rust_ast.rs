@@ -1,5 +1,5 @@
-use std::borrow::Cow;
-use std::collections::HashMap;
+#![allow(dead_code)]
+
 use std::rc::Rc;
 
 use crate::output::{Fragment, FragmentBuilder};
@@ -28,7 +28,9 @@ pub(crate) struct RustProgram {
 
 impl FromIterator<RustItem> for RustProgram {
     fn from_iter<T: IntoIterator<Item = RustItem>>(iter: T) -> Self {
-        Self { items: Vec::from_iter(iter) }
+        Self {
+            items: Vec::from_iter(iter),
+        }
     }
 }
 
@@ -52,7 +54,7 @@ impl RustItem {
     pub fn from_decl(decl: RustDecl) -> Self {
         Self {
             vis: Default::default(),
-            decl
+            decl,
         }
     }
 }
@@ -80,7 +82,12 @@ impl RustDecl {
                 .cat(rhs.to_fragment()),
             RustDecl::TypeDef(name, tdef) => {
                 let frag_key = Fragment::string(tdef.keyword_for());
-                Fragment::intervene(frag_key, Fragment::Char(' '), Fragment::String(name.clone())).intervene(Fragment::Char(' '), tdef.to_fragment())
+                Fragment::intervene(
+                    frag_key,
+                    Fragment::Char(' '),
+                    Fragment::String(name.clone()),
+                )
+                .intervene(Fragment::Char(' '), tdef.to_fragment())
             }
             RustDecl::Function(fdef) => fdef.to_fragment(),
         }
@@ -89,19 +96,20 @@ impl RustDecl {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RustParams<Lt, Ty> {
     lt_params: Vec<Lt>,
-    ty_params: Vec<Ty>
+    ty_params: Vec<Ty>,
 }
 
 impl<Lt, Ty> Default for RustParams<Lt, Ty> {
     fn default() -> Self {
-        Self { lt_params: Default::default(), ty_params: Default::default() }
+        Self {
+            lt_params: Default::default(),
+            ty_params: Default::default(),
+        }
     }
 }
 
 pub(crate) type DefParams = RustParams<Label, Label>;
 pub(crate) type UseParams = RustParams<RustLt, RustType>;
-
-
 
 impl<Lt, Ty> RustParams<Lt, Ty> {
     pub fn new() -> Self {
@@ -135,13 +143,13 @@ impl ToFragment for RustParams<Label, Label> {
 
 impl ToFragment for RustParams<RustLt, RustType> {
     fn to_fragment(&self) -> Fragment {
-        let all = self.lt_params.iter().map(RustLt::to_fragment)
+        let all = self
+            .lt_params
+            .iter()
+            .map(RustLt::to_fragment)
             .chain(self.ty_params.iter().map(RustType::to_fragment));
-        Fragment::seq(
-            all,
-            Some(Fragment::string(", ")),
-        )
-        .delimit(Fragment::Char('<'), Fragment::Char('>'))
+        Fragment::seq(all, Some(Fragment::string(", ")))
+            .delimit(Fragment::Char('<'), Fragment::Char('>'))
     }
 }
 
@@ -181,9 +189,15 @@ pub(crate) struct RustFn {
 }
 
 impl RustFn {
-    pub fn new(name: Label, params: Option<DefParams>, sig: FnSig, body: Vec<RustStmt>) -> Self { Self { name, params, sig, body } }
+    pub fn new(name: Label, params: Option<DefParams>, sig: FnSig, body: Vec<RustStmt>) -> Self {
+        Self {
+            name,
+            params,
+            sig,
+            body,
+        }
+    }
 }
-
 
 impl ToFragment for RustFn {
     fn to_fragment(&self) -> Fragment {
@@ -217,13 +231,11 @@ impl RustTypeDef {
     pub fn to_fragment(&self) -> Fragment {
         match self {
             RustTypeDef::Enum(vars) => {
-                let iter = vars
-                    .iter()
-                    .map(RustVariant::to_fragment);
+                let iter = vars.iter().map(RustVariant::to_fragment);
                 let inner = Fragment::seq(iter, Some(Fragment::string(", ")));
                 inner.delimit(Fragment::string("{ "), Fragment::string(" }"))
             }
-            RustTypeDef::Struct(str) => str.to_fragment()
+            RustTypeDef::Struct(str) => str.to_fragment(),
         }
     }
 }
@@ -301,10 +313,8 @@ impl ToFragment for RustStruct {
     fn to_fragment(&self) -> Fragment {
         match self {
             RustStruct::Unit => Fragment::Empty,
-            RustStruct::Tuple(args) =>
-                RustType::paren_list(args.iter()),
-            RustStruct::Record(flds) =>
-                <(Label, RustType)>::block(flds.iter()),
+            RustStruct::Tuple(args) => RustType::paren_list(args.iter()),
+            RustStruct::Record(flds) => <(Label, RustType)>::block(flds.iter()),
         }
     }
 }
@@ -313,10 +323,11 @@ impl ToFragment for RustVariant {
     fn to_fragment(&self) -> Fragment {
         match self {
             RustVariant::Unit(lab) => Fragment::String(lab.clone()),
-            RustVariant::Tuple(lab, args) =>
-                Fragment::String(lab.clone()).cat(RustType::paren_list(args.iter())),
-            RustVariant::Record(lab, flds) =>
-                Fragment::String(lab.clone()).intervene(Fragment::Char(' '), <(Label, RustType)>::block(flds.iter())),
+            RustVariant::Tuple(lab, args) => {
+                Fragment::String(lab.clone()).cat(RustType::paren_list(args.iter()))
+            }
+            RustVariant::Record(lab, flds) => Fragment::String(lab.clone())
+                .intervene(Fragment::Char(' '), <(Label, RustType)>::block(flds.iter())),
         }
     }
 }
@@ -580,16 +591,15 @@ pub(crate) enum RustOp {
 impl ToFragment for RustOp {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustOp::InfixOp(op, lhs, rhs) => {
-                lhs.to_fragment().intervene(Fragment::string(*op), rhs.to_fragment())
-            }
+            RustOp::InfixOp(op, lhs, rhs) => lhs
+                .to_fragment()
+                .intervene(Fragment::string(*op), rhs.to_fragment()),
         }
     }
 }
 
-
 impl RustExpr {
-    pub const UNIT : Self = Self::Tuple(Vec::new());
+    pub const UNIT: Self = Self::Tuple(Vec::new());
 
     pub fn local(name: impl Into<Label>) -> Self {
         Self::Entity(RustEntity::Local(name.into()))
@@ -666,6 +676,7 @@ impl ToFragment for RustExpr {
 #[derive(Clone, Debug)]
 pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
+    #[allow(dead_code)]
     Expr(RustExpr),
     Return(bool, RustExpr), // bool: true for explicit return, false for implicit return
     Control(RustControl),
@@ -679,15 +690,12 @@ pub(crate) enum RustControl {
 impl ToFragment for RustControl {
     fn to_fragment(&self) -> Fragment {
         match self {
-            Self::While(cond, body) => {
-                Fragment::string("while")
-                    .intervene(Fragment::Char(' '), cond.to_fragment())
-                    .intervene(Fragment::Char(' '), RustStmt::block(body.iter()))
-            }
+            Self::While(cond, body) => Fragment::string("while")
+                .intervene(Fragment::Char(' '), cond.to_fragment())
+                .intervene(Fragment::Char(' '), RustStmt::block(body.iter())),
         }
     }
 }
-
 
 impl ToFragment for RustStmt {
     fn to_fragment(&self) -> Fragment {

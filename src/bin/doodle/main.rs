@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                     // FIXME: hack to dodge the todo! while showing capabilities
                     {
                         let mut prog2 = program.clone();
-                        for (d, t) in prog2.decoders.iter_mut() {
+                        for (d, _) in prog2.decoders.iter_mut() {
                             *d = Decoder::Align(512);
                         }
                         doodle::codegen::print_program(&prog2);

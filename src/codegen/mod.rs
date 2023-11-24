@@ -1,6 +1,6 @@
 mod rust_ast;
 
-use crate::codegen::rust_ast::{RustItem, RustDecl, RustControl, Mut, RustProgram};
+use crate::codegen::rust_ast::{Mut, RustControl, RustDecl, RustItem, RustProgram};
 use crate::decoder::{Decoder, Program};
 use crate::{Label, ValueType};
 use std::borrow::Cow;
@@ -8,7 +8,10 @@ use std::collections::HashMap;
 
 use rust_ast::{CompType, PrimType, RustType, RustTypeDef, ToFragment};
 
-use self::rust_ast::{RustStruct, RustVariant, RustFn, RustParams, RustLt, FnSig, AtomType, DefParams, RustExpr, RustStmt};
+use self::rust_ast::{
+    AtomType, DefParams, FnSig, RustExpr, RustFn, RustLt, RustParams, RustStmt, RustStruct,
+    RustVariant,
+};
 
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
@@ -30,12 +33,6 @@ impl From<IxLabel> for Label {
 impl From<&IxLabel> for Label {
     fn from(value: &IxLabel) -> Self {
         Cow::Owned(format!("Type{}", value.0))
-    }
-}
-
-impl IxLabel {
-    pub const fn to_usize(&self) -> usize {
-        self.0
     }
 }
 
@@ -137,30 +134,28 @@ impl Codegen {
                 let mut rt_vars = Vec::new();
                 for (vname, vdef) in vars.iter() {
                     let rt_var = match vdef {
-                        ValueType::Empty => {
-                            RustVariant::Unit(vname.clone())
-                        },
+                        ValueType::Empty => RustVariant::Unit(vname.clone()),
                         ValueType::Tuple(args) => {
                             let mut rt_args = Vec::new();
                             for arg in args.iter() {
                                 rt_args.push(self.resolve(arg));
                             }
                             RustVariant::Tuple(vname.clone(), rt_args)
-                        },
+                        }
                         ValueType::Record(fields) => {
                             let mut rt_fields = Vec::new();
                             for (f_lab, f_ty) in fields.iter() {
                                 rt_fields.push((f_lab.clone(), self.resolve(f_ty)));
                             }
                             RustVariant::Record(vname.clone(), rt_fields)
-                        },
+                        }
                         other => {
                             let inner = self.resolve(other);
                             RustVariant::Tuple(vname.clone(), vec![inner])
                         }
                     };
                     rt_vars.push(rt_var);
-                };
+                }
                 let rtdef = RustTypeDef::Enum(rt_vars);
                 let old_ctr = self.namegen.ctr;
                 let tname = self.namegen.get_name(&rtdef);
@@ -193,7 +188,11 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
         let args = {
             let arg0 = {
                 let name = "scope".into();
-                let ty = RustType::Atom(AtomType::Comp(CompType::Borrow(None, Mut::Mutable, Box::new(RustType::named("Scope")))));
+                let ty = RustType::Atom(AtomType::Comp(CompType::Borrow(
+                    None,
+                    Mut::Mutable,
+                    Box::new(RustType::named("Scope")),
+                )));
                 (name, ty)
             };
             let arg1 = {
@@ -210,12 +209,7 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
         FnSig::new(args, Some(RustType::option_of(t.clone())))
     };
     let body = decoder_body(decoder);
-    RustFn::new(
-        name,
-        Some(params),
-        sig,
-        body,
-    )
+    RustFn::new(name, Some(params), sig, body)
 }
 
 fn decoder_body(decoder: &Decoder) -> Vec<rust_ast::RustStmt> {
@@ -225,20 +219,22 @@ fn decoder_body(decoder: &Decoder) -> Vec<rust_ast::RustStmt> {
                 RustExpr::infix(
                     RustExpr::local("input").field("offset"),
                     " % ",
-                    RustExpr::NumericLit(*factor)
+                    RustExpr::NumericLit(*factor),
                 ),
                 " != ",
-                RustExpr::NumericLit(0)
+                RustExpr::NumericLit(0),
             );
             let body = {
                 let call = RustExpr::local("input").call_method("read_byte");
                 vec![RustStmt::Let(Mut::Immutable, "_".into(), None, call)]
             };
-            [RustStmt::Control(RustControl::While(cond, body)), RustStmt::Return(true, RustExpr::local("Some").call_with([RustExpr::UNIT]))].to_vec()
-        },
-        Decoder::Fail => {
-            [RustStmt::Return(true, RustExpr::local("None"))].to_vec()
+            [
+                RustStmt::Control(RustControl::While(cond, body)),
+                RustStmt::Return(true, RustExpr::local("Some").call_with([RustExpr::UNIT])),
+            ]
+            .to_vec()
         }
+        Decoder::Fail => [RustStmt::Return(true, RustExpr::local("None"))].to_vec(),
         // FIXME - implement more gradually
         Decoder::Call(_, _) => todo!(),
         Decoder::EndOfInput => todo!(),
@@ -272,9 +268,7 @@ pub fn print_program(program: &Program) {
     let mut items = Vec::new();
     codegen.populate_decoder_types(program);
     for (tdef, ixlab) in codegen.namegen.revmap.iter() {
-        let it = RustItem::from_decl(
-            RustDecl::TypeDef(ixlab.into(), tdef.clone()),
-        );
+        let it = RustItem::from_decl(RustDecl::TypeDef(ixlab.into(), tdef.clone()));
         items.push(it);
     }
 

@@ -352,7 +352,7 @@ impl Expr {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
-                        if let Value::Seq(vn) = expr.eval_lambda(scope, &v) {
+                        if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
                             vs.extend(vn);
                         } else {
                             panic!("FlatMap: expected Seq");
@@ -484,8 +484,8 @@ impl<'a> Compiler<'a> {
     pub fn compile(module: &FormatModule, format: &Format) -> Result<Program, String> {
         let mut compiler = Compiler::new(module);
         // type
-        let mut scope = TypeScope::new();
-        let t = module.infer_format_type(&mut scope, format)?;
+        let scope = TypeScope::new();
+        let t = module.infer_format_type(&scope, format)?;
         // decoder
         compiler.queue_compile(t, format, Rc::new(Next::Empty));
         while let Some((f, next, n)) = compiler.compile_queue.pop() {
