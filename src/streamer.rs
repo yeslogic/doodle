@@ -1,462 +1,56 @@
 use crate::byte_set::ByteSet;
+use crate::decoder::{
+    self, make_huffman_codes, value_to_vec_usize, Decoder, DecoderScope, MultiScope, Scope,
+    ScopeBinding, ScopeLookup, SingleScope, Value,
+};
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
-use crate::{
-    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType,
-};
-use crate::{IntoLabel, Label};
-use serde::Serialize;
-use std::borrow::Cow;
+use crate::{DynFormat, Expr, Format, FormatModule, Label, MatchTree, Next, Pattern};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-#[serde(tag = "tag", content = "data")]
-pub enum Value {
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    Char(char),
-    Tuple(Vec<Value>),
-    Record(Vec<(Label, Value)>),
-    Variant(Label, Box<Value>),
-    Seq(Vec<Value>),
-    Mapped(Box<Value>, Box<Value>),
-    Branch(usize, Box<Value>),
-}
-
-impl Value {
-    pub const UNIT: Value = Value::Tuple(Vec::new());
-
-    pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Value)>) -> Value {
-        Value::Record(
-            fields
-                .into_iter()
-                .map(|(label, value)| (label.into(), value))
-                .collect(),
-        )
-    }
-
-    pub fn variant(label: impl IntoLabel, value: impl Into<Box<Value>>) -> Value {
-        Value::Variant(label.into(), value.into())
-    }
-
-    pub fn record_proj(&self, label: &str) -> &Value {
-        match self {
-            Value::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
-                Some((_, v)) => v,
-                None => panic!("{label} not found in record"),
-            },
-            _ => panic!("expected record, found {self:?}"),
-        }
-    }
-
-    pub fn tuple_proj(&self, index: usize) -> &Value {
-        match self.coerce_mapped_value() {
-            Value::Tuple(vs) => &vs[index],
-            _ => panic!("expected tuple"),
-        }
-    }
-
-    pub fn coerce_mapped_value(&self) -> &Value {
-        match self {
-            Value::Mapped(_orig, v) => v.coerce_mapped_value(),
-            Value::Branch(_n, v) => v.coerce_mapped_value(),
-            v => v,
-        }
-    }
-
-    pub fn unwrap_usize(self) -> usize {
-        match self {
-            Value::U8(n) => usize::from(n),
-            Value::U16(n) => usize::from(n),
-            Value::U32(n) => usize::try_from(n).unwrap(),
-            _ => panic!("value is not a number"),
-        }
-    }
-
-    pub fn unwrap_tuple(self) -> Vec<Value> {
-        match self {
-            Value::Tuple(values) => values,
-            _ => panic!("value is not a tuple"),
-        }
-    }
-
-    pub fn unwrap_bool(self) -> bool {
-        match self {
-            Value::Bool(b) => b,
-            _ => panic!("value is not a bool"),
-        }
-    }
-
-    pub fn unwrap_char(self) -> char {
-        match self {
-            Value::Char(c) => c,
-            _ => panic!("value is not a char"),
-        }
-    }
-
-    /// Returns `true` if the pattern successfully matches the value, pushing
-    /// any values bound by the pattern onto the scope
-    pub fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
-        let mut pattern_scope = MultiScope::new(scope);
-        self.coerce_mapped_value()
-            .matches_inner(&mut pattern_scope, pattern)
-            .then_some(pattern_scope)
-    }
-
-    pub fn matches_inner(&self, scope: &mut dyn ScopeBinding, pattern: &Pattern) -> bool {
-        match (pattern, self) {
-            (Pattern::Binding(name), head) => {
-                scope.push(name.clone(), head.clone());
-                true
-            }
-            (Pattern::Wildcard, _) => true,
-            (Pattern::Bool(b0), Value::Bool(b1)) => b0 == b1,
-            (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
-            (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
-            (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
-            (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
-            (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
-                if ps.len() == vs.len() =>
-            {
-                for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
-                    if !v.matches_inner(scope, p) {
-                        return false;
-                    }
-                }
-                true
-            }
-            (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
-                v.matches_inner(scope, p)
-            }
-            _ => false,
-        }
-    }
-}
-
-impl Expr {
-    pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
-        match self {
-            Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
-            Expr::Bool(b) => Cow::Owned(Value::Bool(*b)),
-            Expr::U8(i) => Cow::Owned(Value::U8(*i)),
-            Expr::U16(i) => Cow::Owned(Value::U16(*i)),
-            Expr::U32(i) => Cow::Owned(Value::U32(*i)),
-            Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
-                exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
-            )),
-            Expr::TupleProj(head, index) => match head.eval(scope) {
-                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
-            },
-            Expr::Record(fields) => Cow::Owned(Value::record(
-                fields
-                    .iter()
-                    .map(|(label, expr)| (label.clone(), expr.eval_value(scope))),
-            )),
-            Expr::RecordProj(head, label) => match head.eval(scope) {
-                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().record_proj(label).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().record_proj(label)),
-            },
-            Expr::Variant(label, expr) => {
-                Cow::Owned(Value::variant(label.clone(), expr.eval_value(scope)))
-            }
-            Expr::Seq(exprs) => Cow::Owned(Value::Seq(
-                exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
-            )),
-            Expr::Match(head, branches) => {
-                let head = head.eval(scope);
-                for (pattern, expr) in branches {
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let value = expr.eval_value(&Scope::Multi(&pattern_scope));
-                        return Cow::Owned(value);
-                    }
-                }
-                panic!("non-exhaustive patterns");
-            }
-            Expr::Lambda(_, _) => panic!("cannot eval lambda"),
-
-            Expr::BitAnd(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
-                (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
-                (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::BitOr(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
-                (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
-                (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Eq(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
-                (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
-                (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Ne(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
-                (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
-                (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Lt(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
-                (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
-                (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Gt(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
-                (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
-                (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Lte(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
-                (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
-                (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Gte(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
-                (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
-                (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Mul(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
-                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Div(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
-                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Rem(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
-                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Shl(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => {
-                    Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
-                }
-                (Value::U16(x), Value::U16(y)) => {
-                    Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
-                }
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Shr(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => {
-                    Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
-                }
-                (Value::U16(x), Value::U16(y)) => {
-                    Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
-                }
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Add(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
-                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-            Expr::Sub(x, y) => Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
-                (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
-                (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
-                (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
-                (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-            }),
-
-            Expr::AsU8(x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(x),
-                Value::U16(x) if x < 256 => Value::U8(x as u8),
-                Value::U32(x) if x < 256 => Value::U8(x as u8),
-                x => panic!("cannot convert {x:?} to U8"),
-            }),
-            Expr::AsU16(x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U16(u16::from(x)),
-                Value::U16(x) => Value::U16(x),
-                Value::U32(x) if x < 65536 => Value::U16(x as u16),
-                x => panic!("cannot convert {x:?} to U16"),
-            }),
-            Expr::AsU32(x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U32(u32::from(x)),
-                Value::U16(x) => Value::U32(u32::from(x)),
-                Value::U32(x) => Value::U32(x),
-                x => panic!("cannot convert {x:?} to U32"),
-            }),
-
-            Expr::U16Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(hi), Value::U8(lo)] => {
-                    Cow::Owned(Value::U16(u16::from_be_bytes([*hi, *lo])))
-                }
-                _ => panic!("U16Be: expected (U8, U8)"),
-            },
-            Expr::U16Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(lo), Value::U8(hi)] => {
-                    Cow::Owned(Value::U16(u16::from_le_bytes([*lo, *hi])))
-                }
-                _ => panic!("U16Le: expected (U8, U8)"),
-            },
-            Expr::U32Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                    Cow::Owned(Value::U32(u32::from_be_bytes([*a, *b, *c, *d])))
-                }
-                _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
-            },
-            Expr::U32Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                    Cow::Owned(Value::U32(u32::from_le_bytes([*a, *b, *c, *d])))
-                }
-                _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
-            },
-            Expr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
-                Value::U8(x) => Value::Char(char::from(x)),
-                Value::U16(x) => {
-                    Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER))
-                }
-                Value::U32(x) => {
-                    Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
-                }
-                _ => panic!("AsChar: expected U8, U16, or U32"),
-            }),
-            Expr::SeqLength(seq) => match seq.eval(scope).coerce_mapped_value() {
-                Value::Seq(values) => {
-                    let len = values.len();
-                    Cow::Owned(Value::U32(len as u32))
-                }
-                _ => panic!("SeqLength: expected Seq"),
-            },
-            Expr::SubSeq(seq, start, length) => match seq.eval(scope).coerce_mapped_value() {
-                Value::Seq(values) => {
-                    let start = start.eval_value(scope).unwrap_usize();
-                    let length = length.eval_value(scope).unwrap_usize();
-                    let values = &values[start..];
-                    let values = &values[..length];
-                    Cow::Owned(Value::Seq(values.to_vec()))
-                }
-                _ => panic!("SubSeq: expected Seq"),
-            },
-            Expr::FlatMap(expr, seq) => match seq.eval(scope).coerce_mapped_value() {
-                Value::Seq(values) => {
-                    let mut vs = Vec::new();
-                    for v in values {
-                        if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
-                            vs.extend(vn);
-                        } else {
-                            panic!("FlatMap: expected Seq");
-                        }
-                    }
-                    Cow::Owned(Value::Seq(vs))
-                }
-                _ => panic!("FlatMap: expected Seq"),
-            },
-            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_value(scope) {
-                Value::Seq(values) => {
-                    let mut accum = accum.eval_value(scope);
-                    let mut vs = Vec::new();
-                    for v in values {
-                        let ret = expr.eval_lambda(scope, &Value::Tuple(vec![accum, v]));
-                        accum = match ret.unwrap_tuple().as_mut_slice() {
-                            [accum, Value::Seq(vn)] => {
-                                vs.extend_from_slice(vn);
-                                accum.clone()
-                            }
-                            _ => panic!("FlatMapAccum: expected two values"),
-                        };
-                    }
-                    Cow::Owned(Value::Seq(vs))
-                }
-                _ => panic!("FlatMapAccum: expected Seq"),
-            },
-            Expr::Dup(count, expr) => {
-                let count = count.eval_value(scope).unwrap_usize();
-                let v = expr.eval_value(scope);
-                let mut vs = Vec::new();
-                for _ in 0..count {
-                    vs.push(v.clone());
-                }
-                Cow::Owned(Value::Seq(vs))
-            }
-            Expr::Inflate(seq) => match seq.eval(scope).coerce_mapped_value() {
-                Value::Seq(values) => {
-                    let vs = inflate(values);
-                    Cow::Owned(Value::Seq(vs))
-                }
-                _ => panic!("Inflate: expected Seq"),
-            },
-        }
-    }
-
-    pub fn eval_value<'a>(&self, scope: &'a Scope<'a>) -> Value {
-        self.eval(scope).coerce_mapped_value().clone()
-    }
-
-    pub fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: &Value) -> Value {
-        match self {
-            Expr::Lambda(name, expr) => {
-                let child_scope = SingleScope::new(scope, name, arg);
-                expr.eval_value(&Scope::Single(child_scope))
-            }
-            _ => panic!("expected Lambda"),
-        }
-    }
-}
-
-/// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
-pub enum Decoder {
+pub enum Streamer {
     Call(usize, Vec<(Label, Expr)>),
     Fail,
     EndOfInput,
     Align(usize),
     Byte(ByteSet),
-    Variant(Label, Box<Decoder>),
-    Parallel(Vec<Decoder>),
-    Branch(MatchTree, Vec<Decoder>),
-    Tuple(Vec<Decoder>),
-    Record(Vec<(Label, Decoder)>),
-    While(MatchTree, Box<Decoder>),
-    Until(MatchTree, Box<Decoder>),
-    RepeatCount(Expr, Box<Decoder>),
-    RepeatUntilLast(Expr, Box<Decoder>),
-    RepeatUntilSeq(Expr, Box<Decoder>),
-    Peek(Box<Decoder>),
-    PeekNot(Box<Decoder>),
-    Slice(Expr, Box<Decoder>),
-    Bits(Box<Decoder>),
-    WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Box<Decoder>, Expr),
+    Variant(Label, Box<Streamer>),
+    Parallel(Vec<Streamer>),
+    Branch(MatchTree, Vec<Streamer>),
+    Tuple(Vec<Streamer>),
+    Record(Vec<(Label, Streamer)>),
+    While(MatchTree, Box<Streamer>),
+    Until(MatchTree, Box<Streamer>),
+    RepeatCount(Expr, Box<Streamer>),
+    RepeatUntilLast(Expr, Box<Streamer>),
+    RepeatUntilSeq(Expr, Box<Streamer>),
+    Peek(Box<Streamer>),
+    PeekNot(Box<Streamer>),
+    Slice(Expr, Box<Streamer>),
+    Bits(Box<Streamer>),
+    WithRelativeOffset(Expr, Box<Streamer>),
+    Map(Box<Streamer>, Expr),
     Compute(Expr),
-    Let(Label, Expr, Box<Decoder>),
-    Match(Expr, Vec<(Pattern, Decoder)>),
-    Dynamic(Label, DynFormat, Box<Decoder>),
+    Let(Label, Expr, Box<Streamer>),
+    Match(Expr, Vec<(Pattern, Streamer)>),
+    Dynamic(Label, DynFormat, Box<Streamer>),
     Apply(Label),
 }
 
-#[derive(Clone, Debug)]
 pub struct Program {
-    pub decoders: Vec<(Decoder, ValueType)>,
+    streamers: Vec<Streamer>,
 }
 
 impl Program {
-    pub fn new() -> Self {
-        let decoders = Vec::new();
-        Program { decoders }
+    fn new() -> Self {
+        let streamers = Vec::new();
+        Program { streamers }
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        self.decoders[0].0.parse(self, &Scope::Empty, input)
+        self.streamers[0].parse(self, &Scope::Empty, input)
     }
 }
 
@@ -483,204 +77,49 @@ impl<'a> Compiler<'a> {
     pub fn compile(module: &FormatModule, format: &Format) -> Result<Program, String> {
         let mut compiler = Compiler::new(module);
         // type
-        let scope = TypeScope::new();
-        let t = module.infer_format_type(&scope, format)?;
+        /*
+        let mut scope = TypeScope::new();
+        let t = TypeRef::from_value_type(
+            &mut compiler,
+            &module.infer_format_type(&mut scope, format)?,
+        );
+        */
         // decoder
-        compiler.queue_compile(t, format, Rc::new(Next::Empty));
+        compiler.queue_compile(format, Rc::new(Next::Empty));
         while let Some((f, next, n)) = compiler.compile_queue.pop() {
-            let d = Decoder::compile_next(&mut compiler, f, next)?;
-            compiler.program.decoders[n].0 = d;
+            let d = Streamer::compile_next(&mut compiler, f, next)?;
+            compiler.program.streamers[n] = d;
         }
         Ok(compiler.program)
     }
 
-    fn queue_compile(&mut self, t: ValueType, f: &'a Format, next: Rc<Next<'a>>) -> usize {
-        let n = self.program.decoders.len();
-        self.program.decoders.push((Decoder::Fail, t));
+    fn queue_compile(&mut self, f: &'a Format, next: Rc<Next<'a>>) -> usize {
+        let n = self.program.streamers.len();
+        self.program.streamers.push(Streamer::Fail);
         self.compile_queue.push((f, next, n));
         n
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ScopeEntry {
-    Value(Value),
-    Decoder(Decoder),
-}
-
-pub enum Scope<'a> {
-    Empty,
-    Multi(&'a MultiScope<'a>),
-    Single(SingleScope<'a>),
-    Decoder(DecoderScope<'a>),
-    Other(&'a dyn ScopeLookup),
-}
-
-pub struct MultiScope<'a> {
-    parent: &'a Scope<'a>,
-    entries: Vec<(Label, Value)>,
-}
-
-pub struct SingleScope<'a> {
-    parent: &'a Scope<'a>,
-    name: &'a str,
-    value: &'a Value,
-}
-
-pub struct DecoderScope<'a> {
-    parent: &'a Scope<'a>,
-    name: &'a str,
-    decoder: Decoder,
-}
-
-pub trait ScopeLookup {
-    fn get_value_by_name(&self, name: &str) -> &Value;
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder;
-    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>);
-}
-
-pub trait ScopeBinding {
-    fn push(&mut self, name: Label, v: Value);
-}
-
-impl<'a> ScopeLookup for Scope<'a> {
-    fn get_value_by_name(&self, name: &str) -> &Value {
-        match self {
-            Scope::Empty => panic!("value not found: {name}"),
-            Scope::Multi(multi) => multi.get_value_by_name(name),
-            Scope::Single(single) => single.get_value_by_name(name),
-            Scope::Decoder(decoder) => decoder.parent.get_value_by_name(name),
-            Scope::Other(other) => other.get_value_by_name(name),
-        }
-    }
-
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        match self {
-            Scope::Empty => panic!("decoder not found: {name}"),
-            Scope::Multi(multi) => multi.parent.get_decoder_by_name(name),
-            Scope::Single(single) => single.parent.get_decoder_by_name(name),
-            Scope::Decoder(decoder) => decoder.get_decoder_by_name(name),
-            Scope::Other(other) => other.get_decoder_by_name(name),
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
-        match self {
-            Scope::Empty => {}
-            Scope::Multi(multi) => multi.get_bindings(bindings),
-            Scope::Single(single) => single.get_bindings(bindings),
-            Scope::Decoder(decoder) => decoder.get_bindings(bindings),
-            Scope::Other(other) => other.get_bindings(bindings),
-        }
-    }
-}
-
-impl<'a> ScopeBinding for MultiScope<'a> {
-    fn push(&mut self, name: Label, v: Value) {
-        self.entries.push((name, v));
-    }
-}
-
-impl<'a> MultiScope<'a> {
-    fn new(parent: &'a Scope<'a>) -> MultiScope<'a> {
-        let entries = Vec::new();
-        MultiScope { parent, entries }
-    }
-
-    pub fn with_capacity(parent: &'a Scope<'a>, capacity: usize) -> MultiScope<'a> {
-        let entries = Vec::with_capacity(capacity);
-        MultiScope { parent, entries }
-    }
-
-    pub fn into_record(self) -> Value {
-        Value::Record(self.entries)
-    }
-
-    fn get_value_by_name(&self, name: &str) -> &Value {
-        for (n, v) in self.entries.iter().rev() {
-            if n == name {
-                return v;
-            }
-        }
-        self.parent.get_value_by_name(name)
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
-        for (name, value) in self.entries.iter().rev() {
-            bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
-        }
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> SingleScope<'a> {
-    pub fn new(parent: &'a Scope<'a>, name: &'a str, value: &'a Value) -> SingleScope<'a> {
-        SingleScope {
-            parent,
-            name,
-            value,
-        }
-    }
-
-    fn get_value_by_name(&self, name: &str) -> &Value {
-        if self.name == name {
-            self.value
-        } else {
-            self.parent.get_value_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            ScopeEntry::Value(self.value.clone()),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl<'a> DecoderScope<'a> {
-    pub fn new(parent: &'a Scope<'a>, name: &'a str, decoder: Decoder) -> DecoderScope<'a> {
-        DecoderScope {
-            parent,
-            name,
-            decoder,
-        }
-    }
-
-    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
-        if self.name == name {
-            &self.decoder
-        } else {
-            self.parent.get_decoder_by_name(name)
-        }
-    }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
-        bindings.push((
-            self.name.to_string().into(),
-            ScopeEntry::Decoder(self.decoder.clone()),
-        ));
-        self.parent.get_bindings(bindings);
-    }
-}
-
-impl Decoder {
-    pub fn compile_one(format: &Format) -> Result<Decoder, String> {
+impl Streamer {
+    pub fn compile_one(format: &Format) -> Result<Streamer, String> {
         let module = FormatModule::new();
         let mut compiler = Compiler::new(&module);
-        Decoder::compile(&mut compiler, format)
+        Streamer::compile(&mut compiler, format)
     }
 
-    pub fn compile<'a>(compiler: &mut Compiler<'a>, format: &'a Format) -> Result<Decoder, String> {
-        Decoder::compile_next(compiler, format, Rc::new(Next::Empty))
+    pub fn compile<'a>(
+        compiler: &mut Compiler<'a>,
+        format: &'a Format,
+    ) -> Result<Streamer, String> {
+        Streamer::compile_next(compiler, format, Rc::new(Next::Empty))
     }
 
     fn compile_next<'a>(
         compiler: &mut Compiler<'a>,
         format: &'a Format,
         next: Rc<Next<'a>>,
-    ) -> Result<Decoder, String> {
+    ) -> Result<Streamer, String> {
         match format {
             Format::ItemVar(level, arg_exprs) => {
                 let f = compiler.module.get_format(*level);
@@ -692,8 +131,7 @@ impl Decoder {
                 let n = if let Some(n) = compiler.decoder_map.get(&(*level, next.clone())) {
                     *n
                 } else {
-                    let t = compiler.module.get_format_type(*level).clone();
-                    let n = compiler.queue_compile(t, f, next.clone());
+                    let n = compiler.queue_compile(f, next.clone());
                     compiler.decoder_map.insert((*level, next.clone()), n);
                     n
                 };
@@ -702,25 +140,25 @@ impl Decoder {
                 for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
-                Ok(Decoder::Call(n, args))
+                Ok(Streamer::Call(n, args))
             }
-            Format::Fail => Ok(Decoder::Fail),
-            Format::EndOfInput => Ok(Decoder::EndOfInput),
-            Format::Align(n) => Ok(Decoder::Align(*n)),
-            Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
+            Format::Fail => Ok(Streamer::Fail),
+            Format::EndOfInput => Ok(Streamer::EndOfInput),
+            Format::Align(n) => Ok(Streamer::Align(*n)),
+            Format::Byte(bs) => Ok(Streamer::Byte(*bs)),
             Format::Variant(label, f) => {
-                let d = Decoder::compile_next(compiler, f, next.clone())?;
-                Ok(Decoder::Variant(label.clone(), Box::new(d)))
+                let d = Streamer::compile_next(compiler, f, next.clone())?;
+                Ok(Streamer::Variant(label.clone(), Box::new(d)))
             }
             Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for f in branches {
-                    ds.push(Decoder::compile_next(compiler, f, next.clone())?);
+                    ds.push(Streamer::compile_next(compiler, f, next.clone())?);
                     fs.push(f.clone());
                 }
                 if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
-                    Ok(Decoder::Branch(tree, ds))
+                    Ok(Streamer::Branch(tree, ds))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
@@ -729,12 +167,12 @@ impl Decoder {
                 let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
-                    let d = Decoder::compile_next(compiler, f, next.clone())?;
-                    ds.push(Decoder::Variant(label.clone(), Box::new(d)));
+                    let d = Streamer::compile_next(compiler, f, next.clone())?;
+                    ds.push(Streamer::Variant(label.clone(), Box::new(d)));
                     fs.push(f.clone());
                 }
                 if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
-                    Ok(Decoder::Branch(tree, ds))
+                    Ok(Streamer::Branch(tree, ds))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
@@ -742,42 +180,42 @@ impl Decoder {
             Format::UnionNondet(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
-                    let d = Decoder::compile_next(compiler, f, next.clone())?;
-                    ds.push(Decoder::Variant(label.clone(), Box::new(d)));
+                    let d = Streamer::compile_next(compiler, f, next.clone())?;
+                    ds.push(Streamer::Variant(label.clone(), Box::new(d)));
                 }
-                Ok(Decoder::Parallel(ds))
+                Ok(Streamer::Parallel(ds))
             }
             Format::Tuple(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
                     let next = Rc::new(Next::Tuple(fields.as_slice(), next.clone()));
-                    let df = Decoder::compile_next(compiler, f, next)?;
+                    let df = Streamer::compile_next(compiler, f, next)?;
                     dfields.push(df);
                 }
-                Ok(Decoder::Tuple(dfields))
+                Ok(Streamer::Tuple(dfields))
             }
             Format::Record(fields) => {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some((name, f)) = fields.next() {
                     let next = Rc::new(Next::Record(fields.as_slice(), next.clone()));
-                    let df = Decoder::compile_next(compiler, f, next)?;
+                    let df = Streamer::compile_next(compiler, f, next)?;
                     dfields.push((name.clone(), df));
                 }
-                Ok(Decoder::Record(dfields))
+                Ok(Streamer::Record(dfields))
             }
             Format::Repeat(a) => {
                 if a.is_nullable(compiler.module) {
                     return Err(format!("cannot repeat nullable format: {a:?}"));
                 }
                 let da =
-                    Decoder::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                    Streamer::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
                 if let Some(tree) = MatchTree::build(compiler.module, &[fa, fb], next) {
-                    Ok(Decoder::While(tree, Box::new(da)))
+                    Ok(Streamer::While(tree, Box::new(da)))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
@@ -787,34 +225,34 @@ impl Decoder {
                     return Err(format!("cannot repeat nullable format: {a:?}"));
                 }
                 let da =
-                    Decoder::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                    Streamer::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::EMPTY;
                 let fb = Format::Tuple(vec![(**a).clone(), astar]);
                 if let Some(tree) = MatchTree::build(compiler.module, &[fa, fb], next) {
-                    Ok(Decoder::Until(tree, Box::new(da)))
+                    Ok(Streamer::Until(tree, Box::new(da)))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
             }
             Format::RepeatCount(expr, a) => {
                 // FIXME probably not right
-                let da = Box::new(Decoder::compile_next(compiler, a, next)?);
-                Ok(Decoder::RepeatCount(expr.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, next)?);
+                Ok(Streamer::RepeatCount(expr.clone(), da))
             }
             Format::RepeatUntilLast(expr, a) => {
                 // FIXME probably not right
-                let da = Box::new(Decoder::compile_next(compiler, a, next)?);
-                Ok(Decoder::RepeatUntilLast(expr.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, next)?);
+                Ok(Streamer::RepeatUntilLast(expr.clone(), da))
             }
             Format::RepeatUntilSeq(expr, a) => {
                 // FIXME probably not right
-                let da = Box::new(Decoder::compile_next(compiler, a, next)?);
-                Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, next)?);
+                Ok(Streamer::RepeatUntilSeq(expr.clone(), da))
             }
             Format::Peek(a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
-                Ok(Decoder::Peek(da))
+                let da = Box::new(Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Streamer::Peek(da))
             }
             Format::PeekNot(a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
@@ -827,29 +265,29 @@ impl Decoder {
                     }
                     _ => {}
                 }
-                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
-                Ok(Decoder::PeekNot(da))
+                let da = Box::new(Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Streamer::PeekNot(da))
             }
             Format::Slice(expr, a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
-                Ok(Decoder::Slice(expr.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Streamer::Slice(expr.clone(), da))
             }
             Format::Bits(a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
-                Ok(Decoder::Bits(da))
+                let da = Box::new(Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Streamer::Bits(da))
             }
             Format::WithRelativeOffset(expr, a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, Rc::new(Next::Empty))?);
-                Ok(Decoder::WithRelativeOffset(expr.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?);
+                Ok(Streamer::WithRelativeOffset(expr.clone(), da))
             }
             Format::Map(a, expr) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
-                Ok(Decoder::Map(da, expr.clone()))
+                let da = Box::new(Streamer::compile_next(compiler, a, next.clone())?);
+                Ok(Streamer::Map(da, expr.clone()))
             }
-            Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
+            Format::Compute(expr) => Ok(Streamer::Compute(expr.clone())),
             Format::Let(name, expr, a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
-                Ok(Decoder::Let(name.clone(), expr.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, next.clone())?);
+                Ok(Streamer::Let(name.clone(), expr.clone(), da))
             }
             Format::Match(head, branches) => {
                 let branches = branches
@@ -857,30 +295,30 @@ impl Decoder {
                     .map(|(pattern, f)| {
                         Ok((
                             pattern.clone(),
-                            Decoder::compile_next(compiler, f, next.clone())?,
+                            Streamer::compile_next(compiler, f, next.clone())?,
                         ))
                     })
                     .collect::<Result<_, String>>()?;
-                Ok(Decoder::Match(head.clone(), branches))
+                Ok(Streamer::Match(head.clone(), branches))
             }
             Format::MatchVariant(head, branches) => {
                 let branches = branches
                     .iter()
                     .map(|(pattern, label, f)| {
-                        let d = Decoder::compile_next(compiler, f, next.clone())?;
+                        let d = Streamer::compile_next(compiler, f, next.clone())?;
                         Ok((
                             pattern.clone(),
-                            Decoder::Variant(label.clone(), Box::new(d)),
+                            Streamer::Variant(label.clone(), Box::new(d)),
                         ))
                     })
                     .collect::<Result<_, String>>()?;
-                Ok(Decoder::Match(head.clone(), branches))
+                Ok(Streamer::Match(head.clone(), branches))
             }
             Format::Dynamic(name, dynformat, a) => {
-                let da = Box::new(Decoder::compile_next(compiler, a, next.clone())?);
-                Ok(Decoder::Dynamic(name.clone(), dynformat.clone(), da))
+                let da = Box::new(Streamer::compile_next(compiler, a, next.clone())?);
+                Ok(Streamer::Dynamic(name.clone(), dynformat.clone(), da))
             }
-            Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
+            Format::Apply(name) => Ok(Streamer::Apply(name.clone())),
         }
     }
 
@@ -891,29 +329,27 @@ impl Decoder {
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         match self {
-            Decoder::Call(n, es) => {
+            Streamer::Call(n, es) => {
                 let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_value(scope);
                     new_scope.push(name.clone(), v);
                 }
-                program.decoders[*n]
-                    .0
-                    .parse(program, &Scope::Multi(&new_scope), input)
+                program.streamers[*n].parse(program, &Scope::Multi(&new_scope), input)
             }
-            Decoder::Fail => Err(ParseError::fail(scope, input)),
-            Decoder::EndOfInput => match input.read_byte() {
+            Streamer::Fail => Err(ParseError::fail(scope, input)),
+            Streamer::EndOfInput => match input.read_byte() {
                 None => Ok((Value::UNIT, input)),
                 Some((b, _)) => Err(ParseError::trailing(b, input.offset)),
             },
-            Decoder::Align(n) => {
+            Streamer::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
                     .ok_or(ParseError::overrun(skip, input.offset))?;
                 Ok((Value::UNIT, input))
             }
-            Decoder::Byte(bs) => {
+            Streamer::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()
                     .ok_or(ParseError::overbyte(input.offset))?;
@@ -923,11 +359,11 @@ impl Decoder {
                     Err(ParseError::unexpected(b, *bs, input.offset))
                 }
             }
-            Decoder::Variant(label, d) => {
+            Streamer::Variant(label, d) => {
                 let (v, input) = d.parse(program, scope, input)?;
                 Ok((Value::Variant(label.clone(), Box::new(v)), input))
             }
-            Decoder::Branch(tree, branches) => {
+            Streamer::Branch(tree, branches) => {
                 let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
                     offset: input.offset,
                 })?;
@@ -935,7 +371,7 @@ impl Decoder {
                 let (v, input) = d.parse(program, scope, input)?;
                 Ok((Value::Branch(index, Box::new(v)), input))
             }
-            Decoder::Parallel(branches) => {
+            Streamer::Parallel(branches) => {
                 for (index, d) in branches.iter().enumerate() {
                     let res = d.parse(program, scope, input);
                     if let Ok((v, input)) = res {
@@ -944,7 +380,7 @@ impl Decoder {
                 }
                 Err(ParseError::fail(scope, input))
             }
-            Decoder::Tuple(fields) => {
+            Streamer::Tuple(fields) => {
                 let mut input = input;
                 let mut v = Vec::with_capacity(fields.len());
                 for f in fields {
@@ -954,7 +390,7 @@ impl Decoder {
                 }
                 Ok((Value::Tuple(v), input))
             }
-            Decoder::Record(fields) => {
+            Streamer::Record(fields) => {
                 let mut input = input;
                 let mut record_scope = MultiScope::with_capacity(scope, fields.len());
                 for (name, f) in fields {
@@ -964,7 +400,7 @@ impl Decoder {
                 }
                 Ok((record_scope.into_record(), input))
             }
-            Decoder::While(tree, a) => {
+            Streamer::While(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 while tree.matches(input).ok_or(ParseError::NoValidBranch {
@@ -977,7 +413,7 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v), input))
             }
-            Decoder::Until(tree, a) => {
+            Streamer::Until(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
@@ -993,7 +429,7 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v), input))
             }
-            Decoder::RepeatCount(expr, a) => {
+            Streamer::RepeatCount(expr, a) => {
                 let mut input = input;
                 let count = expr.eval_value(scope).unwrap_usize();
                 let mut v = Vec::with_capacity(count);
@@ -1004,7 +440,7 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v), input))
             }
-            Decoder::RepeatUntilLast(expr, a) => {
+            Streamer::RepeatUntilLast(expr, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
@@ -1018,7 +454,7 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v), input))
             }
-            Decoder::RepeatUntilSeq(expr, a) => {
+            Streamer::RepeatUntilSeq(expr, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
                 loop {
@@ -1037,18 +473,18 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v), input))
             }
-            Decoder::Peek(a) => {
+            Streamer::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;
                 Ok((v, input))
             }
-            Decoder::PeekNot(a) => {
+            Streamer::PeekNot(a) => {
                 if a.parse(program, scope, input).is_ok() {
                     Err(ParseError::fail(scope, input))
                 } else {
                     Ok((Value::Tuple(vec![]), input))
                 }
             }
-            Decoder::Slice(expr, a) => {
+            Streamer::Slice(expr, a) => {
                 let size = expr.eval_value(scope).unwrap_usize();
                 let (slice, input) = input
                     .split_at(size)
@@ -1056,7 +492,7 @@ impl Decoder {
                 let (v, _) = a.parse(program, scope, slice)?;
                 Ok((v, input))
             }
-            Decoder::Bits(a) => {
+            Streamer::Bits(a) => {
                 let mut bits = Vec::with_capacity(input.remaining().len() * 8);
                 for b in input.remaining() {
                     for i in 0..8 {
@@ -1071,7 +507,7 @@ impl Decoder {
                     .ok_or(ParseError::overrun(bytes_read, input.offset))?;
                 Ok((v, input))
             }
-            Decoder::WithRelativeOffset(expr, a) => {
+            Streamer::WithRelativeOffset(expr, a) => {
                 let offset = expr.eval_value(scope).unwrap_usize();
                 let (_, slice) = input
                     .split_at(offset)
@@ -1079,21 +515,21 @@ impl Decoder {
                 let (v, _) = a.parse(program, scope, slice)?;
                 Ok((v, input))
             }
-            Decoder::Map(d, expr) => {
+            Streamer::Map(d, expr) => {
                 let (orig, input) = d.parse(program, scope, input)?;
                 let v = expr.eval_lambda(scope, &orig);
                 Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
             }
-            Decoder::Compute(expr) => {
+            Streamer::Compute(expr) => {
                 let v = expr.eval_value(scope);
                 Ok((v, input))
             }
-            Decoder::Let(name, expr, d) => {
+            Streamer::Let(name, expr, d) => {
                 let v = expr.eval_value(scope);
                 let let_scope = SingleScope::new(scope, name, &v);
                 d.parse(program, &Scope::Single(let_scope), input)
             }
-            Decoder::Match(head, branches) => {
+            Streamer::Match(head, branches) => {
                 let head = head.eval(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
@@ -1104,7 +540,7 @@ impl Decoder {
                 }
                 panic!("non-exhaustive patterns");
             }
-            Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
+            Streamer::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval(scope);
                 let lengths = value_to_vec_usize(&lengths_val);
                 let lengths = match opt_values_expr {
@@ -1123,121 +559,12 @@ impl Decoder {
                 let child_scope = DecoderScope::new(scope, name, dyn_d);
                 d.parse(program, &Scope::Decoder(child_scope), input)
             }
-            Decoder::Apply(name) => {
+            Streamer::Apply(name) => {
                 let d = scope.get_decoder_by_name(name);
-                d.parse(program, scope, input)
+                d.parse(&decoder::Program::new(), scope, input)
             }
         }
     }
-}
-
-pub fn value_to_vec_usize(v: &Value) -> Vec<usize> {
-    let vs = match v {
-        Value::Seq(vs) => vs,
-        _ => panic!("expected Seq"),
-    };
-    vs.iter()
-        .map(|v| match v.coerce_mapped_value() {
-            Value::U8(n) => *n as usize,
-            Value::U16(n) => *n as usize,
-            _ => panic!("expected U8 or U16"),
-        })
-        .collect::<Vec<usize>>()
-}
-
-pub fn make_huffman_codes(lengths: &[usize]) -> Format {
-    let max_length = *lengths.iter().max().unwrap();
-    let mut bl_count = [0].repeat(max_length + 1);
-
-    for len in lengths {
-        bl_count[*len] += 1;
-    }
-
-    let mut next_code = [0].repeat(max_length + 1);
-    let mut code = 0;
-    bl_count[0] = 0;
-
-    for bits in 1..max_length + 1 {
-        code = (code + bl_count[bits - 1]) << 1;
-        next_code[bits] = code;
-    }
-
-    let mut codes = Vec::with_capacity(lengths.len());
-
-    for (n, &len) in lengths.iter().enumerate() {
-        if len != 0 {
-            codes.push(Format::Map(
-                Box::new(bit_range(len, next_code[len])),
-                Expr::Lambda("_".into(), Box::new(Expr::U16(n.try_into().unwrap()))),
-            ));
-            //println!("{:?}", codes[codes.len()-1]);
-            next_code[len] += 1;
-        } else {
-            //codes.push((n.to_string(), Format::Fail));
-        }
-    }
-
-    Format::Union(codes)
-}
-
-fn bit_range(n: usize, bits: usize) -> Format {
-    let mut fs = Vec::with_capacity(n);
-    for i in 0..n {
-        let r = n - 1 - i;
-        let b = (bits & (1 << r)) >> r != 0;
-        fs.push(is_bit(b));
-    }
-    Format::Tuple(fs)
-}
-
-fn is_bit(b: bool) -> Format {
-    Format::Byte(ByteSet::from([if b { 1 } else { 0 }]))
-}
-
-fn inflate(codes: &[Value]) -> Vec<Value> {
-    let mut vs = Vec::new();
-    for code in codes {
-        match code {
-            Value::Variant(name, v) => match (name.as_ref(), v.as_ref()) {
-                ("literal", v) => match v.coerce_mapped_value() {
-                    Value::U8(b) => vs.push(Value::U8(*b)),
-                    _ => panic!("inflate: expected U8"),
-                },
-                ("reference", Value::Record(fields)) => {
-                    let length = &fields
-                        .iter()
-                        .find(|(label, _)| label == "length")
-                        .unwrap()
-                        .1;
-                    let distance = &fields
-                        .iter()
-                        .find(|(label, _)| label == "distance")
-                        .unwrap()
-                        .1;
-                    match (length, distance) {
-                        (Value::U16(length), Value::U16(distance)) => {
-                            let length = *length as usize;
-                            let distance = *distance as usize;
-                            if distance > vs.len() {
-                                panic!("inflate: distance out of range");
-                            }
-                            let start = vs.len() - distance;
-                            for i in 0..length {
-                                vs.push(vs[start + i].clone());
-                            }
-                        }
-                        _ => panic!(
-                            "inflate: unexpected length/distance {:?} {:?}",
-                            length, distance
-                        ),
-                    }
-                }
-                _ => panic!("inflate: unknown code"),
-            },
-            _ => panic!("inflate: expected variant"),
-        }
-    }
-    vs
 }
 
 #[cfg(test)]
@@ -1283,7 +610,7 @@ mod tests {
         Format::Byte(!ByteSet::from([b]))
     }
 
-    fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
+    fn accepts(d: &Streamer, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();
         let (val, remain) = d
             .parse(&program, &Scope::Empty, ReadCtxt::new(input))
@@ -1292,7 +619,7 @@ mod tests {
         assert_eq!(remain.remaining(), tail);
     }
 
-    fn rejects(d: &Decoder, input: &[u8]) {
+    fn rejects(d: &Streamer, input: &[u8]) {
         let program = Program::new();
         assert!(d
             .parse(&program, &Scope::Empty, ReadCtxt::new(input))
@@ -1302,7 +629,7 @@ mod tests {
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1310,7 +637,7 @@ mod tests {
     #[test]
     fn compile_empty() {
         let f = Format::EMPTY;
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0x00], &[0x00], Value::UNIT);
     }
@@ -1318,7 +645,7 @@ mod tests {
     #[test]
     fn compile_byte_is() {
         let f = is_byte(0x00);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
         rejects(&d, &[0xFF]);
@@ -1328,7 +655,7 @@ mod tests {
     #[test]
     fn compile_byte_not() {
         let f = not_byte(0x00);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
@@ -1338,7 +665,7 @@ mod tests {
     #[test]
     fn compile_alt() {
         let f = alts::<&str>([]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1346,7 +673,7 @@ mod tests {
     #[test]
     fn compile_alt_byte() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0xFF))]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1366,7 +693,7 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0x00))]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1374,7 +701,7 @@ mod tests {
         let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
         let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0xFF)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1396,7 +723,7 @@ mod tests {
         let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
         let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1406,32 +733,32 @@ mod tests {
         let slice_a = Format::Slice(Expr::U8(1), Box::new(tuple_a));
         let slice_b = Format::Slice(Expr::U8(1), Box::new(tuple_b));
         let f = alts([("a", slice_a), ("b", slice_b)]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_alt_fail() {
         let f = alts([("a", Format::Fail), ("b", Format::Fail)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         rejects(&d, &[]);
     }
 
     #[test]
     fn compile_alt_end_of_input() {
         let f = alts([("a", Format::EndOfInput), ("b", Format::EndOfInput)]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
         let f = alts([("a", Format::EMPTY), ("b", Format::EMPTY)]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_alt_fail_end_of_input() {
         let f = alts([("a", Format::Fail), ("b", Format::EndOfInput)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1443,7 +770,7 @@ mod tests {
     #[test]
     fn compile_alt_end_of_input_or_byte() {
         let f = alts([("a", Format::EndOfInput), ("b", is_byte(0x00))]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1468,7 +795,7 @@ mod tests {
     #[test]
     fn compile_alt_opt() {
         let f = alts([("a", Format::EMPTY), ("b", is_byte(0x00))]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1492,7 +819,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_next() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), is_byte(0xFF)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1518,7 +845,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_opt() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0xFF))]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1578,7 +905,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_ambiguous() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0x00))]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1604,7 +931,7 @@ mod tests {
             ("7", alt.clone()),
         ]);
         let f = alts([("a", rec.clone()), ("b", rec.clone())]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1614,13 +941,13 @@ mod tests {
             ("b", is_byte(0x01)),
             ("c", is_byte(0x02)),
         ]));
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1635,13 +962,13 @@ mod tests {
     #[test]
     fn compile_repeat_repeat() {
         let f = repeat(repeat(is_byte(0x00)));
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_cat_repeat() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), repeat(is_byte(0xFF))]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1689,7 +1016,7 @@ mod tests {
     #[test]
     fn compile_cat_end_of_input() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::EndOfInput]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1703,7 +1030,7 @@ mod tests {
     #[test]
     fn compile_cat_repeat_end_of_input() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), Format::EndOfInput]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1725,7 +1052,7 @@ mod tests {
     #[test]
     fn compile_cat_repeat_ambiguous() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), repeat(is_byte(0x00))]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1735,7 +1062,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x7F))),
         ]);
-        assert!(Decoder::compile_one(&f).is_ok());
+        assert!(Streamer::compile_one(&f).is_ok());
     }
 
     #[test]
@@ -1745,7 +1072,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x00))),
         ]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1763,7 +1090,7 @@ mod tests {
                 ])),
             ),
         ]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1853,7 +1180,7 @@ mod tests {
     #[test]
     fn compile_repeat1() {
         let f = repeat1(is_byte(0x00));
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1874,7 +1201,7 @@ mod tests {
     #[test]
     fn compile_align1() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::Align(1), is_byte(0xFF)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1886,7 +1213,7 @@ mod tests {
     #[test]
     fn compile_align2() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::Align(2), is_byte(0xFF)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         rejects(&d, &[0x00, 0xFF]);
         rejects(&d, &[0x00, 0x99, 0x99, 0xFF]);
         accepts(
@@ -1903,7 +1230,7 @@ mod tests {
         let a = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
         let peek_not = Format::PeekNot(Box::new(a));
         let f = Format::Tuple(vec![peek_not, any_byte.clone(), any_byte.clone()]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
         rejects(&d, &[0xFF, 0xFF]);
@@ -1928,7 +1255,7 @@ mod tests {
         let a = Format::Tuple(vec![guard, Format::Repeat(Box::new(any_byte.clone()))]);
         let b = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
         let f = alts([("a", a), ("b", b)]);
-        let d = Decoder::compile_one(&f).unwrap();
+        let d = Streamer::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -2005,6 +1332,6 @@ mod tests {
         let peek_not = Format::PeekNot(Box::new(repeat1(is_byte(0x00))));
         let any_byte = Format::Byte(ByteSet::full());
         let f = Format::Tuple(vec![peek_not, repeat1(any_byte)]);
-        assert!(Decoder::compile_one(&f).is_err());
+        assert!(Streamer::compile_one(&f).is_err());
     }
 }

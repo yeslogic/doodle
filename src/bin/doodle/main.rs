@@ -5,8 +5,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
-use doodle::decoder::Compiler;
+use doodle::decoder;
 use doodle::read::ReadCtxt;
+use doodle::streamer;
 use doodle::FormatModule;
 
 mod format;
@@ -61,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FormatOutput::Debug => println!("{module:?}"),
                 FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
                 FormatOutput::Rust => {
-                    let program = Compiler::compile(&module, &format)?;
+                    let program = decoder::Compiler::compile(&module, &format)?;
                     doodle::codegen::print_program(&program);
                 }
             }
@@ -71,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         Command::File { output, filename } => {
             let mut module = FormatModule::new();
             let format = format::main(&mut module).call();
-            let program = Compiler::compile(&module, &format)?;
+            let program = streamer::Compiler::compile(&module, &format)?;
 
             let input = fs::read(filename)?;
             let (value, _) = program.run(ReadCtxt::new(&input))?;
