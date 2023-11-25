@@ -16,6 +16,7 @@ pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
 pub mod error;
+pub mod streamer;
 
 pub mod output;
 pub mod prelude;

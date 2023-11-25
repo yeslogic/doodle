@@ -67,7 +67,7 @@ impl Value {
         }
     }
 
-    fn unwrap_usize(self) -> usize {
+    pub fn unwrap_usize(self) -> usize {
         match self {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
@@ -76,22 +76,21 @@ impl Value {
         }
     }
 
-    fn unwrap_tuple(self) -> Vec<Value> {
+    pub fn unwrap_tuple(self) -> Vec<Value> {
         match self {
             Value::Tuple(values) => values,
             _ => panic!("value is not a tuple"),
         }
     }
 
-    fn unwrap_bool(self) -> bool {
+    pub fn unwrap_bool(self) -> bool {
         match self {
             Value::Bool(b) => b,
             _ => panic!("value is not a bool"),
         }
     }
 
-    #[allow(dead_code)]
-    fn unwrap_char(self) -> char {
+    pub fn unwrap_char(self) -> char {
         match self {
             Value::Char(c) => c,
             _ => panic!("value is not a char"),
@@ -403,7 +402,7 @@ impl Expr {
         self.eval(scope).coerce_mapped_value().clone()
     }
 
-    fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: &Value) -> Value {
+    pub fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: &Value) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
                 let child_scope = SingleScope::new(scope, name, arg);
@@ -451,7 +450,7 @@ pub struct Program {
 }
 
 impl Program {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let decoders = Vec::new();
         Program { decoders }
     }
@@ -823,7 +822,7 @@ impl<'a> SingleScope<'a> {
 }
 
 impl<'a> DecoderScope<'a> {
-    fn new(parent: &'a Scope<'a>, name: &'a str, decoder: Decoder) -> DecoderScope<'a> {
+    pub fn new(parent: &'a Scope<'a>, name: &'a str, decoder: Decoder) -> DecoderScope<'a> {
         DecoderScope {
             parent,
             name,
@@ -1096,7 +1095,7 @@ impl Decoder {
     }
 }
 
-fn value_to_vec_usize(v: &Value) -> Vec<usize> {
+pub fn value_to_vec_usize(v: &Value) -> Vec<usize> {
     let vs = match v {
         Value::Seq(vs) => vs,
         _ => panic!("expected Seq"),
@@ -1110,7 +1109,7 @@ fn value_to_vec_usize(v: &Value) -> Vec<usize> {
         .collect::<Vec<usize>>()
 }
 
-fn make_huffman_codes(lengths: &[usize]) -> Format {
+pub fn make_huffman_codes(lengths: &[usize]) -> Format {
     let max_length = *lengths.iter().max().unwrap();
     let mut bl_count = [0].repeat(max_length + 1);
 
