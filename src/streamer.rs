@@ -1,13 +1,144 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::{
-    self, make_huffman_codes, value_to_vec_usize, Decoder, DecoderScope, MultiScope, Scope,
-    ScopeBinding, ScopeLookup, SingleScope, Value,
+    self, make_huffman_codes, value_to_vec_usize, Decoder, Scope, ScopeEntry, ScopeLookup, Value,
 };
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
 use crate::{DynFormat, Expr, Format, FormatModule, Label, MatchTree, Next, Pattern};
 use std::collections::HashMap;
 use std::rc::Rc;
+
+struct StreamStack<'a> {
+    parent: &'a Scope<'a>,
+    frames: Vec<StreamFrame<'a>>,
+}
+
+enum StreamFrame<'a> {
+    Call(CallScope),
+    Let(LetScope<'a>),
+    Record(RecordScope<'a>),
+    Decoder(DecoderScope<'a>),
+}
+
+struct CallScope {
+    args: Vec<(Label, Value)>,
+}
+
+struct LetScope<'a> {
+    name: &'a str,
+    value: Value,
+}
+
+struct RecordScope<'a> {
+    record: Vec<(Label, Value)>,
+    name: &'a Label,
+    fields: &'a [(Label, Streamer)],
+}
+
+struct DecoderScope<'a> {
+    name: &'a str,
+    decoder: Decoder,
+}
+
+impl CallScope {
+    fn new(args: Vec<(Label, Value)>) -> CallScope {
+        CallScope { args }
+    }
+}
+
+impl<'a> LetScope<'a> {
+    fn new(name: &'a str, value: Value) -> LetScope<'a> {
+        LetScope { name, value }
+    }
+}
+
+impl<'a> RecordScope<'a> {
+    fn new(name: &'a Label, fields: &'a [(Label, Streamer)]) -> RecordScope<'a> {
+        let record = Vec::with_capacity(fields.len());
+        RecordScope {
+            record,
+            name,
+            fields,
+        }
+    }
+}
+
+impl<'a> DecoderScope<'a> {
+    fn new(name: &'a str, decoder: Decoder) -> DecoderScope<'a> {
+        DecoderScope { name, decoder }
+    }
+}
+
+impl<'a> ScopeLookup for StreamStack<'a> {
+    fn get_value_by_name(&self, name: &str) -> &Value {
+        for frame in self.frames.iter().rev() {
+            match frame {
+                StreamFrame::Call(call_scope) => {
+                    for (n, v) in call_scope.args.iter().rev() {
+                        if n == name {
+                            return v;
+                        }
+                    }
+                }
+                StreamFrame::Let(let_scope) => {
+                    if let_scope.name == name {
+                        return &let_scope.value;
+                    }
+                }
+                StreamFrame::Record(record_scope) => {
+                    for (n, v) in record_scope.record.iter().rev() {
+                        if n == name {
+                            return v;
+                        }
+                    }
+                }
+                StreamFrame::Decoder(_decoder_scope) => {}
+            }
+        }
+        self.parent.get_value_by_name(name)
+    }
+
+    fn get_decoder_by_name(&self, name: &str) -> &Decoder {
+        for frame in self.frames.iter().rev() {
+            match frame {
+                StreamFrame::Call(_call_scope) => {}
+                StreamFrame::Let(_let_scope) => {}
+                StreamFrame::Record(_record_scope) => {}
+                StreamFrame::Decoder(decoder_scope) => {
+                    if decoder_scope.name == name {
+                        return &decoder_scope.decoder;
+                    }
+                }
+            }
+        }
+        self.parent.get_decoder_by_name(name)
+    }
+
+    fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
+        for frame in self.frames.iter().rev() {
+            match frame {
+                StreamFrame::Call(call_scope) => {
+                    for (name, value) in call_scope.args.iter().rev() {
+                        bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
+                    }
+                }
+                StreamFrame::Let(let_scope) => {
+                    bindings.push((
+                        let_scope.name.to_string().into(),
+                        ScopeEntry::Value(let_scope.value.clone()),
+                    ));
+                }
+                StreamFrame::Record(record_scope) => {
+                    for (name, value) in record_scope.record.iter().rev() {
+                        bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
+                    }
+                }
+                StreamFrame::Decoder(_decoder_scope) => {} // FIXME
+            }
+        }
+        self.parent.get_bindings(bindings);
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Streamer {
@@ -325,243 +456,325 @@ impl Streamer {
     pub fn parse<'input>(
         &self,
         program: &Program,
-        scope: &Scope<'_>,
+        parent_scope: &Scope<'_>,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        match self {
-            Streamer::Call(n, es) => {
-                let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
-                for (name, e) in es {
-                    let v = e.eval_value(scope);
-                    new_scope.push(name.clone(), v);
+        let stack = StreamStack {
+            parent: parent_scope,
+            frames: Vec::new(),
+        };
+        self.parse0(program, stack, input)
+    }
+
+    fn parse0<'a, 'input>(
+        &'a self,
+        program: &Program,
+        mut stack: StreamStack<'a>,
+        mut input: ReadCtxt<'input>,
+    ) -> ParseResult<(Value, ReadCtxt<'input>)> {
+        let mut s = self;
+        loop {
+            let (mut v, new_input) = match s {
+                Streamer::Call(n, es) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut args = Vec::with_capacity(es.len());
+                    for (name, e) in es {
+                        let v = e.eval_value(scope);
+                        args.push((name.clone(), v));
+                    }
+                    let call_scope = CallScope::new(args);
+                    let new_stack = StreamStack {
+                        parent: &Scope::Empty,
+                        frames: vec![StreamFrame::Call(call_scope)],
+                    };
+                    program.streamers[*n].parse0(program, new_stack, input)
                 }
-                program.streamers[*n].parse(program, &Scope::Multi(&new_scope), input)
-            }
-            Streamer::Fail => Err(ParseError::fail(scope, input)),
-            Streamer::EndOfInput => match input.read_byte() {
-                None => Ok((Value::UNIT, input)),
-                Some((b, _)) => Err(ParseError::trailing(b, input.offset)),
-            },
-            Streamer::Align(n) => {
-                let skip = (n - (input.offset % n)) % n;
-                let (_, input) = input
-                    .split_at(skip)
-                    .ok_or(ParseError::overrun(skip, input.offset))?;
-                Ok((Value::UNIT, input))
-            }
-            Streamer::Byte(bs) => {
-                let (b, input) = input
-                    .read_byte()
-                    .ok_or(ParseError::overbyte(input.offset))?;
-                if bs.contains(b) {
-                    Ok((Value::U8(b), input))
-                } else {
-                    Err(ParseError::unexpected(b, *bs, input.offset))
+                Streamer::Fail => {
+                    let scope = &Scope::Other(&stack);
+                    Err(ParseError::fail(scope, input))
                 }
-            }
-            Streamer::Variant(label, d) => {
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Variant(label.clone(), Box::new(v)), input))
-            }
-            Streamer::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
-                    offset: input.offset,
-                })?;
-                let d = &branches[index];
-                let (v, input) = d.parse(program, scope, input)?;
-                Ok((Value::Branch(index, Box::new(v)), input))
-            }
-            Streamer::Parallel(branches) => {
-                for (index, d) in branches.iter().enumerate() {
-                    let res = d.parse(program, scope, input);
-                    if let Ok((v, input)) = res {
-                        return Ok((Value::Branch(index, Box::new(v)), input));
+                Streamer::EndOfInput => match input.read_byte() {
+                    None => Ok((Value::UNIT, input)),
+                    Some((b, _)) => Err(ParseError::trailing(b, input.offset)),
+                },
+                Streamer::Align(n) => {
+                    let skip = (n - (input.offset % n)) % n;
+                    let (_, input) = input
+                        .split_at(skip)
+                        .ok_or(ParseError::overrun(skip, input.offset))?;
+                    Ok((Value::UNIT, input))
+                }
+                Streamer::Byte(bs) => {
+                    let (b, input) = input
+                        .read_byte()
+                        .ok_or(ParseError::overbyte(input.offset))?;
+                    if bs.contains(b) {
+                        Ok((Value::U8(b), input))
+                    } else {
+                        Err(ParseError::unexpected(b, *bs, input.offset))
                     }
                 }
-                Err(ParseError::fail(scope, input))
-            }
-            Streamer::Tuple(fields) => {
-                let mut input = input;
-                let mut v = Vec::with_capacity(fields.len());
-                for f in fields {
-                    let (vf, next_input) = f.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(vf.clone());
+                Streamer::Variant(label, d) => {
+                    let scope = &Scope::Other(&stack);
+                    let (v, input) = d.parse(program, scope, input)?;
+                    Ok((Value::Variant(label.clone(), Box::new(v)), input))
                 }
-                Ok((Value::Tuple(v), input))
-            }
-            Streamer::Record(fields) => {
-                let mut input = input;
-                let mut record_scope = MultiScope::with_capacity(scope, fields.len());
-                for (name, f) in fields {
-                    let (vf, next_input) = f.parse(program, &Scope::Multi(&record_scope), input)?;
-                    record_scope.push(name.clone(), vf);
-                    input = next_input;
+                Streamer::Branch(tree, branches) => {
+                    let scope = &Scope::Other(&stack);
+                    let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
+                        offset: input.offset,
+                    })?;
+                    let d = &branches[index];
+                    let (v, input) = d.parse(program, scope, input)?;
+                    Ok((Value::Branch(index, Box::new(v)), input))
                 }
-                Ok((record_scope.into_record(), input))
-            }
-            Streamer::While(tree, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                while tree.matches(input).ok_or(ParseError::NoValidBranch {
-                    offset: input.offset,
-                })? == 0
-                {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
+                Streamer::Parallel(branches) => {
+                    let scope = &Scope::Other(&stack);
+                    (|| {
+                        for (index, d) in branches.iter().enumerate() {
+                            let res = d.parse(program, scope, input);
+                            if let Ok((v, input)) = res {
+                                return Ok((Value::Branch(index, Box::new(v)), input));
+                            }
+                        }
+                        Err(ParseError::fail(scope, input))
+                    })()
                 }
-                Ok((Value::Seq(v), input))
-            }
-            Streamer::Until(tree, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                Streamer::Tuple(fields) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut input = input;
+                    let mut v = Vec::with_capacity(fields.len());
+                    for f in fields {
+                        let (vf, next_input) = f.parse(program, scope, input)?;
+                        input = next_input;
+                        v.push(vf.clone());
+                    }
+                    Ok((Value::Tuple(v), input))
+                }
+                Streamer::Record(fields) => match fields.split_first() {
+                    None => Ok((Value::Record(vec![]), input)),
+                    Some(((name, first_s), fields)) => {
+                        let record_scope = RecordScope::new(name, fields);
+                        stack.frames.push(StreamFrame::Record(record_scope));
+                        s = first_s;
+                        continue;
+                    }
+                },
+                Streamer::While(tree, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut input = input;
+                    let mut v = Vec::new();
+                    while tree.matches(input).ok_or(ParseError::NoValidBranch {
                         offset: input.offset,
                     })? == 0
                     {
-                        break;
+                        let (va, next_input) = a.parse(program, scope, input)?;
+                        input = next_input;
+                        v.push(va);
                     }
+                    Ok((Value::Seq(v), input))
                 }
-                Ok((Value::Seq(v), input))
-            }
-            Streamer::RepeatCount(expr, a) => {
-                let mut input = input;
-                let count = expr.eval_value(scope).unwrap_usize();
-                let mut v = Vec::with_capacity(count);
-                for _ in 0..count {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                }
-                Ok((Value::Seq(v), input))
-            }
-            Streamer::RepeatUntilLast(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    let done = expr.eval_lambda(scope, &va).unwrap_bool();
-                    v.push(va);
-                    if done {
-                        break;
-                    }
-                }
-                Ok((Value::Seq(v), input))
-            }
-            Streamer::RepeatUntilSeq(expr, a) => {
-                let mut input = input;
-                let mut v = Vec::new();
-                loop {
-                    let (va, next_input) = a.parse(program, scope, input)?;
-                    input = next_input;
-                    v.push(va);
-                    let vs = Value::Seq(v);
-                    let done = expr.eval_lambda(scope, &vs).unwrap_bool();
-                    v = match vs {
-                        Value::Seq(v) => v,
-                        _ => unreachable!(),
-                    };
-                    if done {
-                        break;
-                    }
-                }
-                Ok((Value::Seq(v), input))
-            }
-            Streamer::Peek(a) => {
-                let (v, _next_input) = a.parse(program, scope, input)?;
-                Ok((v, input))
-            }
-            Streamer::PeekNot(a) => {
-                if a.parse(program, scope, input).is_ok() {
-                    Err(ParseError::fail(scope, input))
-                } else {
-                    Ok((Value::Tuple(vec![]), input))
-                }
-            }
-            Streamer::Slice(expr, a) => {
-                let size = expr.eval_value(scope).unwrap_usize();
-                let (slice, input) = input
-                    .split_at(size)
-                    .ok_or(ParseError::overrun(size, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
-                Ok((v, input))
-            }
-            Streamer::Bits(a) => {
-                let mut bits = Vec::with_capacity(input.remaining().len() * 8);
-                for b in input.remaining() {
-                    for i in 0..8 {
-                        bits.push((b & (1 << i)) >> i);
-                    }
-                }
-                let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
-                let bytes_remain = bits.remaining().len() >> 3;
-                let bytes_read = input.remaining().len() - bytes_remain;
-                let (_, input) = input
-                    .split_at(bytes_read)
-                    .ok_or(ParseError::overrun(bytes_read, input.offset))?;
-                Ok((v, input))
-            }
-            Streamer::WithRelativeOffset(expr, a) => {
-                let offset = expr.eval_value(scope).unwrap_usize();
-                let (_, slice) = input
-                    .split_at(offset)
-                    .ok_or(ParseError::overrun(offset, input.offset))?;
-                let (v, _) = a.parse(program, scope, slice)?;
-                Ok((v, input))
-            }
-            Streamer::Map(d, expr) => {
-                let (orig, input) = d.parse(program, scope, input)?;
-                let v = expr.eval_lambda(scope, &orig);
-                Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
-            }
-            Streamer::Compute(expr) => {
-                let v = expr.eval_value(scope);
-                Ok((v, input))
-            }
-            Streamer::Let(name, expr, d) => {
-                let v = expr.eval_value(scope);
-                let let_scope = SingleScope::new(scope, name, &v);
-                d.parse(program, &Scope::Single(let_scope), input)
-            }
-            Streamer::Match(head, branches) => {
-                let head = head.eval(scope);
-                for (index, (pattern, decoder)) in branches.iter().enumerate() {
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) =
-                            decoder.parse(program, &Scope::Multi(&pattern_scope), input)?;
-                        return Ok((Value::Branch(index, Box::new(v)), input));
-                    }
-                }
-                panic!("non-exhaustive patterns");
-            }
-            Streamer::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
-                let lengths_val = lengths_expr.eval(scope);
-                let lengths = value_to_vec_usize(&lengths_val);
-                let lengths = match opt_values_expr {
-                    None => lengths,
-                    Some(e) => {
-                        let values = value_to_vec_usize(&e.eval(scope));
-                        let mut new_lengths = [0].repeat(values.len());
-                        for i in 0..lengths.len() {
-                            new_lengths[values[i]] = lengths[i];
+                Streamer::Until(tree, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut input = input;
+                    let mut v = Vec::new();
+                    loop {
+                        let (va, next_input) = a.parse(program, scope, input)?;
+                        input = next_input;
+                        v.push(va);
+                        if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                            offset: input.offset,
+                        })? == 0
+                        {
+                            break;
                         }
-                        new_lengths
                     }
-                };
-                let f = make_huffman_codes(&lengths);
-                let dyn_d = Decoder::compile_one(&f).unwrap();
-                let child_scope = DecoderScope::new(scope, name, dyn_d);
-                d.parse(program, &Scope::Decoder(child_scope), input)
-            }
-            Streamer::Apply(name) => {
-                let d = scope.get_decoder_by_name(name);
-                d.parse(&decoder::Program::new(), scope, input)
+                    Ok((Value::Seq(v), input))
+                }
+                Streamer::RepeatCount(expr, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut input = input;
+                    let count = expr.eval_value(scope).unwrap_usize();
+                    let mut v = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        let (va, next_input) = a.parse(program, scope, input)?;
+                        input = next_input;
+                        v.push(va);
+                    }
+                    Ok((Value::Seq(v), input))
+                }
+                Streamer::RepeatUntilLast(expr, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut input = input;
+                    let mut v = Vec::new();
+                    loop {
+                        let (va, next_input) = a.parse(program, scope, input)?;
+                        input = next_input;
+                        let done = expr.eval_lambda(scope, &va).unwrap_bool();
+                        v.push(va);
+                        if done {
+                            break;
+                        }
+                    }
+                    Ok((Value::Seq(v), input))
+                }
+                Streamer::RepeatUntilSeq(expr, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut input = input;
+                    let mut v = Vec::new();
+                    loop {
+                        let (va, next_input) = a.parse(program, scope, input)?;
+                        input = next_input;
+                        v.push(va);
+                        let vs = Value::Seq(v);
+                        let done = expr.eval_lambda(scope, &vs).unwrap_bool();
+                        v = match vs {
+                            Value::Seq(v) => v,
+                            _ => unreachable!(),
+                        };
+                        if done {
+                            break;
+                        }
+                    }
+                    Ok((Value::Seq(v), input))
+                }
+                Streamer::Peek(a) => {
+                    let scope = &Scope::Other(&stack);
+                    let (v, _next_input) = a.parse(program, scope, input)?;
+                    Ok((v, input))
+                }
+                Streamer::PeekNot(a) => {
+                    let scope = &Scope::Other(&stack);
+                    if a.parse(program, scope, input).is_ok() {
+                        Err(ParseError::fail(scope, input))
+                    } else {
+                        Ok((Value::Tuple(vec![]), input))
+                    }
+                }
+                Streamer::Slice(expr, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let size = expr.eval_value(scope).unwrap_usize();
+                    let (slice, input) = input
+                        .split_at(size)
+                        .ok_or(ParseError::overrun(size, input.offset))?;
+                    let (v, _) = a.parse(program, scope, slice)?;
+                    Ok((v, input))
+                }
+                Streamer::Bits(a) => {
+                    let scope = &Scope::Other(&stack);
+                    let mut bits = Vec::with_capacity(input.remaining().len() * 8);
+                    for b in input.remaining() {
+                        for i in 0..8 {
+                            bits.push((b & (1 << i)) >> i);
+                        }
+                    }
+                    let (v, bits) = a.parse(program, scope, ReadCtxt::new(&bits))?;
+                    let bytes_remain = bits.remaining().len() >> 3;
+                    let bytes_read = input.remaining().len() - bytes_remain;
+                    let (_, input) = input
+                        .split_at(bytes_read)
+                        .ok_or(ParseError::overrun(bytes_read, input.offset))?;
+                    Ok((v, input))
+                }
+                Streamer::WithRelativeOffset(expr, a) => {
+                    let scope = &Scope::Other(&stack);
+                    let offset = expr.eval_value(scope).unwrap_usize();
+                    let (_, slice) = input
+                        .split_at(offset)
+                        .ok_or(ParseError::overrun(offset, input.offset))?;
+                    let (v, _) = a.parse(program, scope, slice)?;
+                    Ok((v, input))
+                }
+                Streamer::Map(d, expr) => {
+                    let scope = &Scope::Other(&stack);
+                    let (orig, input) = d.parse(program, scope, input)?;
+                    let v = expr.eval_lambda(scope, &orig);
+                    Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
+                }
+                Streamer::Compute(expr) => {
+                    let scope = &Scope::Other(&stack);
+                    let v = expr.eval_value(scope);
+                    Ok((v, input))
+                }
+                Streamer::Let(name, expr, sub_s) => {
+                    let scope = &Scope::Other(&stack);
+                    let v = expr.eval_value(scope);
+                    let let_scope = LetScope::new(name, v);
+                    stack.frames.push(StreamFrame::Let(let_scope));
+                    s = sub_s;
+                    continue;
+                }
+                Streamer::Match(head, branches) => {
+                    let scope = &Scope::Other(&stack);
+                    let head = head.eval(scope);
+                    (|| {
+                        for (index, (pattern, decoder)) in branches.iter().enumerate() {
+                            if let Some(pattern_scope) = head.matches(scope, pattern) {
+                                let (v, input) =
+                                    decoder.parse(program, &Scope::Multi(&pattern_scope), input)?;
+                                return Ok((Value::Branch(index, Box::new(v)), input));
+                            }
+                        }
+                        panic!("non-exhaustive patterns");
+                    })()
+                }
+                Streamer::Dynamic(
+                    name,
+                    DynFormat::Huffman(lengths_expr, opt_values_expr),
+                    sub_s,
+                ) => {
+                    let scope = &Scope::Other(&stack);
+                    let lengths_val = lengths_expr.eval(scope);
+                    let lengths = value_to_vec_usize(&lengths_val);
+                    let lengths = match opt_values_expr {
+                        None => lengths,
+                        Some(e) => {
+                            let values = value_to_vec_usize(&e.eval(scope));
+                            let mut new_lengths = [0].repeat(values.len());
+                            for i in 0..lengths.len() {
+                                new_lengths[values[i]] = lengths[i];
+                            }
+                            new_lengths
+                        }
+                    };
+                    let f = make_huffman_codes(&lengths);
+                    let dyn_d = Decoder::compile_one(&f).unwrap();
+                    let decoder_scope = DecoderScope::new(name, dyn_d);
+                    stack.frames.push(StreamFrame::Decoder(decoder_scope));
+                    s = sub_s;
+                    continue;
+                }
+                Streamer::Apply(name) => {
+                    let scope = &Scope::Other(&stack);
+                    let d = scope.get_decoder_by_name(&name);
+                    d.parse(&decoder::Program::new(), scope, input)
+                }
+            }?;
+            input = new_input;
+            'inner: loop {
+                match stack.frames.pop() {
+                    None => return Ok((v, input)),
+                    Some(frame) => match frame {
+                        StreamFrame::Call(_call_scope) => {}
+                        StreamFrame::Let(_let_scope) => {}
+                        StreamFrame::Record(mut record_scope) => {
+                            record_scope.record.push((record_scope.name.clone(), v));
+                            match record_scope.fields.split_first() {
+                                None => {
+                                    v = Value::Record(record_scope.record);
+                                }
+                                Some(((name, next_s), fields)) => {
+                                    record_scope.name = name;
+                                    record_scope.fields = fields;
+                                    stack.frames.push(StreamFrame::Record(record_scope));
+                                    s = next_s;
+                                    break 'inner;
+                                }
+                            }
+                        }
+                        StreamFrame::Decoder(_decoder_scope) => {}
+                    },
+                }
             }
         }
     }
