@@ -18,6 +18,7 @@ pub mod decoder;
 pub mod error;
 
 pub mod output;
+pub mod prelude;
 pub mod read;
 
 pub type Label = std::borrow::Cow<'static, str>;
