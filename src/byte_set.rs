@@ -21,6 +21,10 @@ impl ByteSet {
         ByteSet { bits }
     }
 
+    pub const fn to_bits(&self) -> [u64; 4] {
+        self.bits
+    }
+
     pub const fn empty() -> ByteSet {
         ByteSet::from_bits([0; 4])
     }

@@ -651,12 +651,31 @@ impl RustEntity {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum SubIdent {
+    ByIndex(usize),
+    ByName(Label),
+}
+
+impl ToFragment for SubIdent {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            SubIdent::ByIndex(ix) => Fragment::DisplayAtom(Rc::new(*ix)),
+            SubIdent::ByName(lab) => lab.to_fragment(),
+        }
+    }
+}
+
+
+
+
 #[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
     Entity(RustEntity),
     NumericLit(usize),
     StringLit(Label),
-    FieldAccess(Box<RustExpr>, Label), // can be used for receiver methods as well, with FunctionCall
+    ArrayLit(Vec<RustExpr>),
+    FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
     Struct(Label, Vec<(Label, Option<Box<RustExpr>>)>),
@@ -689,10 +708,19 @@ impl RustExpr {
         Self::Entity(RustEntity::Local(name.into()))
     }
 
+    pub fn scoped<Name: Into<Label>>(path: impl IntoIterator<Item = Name>, name: impl Into<Label>) -> Self {
+        let lpath = path.into_iter().map(|x| x.into()).collect::<Vec<Label>>();
+        Self::Entity(RustEntity::Scoped(lpath, name.into()))
+    }
+
     pub const SELF: Self = Self::Entity(RustEntity::SelfEntity);
 
     pub fn field(self, name: impl Into<Label>) -> Self {
-        Self::FieldAccess(Box::new(self), name.into())
+        Self::FieldAccess(Box::new(self), SubIdent::ByName(name.into()))
+    }
+
+    pub fn nth(self, ix: usize) -> Self {
+        Self::FieldAccess(Box::new(self), SubIdent::ByIndex(ix))
     }
 
     pub fn call_with(self, args: impl IntoIterator<Item = Self>) -> Self {
@@ -718,6 +746,14 @@ impl RustExpr {
     pub fn infix(lhs: Self, op: &'static str, rhs: Self) -> Self {
         Self::Operation(RustOp::InfixOp(op, Box::new(lhs), Box::new(rhs)))
     }
+
+    pub fn wrap_try(self) -> Self {
+        Self::Try(Box::new(self))
+    }
+
+    pub fn str_lit(str: impl Into<Label>) -> Self {
+        Self::StringLit(str.into())
+    }
 }
 
 impl ToFragment for RustExpr {
@@ -725,8 +761,10 @@ impl ToFragment for RustExpr {
         match self {
             RustExpr::Entity(e) => e.to_fragment(),
             RustExpr::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
-            RustExpr::StringLit(s) =>
-                Fragment::Char('"').cat(s.to_fragment()).cat(Fragment::Char('"')),
+            RustExpr::StringLit(s) => s.to_fragment().delimit(Fragment::Char('"'), Fragment::Char('"')),
+            RustExpr::ArrayLit(elts) => {
+                Fragment::seq(elts.iter().map(RustExpr::to_fragment), Some(Fragment::string(", "))).delimit(Fragment::Char('['), Fragment::Char(']'))
+            }
             RustExpr::FieldAccess(x, name) =>
                 x.to_fragment().intervene(Fragment::Char('.'), name.to_fragment()),
             RustExpr::FunctionCall(f, args) => f.to_fragment().cat(ToFragment::paren_list(args)),
@@ -763,9 +801,16 @@ pub(crate) enum RustStmt {
     Control(RustControl),
 }
 
+impl RustStmt {
+    pub fn assign(name: impl Into<Label>, rhs: RustExpr) -> Self {
+        Self::Let(Mut::Immutable, name.into(), None, rhs)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum RustControl {
     While(RustExpr, Vec<RustStmt>),
+    If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
 }
 
 impl ToFragment for RustControl {
@@ -775,6 +820,12 @@ impl ToFragment for RustControl {
                 Fragment::string("while")
                     .intervene(Fragment::Char(' '), cond.to_fragment())
                     .intervene(Fragment::Char(' '), RustStmt::block(body.iter()))
+            }
+            Self::If(cond, b_then, b_else) => {
+                Fragment::string("if")
+                    .intervene(Fragment::Char(' '), cond.to_fragment())
+                    .intervene(Fragment::Char(' '), RustStmt::block(b_then.iter()))
+                    .intervene(Fragment::string(" else "), Fragment::opt(b_else.as_ref(), |branch| RustStmt::block(branch.iter())))
             }
         }
     }

@@ -62,15 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
                 FormatOutput::Rust => {
                     let program = Compiler::compile(&module, &format)?;
-                    // FIXME: hack to dodge the todo! while showing capabilities
-                    {
-                        let mut prog2 = program.clone();
-                        for (d, _) in prog2.decoders.iter_mut() {
-                            *d = Decoder::Align(512);
-                        }
-                        doodle::codegen::print_program(&prog2);
-                    }
-                    // doodle::codegen::print_program(&program);
+                    doodle::codegen::print_program(&program);
                 }
             }
 
