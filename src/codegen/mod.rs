@@ -211,7 +211,7 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
         };
         FnSig::new(args, Some(RustType::option_of(t.clone())))
     };
-    let body = decoder_body(decoder);
+    let body = decoder_body(decoder, t);
     RustFn::new(name, Some(params), sig, body)
 }
 
@@ -225,7 +225,26 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
     ])])
 }
 
-fn decoder_body(decoder: &Decoder) -> Vec<rust_ast::RustStmt> {
+// FIXME - implement something that actually works
+fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
+    match decoder {
+        // FIXME - not sure what to do with _args ...
+        Decoder::Call(ix_dec, _args) => {
+            let fname = format!("Decoder{ix_dec}");
+            let call = RustExpr::local(fname).call_with([
+                RustExpr::local("scope"),
+                RustExpr::local(input_varname.clone()),
+            ]);
+            let bind = RustStmt::assign("tmp", call.wrap_try());
+            let replace = RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1));
+            let ret = RustExpr::local("tmp").nth(0);
+            RustExpr::BlockScope(vec![bind, replace], Box::new(ret))
+        }
+        _ => RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("invoke_decoder")]),
+    }
+}
+
+fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::RustStmt> {
     match decoder {
         Decoder::Align(factor) => {
             let cond = RustExpr::infix(
@@ -285,6 +304,89 @@ fn decoder_body(decoder: &Decoder) -> Vec<rust_ast::RustStmt> {
 
             [bs_let, b_let, logic].to_vec()
         }
+        Decoder::Tuple(elems) => {
+            if elems.is_empty() {
+                return vec![RustStmt::Return(
+                    false,
+                    RustExpr::local("Some").call_with([RustExpr::UNIT]),
+                )];
+            }
+
+            let mut names: Vec<Label> = Vec::new();
+            let mut stmts = Vec::new();
+
+            let inp_varname: Label = "inp".into();
+            let init = RustStmt::Let(
+                Mut::Mutable,
+                inp_varname.clone(),
+                None,
+                RustExpr::local("input"),
+            );
+
+            stmts.push(init);
+
+            for (ix, dec) in elems.iter().enumerate() {
+                let varname = format!("field{}", ix);
+                names.push(varname.clone().into());
+                let assign = {
+                    let rhs = invoke_decoder(dec, &inp_varname);
+                    RustStmt::assign(varname, rhs)
+                };
+                stmts.push(assign);
+            }
+
+            let ret = RustStmt::Return(
+                true,
+                RustExpr::Tuple(names.into_iter().map(RustExpr::local).collect()),
+            );
+
+            stmts.push(ret);
+            stmts
+        }
+        Decoder::Record(fields) => {
+            if fields.is_empty() {
+                unreachable!("Decoder::Record has no fields, which is not an expected case");
+            }
+            let constr = match return_type {
+                RustType::Atom(AtomType::Named(tyname)) => tyname.clone(),
+                _ => unreachable!(
+                    "decoder_body found Decoder::Record with a non-`Named` return type {:?}",
+                    return_type
+                ),
+            };
+
+            let mut names: Vec<Label> = Vec::new();
+            let mut stmts = Vec::new();
+
+            // FIXME - make sure that this name does not overlap with record fields
+            let inp_varname: Label = "inp".into();
+            let init = RustStmt::Let(
+                Mut::Mutable,
+                inp_varname.clone(),
+                None,
+                RustExpr::local("input"),
+            );
+
+            stmts.push(init);
+
+            for (fname, dec) in fields.iter() {
+                let varname = rust_ast::sanitize_label(fname);
+                names.push(varname.clone());
+                let assign = {
+                    let rhs = invoke_decoder(dec, &inp_varname);
+                    RustStmt::assign(varname, rhs)
+                };
+                stmts.push(assign);
+            }
+
+            let ret = RustStmt::Return(
+                true,
+                RustExpr::Struct(constr, names.into_iter().map(|l| (l, None)).collect()),
+            );
+
+            stmts.push(ret);
+            stmts
+        }
         Decoder::Call(_, _) => {
             // FIXME - implement this
             vec![RustStmt::Expr(
@@ -311,18 +413,7 @@ fn decoder_body(decoder: &Decoder) -> Vec<rust_ast::RustStmt> {
                 RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Branch")]),
             )]
         }
-        Decoder::Tuple(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Tuple")]),
-            )]
-        }
-        Decoder::Record(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Record")]),
-            )]
-        }
+
         Decoder::While(_, _) => {
             // FIXME - implement this
             vec![RustStmt::Expr(
