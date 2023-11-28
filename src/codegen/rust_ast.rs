@@ -365,7 +365,7 @@ impl ToFragment for Label {
     }
 }
 
-fn sanitize_label(label: &Label) -> Label {
+pub(crate) fn sanitize_label(label: &Label) -> Label {
     if label.chars().enumerate().all(|(ix, c)| is_valid(ix, c)) {
         remap(label.clone())
     } else {
@@ -701,6 +701,7 @@ pub(crate) enum RustExpr {
     BorrowMut(Box<RustExpr>),
     Try(Box<RustExpr>),
     Operation(RustOp),
+    BlockScope(Vec<RustStmt>, Box<RustExpr>), // scoped block with a final value as an implicit return
 }
 
 #[derive(Debug, Clone)]
@@ -814,6 +815,9 @@ impl ToFragment for RustExpr {
             RustExpr::BorrowMut(expr) => Fragment::string("&mut ").cat(expr.to_fragment()),
             RustExpr::Try(expr) => expr.to_fragment().cat(Fragment::Char('?')),
             RustExpr::Operation(op) => op.to_fragment(),
+            RustExpr::BlockScope(stmts, val) => RustStmt::block(stmts.iter().chain(
+                std::iter::once(&RustStmt::Return(false, val.as_ref().clone())),
+            )),
         }
     }
 }
@@ -821,6 +825,7 @@ impl ToFragment for RustExpr {
 #[derive(Clone, Debug)]
 pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
+    Reassign(Label, RustExpr),
     #[allow(dead_code)]
     Expr(RustExpr),
     Return(bool, RustExpr), // bool: true for explicit return, false for implicit return
@@ -871,6 +876,11 @@ impl ToFragment for RustStmt {
             .cat(Fragment::string(" = "))
             .cat(value.to_fragment())
             .cat(Fragment::Char(';')),
+            Self::Reassign(lab, expr) => lab
+                .to_fragment()
+                .cat(Fragment::string(" = "))
+                .cat(expr.to_fragment())
+                .cat(Fragment::Char(';')),
             Self::Expr(expr) => expr.to_fragment().cat(Fragment::Char(';')),
             Self::Return(is_keyword, expr) => {
                 let (before, after) = if *is_keyword {
