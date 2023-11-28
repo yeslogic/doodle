@@ -702,6 +702,7 @@ pub(crate) enum RustExpr {
     Try(Box<RustExpr>),
     Operation(RustOp),
     BlockScope(Vec<RustStmt>, Box<RustExpr>), // scoped block with a final value as an implicit return
+    Control(Box<RustControl>),                // for control blocks that return a value
 }
 
 #[derive(Debug, Clone)]
@@ -721,6 +722,12 @@ impl ToFragment for RustOp {
 
 impl RustExpr {
     pub const UNIT: Self = Self::Tuple(Vec::new());
+
+    pub const NONE: Self = Self::Entity(RustEntity::Local(Label::Borrowed("None")));
+
+    pub fn some(inner: Self) -> Self {
+        Self::local("Some").call_with([inner])
+    }
 
     pub fn local(name: impl Into<Label>) -> Self {
         Self::Entity(RustEntity::Local(name.into()))
@@ -818,6 +825,7 @@ impl ToFragment for RustExpr {
             RustExpr::BlockScope(stmts, val) => RustStmt::block(stmts.iter().chain(
                 std::iter::once(&RustStmt::Return(false, val.as_ref().clone())),
             )),
+            RustExpr::Control(ctrl) => ctrl.to_fragment(),
         }
     }
 }

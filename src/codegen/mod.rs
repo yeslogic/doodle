@@ -228,6 +228,78 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
 // FIXME - implement something that actually works
 fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
     match decoder {
+        Decoder::Align(factor) => {
+            // FIXME - this currently produces correct but inefficient code
+            // it is harder to write, but much more efficient, to cut the buffer at the right place
+            let cond = RustExpr::infix(
+                RustExpr::infix(
+                    RustExpr::local("input").field("offset"),
+                    " % ",
+                    RustExpr::NumericLit(*factor),
+                ),
+                " != ",
+                RustExpr::NumericLit(0),
+            );
+            let body = {
+                let let_tmp = RustStmt::assign(
+                    "tmp",
+                    RustExpr::local(input_varname.clone())
+                        .call_method("read_byte")
+                        .wrap_try(),
+                );
+                let rebind =
+                    RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1));
+                vec![let_tmp, rebind]
+            };
+            RustExpr::BlockScope(
+                vec![RustStmt::Control(RustControl::While(cond, body))],
+                Box::new(RustExpr::UNIT),
+            )
+        }
+        Decoder::Fail => RustExpr::BlockScope(
+            vec![RustStmt::Return(true, RustExpr::NONE)],
+            Box::new(RustExpr::UNIT),
+        ),
+        Decoder::EndOfInput => {
+            let call = RustExpr::local(input_varname.clone()).call_method("read_byte");
+            let bind = RustStmt::assign("tmp", call);
+            let cond = RustExpr::local("tmp").call_method("is_none");
+            let b_true = [
+                RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1)),
+                RustStmt::Return(false, RustExpr::UNIT),
+            ];
+            let b_false = [RustStmt::Return(true, RustExpr::NONE)];
+            RustExpr::BlockScope(
+                vec![bind],
+                Box::new(RustExpr::Control(Box::new(RustControl::If(
+                    cond,
+                    b_true.to_vec(),
+                    Some(b_false.to_vec()),
+                )))),
+            )
+        }
+        Decoder::Byte(bs) => {
+            // FIXME - we have multiple options to handle this, none of them simple
+            let bs_let = RustStmt::assign("bs", embed_byteset(bs));
+
+            let call = RustExpr::local("input").call_method("read_byte").wrap_try();
+
+            let bind = RustStmt::assign("tmp", call);
+            let b_let = RustStmt::assign("b", RustExpr::local("tmp").nth(0));
+
+            let logic = {
+                let cond =
+                    RustExpr::local("bs").call_method_with("contains", [RustExpr::local("b")]);
+                let b_true = vec![
+                    RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1)),
+                    RustStmt::Return(false, RustExpr::local("b")),
+                ];
+                let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
+                RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
+            };
+
+            RustExpr::BlockScope([bs_let, bind, b_let].to_vec(), Box::new(logic))
+        }
         // FIXME - not sure what to do with _args ...
         Decoder::Call(ix_dec, _args) => {
             let fname = format!("Decoder{ix_dec}");
@@ -245,85 +317,25 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
 }
 
 fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::RustStmt> {
+    // FIXME - double-check this won't clash with any local assignments in Decoder expansion
+    let inp_varname: Label = "inp".into();
+    let mut body = Vec::new();
+
+    let init = RustStmt::Let(
+        Mut::Mutable,
+        inp_varname.clone(),
+        None,
+        RustExpr::local("input"),
+    );
+    body.push(init);
+
     match decoder {
-        Decoder::Align(factor) => {
-            let cond = RustExpr::infix(
-                RustExpr::infix(
-                    RustExpr::local("input").field("offset"),
-                    " % ",
-                    RustExpr::NumericLit(*factor),
-                ),
-                " != ",
-                RustExpr::NumericLit(0),
-            );
-            let body = {
-                let call = RustExpr::local("input").call_method("read_byte");
-                vec![RustStmt::Let(Mut::Immutable, "_".into(), None, call)]
-            };
-            [
-                RustStmt::Control(RustControl::While(cond, body)),
-                RustStmt::Return(true, RustExpr::local("Some").call_with([RustExpr::UNIT])),
-            ]
-            .to_vec()
-        }
-        Decoder::Fail => [RustStmt::Return(true, RustExpr::local("None"))].to_vec(),
-        Decoder::EndOfInput => {
-            let cond = {
-                let call = RustExpr::local("input").call_method("read_byte");
-                call.call_method("is_none")
-            };
-            let b_true = [RustStmt::Return(
-                false,
-                RustExpr::local("Some").call_with([RustExpr::UNIT]),
-            )];
-            let b_false = [RustStmt::Return(false, RustExpr::local("None"))];
-            [RustStmt::Control(RustControl::If(
-                cond,
-                b_true.to_vec(),
-                Some(b_false.to_vec()),
-            ))]
-            .to_vec()
-        }
-        Decoder::Byte(bs) => {
-            // FIXME - we have multiple options to handle this, none of them simple
-            let bs_let = RustStmt::assign("bs", embed_byteset(bs));
-
-            let call = RustExpr::local("input").call_method("read_byte").wrap_try();
-            let b_let = RustStmt::assign("b", call.nth(0));
-
-            let logic = {
-                let cond =
-                    RustExpr::local("bs").call_method_with("contains", [RustExpr::local("b")]);
-                let b_true = vec![RustStmt::Return(
-                    false,
-                    RustExpr::local("Some").call_with([RustExpr::local("b")]),
-                )];
-                let b_false = vec![RustStmt::Return(false, RustExpr::local("None"))];
-                RustStmt::Control(RustControl::If(cond, b_true, Some(b_false)))
-            };
-
-            [bs_let, b_let, logic].to_vec()
-        }
         Decoder::Tuple(elems) => {
             if elems.is_empty() {
-                return vec![RustStmt::Return(
-                    false,
-                    RustExpr::local("Some").call_with([RustExpr::UNIT]),
-                )];
+                return vec![RustStmt::Return(false, RustExpr::some(RustExpr::UNIT))];
             }
 
             let mut names: Vec<Label> = Vec::new();
-            let mut stmts = Vec::new();
-
-            let inp_varname: Label = "inp".into();
-            let init = RustStmt::Let(
-                Mut::Mutable,
-                inp_varname.clone(),
-                None,
-                RustExpr::local("input"),
-            );
-
-            stmts.push(init);
 
             for (ix, dec) in elems.iter().enumerate() {
                 let varname = format!("field{}", ix);
@@ -332,16 +344,17 @@ fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::Rust
                     let rhs = invoke_decoder(dec, &inp_varname);
                     RustStmt::assign(varname, rhs)
                 };
-                stmts.push(assign);
+                body.push(assign);
             }
 
             let ret = RustStmt::Return(
                 true,
-                RustExpr::Tuple(names.into_iter().map(RustExpr::local).collect()),
+                RustExpr::some(RustExpr::Tuple(
+                    names.into_iter().map(RustExpr::local).collect(),
+                )),
             );
 
-            stmts.push(ret);
-            stmts
+            body.push(ret);
         }
         Decoder::Record(fields) => {
             if fields.is_empty() {
@@ -356,18 +369,6 @@ fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::Rust
             };
 
             let mut names: Vec<Label> = Vec::new();
-            let mut stmts = Vec::new();
-
-            // FIXME - make sure that this name does not overlap with record fields
-            let inp_varname: Label = "inp".into();
-            let init = RustStmt::Let(
-                Mut::Mutable,
-                inp_varname.clone(),
-                None,
-                RustExpr::local("input"),
-            );
-
-            stmts.push(init);
 
             for (fname, dec) in fields.iter() {
                 let varname = rust_ast::sanitize_label(fname);
@@ -376,147 +377,27 @@ fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::Rust
                     let rhs = invoke_decoder(dec, &inp_varname);
                     RustStmt::assign(varname, rhs)
                 };
-                stmts.push(assign);
+                body.push(assign);
             }
 
             let ret = RustStmt::Return(
                 true,
-                RustExpr::Struct(constr, names.into_iter().map(|l| (l, None)).collect()),
+                RustExpr::some(RustExpr::Struct(
+                    constr,
+                    names.into_iter().map(|l| (l, None)).collect(),
+                )),
             );
 
-            stmts.push(ret);
-            stmts
+            body.push(ret);
         }
-        Decoder::Call(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Call")]),
-            )]
-        }
-        Decoder::Variant(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::Variant")]),
-            )]
-        }
-        Decoder::Parallel(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::Parallel")]),
-            )]
-        }
-        Decoder::Branch(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Branch")]),
-            )]
-        }
-
-        Decoder::While(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::While")]),
-            )]
-        }
-        Decoder::Until(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Until")]),
-            )]
-        }
-        Decoder::RepeatCount(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::RepeatCount")]),
-            )]
-        }
-        Decoder::RepeatUntilLast(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::RepeatUntilLast")]),
-            )]
-        }
-        Decoder::RepeatUntilSeq(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::RepeatUntilSeq")]),
-            )]
-        }
-        Decoder::Peek(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Peek")]),
-            )]
-        }
-        Decoder::PeekNot(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::PeekNot")]),
-            )]
-        }
-        Decoder::Slice(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Slice")]),
-            )]
-        }
-        Decoder::Bits(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Bits")]),
-            )]
-        }
-        Decoder::WithRelativeOffset(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(RustExpr::local("unimplemented!").call_with(
-                [RustExpr::str_lit("Decoder::WithRelativeOffset")],
-            ))]
-        }
-        Decoder::Map(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Map")]),
-            )]
-        }
-        Decoder::Compute(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::Compute")]),
-            )]
-        }
-        Decoder::Let(_, _, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Let")]),
-            )]
-        }
-        Decoder::Match(_, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Match")]),
-            )]
-        }
-        Decoder::Dynamic(_, _, _) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!")
-                    .call_with([RustExpr::str_lit("Decoder::Dynamic")]),
-            )]
-        }
-        Decoder::Apply(_) => {
-            // FIXME - implement this
-            vec![RustStmt::Expr(
-                RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("Decoder::Apply")]),
-            )]
+        // FIXME - cover the other non-simple cases before the catch-all
+        _ => {
+            let ret = RustStmt::Return(true, RustExpr::some(invoke_decoder(decoder, &inp_varname)));
+            body.push(ret);
         }
     }
+
+    body
 }
 
 pub fn print_program(program: &Program) {
