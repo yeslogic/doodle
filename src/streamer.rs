@@ -1,6 +1,7 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::{
-    self, make_huffman_codes, value_to_vec_usize, Decoder, Scope, ScopeEntry, ScopeLookup, Value,
+    self, make_huffman_codes, value_to_vec_usize, Decoder, Scope, ScopeBinding, ScopeEntry,
+    ScopeLookup, Value,
 };
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
@@ -17,6 +18,7 @@ enum StreamFrame<'a> {
     Call(CallScope),
     Let(LetScope<'a>),
     Record(RecordScope),
+    Pattern(RecordScope),
     Decoder(DecoderScope<'a>),
 }
 
@@ -57,6 +59,12 @@ impl RecordScope {
     }
 }
 
+impl ScopeBinding for RecordScope {
+    fn push(&mut self, name: Label, v: Value) {
+        self.record.push((name, v));
+    }
+}
+
 impl<'a> DecoderScope<'a> {
     fn new(name: &'a str, decoder: Decoder) -> DecoderScope<'a> {
         DecoderScope { name, decoder }
@@ -86,6 +94,13 @@ impl<'a> ScopeLookup for StreamStack<'a> {
                         }
                     }
                 }
+                StreamFrame::Pattern(pattern_scope) => {
+                    for (n, v) in pattern_scope.record.iter().rev() {
+                        if n == name {
+                            return v;
+                        }
+                    }
+                }
                 StreamFrame::Decoder(_decoder_scope) => {}
             }
         }
@@ -98,6 +113,7 @@ impl<'a> ScopeLookup for StreamStack<'a> {
                 StreamFrame::Call(_call_scope) => {}
                 StreamFrame::Let(_let_scope) => {}
                 StreamFrame::Record(_record_scope) => {}
+                StreamFrame::Pattern(_pattern_scope) => {}
                 StreamFrame::Decoder(decoder_scope) => {
                     if decoder_scope.name == name {
                         return &decoder_scope.decoder;
@@ -127,6 +143,11 @@ impl<'a> ScopeLookup for StreamStack<'a> {
                         bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
                     }
                 }
+                StreamFrame::Pattern(pattern_scope) => {
+                    for (name, value) in pattern_scope.record.iter().rev() {
+                        bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
+                    }
+                }
                 StreamFrame::Decoder(_decoder_scope) => {} // FIXME
             }
         }
@@ -135,27 +156,37 @@ impl<'a> ScopeLookup for StreamStack<'a> {
 }
 
 #[derive(Clone, Debug)]
+pub enum Block {
+    Ops(Box<[Op]>),
+}
+
+#[derive(Clone, Debug)]
 pub enum Op {
-    Value(Streamer),
+    Value(Block),
     Call(usize, Vec<(Label, Expr)>),
     Fail,
     EndOfInput,
     Align(usize),
     Byte(ByteSet),
     Variant(Label),
-    Parallel(Vec<Streamer>),
-    Branch(MatchTree, Vec<Streamer>),
-    Match(Expr, Vec<(Pattern, Streamer)>),
+    Branch(usize),
+    Parallel(Vec<Block>),
+    MatchTree(MatchTree, Vec<usize>),
+    Match(Expr, Vec<(Pattern, usize)>),
     PushTuple(usize),
     TupleField,
     PushRecord(usize),
     RecordField(Label),
     PopRecord,
-    While(MatchTree, Streamer),
-    Until(MatchTree, Streamer),
-    RepeatCount(Expr, Streamer),
-    RepeatUntilLast(Expr, Streamer),
-    RepeatUntilSeq(Expr, Streamer),
+    PushSeq,
+    SeqItem,
+    PushPattern,
+    PopPattern,
+    While(MatchTree, Block),
+    Until(MatchTree, Block),
+    RepeatCount(Expr, Block),
+    RepeatUntilLast(Expr, Block),
+    RepeatUntilSeq(Expr, Block),
     Map(Expr),
     Compute(Expr),
     PushLet(Label, Expr),
@@ -167,27 +198,22 @@ pub enum Op {
     PushInputSlice(Expr),
     PushInputOffset(Expr),
     PopInput,
-    Bits(Streamer),
-    Negated(Streamer),
-}
-
-#[derive(Clone, Debug)]
-pub enum Streamer {
-    Ops(Vec<Op>),
+    Bits(Block),
+    Negated(Block),
 }
 
 pub struct Program {
-    streamers: Vec<Streamer>,
+    blocks: Vec<Block>,
 }
 
 impl Program {
     fn new() -> Self {
-        let streamers = Vec::new();
-        Program { streamers }
+        let blocks = Vec::new();
+        Program { blocks }
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        self.streamers[0].parse(self, &Scope::Empty, input)
+        self.blocks[0].eval_clean(self, &Scope::Empty, input)
     }
 }
 
@@ -213,50 +239,43 @@ impl<'a> Compiler<'a> {
 
     pub fn compile(module: &FormatModule, format: &Format) -> Result<Program, String> {
         let mut compiler = Compiler::new(module);
-        // type
-        /*
-        let mut scope = TypeScope::new();
-        let t = TypeRef::from_value_type(
-            &mut compiler,
-            &module.infer_format_type(&mut scope, format)?,
-        );
-        */
-        // decoder
         compiler.queue_compile(format, Rc::new(Next::Empty));
         while let Some((f, next, n)) = compiler.compile_queue.pop() {
-            let d = Streamer::compile_next(&mut compiler, f, next)?;
-            compiler.program.streamers[n] = d;
+            let b = Block::compile_next(&mut compiler, f, next)?;
+            compiler.program.blocks[n] = b;
         }
         Ok(compiler.program)
     }
 
+    fn add_block(&mut self, b: Block) -> usize {
+        let n = self.program.blocks.len();
+        self.program.blocks.push(b);
+        n
+    }
+
     fn queue_compile(&mut self, f: &'a Format, next: Rc<Next<'a>>) -> usize {
-        let n = self.program.streamers.len();
-        self.program.streamers.push(Streamer::Ops(vec![]));
+        let n = self.program.blocks.len();
+        self.program.blocks.push(Block::Ops(Box::new([])));
         self.compile_queue.push((f, next, n));
         n
     }
 }
 
-impl Streamer {
-    pub fn compile_one(format: &Format) -> Result<Streamer, String> {
+impl Block {
+    pub fn compile_one(format: &Format) -> Result<Program, String> {
         let module = FormatModule::new();
-        let mut compiler = Compiler::new(&module);
-        Streamer::compile(&mut compiler, format)
+        Compiler::compile(&module, format)
     }
 
-    pub fn compile<'a>(
-        compiler: &mut Compiler<'a>,
-        format: &'a Format,
-    ) -> Result<Streamer, String> {
-        Streamer::compile_next(compiler, format, Rc::new(Next::Empty))
+    pub fn compile<'a>(compiler: &mut Compiler<'a>, format: &'a Format) -> Result<Block, String> {
+        Block::compile_next(compiler, format, Rc::new(Next::Empty))
     }
 
     fn compile_next<'a>(
         compiler: &mut Compiler<'a>,
         format: &'a Format,
         next: Rc<Next<'a>>,
-    ) -> Result<Streamer, String> {
+    ) -> Result<Block, String> {
         match format {
             Format::ItemVar(level, arg_exprs) => {
                 let f = compiler.module.get_format(*level);
@@ -277,45 +296,50 @@ impl Streamer {
                 for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
-                Ok(Streamer::Ops(vec![Op::Call(n, args)]))
+                Ok(Block::op(Op::Call(n, args)))
             }
-            Format::Fail => Ok(Streamer::Ops(vec![Op::Fail])),
-            Format::EndOfInput => Ok(Streamer::Ops(vec![Op::EndOfInput])),
-            Format::Align(n) => Ok(Streamer::Ops(vec![Op::Align(*n)])),
-            Format::Byte(bs) => Ok(Streamer::Ops(vec![Op::Byte(*bs)])),
+            Format::Fail => Ok(Block::op(Op::Fail)),
+            Format::EndOfInput => Ok(Block::op(Op::EndOfInput)),
+            Format::Align(n) => Ok(Block::op(Op::Align(*n))),
+            Format::Byte(bs) => Ok(Block::op(Op::Byte(*bs))),
             Format::Variant(label, f) => {
-                let s = Streamer::compile_next(compiler, f, next.clone())?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, f, next.clone())?;
+                Ok(Block::ops(Box::new([
                     Op::Value(s),
                     Op::Variant(label.clone()),
-                ]))
+                ])))
             }
             Format::Union(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
-                let mut ds = Vec::with_capacity(branches.len());
-                for f in branches {
-                    ds.push(Streamer::compile_next(compiler, f, next.clone())?);
+                let mut bs = Vec::with_capacity(branches.len());
+                for (index, f) in branches.iter().enumerate() {
+                    let s = Block::compile_next(compiler, f, next.clone())?;
+                    let b =
+                        compiler.add_block(Block::ops(Box::new([Op::Value(s), Op::Branch(index)])));
+                    bs.push(b);
                     fs.push(f.clone());
                 }
                 if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
-                    Ok(Streamer::Ops(vec![Op::Branch(tree, ds)]))
+                    Ok(Block::op(Op::MatchTree(tree, bs)))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
             }
             Format::UnionVariant(branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
-                let mut ds = Vec::with_capacity(branches.len());
-                for (label, f) in branches {
-                    let s = Streamer::compile_next(compiler, f, next.clone())?;
-                    ds.push(Streamer::Ops(vec![
+                let mut bs = Vec::with_capacity(branches.len());
+                for (index, (label, f)) in branches.iter().enumerate() {
+                    let s = Block::compile_next(compiler, f, next.clone())?;
+                    let b = compiler.add_block(Block::ops(Box::new([
                         Op::Value(s),
                         Op::Variant(label.clone()),
-                    ]));
+                        Op::Branch(index),
+                    ])));
+                    bs.push(b);
                     fs.push(f.clone());
                 }
                 if let Some(tree) = MatchTree::build(compiler.module, &fs, next) {
-                    Ok(Streamer::Ops(vec![Op::Branch(tree, ds)]))
+                    Ok(Block::op(Op::MatchTree(tree, bs)))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
@@ -323,13 +347,13 @@ impl Streamer {
             Format::UnionNondet(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
-                    let s = Streamer::compile_next(compiler, f, next.clone())?;
-                    ds.push(Streamer::Ops(vec![
+                    let s = Block::compile_next(compiler, f, next.clone())?;
+                    ds.push(Block::ops(Box::new([
                         Op::Value(s),
                         Op::Variant(label.clone()),
-                    ]));
+                    ])));
                 }
-                Ok(Streamer::Ops(vec![Op::Parallel(ds)]))
+                Ok(Block::op(Op::Parallel(ds)))
             }
             Format::Tuple(fields) => {
                 let mut ops = Vec::with_capacity(fields.len() * 2 + 1);
@@ -337,11 +361,11 @@ impl Streamer {
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
                     let next = Rc::new(Next::Tuple(fields.as_slice(), next.clone()));
-                    let s = Streamer::compile_next(compiler, f, next)?;
+                    let s = Block::compile_next(compiler, f, next)?;
                     ops.push(Op::Value(s));
                     ops.push(Op::TupleField);
                 }
-                Ok(Streamer::Ops(ops))
+                Ok(Block::ops(ops.into_boxed_slice()))
             }
             Format::Record(fields) => {
                 let mut ops = Vec::with_capacity(fields.len() * 2 + 2);
@@ -349,24 +373,24 @@ impl Streamer {
                 let mut fields = fields.iter();
                 while let Some((name, f)) = fields.next() {
                     let next = Rc::new(Next::Record(fields.as_slice(), next.clone()));
-                    let s = Streamer::compile_next(compiler, f, next)?;
+                    let s = Block::compile_next(compiler, f, next)?;
                     ops.push(Op::Value(s));
                     ops.push(Op::RecordField(name.clone()));
                 }
                 ops.push(Op::PopRecord);
-                Ok(Streamer::Ops(ops))
+                Ok(Block::ops(ops.into_boxed_slice()))
             }
             Format::Repeat(a) => {
                 if a.is_nullable(compiler.module) {
                     return Err(format!("cannot repeat nullable format: {a:?}"));
                 }
-                let s =
-                    Streamer::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                let b = Block::ops(Box::new([Op::Value(s), Op::SeqItem]));
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
                 if let Some(tree) = MatchTree::build(compiler.module, &[fa, fb], next) {
-                    Ok(Streamer::Ops(vec![Op::While(tree, s)]))
+                    Ok(Block::ops(Box::new([Op::PushSeq, Op::While(tree, b)])))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
@@ -375,39 +399,39 @@ impl Streamer {
                 if a.is_nullable(compiler.module) {
                     return Err(format!("cannot repeat nullable format: {a:?}"));
                 }
-                let s =
-                    Streamer::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Repeat(a, next.clone())))?;
+                let b = Block::ops(Box::new([Op::Value(s), Op::SeqItem]));
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::EMPTY;
                 let fb = Format::Tuple(vec![(**a).clone(), astar]);
                 if let Some(tree) = MatchTree::build(compiler.module, &[fa, fb], next) {
-                    Ok(Streamer::Ops(vec![Op::Until(tree, s)]))
+                    Ok(Block::ops(Box::new([Op::PushSeq, Op::Until(tree, b)])))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
             }
             Format::RepeatCount(expr, a) => {
                 // FIXME probably not right
-                let s = Streamer::compile_next(compiler, a, next)?;
-                Ok(Streamer::Ops(vec![Op::RepeatCount(expr.clone(), s)]))
+                let s = Block::compile_next(compiler, a, next)?;
+                Ok(Block::op(Op::RepeatCount(expr.clone(), s)))
             }
             Format::RepeatUntilLast(expr, a) => {
                 // FIXME probably not right
-                let s = Streamer::compile_next(compiler, a, next)?;
-                Ok(Streamer::Ops(vec![Op::RepeatUntilLast(expr.clone(), s)]))
+                let s = Block::compile_next(compiler, a, next)?;
+                Ok(Block::op(Op::RepeatUntilLast(expr.clone(), s)))
             }
             Format::RepeatUntilSeq(expr, a) => {
                 // FIXME probably not right
-                let s = Streamer::compile_next(compiler, a, next)?;
-                Ok(Streamer::Ops(vec![Op::RepeatUntilSeq(expr.clone(), s)]))
+                let s = Block::compile_next(compiler, a, next)?;
+                Ok(Block::op(Op::RepeatUntilSeq(expr.clone(), s)))
             }
             Format::Peek(a) => {
-                let s = Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Empty))?;
+                Ok(Block::ops(Box::new([
                     Op::PushInput,
                     Op::Value(s),
                     Op::PopInput,
-                ]))
+                ])))
             }
             Format::PeekNot(a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
@@ -420,510 +444,633 @@ impl Streamer {
                     }
                     _ => {}
                 }
-                let s = Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Empty))?;
+                Ok(Block::ops(Box::new([
                     Op::PushInput,
                     Op::Negated(s),
                     Op::PopInput,
-                ]))
+                ])))
             }
             Format::Slice(expr, a) => {
-                let s = Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Empty))?;
+                Ok(Block::ops(Box::new([
                     Op::PushInputSlice(expr.clone()),
                     Op::Value(s),
                     Op::PopInput,
-                ]))
+                ])))
             }
             Format::Bits(a) => {
-                let s = Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?;
-                Ok(Streamer::Ops(vec![Op::Bits(s)]))
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Empty))?;
+                Ok(Block::op(Op::Bits(s)))
             }
             Format::WithRelativeOffset(expr, a) => {
-                let s = Streamer::compile_next(compiler, a, Rc::new(Next::Empty))?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, a, Rc::new(Next::Empty))?;
+                Ok(Block::ops(Box::new([
                     Op::PushInputOffset(expr.clone()),
                     Op::Value(s),
                     Op::PopInput,
-                ]))
+                ])))
             }
             Format::Map(a, expr) => {
-                let s = Streamer::compile_next(compiler, a, next.clone())?;
-                Ok(Streamer::Ops(vec![Op::Value(s), Op::Map(expr.clone())]))
+                let s = Block::compile_next(compiler, a, next.clone())?;
+                Ok(Block::ops(Box::new([Op::Value(s), Op::Map(expr.clone())])))
             }
-            Format::Compute(expr) => Ok(Streamer::Ops(vec![Op::Compute(expr.clone())])),
+            Format::Compute(expr) => Ok(Block::op(Op::Compute(expr.clone()))),
             Format::Let(name, expr, a) => {
-                let s = Streamer::compile_next(compiler, a, next.clone())?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, a, next.clone())?;
+                Ok(Block::ops(Box::new([
                     Op::PushLet(name.clone(), expr.clone()),
                     Op::Value(s),
                     Op::PopLet,
-                ]))
+                ])))
             }
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()
-                    .map(|(pattern, f)| {
-                        Ok((
-                            pattern.clone(),
-                            Streamer::compile_next(compiler, f, next.clone())?,
-                        ))
+                    .enumerate()
+                    .map(|(index, (pattern, f))| {
+                        let s = Block::compile_next(compiler, f, next.clone())?;
+                        let b = compiler.add_block(Block::ops(Box::new([
+                            Op::Value(s),
+                            Op::Branch(index),
+                            Op::PopPattern,
+                        ])));
+                        Ok((pattern.clone(), b))
                     })
                     .collect::<Result<_, String>>()?;
-                Ok(Streamer::Ops(vec![Op::Match(head.clone(), branches)]))
+                Ok(Block::ops(Box::new([Op::Match(head.clone(), branches)])))
             }
             Format::MatchVariant(head, branches) => {
                 let branches = branches
                     .iter()
-                    .map(|(pattern, label, f)| {
-                        let s = Streamer::compile_next(compiler, f, next.clone())?;
-                        Ok((
-                            pattern.clone(),
-                            Streamer::Ops(vec![Op::Value(s), Op::Variant(label.clone())]),
-                        ))
+                    .enumerate()
+                    .map(|(index, (pattern, label, f))| {
+                        let s = Block::compile_next(compiler, f, next.clone())?;
+                        let b = compiler.add_block(Block::ops(Box::new([
+                            Op::Value(s),
+                            Op::Variant(label.clone()),
+                            Op::Branch(index),
+                            Op::PopPattern,
+                        ])));
+                        Ok((pattern.clone(), b))
                     })
                     .collect::<Result<_, String>>()?;
-                Ok(Streamer::Ops(vec![Op::Match(head.clone(), branches)]))
+                Ok(Block::ops(Box::new([Op::Match(head.clone(), branches)])))
             }
             Format::Dynamic(name, dynformat, a) => {
-                let s = Streamer::compile_next(compiler, a, next.clone())?;
-                Ok(Streamer::Ops(vec![
+                let s = Block::compile_next(compiler, a, next.clone())?;
+                Ok(Block::ops(Box::new([
                     Op::PushDynamic(name.clone(), dynformat.clone()),
                     Op::Value(s),
                     Op::PopDynamic,
-                ]))
+                ])))
             }
-            Format::Apply(name) => Ok(Streamer::Ops(vec![Op::ApplyDynamic(name.clone())])),
+            Format::Apply(name) => Ok(Block::op(Op::ApplyDynamic(name.clone()))),
         }
     }
 
-    pub fn parse<'input>(
+    fn op(op: Op) -> Block {
+        Block::Ops(Box::new([op]))
+    }
+
+    fn ops(ops: Box<[Op]>) -> Block {
+        Block::Ops(ops)
+    }
+
+    fn eval_clean<'input>(
         &self,
         program: &Program,
         parent_scope: &Scope<'_>,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let stack = StreamStack {
+        let mut stack = StreamStack {
             parent: parent_scope,
             frames: Vec::new(),
         };
-        self.parse0(program, stack, input)
+        let mut value_stack = Vec::new();
+        let mut input_stack = Vec::new();
+        self.eval(
+            program,
+            &mut stack,
+            &mut value_stack,
+            &mut input_stack,
+            input,
+        )
     }
 
-    fn parse0<'a, 'input>(
+    fn eval<'a, 'input>(
         &'a self,
-        program: &Program,
-        mut stack: StreamStack<'a>,
+        program: &'a Program,
+        stack: &mut StreamStack<'a>,
+        value_stack: &mut Vec<Value>,
+        input_stack: &mut Vec<ReadCtxt<'input>>,
         mut input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        match self {
-            Streamer::Ops(ops) => 'oploop: loop {
-                let mut value_stack = Vec::new();
-                let mut input_stack = Vec::new();
-                for op in ops {
-                    match op {
-                        Op::Value(s) => {
-                            let scope = &Scope::Other(&stack);
-                            match s.parse(program, scope, input) {
-                                Ok((v, new_input)) => {
-                                    value_stack.push(v);
-                                    input = new_input;
-                                }
-                                Err(err) => {
-                                    break 'oploop Err(err);
-                                }
-                            }
-                        }
-                        Op::Call(n, es) => {
-                            let scope = &Scope::Other(&stack);
-                            let mut args = Vec::with_capacity(es.len());
-                            for (name, e) in es {
-                                let v = e.eval_value(scope);
-                                args.push((name.clone(), v));
-                            }
-                            let call_scope = CallScope::new(args);
-                            let new_stack = StreamStack {
-                                parent: &Scope::Empty,
-                                frames: vec![StreamFrame::Call(call_scope)],
-                            };
-                            match program.streamers[*n].parse0(program, new_stack, input) {
-                                Ok((v, new_input)) => {
-                                    value_stack.push(v);
-                                    input = new_input;
-                                }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::Fail => {
-                            let scope = &Scope::Other(&stack);
-                            break 'oploop Err(ParseError::fail(scope, input));
-                        }
-                        Op::EndOfInput => match input.read_byte() {
-                            None => value_stack.push(Value::UNIT),
-                            Some((b, _)) => {
-                                break 'oploop Err(ParseError::trailing(b, input.offset))
-                            }
-                        },
-                        Op::Align(n) => {
-                            let skip = (n - (input.offset % n)) % n;
-                            match input
-                                .split_at(skip)
-                                .ok_or(ParseError::overrun(skip, input.offset))
-                            {
-                                Ok((_, new_input)) => {
-                                    value_stack.push(Value::UNIT);
-                                    input = new_input;
-                                }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::Byte(bs) => {
-                            match input.read_byte().ok_or(ParseError::overbyte(input.offset)) {
-                                Ok((b, new_input)) => {
-                                    if bs.contains(b) {
-                                        let v = Value::U8(b);
-                                        value_stack.push(v);
-                                        input = new_input;
-                                    } else {
-                                        break 'oploop Err(ParseError::unexpected(
-                                            b,
-                                            *bs,
-                                            input.offset,
-                                        ));
+        let mut block = self;
+        'blockloop: loop {
+            match block {
+                Block::Ops(ops) => {
+                    match 'oploop: loop {
+                        for op in ops.iter() {
+                            match op {
+                                Op::Value(s) => {
+                                    match s.eval(program, stack, value_stack, input_stack, input) {
+                                        Ok((v, new_input)) => {
+                                            value_stack.push(v);
+                                            input = new_input;
+                                        }
+                                        Err(err) => {
+                                            break 'oploop Err(err);
+                                        }
                                     }
                                 }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::Variant(label) => {
-                            let v = value_stack.pop().unwrap();
-                            let v = Value::Variant(label.clone(), Box::new(v));
-                            value_stack.push(v);
-                        }
-                        Op::Parallel(branches) => {
-                            let scope = &Scope::Other(&stack);
-                            match (|| {
-                                for (index, d) in branches.iter().enumerate() {
-                                    let res = d.parse(program, scope, input);
-                                    if let Ok((v, input)) = res {
-                                        return Ok((Value::Branch(index, Box::new(v)), input));
+                                Op::Call(n, es) => {
+                                    let scope = &Scope::Other(stack);
+                                    let mut args = Vec::with_capacity(es.len());
+                                    for (name, e) in es {
+                                        let v = e.eval_value(scope);
+                                        args.push((name.clone(), v));
+                                    }
+                                    let call_scope = CallScope::new(args);
+                                    let mut new_stack = StreamStack {
+                                        parent: &Scope::Empty,
+                                        frames: vec![StreamFrame::Call(call_scope)],
+                                    };
+                                    match program.blocks[*n].eval(
+                                        program,
+                                        &mut new_stack,
+                                        value_stack,
+                                        input_stack,
+                                        input,
+                                    ) {
+                                        Ok((v, new_input)) => {
+                                            value_stack.push(v);
+                                            input = new_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
                                     }
                                 }
-                                Err(ParseError::fail(scope, input))
-                            })() {
-                                Ok((v, new_input)) => {
-                                    input = new_input;
+                                Op::Fail => {
+                                    let scope = &Scope::Other(stack);
+                                    break 'oploop Err(ParseError::fail(scope, input));
+                                }
+                                Op::EndOfInput => match input.read_byte() {
+                                    None => value_stack.push(Value::UNIT),
+                                    Some((b, _)) => {
+                                        break 'oploop Err(ParseError::trailing(b, input.offset))
+                                    }
+                                },
+                                Op::Align(n) => {
+                                    let skip = (n - (input.offset % n)) % n;
+                                    match input
+                                        .split_at(skip)
+                                        .ok_or(ParseError::overrun(skip, input.offset))
+                                    {
+                                        Ok((_, new_input)) => {
+                                            value_stack.push(Value::UNIT);
+                                            input = new_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::Byte(bs) => {
+                                    match input
+                                        .read_byte()
+                                        .ok_or(ParseError::overbyte(input.offset))
+                                    {
+                                        Ok((b, new_input)) => {
+                                            if bs.contains(b) {
+                                                let v = Value::U8(b);
+                                                value_stack.push(v);
+                                                input = new_input;
+                                            } else {
+                                                break 'oploop Err(ParseError::unexpected(
+                                                    b,
+                                                    *bs,
+                                                    input.offset,
+                                                ));
+                                            }
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::Variant(label) => {
+                                    let v = value_stack.pop().unwrap();
+                                    let v = Value::Variant(label.clone(), Box::new(v));
                                     value_stack.push(v);
                                 }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::Branch(tree, branches) => {
-                            let scope = &Scope::Other(&stack);
-                            match tree.matches(input).ok_or(ParseError::NoValidBranch {
-                                offset: input.offset,
-                            }) {
-                                Ok(index) => {
-                                    let s = &branches[index];
-                                    match s.parse(program, scope, input) {
+                                Op::Branch(index) => {
+                                    let v = value_stack.pop().unwrap();
+                                    let v = Value::Branch(*index, Box::new(v));
+                                    value_stack.push(v);
+                                }
+                                Op::Parallel(branches) => {
+                                    let scope = &Scope::Other(stack);
+                                    match (|| {
+                                        for (index, d) in branches.iter().enumerate() {
+                                            let res = d.eval_clean(program, scope, input);
+                                            if let Ok((v, input)) = res {
+                                                return Ok((
+                                                    Value::Branch(index, Box::new(v)),
+                                                    input,
+                                                ));
+                                            }
+                                        }
+                                        Err(ParseError::fail(scope, input))
+                                    })() {
                                         Ok((v, new_input)) => {
                                             input = new_input;
-                                            let v = Value::Branch(index, Box::new(v));
                                             value_stack.push(v);
                                         }
                                         Err(err) => break 'oploop Err(err),
                                     }
                                 }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::Match(head, branches) => {
-                            let scope = &Scope::Other(&stack);
-                            let head = head.eval(scope);
-                            match (|| {
-                                for (index, (pattern, s)) in branches.iter().enumerate() {
-                                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                                        let (v, input) =
-                                            s.parse(program, &Scope::Multi(&pattern_scope), input)?;
-                                        return Ok((Value::Branch(index, Box::new(v)), input));
-                                    }
-                                }
-                                panic!("non-exhaustive patterns");
-                            })() {
-                                Ok((v, new_input)) => {
-                                    input = new_input;
-                                    value_stack.push(v);
-                                }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::PushTuple(num_fields) => {
-                            let v = Value::Tuple(Vec::with_capacity(*num_fields));
-                            value_stack.push(v);
-                        }
-                        Op::TupleField => {
-                            let v = value_stack.pop().unwrap();
-                            if let Value::Tuple(ref mut vs) = value_stack.last_mut().unwrap() {
-                                vs.push(v);
-                            } else {
-                                panic!("expected tuple value");
-                            }
-                        }
-                        Op::PushRecord(num_fields) => {
-                            let record_scope = RecordScope::new(*num_fields);
-                            stack.frames.push(StreamFrame::Record(record_scope));
-                        }
-                        Op::RecordField(name) => {
-                            let v = value_stack.pop().unwrap();
-                            if let StreamFrame::Record(ref mut record_scope) =
-                                stack.frames.last_mut().unwrap()
-                            {
-                                record_scope.record.push((name.clone(), v));
-                            } else {
-                                panic!("expected record stack frame");
-                            }
-                        }
-                        Op::PopRecord => {
-                            if let StreamFrame::Record(record_scope) = stack.frames.pop().unwrap() {
-                                let v = Value::Record(record_scope.record);
-                                value_stack.push(v);
-                            } else {
-                                panic!("expected record stack frame");
-                            }
-                        }
-                        Op::While(tree, a) => {
-                            let scope = &Scope::Other(&stack);
-                            let mut vs = Vec::new();
-                            match (|| {
-                                while tree.matches(input).ok_or(ParseError::NoValidBranch {
-                                    offset: input.offset,
-                                })? == 0
-                                {
-                                    let (va, next_input) = a.parse(program, scope, input)?;
-                                    input = next_input;
-                                    vs.push(va);
-                                }
-                                Ok((Value::Seq(vs), input))
-                            })() {
-                                Ok((v, new_input)) => {
-                                    value_stack.push(v);
-                                    input = new_input;
-                                }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::Until(tree, a) => {
-                            let scope = &Scope::Other(&stack);
-                            let mut vs = Vec::new();
-                            match (|| {
-                                loop {
-                                    let (va, next_input) = a.parse(program, scope, input)?;
-                                    input = next_input;
-                                    vs.push(va);
-                                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                                Op::MatchTree(tree, bs) => {
+                                    match tree.matches(input).ok_or(ParseError::NoValidBranch {
                                         offset: input.offset,
-                                    })? == 0
+                                    }) {
+                                        Ok(index) => {
+                                            let b = bs[index];
+                                            block = &program.blocks[b];
+                                            continue 'blockloop;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::Match(head, branches) => {
+                                    let scope = &Scope::Other(stack);
+                                    let head = head.eval(scope);
+                                    let mut matched = false;
+                                    for (pattern, b) in branches.iter() {
+                                        let mut pattern_scope = RecordScope::new(0);
+                                        if head
+                                            .coerce_mapped_value()
+                                            .matches_inner(&mut pattern_scope, pattern)
+                                        {
+                                            stack.frames.push(StreamFrame::Pattern(pattern_scope));
+                                            match program.blocks[*b].eval(
+                                                program,
+                                                stack,
+                                                value_stack,
+                                                input_stack,
+                                                input,
+                                            ) {
+                                                Ok((v, new_input)) => {
+                                                    input = new_input;
+                                                    value_stack.push(v);
+                                                    matched = true;
+                                                    break;
+                                                }
+                                                Err(err) => break 'oploop Err(err),
+                                            }
+                                        }
+                                    }
+                                    if !matched {
+                                        panic!("non-exhaustive patterns");
+                                    }
+                                }
+                                Op::PushTuple(num_fields) => {
+                                    let v = Value::Tuple(Vec::with_capacity(*num_fields));
+                                    value_stack.push(v);
+                                }
+                                Op::TupleField => {
+                                    let v = value_stack.pop().unwrap();
+                                    if let Value::Tuple(ref mut vs) =
+                                        value_stack.last_mut().unwrap()
                                     {
-                                        break;
+                                        vs.push(v);
+                                    } else {
+                                        panic!("expected tuple value");
                                     }
                                 }
-                                Ok((Value::Seq(vs), input))
-                            })() {
-                                Ok((v, new_input)) => {
+                                Op::PushRecord(num_fields) => {
+                                    let record_scope = RecordScope::new(*num_fields);
+                                    stack.frames.push(StreamFrame::Record(record_scope));
+                                }
+                                Op::RecordField(name) => {
+                                    let v = value_stack.pop().unwrap();
+                                    if let StreamFrame::Record(ref mut record_scope) =
+                                        stack.frames.last_mut().unwrap()
+                                    {
+                                        record_scope.record.push((name.clone(), v));
+                                    } else {
+                                        panic!("expected record stack frame");
+                                    }
+                                }
+                                Op::PopRecord => {
+                                    if let StreamFrame::Record(record_scope) =
+                                        stack.frames.pop().unwrap()
+                                    {
+                                        let v = Value::Record(record_scope.record);
+                                        value_stack.push(v);
+                                    } else {
+                                        panic!("expected record stack frame");
+                                    }
+                                }
+                                Op::PushSeq => {
+                                    let v = Value::Seq(Vec::new());
                                     value_stack.push(v);
-                                    input = new_input;
                                 }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::RepeatCount(expr, s) => {
-                            let scope = &Scope::Other(&stack);
-                            let count = expr.eval_value(scope).unwrap_usize();
-                            let mut vs = Vec::with_capacity(count);
-                            for _ in 0..count {
-                                match s.parse(program, scope, input) {
-                                    Ok((va, new_input)) => {
-                                        vs.push(va);
-                                        input = new_input;
+                                Op::SeqItem => {
+                                    let v = value_stack.pop().unwrap();
+                                    if let Value::Seq(ref mut vs) = value_stack.last_mut().unwrap()
+                                    {
+                                        vs.push(v);
+                                    } else {
+                                        panic!("expected seq value");
                                     }
-                                    Err(err) => break 'oploop Err(err),
                                 }
-                            }
-                            value_stack.push(Value::Seq(vs));
-                        }
-                        Op::RepeatUntilLast(expr, s) => {
-                            let scope = &Scope::Other(&stack);
-                            let mut vs = Vec::new();
-                            loop {
-                                match s.parse(program, scope, input) {
-                                    Ok((va, new_input)) => {
-                                        let done = expr.eval_lambda(scope, &va).unwrap_bool();
-                                        vs.push(va);
-                                        input = new_input;
-                                        if done {
-                                            break;
+                                Op::PushPattern => {
+                                    let pattern_scope = RecordScope::new(0);
+                                    stack.frames.push(StreamFrame::Pattern(pattern_scope));
+                                }
+                                Op::PopPattern => {
+                                    if let StreamFrame::Pattern(_pattern_scope) =
+                                        stack.frames.pop().unwrap()
+                                    {
+                                    } else {
+                                        panic!("expected pattern stack frame");
+                                    }
+                                }
+                                Op::While(tree, a) => {
+                                    match (|| {
+                                        while tree.matches(input).ok_or(
+                                            ParseError::NoValidBranch {
+                                                offset: input.offset,
+                                            },
+                                        )? == 0
+                                        {
+                                            let (va, next_input) = a.eval(
+                                                program,
+                                                stack,
+                                                value_stack,
+                                                input_stack,
+                                                input,
+                                            )?;
+                                            value_stack.push(va);
+                                            input = next_input;
+                                        }
+                                        Ok(input)
+                                    })() {
+                                        Ok(new_input) => {
+                                            input = new_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::Until(tree, a) => {
+                                    match (|| {
+                                        loop {
+                                            let (va, next_input) = a.eval(
+                                                program,
+                                                stack,
+                                                value_stack,
+                                                input_stack,
+                                                input,
+                                            )?;
+                                            value_stack.push(va);
+                                            input = next_input;
+                                            if tree.matches(input).ok_or(
+                                                ParseError::NoValidBranch {
+                                                    offset: input.offset,
+                                                },
+                                            )? == 0
+                                            {
+                                                break;
+                                            }
+                                        }
+                                        Ok(input)
+                                    })() {
+                                        Ok(new_input) => {
+                                            input = new_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::RepeatCount(expr, s) => {
+                                    let scope = &Scope::Other(stack);
+                                    let count = expr.eval_value(scope).unwrap_usize();
+                                    let mut vs = Vec::with_capacity(count);
+                                    for _ in 0..count {
+                                        match s.eval(
+                                            program,
+                                            stack,
+                                            value_stack,
+                                            input_stack,
+                                            input,
+                                        ) {
+                                            Ok((va, new_input)) => {
+                                                vs.push(va);
+                                                input = new_input;
+                                            }
+                                            Err(err) => break 'oploop Err(err),
                                         }
                                     }
-                                    Err(err) => break 'oploop Err(err),
+                                    value_stack.push(Value::Seq(vs));
                                 }
-                            }
-                            value_stack.push(Value::Seq(vs));
-                        }
-                        Op::RepeatUntilSeq(expr, s) => {
-                            let scope = &Scope::Other(&stack);
-                            let mut vs = Vec::new();
-                            loop {
-                                match s.parse(program, scope, input) {
-                                    Ok((va, new_input)) => {
-                                        vs.push(va);
-                                        input = new_input;
-                                        let v = Value::Seq(vs);
-                                        let done = expr.eval_lambda(scope, &v).unwrap_bool();
-                                        vs = match v {
-                                            Value::Seq(vs) => vs,
-                                            _ => unreachable!(),
-                                        };
-                                        if done {
-                                            break;
+                                Op::RepeatUntilLast(expr, s) => {
+                                    let mut vs = Vec::new();
+                                    loop {
+                                        match s.eval(
+                                            program,
+                                            stack,
+                                            value_stack,
+                                            input_stack,
+                                            input,
+                                        ) {
+                                            Ok((va, new_input)) => {
+                                                let scope = &Scope::Other(stack);
+                                                let done =
+                                                    expr.eval_lambda(scope, &va).unwrap_bool();
+                                                vs.push(va);
+                                                input = new_input;
+                                                if done {
+                                                    break;
+                                                }
+                                            }
+                                            Err(err) => break 'oploop Err(err),
                                         }
                                     }
-                                    Err(err) => break 'oploop Err(err),
+                                    value_stack.push(Value::Seq(vs));
                                 }
-                            }
-                            value_stack.push(Value::Seq(vs));
-                        }
-                        Op::Map(expr) => {
-                            let scope = &Scope::Other(&stack);
-                            let old_v = value_stack.pop().unwrap();
-                            let new_v = expr.eval_lambda(scope, &old_v);
-                            let v = Value::Mapped(Box::new(old_v), Box::new(new_v));
-                            value_stack.push(v);
-                        }
-                        Op::Compute(expr) => {
-                            let scope = &Scope::Other(&stack);
-                            let v = expr.eval_value(scope);
-                            value_stack.push(v);
-                        }
-                        Op::PushLet(name, expr) => {
-                            let scope = &Scope::Other(&stack);
-                            let v = expr.eval_value(scope);
-                            let let_scope = LetScope::new(name, v);
-                            stack.frames.push(StreamFrame::Let(let_scope));
-                        }
-                        Op::PopLet => {
-                            if let StreamFrame::Let(_let_scope) = stack.frames.pop().unwrap() {
-                            } else {
-                                panic!("expected let scope");
-                            }
-                        }
-                        Op::PushDynamic(
-                            name,
-                            DynFormat::Huffman(lengths_expr, opt_values_expr),
-                        ) => {
-                            let scope = &Scope::Other(&stack);
-                            let lengths_val = lengths_expr.eval(scope);
-                            let lengths = value_to_vec_usize(&lengths_val);
-                            let lengths = match opt_values_expr {
-                                None => lengths,
-                                Some(e) => {
-                                    let values = value_to_vec_usize(&e.eval(scope));
-                                    let mut new_lengths = [0].repeat(values.len());
-                                    for i in 0..lengths.len() {
-                                        new_lengths[values[i]] = lengths[i];
+                                Op::RepeatUntilSeq(expr, s) => {
+                                    let mut vs = Vec::new();
+                                    loop {
+                                        match s.eval(
+                                            program,
+                                            stack,
+                                            value_stack,
+                                            input_stack,
+                                            input,
+                                        ) {
+                                            Ok((va, new_input)) => {
+                                                vs.push(va);
+                                                input = new_input;
+                                                let v = Value::Seq(vs);
+                                                let scope = &Scope::Other(stack);
+                                                let done =
+                                                    expr.eval_lambda(scope, &v).unwrap_bool();
+                                                vs = match v {
+                                                    Value::Seq(vs) => vs,
+                                                    _ => unreachable!(),
+                                                };
+                                                if done {
+                                                    break;
+                                                }
+                                            }
+                                            Err(err) => break 'oploop Err(err),
+                                        }
                                     }
-                                    new_lengths
+                                    value_stack.push(Value::Seq(vs));
                                 }
-                            };
-                            let f = make_huffman_codes(&lengths);
-                            let dyn_d = Decoder::compile_one(&f).unwrap();
-                            let decoder_scope = DecoderScope::new(name, dyn_d);
-                            stack.frames.push(StreamFrame::Decoder(decoder_scope));
-                        }
-                        Op::PopDynamic => {
-                            if let StreamFrame::Decoder(_decoder_scope) =
-                                stack.frames.pop().unwrap()
-                            {
-                            } else {
-                                panic!("expected decoder scope");
-                            }
-                        }
-                        Op::ApplyDynamic(name) => {
-                            let scope = &Scope::Other(&stack);
-                            let d = scope.get_decoder_by_name(&name);
-                            match d.parse(&decoder::Program::new(), scope, input) {
-                                Ok((v, new_input)) => {
-                                    input = new_input;
+                                Op::Map(expr) => {
+                                    let scope = &Scope::Other(stack);
+                                    let old_v = value_stack.pop().unwrap();
+                                    let new_v = expr.eval_lambda(scope, &old_v);
+                                    let v = Value::Mapped(Box::new(old_v), Box::new(new_v));
                                     value_stack.push(v);
                                 }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::PushInput => {
-                            input_stack.push(input.clone());
-                        }
-                        Op::PushInputSlice(expr) => {
-                            let scope = &Scope::Other(&stack);
-                            let size = expr.eval_value(scope).unwrap_usize();
-                            match input
-                                .split_at(size)
-                                .ok_or(ParseError::overrun(size, input.offset))
-                            {
-                                Ok((slice_input, next_input)) => {
-                                    input_stack.push(next_input);
-                                    input = slice_input;
-                                }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::PushInputOffset(expr) => {
-                            let scope = &Scope::Other(&stack);
-                            let offset = expr.eval_value(scope).unwrap_usize();
-                            match input
-                                .split_at(offset)
-                                .ok_or(ParseError::overrun(offset, input.offset))
-                            {
-                                Ok((_, offset_input)) => {
-                                    input_stack.push(input);
-                                    input = offset_input;
-                                }
-                                Err(err) => break 'oploop Err(err),
-                            }
-                        }
-                        Op::PopInput => {
-                            input = input_stack.pop().unwrap();
-                        }
-                        Op::Bits(s) => {
-                            let scope = &Scope::Other(&stack);
-                            let mut bits = Vec::with_capacity(input.remaining().len() * 8);
-                            for b in input.remaining() {
-                                for i in 0..8 {
-                                    bits.push((b & (1 << i)) >> i);
-                                }
-                            }
-                            match s.parse(program, scope, ReadCtxt::new(&bits)) {
-                                Ok((v, bits)) => {
-                                    let bytes_remain = bits.remaining().len() >> 3;
-                                    let bytes_read = input.remaining().len() - bytes_remain;
-                                    let (_, new_input) = input.split_at(bytes_read).unwrap();
-                                    //.ok_or(ParseError::overrun(bytes_read, input.offset))?;
+                                Op::Compute(expr) => {
+                                    let scope = &Scope::Other(stack);
+                                    let v = expr.eval_value(scope);
                                     value_stack.push(v);
-                                    input = new_input;
                                 }
-                                Err(err) => break 'oploop Err(err),
+                                Op::PushLet(name, expr) => {
+                                    let scope = &Scope::Other(stack);
+                                    let v = expr.eval_value(scope);
+                                    let let_scope = LetScope::new(name, v);
+                                    stack.frames.push(StreamFrame::Let(let_scope));
+                                }
+                                Op::PopLet => {
+                                    if let StreamFrame::Let(_let_scope) =
+                                        stack.frames.pop().unwrap()
+                                    {
+                                    } else {
+                                        panic!("expected let scope");
+                                    }
+                                }
+                                Op::PushDynamic(
+                                    name,
+                                    DynFormat::Huffman(lengths_expr, opt_values_expr),
+                                ) => {
+                                    let scope = &Scope::Other(stack);
+                                    let lengths_val = lengths_expr.eval(scope);
+                                    let lengths = value_to_vec_usize(&lengths_val);
+                                    let lengths = match opt_values_expr {
+                                        None => lengths,
+                                        Some(e) => {
+                                            let values = value_to_vec_usize(&e.eval(scope));
+                                            let mut new_lengths = [0].repeat(values.len());
+                                            for i in 0..lengths.len() {
+                                                new_lengths[values[i]] = lengths[i];
+                                            }
+                                            new_lengths
+                                        }
+                                    };
+                                    let f = make_huffman_codes(&lengths);
+                                    let dyn_d = Decoder::compile_one(&f).unwrap();
+                                    let decoder_scope = DecoderScope::new(name, dyn_d);
+                                    stack.frames.push(StreamFrame::Decoder(decoder_scope));
+                                }
+                                Op::PopDynamic => {
+                                    if let StreamFrame::Decoder(_decoder_scope) =
+                                        stack.frames.pop().unwrap()
+                                    {
+                                    } else {
+                                        panic!("expected decoder scope");
+                                    }
+                                }
+                                Op::ApplyDynamic(name) => {
+                                    let scope = &Scope::Other(stack);
+                                    let d = scope.get_decoder_by_name(&name);
+                                    match d.parse(&decoder::Program::new(), scope, input) {
+                                        Ok((v, new_input)) => {
+                                            input = new_input;
+                                            value_stack.push(v);
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::PushInput => {
+                                    input_stack.push(input.clone());
+                                }
+                                Op::PushInputSlice(expr) => {
+                                    let scope = &Scope::Other(stack);
+                                    let size = expr.eval_value(scope).unwrap_usize();
+                                    match input
+                                        .split_at(size)
+                                        .ok_or(ParseError::overrun(size, input.offset))
+                                    {
+                                        Ok((slice_input, next_input)) => {
+                                            input_stack.push(next_input);
+                                            input = slice_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::PushInputOffset(expr) => {
+                                    let scope = &Scope::Other(stack);
+                                    let offset = expr.eval_value(scope).unwrap_usize();
+                                    match input
+                                        .split_at(offset)
+                                        .ok_or(ParseError::overrun(offset, input.offset))
+                                    {
+                                        Ok((_, offset_input)) => {
+                                            input_stack.push(input);
+                                            input = offset_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::PopInput => {
+                                    input = input_stack.pop().unwrap();
+                                }
+                                Op::Bits(s) => {
+                                    let mut bits = Vec::with_capacity(input.remaining().len() * 8);
+                                    let mut new_input_stack: Vec<ReadCtxt<'_>> = Vec::new();
+                                    for b in input.remaining() {
+                                        for i in 0..8 {
+                                            bits.push((b & (1 << i)) >> i);
+                                        }
+                                    }
+                                    match s.eval(
+                                        program,
+                                        stack,
+                                        value_stack,
+                                        &mut new_input_stack,
+                                        ReadCtxt::new(&bits),
+                                    ) {
+                                        Ok((v, bits)) => {
+                                            let bytes_remain = bits.remaining().len() >> 3;
+                                            let bytes_read = input.remaining().len() - bytes_remain;
+                                            let (_, new_input) =
+                                                input.split_at(bytes_read).unwrap();
+                                            value_stack.push(v);
+                                            input = new_input;
+                                        }
+                                        Err(err) => break 'oploop Err(err),
+                                    }
+                                }
+                                Op::Negated(s) => {
+                                    let scope = &Scope::Other(stack);
+                                    if s.eval_clean(program, scope, input).is_ok() {
+                                        break 'oploop Err(ParseError::fail(scope, input));
+                                    } else {
+                                        value_stack.push(Value::UNIT);
+                                    }
+                                }
                             }
                         }
-                        Op::Negated(s) => {
-                            let scope = &Scope::Other(&stack);
-                            if s.parse(program, scope, input).is_ok() {
-                                break 'oploop Err(ParseError::fail(scope, input));
-                            } else {
-                                value_stack.push(Value::UNIT);
-                            }
+                        break 'oploop Ok(());
+                    } {
+                        Ok(()) => {
+                            let v = value_stack.pop().unwrap();
+                            return Ok((v, input));
                         }
+                        Err(err) => return Err(err),
                     }
                 }
-                break 'oploop Ok((value_stack.pop().unwrap(), input));
-            },
+            }
         }
     }
 }
@@ -971,26 +1118,20 @@ mod tests {
         Format::Byte(!ByteSet::from([b]))
     }
 
-    fn accepts(d: &Streamer, input: &[u8], tail: &[u8], expect: Value) {
-        let program = Program::new();
-        let (val, remain) = d
-            .parse(&program, &Scope::Empty, ReadCtxt::new(input))
-            .unwrap();
+    fn accepts(program: &Program, input: &[u8], tail: &[u8], expect: Value) {
+        let (val, remain) = program.run(ReadCtxt::new(input)).unwrap();
         assert_eq!(val, expect);
         assert_eq!(remain.remaining(), tail);
     }
 
-    fn rejects(d: &Streamer, input: &[u8]) {
-        let program = Program::new();
-        assert!(d
-            .parse(&program, &Scope::Empty, ReadCtxt::new(input))
-            .is_err());
+    fn rejects(program: &Program, input: &[u8]) {
+        assert!(program.run(ReadCtxt::new(input)).is_err());
     }
 
     #[test]
     fn compile_fail() {
         let f = Format::Fail;
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -998,7 +1139,7 @@ mod tests {
     #[test]
     fn compile_empty() {
         let f = Format::EMPTY;
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(&d, &[], &[], Value::UNIT);
         accepts(&d, &[0x00], &[0x00], Value::UNIT);
     }
@@ -1006,7 +1147,7 @@ mod tests {
     #[test]
     fn compile_byte_is() {
         let f = is_byte(0x00);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(&d, &[0x00], &[], Value::U8(0));
         accepts(&d, &[0x00, 0xFF], &[0xFF], Value::U8(0));
         rejects(&d, &[0xFF]);
@@ -1016,7 +1157,7 @@ mod tests {
     #[test]
     fn compile_byte_not() {
         let f = not_byte(0x00);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(&d, &[0xFF], &[], Value::U8(0xFF));
         accepts(&d, &[0xFF, 0x00], &[0x00], Value::U8(0xFF));
         rejects(&d, &[0x00]);
@@ -1026,7 +1167,7 @@ mod tests {
     #[test]
     fn compile_alt() {
         let f = alts::<&str>([]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0x00]);
     }
@@ -1034,7 +1175,7 @@ mod tests {
     #[test]
     fn compile_alt_byte() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0xFF))]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1054,7 +1195,7 @@ mod tests {
     #[test]
     fn compile_alt_ambiguous() {
         let f = alts([("a", is_byte(0x00)), ("b", is_byte(0x00))]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1062,7 +1203,7 @@ mod tests {
         let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
         let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0xFF)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1084,7 +1225,7 @@ mod tests {
         let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
         let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1094,32 +1235,32 @@ mod tests {
         let slice_a = Format::Slice(Expr::U8(1), Box::new(tuple_a));
         let slice_b = Format::Slice(Expr::U8(1), Box::new(tuple_b));
         let f = alts([("a", slice_a), ("b", slice_b)]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_alt_fail() {
         let f = alts([("a", Format::Fail), ("b", Format::Fail)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         rejects(&d, &[]);
     }
 
     #[test]
     fn compile_alt_end_of_input() {
         let f = alts([("a", Format::EndOfInput), ("b", Format::EndOfInput)]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_alt_empty() {
         let f = alts([("a", Format::EMPTY), ("b", Format::EMPTY)]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_alt_fail_end_of_input() {
         let f = alts([("a", Format::Fail), ("b", Format::EndOfInput)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1131,7 +1272,7 @@ mod tests {
     #[test]
     fn compile_alt_end_of_input_or_byte() {
         let f = alts([("a", Format::EndOfInput), ("b", is_byte(0x00))]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1156,7 +1297,7 @@ mod tests {
     #[test]
     fn compile_alt_opt() {
         let f = alts([("a", Format::EMPTY), ("b", is_byte(0x00))]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1180,7 +1321,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_next() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), is_byte(0xFF)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1206,7 +1347,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_opt() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0xFF))]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1266,7 +1407,7 @@ mod tests {
     #[test]
     fn compile_alt_opt_ambiguous() {
         let f = Format::Tuple(vec![optional(is_byte(0x00)), optional(is_byte(0x00))]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1292,7 +1433,7 @@ mod tests {
             ("7", alt.clone()),
         ]);
         let f = alts([("a", rec.clone()), ("b", rec.clone())]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1302,13 +1443,13 @@ mod tests {
             ("b", is_byte(0x01)),
             ("c", is_byte(0x02)),
         ]));
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_repeat() {
         let f = repeat(is_byte(0x00));
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(&d, &[], &[], Value::Seq(vec![]));
         accepts(&d, &[0xFF], &[0xFF], Value::Seq(vec![]));
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1323,13 +1464,13 @@ mod tests {
     #[test]
     fn compile_repeat_repeat() {
         let f = repeat(repeat(is_byte(0x00)));
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
     fn compile_cat_repeat() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), repeat(is_byte(0xFF))]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1377,7 +1518,7 @@ mod tests {
     #[test]
     fn compile_cat_end_of_input() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::EndOfInput]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00],
@@ -1391,7 +1532,7 @@ mod tests {
     #[test]
     fn compile_cat_repeat_end_of_input() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), Format::EndOfInput]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1413,7 +1554,7 @@ mod tests {
     #[test]
     fn compile_cat_repeat_ambiguous() {
         let f = Format::Tuple(vec![repeat(is_byte(0x00)), repeat(is_byte(0x00))]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1423,7 +1564,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x7F))),
         ]);
-        assert!(Streamer::compile_one(&f).is_ok());
+        assert!(Block::compile_one(&f).is_ok());
     }
 
     #[test]
@@ -1433,7 +1574,7 @@ mod tests {
             ("second", repeat(is_byte(0xFF))),
             ("third", repeat(is_byte(0x00))),
         ]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 
     #[test]
@@ -1451,7 +1592,7 @@ mod tests {
                 ])),
             ),
         ]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1541,7 +1682,7 @@ mod tests {
     #[test]
     fn compile_repeat1() {
         let f = repeat1(is_byte(0x00));
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
         accepts(&d, &[0x00], &[], Value::Seq(vec![Value::U8(0x00)]));
@@ -1562,7 +1703,7 @@ mod tests {
     #[test]
     fn compile_align1() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::Align(1), is_byte(0xFF)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[0x00, 0xFF],
@@ -1574,7 +1715,7 @@ mod tests {
     #[test]
     fn compile_align2() {
         let f = Format::Tuple(vec![is_byte(0x00), Format::Align(2), is_byte(0xFF)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         rejects(&d, &[0x00, 0xFF]);
         rejects(&d, &[0x00, 0x99, 0x99, 0xFF]);
         accepts(
@@ -1591,7 +1732,7 @@ mod tests {
         let a = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
         let peek_not = Format::PeekNot(Box::new(a));
         let f = Format::Tuple(vec![peek_not, any_byte.clone(), any_byte.clone()]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         rejects(&d, &[]);
         rejects(&d, &[0xFF]);
         rejects(&d, &[0xFF, 0xFF]);
@@ -1616,7 +1757,7 @@ mod tests {
         let a = Format::Tuple(vec![guard, Format::Repeat(Box::new(any_byte.clone()))]);
         let b = Format::Tuple(vec![is_byte(0xFF), is_byte(0xFF)]);
         let f = alts([("a", a), ("b", b)]);
-        let d = Streamer::compile_one(&f).unwrap();
+        let d = Block::compile_one(&f).unwrap();
         accepts(
             &d,
             &[],
@@ -1693,6 +1834,6 @@ mod tests {
         let peek_not = Format::PeekNot(Box::new(repeat1(is_byte(0x00))));
         let any_byte = Format::Byte(ByteSet::full());
         let f = Format::Tuple(vec![peek_not, repeat1(any_byte)]);
-        assert!(Streamer::compile_one(&f).is_err());
+        assert!(Block::compile_one(&f).is_err());
     }
 }
