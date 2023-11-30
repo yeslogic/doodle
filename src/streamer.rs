@@ -9,9 +9,10 @@ use crate::{DynFormat, Expr, Format, FormatModule, Label, MatchTree, Next, Patte
 use std::collections::HashMap;
 use std::rc::Rc;
 
-struct StreamStack<'a> {
+struct StreamCtxt<'a> {
     parent: &'a Scope<'a>,
     frames: Vec<StreamFrame<'a>>,
+    values: Vec<Value>,
 }
 
 enum StreamFrame<'a> {
@@ -71,7 +72,7 @@ impl<'a> DecoderScope<'a> {
     }
 }
 
-impl<'a> ScopeLookup for StreamStack<'a> {
+impl<'a> ScopeLookup for StreamCtxt<'a> {
     fn get_value_by_name(&self, name: &str) -> &Value {
         for frame in self.frames.iter().rev() {
             match frame {
@@ -543,26 +544,19 @@ impl Block {
         parent_scope: &Scope<'_>,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        let mut stack = StreamStack {
+        let mut stack = StreamCtxt {
             parent: parent_scope,
             frames: Vec::new(),
+            values: Vec::new(),
         };
-        let mut value_stack = Vec::new();
         let mut input_stack = Vec::new();
-        self.eval(
-            program,
-            &mut stack,
-            &mut value_stack,
-            &mut input_stack,
-            input,
-        )
+        self.eval(program, &mut stack, &mut input_stack, input)
     }
 
     fn eval<'a, 'input>(
         &'a self,
         program: &'a Program,
-        stack: &mut StreamStack<'a>,
-        value_stack: &mut Vec<Value>,
+        ctxt: &mut StreamCtxt<'a>,
         input_stack: &mut Vec<ReadCtxt<'input>>,
         mut input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
@@ -573,49 +567,47 @@ impl Block {
                     match 'oploop: loop {
                         for op in ops.iter() {
                             match op {
-                                Op::Value(s) => {
-                                    match s.eval(program, stack, value_stack, input_stack, input) {
-                                        Ok((v, new_input)) => {
-                                            value_stack.push(v);
-                                            input = new_input;
-                                        }
-                                        Err(err) => {
-                                            break 'oploop Err(err);
-                                        }
+                                Op::Value(s) => match s.eval(program, ctxt, input_stack, input) {
+                                    Ok((v, new_input)) => {
+                                        ctxt.values.push(v);
+                                        input = new_input;
                                     }
-                                }
+                                    Err(err) => {
+                                        break 'oploop Err(err);
+                                    }
+                                },
                                 Op::Call(n, es) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let mut args = Vec::with_capacity(es.len());
                                     for (name, e) in es {
                                         let v = e.eval_value(scope);
                                         args.push((name.clone(), v));
                                     }
                                     let call_scope = CallScope::new(args);
-                                    let mut new_stack = StreamStack {
+                                    let mut new_ctxt = StreamCtxt {
                                         parent: &Scope::Empty,
                                         frames: vec![StreamFrame::Call(call_scope)],
+                                        values: Vec::new(),
                                     };
                                     match program.blocks[*n].eval(
                                         program,
-                                        &mut new_stack,
-                                        value_stack,
+                                        &mut new_ctxt,
                                         input_stack,
                                         input,
                                     ) {
                                         Ok((v, new_input)) => {
-                                            value_stack.push(v);
+                                            ctxt.values.push(v);
                                             input = new_input;
                                         }
                                         Err(err) => break 'oploop Err(err),
                                     }
                                 }
                                 Op::Fail => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     break 'oploop Err(ParseError::fail(scope, input));
                                 }
                                 Op::EndOfInput => match input.read_byte() {
-                                    None => value_stack.push(Value::UNIT),
+                                    None => ctxt.values.push(Value::UNIT),
                                     Some((b, _)) => {
                                         break 'oploop Err(ParseError::trailing(b, input.offset))
                                     }
@@ -627,7 +619,7 @@ impl Block {
                                         .ok_or(ParseError::overrun(skip, input.offset))
                                     {
                                         Ok((_, new_input)) => {
-                                            value_stack.push(Value::UNIT);
+                                            ctxt.values.push(Value::UNIT);
                                             input = new_input;
                                         }
                                         Err(err) => break 'oploop Err(err),
@@ -641,7 +633,7 @@ impl Block {
                                         Ok((b, new_input)) => {
                                             if bs.contains(b) {
                                                 let v = Value::U8(b);
-                                                value_stack.push(v);
+                                                ctxt.values.push(v);
                                                 input = new_input;
                                             } else {
                                                 break 'oploop Err(ParseError::unexpected(
@@ -655,17 +647,17 @@ impl Block {
                                     }
                                 }
                                 Op::Variant(label) => {
-                                    let v = value_stack.pop().unwrap();
+                                    let v = ctxt.values.pop().unwrap();
                                     let v = Value::Variant(label.clone(), Box::new(v));
-                                    value_stack.push(v);
+                                    ctxt.values.push(v);
                                 }
                                 Op::Branch(index) => {
-                                    let v = value_stack.pop().unwrap();
+                                    let v = ctxt.values.pop().unwrap();
                                     let v = Value::Branch(*index, Box::new(v));
-                                    value_stack.push(v);
+                                    ctxt.values.push(v);
                                 }
                                 Op::Parallel(branches) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     match (|| {
                                         for (index, d) in branches.iter().enumerate() {
                                             let res = d.eval_clean(program, scope, input);
@@ -680,7 +672,7 @@ impl Block {
                                     })() {
                                         Ok((v, new_input)) => {
                                             input = new_input;
-                                            value_stack.push(v);
+                                            ctxt.values.push(v);
                                         }
                                         Err(err) => break 'oploop Err(err),
                                     }
@@ -698,7 +690,7 @@ impl Block {
                                     }
                                 }
                                 Op::Match(head, branches) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let head = head.eval(scope);
                                     let mut matched = false;
                                     for (pattern, b) in branches.iter() {
@@ -707,17 +699,16 @@ impl Block {
                                             .coerce_mapped_value()
                                             .matches_inner(&mut pattern_scope, pattern)
                                         {
-                                            stack.frames.push(StreamFrame::Pattern(pattern_scope));
+                                            ctxt.frames.push(StreamFrame::Pattern(pattern_scope));
                                             match program.blocks[*b].eval(
                                                 program,
-                                                stack,
-                                                value_stack,
+                                                ctxt,
                                                 input_stack,
                                                 input,
                                             ) {
                                                 Ok((v, new_input)) => {
                                                     input = new_input;
-                                                    value_stack.push(v);
+                                                    ctxt.values.push(v);
                                                     matched = true;
                                                     break;
                                                 }
@@ -731,12 +722,12 @@ impl Block {
                                 }
                                 Op::PushTuple(num_fields) => {
                                     let v = Value::Tuple(Vec::with_capacity(*num_fields));
-                                    value_stack.push(v);
+                                    ctxt.values.push(v);
                                 }
                                 Op::TupleField => {
-                                    let v = value_stack.pop().unwrap();
+                                    let v = ctxt.values.pop().unwrap();
                                     if let Value::Tuple(ref mut vs) =
-                                        value_stack.last_mut().unwrap()
+                                        ctxt.values.last_mut().unwrap()
                                     {
                                         vs.push(v);
                                     } else {
@@ -745,12 +736,12 @@ impl Block {
                                 }
                                 Op::PushRecord(num_fields) => {
                                     let record_scope = RecordScope::new(*num_fields);
-                                    stack.frames.push(StreamFrame::Record(record_scope));
+                                    ctxt.frames.push(StreamFrame::Record(record_scope));
                                 }
                                 Op::RecordField(name) => {
-                                    let v = value_stack.pop().unwrap();
+                                    let v = ctxt.values.pop().unwrap();
                                     if let StreamFrame::Record(ref mut record_scope) =
-                                        stack.frames.last_mut().unwrap()
+                                        ctxt.frames.last_mut().unwrap()
                                     {
                                         record_scope.record.push((name.clone(), v));
                                     } else {
@@ -759,21 +750,21 @@ impl Block {
                                 }
                                 Op::PopRecord => {
                                     if let StreamFrame::Record(record_scope) =
-                                        stack.frames.pop().unwrap()
+                                        ctxt.frames.pop().unwrap()
                                     {
                                         let v = Value::Record(record_scope.record);
-                                        value_stack.push(v);
+                                        ctxt.values.push(v);
                                     } else {
                                         panic!("expected record stack frame");
                                     }
                                 }
                                 Op::PushSeq => {
                                     let v = Value::Seq(Vec::new());
-                                    value_stack.push(v);
+                                    ctxt.values.push(v);
                                 }
                                 Op::SeqItem => {
-                                    let v = value_stack.pop().unwrap();
-                                    if let Value::Seq(ref mut vs) = value_stack.last_mut().unwrap()
+                                    let v = ctxt.values.pop().unwrap();
+                                    if let Value::Seq(ref mut vs) = ctxt.values.last_mut().unwrap()
                                     {
                                         vs.push(v);
                                     } else {
@@ -782,11 +773,11 @@ impl Block {
                                 }
                                 Op::PushPattern => {
                                     let pattern_scope = RecordScope::new(0);
-                                    stack.frames.push(StreamFrame::Pattern(pattern_scope));
+                                    ctxt.frames.push(StreamFrame::Pattern(pattern_scope));
                                 }
                                 Op::PopPattern => {
                                     if let StreamFrame::Pattern(_pattern_scope) =
-                                        stack.frames.pop().unwrap()
+                                        ctxt.frames.pop().unwrap()
                                     {
                                     } else {
                                         panic!("expected pattern stack frame");
@@ -800,14 +791,9 @@ impl Block {
                                             },
                                         )? == 0
                                         {
-                                            let (va, next_input) = a.eval(
-                                                program,
-                                                stack,
-                                                value_stack,
-                                                input_stack,
-                                                input,
-                                            )?;
-                                            value_stack.push(va);
+                                            let (va, next_input) =
+                                                a.eval(program, ctxt, input_stack, input)?;
+                                            ctxt.values.push(va);
                                             input = next_input;
                                         }
                                         Ok(input)
@@ -821,14 +807,9 @@ impl Block {
                                 Op::Until(tree, a) => {
                                     match (|| {
                                         loop {
-                                            let (va, next_input) = a.eval(
-                                                program,
-                                                stack,
-                                                value_stack,
-                                                input_stack,
-                                                input,
-                                            )?;
-                                            value_stack.push(va);
+                                            let (va, next_input) =
+                                                a.eval(program, ctxt, input_stack, input)?;
+                                            ctxt.values.push(va);
                                             input = next_input;
                                             if tree.matches(input).ok_or(
                                                 ParseError::NoValidBranch {
@@ -848,17 +829,11 @@ impl Block {
                                     }
                                 }
                                 Op::RepeatCount(expr, s) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let count = expr.eval_value(scope).unwrap_usize();
                                     let mut vs = Vec::with_capacity(count);
                                     for _ in 0..count {
-                                        match s.eval(
-                                            program,
-                                            stack,
-                                            value_stack,
-                                            input_stack,
-                                            input,
-                                        ) {
+                                        match s.eval(program, ctxt, input_stack, input) {
                                             Ok((va, new_input)) => {
                                                 vs.push(va);
                                                 input = new_input;
@@ -866,20 +841,14 @@ impl Block {
                                             Err(err) => break 'oploop Err(err),
                                         }
                                     }
-                                    value_stack.push(Value::Seq(vs));
+                                    ctxt.values.push(Value::Seq(vs));
                                 }
                                 Op::RepeatUntilLast(expr, s) => {
                                     let mut vs = Vec::new();
                                     loop {
-                                        match s.eval(
-                                            program,
-                                            stack,
-                                            value_stack,
-                                            input_stack,
-                                            input,
-                                        ) {
+                                        match s.eval(program, ctxt, input_stack, input) {
                                             Ok((va, new_input)) => {
-                                                let scope = &Scope::Other(stack);
+                                                let scope = &Scope::Other(ctxt);
                                                 let done =
                                                     expr.eval_lambda(scope, &va).unwrap_bool();
                                                 vs.push(va);
@@ -891,23 +860,17 @@ impl Block {
                                             Err(err) => break 'oploop Err(err),
                                         }
                                     }
-                                    value_stack.push(Value::Seq(vs));
+                                    ctxt.values.push(Value::Seq(vs));
                                 }
                                 Op::RepeatUntilSeq(expr, s) => {
                                     let mut vs = Vec::new();
                                     loop {
-                                        match s.eval(
-                                            program,
-                                            stack,
-                                            value_stack,
-                                            input_stack,
-                                            input,
-                                        ) {
+                                        match s.eval(program, ctxt, input_stack, input) {
                                             Ok((va, new_input)) => {
                                                 vs.push(va);
                                                 input = new_input;
                                                 let v = Value::Seq(vs);
-                                                let scope = &Scope::Other(stack);
+                                                let scope = &Scope::Other(ctxt);
                                                 let done =
                                                     expr.eval_lambda(scope, &v).unwrap_bool();
                                                 vs = match v {
@@ -921,29 +884,28 @@ impl Block {
                                             Err(err) => break 'oploop Err(err),
                                         }
                                     }
-                                    value_stack.push(Value::Seq(vs));
+                                    ctxt.values.push(Value::Seq(vs));
                                 }
                                 Op::Map(expr) => {
-                                    let scope = &Scope::Other(stack);
-                                    let old_v = value_stack.pop().unwrap();
+                                    let old_v = ctxt.values.pop().unwrap();
+                                    let scope = &Scope::Other(ctxt);
                                     let new_v = expr.eval_lambda(scope, &old_v);
                                     let v = Value::Mapped(Box::new(old_v), Box::new(new_v));
-                                    value_stack.push(v);
+                                    ctxt.values.push(v);
                                 }
                                 Op::Compute(expr) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let v = expr.eval_value(scope);
-                                    value_stack.push(v);
+                                    ctxt.values.push(v);
                                 }
                                 Op::PushLet(name, expr) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let v = expr.eval_value(scope);
                                     let let_scope = LetScope::new(name, v);
-                                    stack.frames.push(StreamFrame::Let(let_scope));
+                                    ctxt.frames.push(StreamFrame::Let(let_scope));
                                 }
                                 Op::PopLet => {
-                                    if let StreamFrame::Let(_let_scope) =
-                                        stack.frames.pop().unwrap()
+                                    if let StreamFrame::Let(_let_scope) = ctxt.frames.pop().unwrap()
                                     {
                                     } else {
                                         panic!("expected let scope");
@@ -953,7 +915,7 @@ impl Block {
                                     name,
                                     DynFormat::Huffman(lengths_expr, opt_values_expr),
                                 ) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let lengths_val = lengths_expr.eval(scope);
                                     let lengths = value_to_vec_usize(&lengths_val);
                                     let lengths = match opt_values_expr {
@@ -970,23 +932,23 @@ impl Block {
                                     let f = make_huffman_codes(&lengths);
                                     let dyn_d = Decoder::compile_one(&f).unwrap();
                                     let decoder_scope = DecoderScope::new(name, dyn_d);
-                                    stack.frames.push(StreamFrame::Decoder(decoder_scope));
+                                    ctxt.frames.push(StreamFrame::Decoder(decoder_scope));
                                 }
                                 Op::PopDynamic => {
                                     if let StreamFrame::Decoder(_decoder_scope) =
-                                        stack.frames.pop().unwrap()
+                                        ctxt.frames.pop().unwrap()
                                     {
                                     } else {
                                         panic!("expected decoder scope");
                                     }
                                 }
                                 Op::ApplyDynamic(name) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let d = scope.get_decoder_by_name(&name);
                                     match d.parse(&decoder::Program::new(), scope, input) {
                                         Ok((v, new_input)) => {
                                             input = new_input;
-                                            value_stack.push(v);
+                                            ctxt.values.push(v);
                                         }
                                         Err(err) => break 'oploop Err(err),
                                     }
@@ -995,7 +957,7 @@ impl Block {
                                     input_stack.push(input.clone());
                                 }
                                 Op::PushInputSlice(expr) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let size = expr.eval_value(scope).unwrap_usize();
                                     match input
                                         .split_at(size)
@@ -1009,7 +971,7 @@ impl Block {
                                     }
                                 }
                                 Op::PushInputOffset(expr) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     let offset = expr.eval_value(scope).unwrap_usize();
                                     match input
                                         .split_at(offset)
@@ -1035,8 +997,7 @@ impl Block {
                                     }
                                     match s.eval(
                                         program,
-                                        stack,
-                                        value_stack,
+                                        ctxt,
                                         &mut new_input_stack,
                                         ReadCtxt::new(&bits),
                                     ) {
@@ -1045,18 +1006,18 @@ impl Block {
                                             let bytes_read = input.remaining().len() - bytes_remain;
                                             let (_, new_input) =
                                                 input.split_at(bytes_read).unwrap();
-                                            value_stack.push(v);
+                                            ctxt.values.push(v);
                                             input = new_input;
                                         }
                                         Err(err) => break 'oploop Err(err),
                                     }
                                 }
                                 Op::Negated(s) => {
-                                    let scope = &Scope::Other(stack);
+                                    let scope = &Scope::Other(ctxt);
                                     if s.eval_clean(program, scope, input).is_ok() {
                                         break 'oploop Err(ParseError::fail(scope, input));
                                     } else {
-                                        value_stack.push(Value::UNIT);
+                                        ctxt.values.push(Value::UNIT);
                                     }
                                 }
                             }
@@ -1064,7 +1025,7 @@ impl Block {
                         break 'oploop Ok(());
                     } {
                         Ok(()) => {
-                            let v = value_stack.pop().unwrap();
+                            let v = ctxt.values.pop().unwrap();
                             return Ok((v, input));
                         }
                         Err(err) => return Err(err),
