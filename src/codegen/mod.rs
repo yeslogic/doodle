@@ -2,10 +2,10 @@ mod rust_ast;
 
 use crate::byte_set::ByteSet;
 use crate::codegen::rust_ast::{
-    Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem, RustProgram,
+    LocalType, Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem, RustProgram,
 };
 use crate::decoder::{Decoder, Program};
-use crate::{Label, ValueType};
+use crate::{Expr, Label, MatchTree, ValueType};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -20,6 +20,12 @@ use self::rust_ast::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
 /// Simple type for ad-hoc names using a counter value
 struct IxLabel(usize);
+
+impl IxLabel {
+    fn to_usize(&self) -> usize {
+        self.0
+    }
+}
 
 impl From<usize> for IxLabel {
     fn from(value: usize) -> Self {
@@ -64,14 +70,19 @@ impl NameGen {
         }
     }
 
-    fn get_name(&mut self, def: &RustTypeDef) -> Label {
+    /// Finds or generates a new name for a RustTypeDef.
+    ///
+    /// Returns `(old, (ix, false))` if the RustTypeDef was already in-scope with name `old` and index `ix``
+    /// Returns `(new, (ix, true))` otherwise, where `ix` is the new index for the RustTypeDef, and `new` is a novel name
+    fn get_name(&mut self, def: &RustTypeDef) -> (Label, (usize, bool)) {
         match self.revmap.get(def) {
-            Some(ixlab) => ixlab.into(),
+            Some(ixlab) => (ixlab.into(), (ixlab.to_usize(), false)),
             None => {
-                let ixlab = IxLabel::from(self.ctr);
+                let ix = self.ctr;
+                let ixlab = IxLabel::from(ix);
                 self.ctr += 1;
                 self.revmap.insert(def.clone(), ixlab);
-                ixlab.into()
+                (ixlab.into(), (ix, true))
             }
         }
     }
@@ -98,7 +109,7 @@ impl Codegen {
     /// Converts a `ValueType` to a `RustType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
-    fn resolve(&mut self, vt: &ValueType) -> RustType {
+    fn lift_type(&mut self, vt: &ValueType) -> RustType {
         match vt {
             ValueType::Empty => RustType::UNIT,
             ValueType::Bool => PrimType::Bool.into(),
@@ -109,29 +120,27 @@ impl Codegen {
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.iter() {
-                    buf.push(self.resolve(v))
+                    buf.push(self.lift_type(v))
                 }
                 RustType::AnonTuple(buf)
             }
             ValueType::Seq(t) => {
-                let inner = self.resolve(t.as_ref());
+                let inner = self.lift_type(t.as_ref());
                 CompType::Vec(Box::new(inner)).into()
             }
             ValueType::Any => panic!("ValueType::Any"),
             ValueType::Record(fields) => {
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
-                    let rt_field = self.resolve(ty);
+                    let rt_field = self.lift_type(ty);
                     rt_fields.push((lab.clone(), rt_field));
                 }
                 let rtdef = RustTypeDef::Struct(RustStruct::Record(rt_fields));
-                let old_ctr = self.namegen.ctr;
-                let tname = self.namegen.get_name(&rtdef);
-                let new_ctr = self.namegen.ctr;
-                if new_ctr > old_ctr {
+                let (tname, (ix, is_new)) = self.namegen.get_name(&rtdef);
+                if is_new {
                     self.defined_types.push(rtdef);
                 }
-                RustType::named(tname)
+                RustType::defined(ix, tname)
             }
             ValueType::Union(vars) => {
                 let mut rt_vars = Vec::new();
@@ -141,32 +150,30 @@ impl Codegen {
                         ValueType::Tuple(args) => {
                             let mut rt_args = Vec::new();
                             for arg in args.iter() {
-                                rt_args.push(self.resolve(arg));
+                                rt_args.push(self.lift_type(arg));
                             }
                             RustVariant::Tuple(vname.clone(), rt_args)
                         }
                         ValueType::Record(fields) => {
                             let mut rt_fields = Vec::new();
                             for (f_lab, f_ty) in fields.iter() {
-                                rt_fields.push((f_lab.clone(), self.resolve(f_ty)));
+                                rt_fields.push((f_lab.clone(), self.lift_type(f_ty)));
                             }
                             RustVariant::Record(vname.clone(), rt_fields)
                         }
                         other => {
-                            let inner = self.resolve(other);
+                            let inner = self.lift_type(other);
                             RustVariant::Tuple(vname.clone(), vec![inner])
                         }
                     };
                     rt_vars.push(rt_var);
                 }
                 let rtdef = RustTypeDef::Enum(rt_vars);
-                let old_ctr = self.namegen.ctr;
-                let tname = self.namegen.get_name(&rtdef);
-                let new_ctr = self.namegen.ctr;
-                if new_ctr > old_ctr {
+                let (tname, (ix, is_new)) = self.namegen.get_name(&rtdef);
+                if is_new {
                     self.defined_types.push(rtdef);
                 }
-                RustType::named(tname)
+                RustType::defined(ix, tname)
             }
         }
     }
@@ -174,8 +181,96 @@ impl Codegen {
     pub fn populate_decoder_types(&mut self, program: &Program) {
         self.decoder_types = Vec::with_capacity(program.decoders.len());
         for (_d, t) in &program.decoders {
-            let r = self.resolve(t);
+            let r = self.lift_type(t);
             self.decoder_types.push(r);
+        }
+    }
+
+    fn translate(&self, decoder: &Decoder, type_hint: Option<&RustType>) -> CaseLogic {
+        match decoder {
+            Decoder::Call(ix, args) => CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
+            Decoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
+            Decoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
+            Decoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
+            Decoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(bs.clone())),
+            Decoder::Variant(vname, inner) => {
+                // FIXME - not sure quite what logic to employ for unwrapping type-hints on variants
+                match type_hint {
+                    _ => CaseLogic::Derived(DerivedLogic::VariantOf(
+                        vname.clone(),
+                        Box::new(self.translate(inner.as_ref(), type_hint.clone())),
+                    )),
+                }
+            }
+            Decoder::Parallel(alts) => CaseLogic::Parallel(ParallelLogic::Alts(
+                alts.iter()
+                    .map(|alt| self.translate(alt, type_hint.clone()))
+                    .collect(),
+            )),
+            Decoder::Branch(tree, flat) => CaseLogic::Other(OtherLogic::Descend(
+                tree.clone(),
+                flat.iter()
+                    .map(|alt| self.translate(alt, type_hint.clone()))
+                    .collect(),
+            )),
+            Decoder::Tuple(elts) => match type_hint {
+                None => CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                    constructor: None,
+                    elements: elts.iter().map(|elt| self.translate(elt, None)).collect(),
+                }),
+                Some(RustType::AnonTuple(tys)) => {
+                    CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                        constructor: None,
+                        elements: elts
+                            .iter()
+                            .zip(tys)
+                            .map(|(elt, ty)| self.translate(elt, Some(ty)))
+                            .collect(),
+                    })
+                }
+                Some(other) => unreachable!(
+                    "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
+                    other
+                ),
+            },
+            Decoder::Record(flds) => {
+                match type_hint {
+                    Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
+                        let ref tdef = self.defined_types[*ix];
+                        let tfields = match tdef {
+                            RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
+                            _ => unreachable!("unexpected non-Struct::Record definition for type `{lab}`: {tdef:?}"),
+                        };
+                        // FIXME - for now we rely on a consistent order of field names between the decoder and type definition
+                        let mut assocs = Vec::new();
+                        for (i, (l0, d)) in flds.iter().enumerate() {
+                            let (l1, t) = &tfields[i];
+                            assert_eq!(l0.as_ref(), l1.as_ref(), "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})");
+                            assocs.push((l0.clone(), self.translate(d, Some(t))));
+                        }
+                        CaseLogic::Sequential(SequentialLogic::AccumRecord { constructor: lab.clone(), fields: assocs })
+                    }
+                    None => unreachable!("Cannot generate CaseLogic for a Record without a definite type-name"),
+                    Some(other) => unreachable!("Decoder::Record expected to have type RustType::Atom(AtomType::TypeRef(..)), found {:?}", other),
+                }
+            }
+            // FIXME - implement CaseLogic variants and translation rules for the remaining cases
+            Decoder::While(_, _) => todo!(),
+            Decoder::Until(_, _) => todo!(),
+            Decoder::RepeatCount(_, _) => todo!(),
+            Decoder::RepeatUntilLast(_, _) => todo!(),
+            Decoder::RepeatUntilSeq(_, _) => todo!(),
+            Decoder::Peek(_) => todo!(),
+            Decoder::PeekNot(_) => todo!(),
+            Decoder::Slice(_, _) => todo!(),
+            Decoder::Bits(_) => todo!(),
+            Decoder::WithRelativeOffset(_, _) => todo!(),
+            Decoder::Map(_, _) => todo!(),
+            Decoder::Compute(_) => todo!(),
+            Decoder::Let(_, _, _) => todo!(),
+            Decoder::Match(_, _) => todo!(),
+            Decoder::Dynamic(_, _, _) => todo!(),
+            Decoder::Apply(_) => todo!(),
         }
     }
 }
@@ -194,7 +289,7 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
                 let ty = RustType::Atom(AtomType::Comp(CompType::Borrow(
                     None,
                     Mut::Mutable,
-                    Box::new(RustType::named("Scope")),
+                    Box::new(RustType::imported("Scope")),
                 )));
                 (name, ty)
             };
@@ -316,6 +411,59 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
     }
 }
 
+/// Abstraction type use to sub-categorize different Decoders and ensure that the codegen layer
+/// is more resilient to changes both upstream (in the Decoder model)
+/// and downstream (in the API made available for generated code to use)
+#[derive(Clone, Debug)]
+pub enum CaseLogic {
+    Simple(SimpleLogic),
+    Derived(DerivedLogic),
+    Sequential(SequentialLogic),
+    Parallel(ParallelLogic),
+    Other(OtherLogic),
+}
+
+/// Cases that apply other case-logic in sequence to an incrementally updated input
+#[derive(Clone, Debug)]
+pub enum SequentialLogic {
+    AccumTuple {
+        constructor: Option<Label>,
+        elements: Vec<CaseLogic>,
+    },
+    AccumRecord {
+        constructor: Label,
+        fields: Vec<(Label, CaseLogic)>,
+    },
+}
+
+/// Catch-all for hard-to-classify cases
+#[derive(Clone, Debug)]
+pub enum OtherLogic {
+    Descend(MatchTree, Vec<CaseLogic>),
+}
+
+/// Cases that require processing of multiple cases in parallel (on the same input-state)
+#[derive(Clone, Debug)]
+pub enum ParallelLogic {
+    Alts(Vec<CaseLogic>),
+}
+
+/// Cases that require no recursion into other case-logic
+#[derive(Clone, Debug)]
+pub enum SimpleLogic {
+    Fail,
+    ExpectEnd,
+    Invoke(usize, Vec<(Label, Expr)>),
+    SkipToNextMultiple(usize),
+    ByteIn(ByteSet),
+}
+
+/// Cases that recurse into other case-logic only once
+#[derive(Clone, Debug)]
+pub enum DerivedLogic {
+    VariantOf(Label, Box<CaseLogic>),
+}
+
 fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::RustStmt> {
     // FIXME - double-check this won't clash with any local assignments in Decoder expansion
     let inp_varname: Label = "inp".into();
@@ -361,7 +509,7 @@ fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::Rust
                 unreachable!("Decoder::Record has no fields, which is not an expected case");
             }
             let constr = match return_type {
-                RustType::Atom(AtomType::Named(tyname)) => tyname.clone(),
+                RustType::Atom(AtomType::TypeRef(lt)) => lt.as_name().clone(),
                 _ => unreachable!(
                     "decoder_body found Decoder::Record with a non-`Named` return type {:?}",
                     return_type

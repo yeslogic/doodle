@@ -300,8 +300,12 @@ pub(crate) enum RustType {
 impl RustType {
     pub const UNIT: RustType = RustType::Atom(AtomType::Prim(PrimType::Unit));
 
-    pub fn named(name: impl Into<Label>) -> Self {
-        Self::Atom(AtomType::Named(name.into()))
+    pub fn imported(name: impl Into<Label>) -> Self {
+        Self::Atom(AtomType::TypeRef(LocalType::External(name.into())))
+    }
+
+    pub fn defined(ix: usize, name: impl Into<Label>) -> Self {
+        Self::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, name.into())))
     }
 
     pub fn vec_of(inner: Self) -> Self {
@@ -442,9 +446,44 @@ where
     T: Sized,
     U: Sized,
 {
-    Named(Label),
+    TypeRef(LocalType),
     Prim(PrimType),
     Comp(CompType<T, U>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum LocalType {
+    LocalDef(usize, Label),
+    External(Label),
+}
+
+impl AsRef<Label> for LocalType {
+    fn as_ref(&self) -> &Label {
+        match self {
+            LocalType::External(lab) | LocalType::LocalDef(_, lab) => lab,
+        }
+    }
+}
+
+impl LocalType {
+    pub fn as_name(&self) -> &Label {
+        self.as_ref()
+    }
+
+    pub fn try_as_index(&self) -> Option<usize> {
+        match self {
+            Self::LocalDef(ix, _) => Some(*ix),
+            Self::External(_) => None,
+        }
+    }
+}
+
+impl ToFragment for LocalType {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            Self::LocalDef(_, lab) | Self::External(lab) => lab.to_fragment(),
+        }
+    }
 }
 
 impl<T, U> ToFragment for AtomType<T, U>
@@ -454,7 +493,7 @@ where
 {
     fn to_fragment(&self) -> Fragment {
         match self {
-            AtomType::Named(label) => label.to_fragment(),
+            AtomType::TypeRef(ltype) => ltype.to_fragment(),
             AtomType::Prim(pt) => pt.to_fragment(),
             AtomType::Comp(ct) => ct.to_fragment(),
         }
@@ -954,8 +993,8 @@ mod test {
     #[test]
     fn sample_type() {
         let rt = RustType::vec_of(RustType::anon_tuple([
-            RustType::named("Label"),
-            RustType::named("TypeRef"),
+            RustType::imported("Label"),
+            RustType::imported("TypeRef"),
         ]));
         expect_fragment(&rt, "Vec<(Label, TypeRef)>");
     }
