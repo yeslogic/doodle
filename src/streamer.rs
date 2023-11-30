@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 struct StreamCtxt<'a> {
-    parent: &'a Scope<'a>,
+    parent: Option<&'a StreamCtxt<'a>>,
     frames: Vec<StreamFrame<'a>>,
     values: Vec<Value>,
 }
@@ -105,7 +105,10 @@ impl<'a> ScopeLookup for StreamCtxt<'a> {
                 StreamFrame::Decoder(_decoder_scope) => {}
             }
         }
-        self.parent.get_value_by_name(name)
+        match self.parent {
+            None => panic!("could not get value: {name}"),
+            Some(parent) => parent.get_value_by_name(name),
+        }
     }
 
     fn get_decoder_by_name(&self, name: &str) -> &Decoder {
@@ -122,7 +125,10 @@ impl<'a> ScopeLookup for StreamCtxt<'a> {
                 }
             }
         }
-        self.parent.get_decoder_by_name(name)
+        match self.parent {
+            None => panic!("could not get decoder: {name}"),
+            Some(parent) => parent.get_decoder_by_name(name),
+        }
     }
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry)>) {
@@ -152,7 +158,10 @@ impl<'a> ScopeLookup for StreamCtxt<'a> {
                 StreamFrame::Decoder(_decoder_scope) => {} // FIXME
             }
         }
-        self.parent.get_bindings(bindings);
+        match self.parent {
+            None => {}
+            Some(parent) => parent.get_bindings(bindings),
+        }
     }
 }
 
@@ -214,7 +223,7 @@ impl Program {
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        self.blocks[0].eval_clean(self, &Scope::Empty, input)
+        self.blocks[0].eval_clean(self, None, input)
     }
 }
 
@@ -541,7 +550,7 @@ impl Block {
     fn eval_clean<'input>(
         &self,
         program: &Program,
-        parent_scope: &Scope<'_>,
+        parent_scope: Option<&StreamCtxt<'_>>,
         input: ReadCtxt<'input>,
     ) -> ParseResult<(Value, ReadCtxt<'input>)> {
         let mut stack = StreamCtxt {
@@ -585,7 +594,7 @@ impl Block {
                                     }
                                     let call_scope = CallScope::new(args);
                                     let mut new_ctxt = StreamCtxt {
-                                        parent: &Scope::Empty,
+                                        parent: None,
                                         frames: vec![StreamFrame::Call(call_scope)],
                                         values: Vec::new(),
                                     };
@@ -657,10 +666,9 @@ impl Block {
                                     ctxt.values.push(v);
                                 }
                                 Op::Parallel(branches) => {
-                                    let scope = &Scope::Other(ctxt);
                                     match (|| {
                                         for (index, d) in branches.iter().enumerate() {
-                                            let res = d.eval_clean(program, scope, input);
+                                            let res = d.eval_clean(program, Some(ctxt), input);
                                             if let Ok((v, input)) = res {
                                                 return Ok((
                                                     Value::Branch(index, Box::new(v)),
@@ -668,7 +676,7 @@ impl Block {
                                                 ));
                                             }
                                         }
-                                        Err(ParseError::fail(scope, input))
+                                        Err(ParseError::fail(&Scope::Other(ctxt), input))
                                     })() {
                                         Ok((v, new_input)) => {
                                             input = new_input;
@@ -1013,9 +1021,11 @@ impl Block {
                                     }
                                 }
                                 Op::Negated(s) => {
-                                    let scope = &Scope::Other(ctxt);
-                                    if s.eval_clean(program, scope, input).is_ok() {
-                                        break 'oploop Err(ParseError::fail(scope, input));
+                                    if s.eval_clean(program, Some(ctxt), input).is_ok() {
+                                        break 'oploop Err(ParseError::fail(
+                                            &Scope::Other(ctxt),
+                                            input,
+                                        ));
                                     } else {
                                         ctxt.values.push(Value::UNIT);
                                     }
