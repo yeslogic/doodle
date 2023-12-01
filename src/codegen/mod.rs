@@ -186,6 +186,7 @@ impl Codegen {
         }
     }
 
+    #[allow(dead_code)]
     fn translate(&self, decoder: &Decoder, type_hint: Option<&RustType>) -> CaseLogic {
         match decoder {
             Decoder::Call(ix, args) => CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
@@ -298,7 +299,7 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
                 let ty = {
                     let mut params = RustParams::<RustLt, RustType>::new();
                     params.push_lifetime(RustLt::Parametric("'input".into()));
-                    RustType::verbatim("ReadCtxt", Some(params))
+                    RustType::Atom(AtomType::Comp(CompType::Borrow(None, Mut::Mutable, Box::new(RustType::verbatim("ParseCtxt", Some(params))))))
                 };
                 (name, ty)
             };
@@ -328,7 +329,7 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
             // it is harder to write, but much more efficient, to cut the buffer at the right place
             let cond = RustExpr::infix(
                 RustExpr::infix(
-                    RustExpr::local("input").field("offset"),
+                    RustExpr::local("input").call_method("offset"),
                     " % ",
                     RustExpr::NumericLit(*factor),
                 ),
@@ -337,14 +338,12 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
             );
             let body = {
                 let let_tmp = RustStmt::assign(
-                    "tmp",
+                    "_",
                     RustExpr::local(input_varname.clone())
                         .call_method("read_byte")
                         .wrap_try(),
                 );
-                let rebind =
-                    RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1));
-                vec![let_tmp, rebind]
+                vec![let_tmp]
             };
             RustExpr::BlockScope(
                 vec![RustStmt::Control(RustControl::While(cond, body))],
@@ -357,43 +356,35 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
         ),
         Decoder::EndOfInput => {
             let call = RustExpr::local(input_varname.clone()).call_method("read_byte");
-            let bind = RustStmt::assign("tmp", call);
-            let cond = RustExpr::local("tmp").call_method("is_none");
+            let cond = call.call_method("is_none");
             let b_true = [
-                RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1)),
                 RustStmt::Return(false, RustExpr::UNIT),
             ];
             let b_false = [RustStmt::Return(true, RustExpr::NONE)];
-            RustExpr::BlockScope(
-                vec![bind],
-                Box::new(RustExpr::Control(Box::new(RustControl::If(
+                RustExpr::Control(Box::new(RustControl::If(
                     cond,
                     b_true.to_vec(),
                     Some(b_false.to_vec()),
-                )))),
-            )
+                )))
         }
         Decoder::Byte(bs) => {
             // FIXME - we have multiple options to handle this, none of them simple
             let bs_let = RustStmt::assign("bs", embed_byteset(bs));
 
-            let call = RustExpr::local("input").call_method("read_byte").wrap_try();
-
-            let bind = RustStmt::assign("tmp", call);
-            let b_let = RustStmt::assign("b", RustExpr::local("tmp").nth(0));
+            let call = RustExpr::local(input_varname.clone()).call_method("read_byte").wrap_try();
+            let b_let = RustStmt::assign("b", call);
 
             let logic = {
                 let cond =
                     RustExpr::local("bs").call_method_with("contains", [RustExpr::local("b")]);
                 let b_true = vec![
-                    RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1)),
                     RustStmt::Return(false, RustExpr::local("b")),
                 ];
                 let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
                 RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
             };
 
-            RustExpr::BlockScope([bs_let, bind, b_let].to_vec(), Box::new(logic))
+            RustExpr::BlockScope([bs_let, b_let].to_vec(), Box::new(logic))
         }
         // FIXME - not sure what to do with _args ...
         Decoder::Call(ix_dec, _args) => {
@@ -402,12 +393,15 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
                 RustExpr::local("scope"),
                 RustExpr::local(input_varname.clone()),
             ]);
-            let bind = RustStmt::assign("tmp", call.wrap_try());
-            let replace = RustStmt::Reassign(input_varname.clone(), RustExpr::local("tmp").nth(1));
-            let ret = RustExpr::local("tmp").nth(0);
-            RustExpr::BlockScope(vec![bind, replace], Box::new(ret))
+            call.wrap_try()
         }
-        _ => RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("invoke_decoder")]),
+        Decoder::Tuple(elts) if elts.is_empty() => {
+            RustExpr::UNIT
+        }
+        other => {
+            let let_tmp = RustStmt::assign("tmp", RustExpr::str_lit(format!("invoke_decoder @ {:?}", std::mem::discriminant(other))));
+            RustExpr::BlockScope(vec![let_tmp], Box::new(RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("{}"), RustExpr::local("tmp")])))
+        }
     }
 }
 
@@ -466,16 +460,8 @@ pub enum DerivedLogic {
 
 fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::RustStmt> {
     // FIXME - double-check this won't clash with any local assignments in Decoder expansion
-    let inp_varname: Label = "inp".into();
+    let inp_varname: Label = "input".into();
     let mut body = Vec::new();
-
-    let init = RustStmt::Let(
-        Mut::Mutable,
-        inp_varname.clone(),
-        None,
-        RustExpr::local("input"),
-    );
-    body.push(init);
 
     match decoder {
         Decoder::Tuple(elems) => {

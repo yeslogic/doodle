@@ -407,7 +407,7 @@ fn replace_bad(input: &str) -> String {
             ret.push('_');
             ret.push(c);
             dashed = false;
-        } else if is_valid(0, c) {
+        } else if is_valid(ret.len(), c) {
             ret.push(c);
             dashed = false;
         } else if !dashed {
@@ -828,9 +828,8 @@ impl ToFragment for RustExpr {
         match self {
             RustExpr::Entity(e) => e.to_fragment(),
             RustExpr::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
-            RustExpr::StringLit(s) => s
-                .to_fragment()
-                .delimit(Fragment::Char('"'), Fragment::Char('"')),
+            RustExpr::StringLit(s) => Fragment::String(s.clone())
+                .delimit(Fragment::string("r#\""), Fragment::string("\"#")),
             RustExpr::ArrayLit(elts) => Fragment::seq(
                 elts.iter().map(RustExpr::to_fragment),
                 Some(Fragment::string(", ")),
