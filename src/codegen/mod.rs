@@ -325,6 +325,37 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
     ])])
 }
 
+fn name_for_decoder(dec: &Decoder) -> &'static str {
+    match dec {
+        Decoder::Call(_, _) => "Call",
+        Decoder::Fail => "Fail",
+        Decoder::EndOfInput => "EndOfInput",
+        Decoder::Align(_) => "Align",
+        Decoder::Byte(_) => "Byte",
+        Decoder::Variant(_, _) => "Variant",
+        Decoder::Parallel(_) => "Parallel",
+        Decoder::Branch(_, _) => "Branch",
+        Decoder::Tuple(_) => "Tuple",
+        Decoder::Record(_) => "Record",
+        Decoder::While(_, _) => "While",
+        Decoder::Until(_, _) => "Until",
+        Decoder::RepeatCount(_, _) => "RepeatCount",
+        Decoder::RepeatUntilLast(_, _) => "RepeatUntilLast",
+        Decoder::RepeatUntilSeq(_, _) => "RepeatUntilSeq",
+        Decoder::Peek(_) => "Peek",
+        Decoder::PeekNot(_) => "PeekNot",
+        Decoder::Slice(_, _) => "Slice",
+        Decoder::Bits(_) => "Bits",
+        Decoder::WithRelativeOffset(_, _) => "WithRelativeOffset",
+        Decoder::Map(_, _) => "Map",
+        Decoder::Compute(_) => "Compute",
+        Decoder::Let(_, _, _) => "Let",
+        Decoder::Match(_, _) => "Match",
+        Decoder::Dynamic(_, _, _) => "Dynamic",
+        Decoder::Apply(_) => "Apply",
+    }
+}
+
 // FIXME - implement something that actually works
 fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
     match decoder {
@@ -401,10 +432,7 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
         other => {
             let let_tmp = RustStmt::assign(
                 "tmp",
-                RustExpr::str_lit(format!(
-                    "invoke_decoder @ {:?}",
-                    std::mem::discriminant(other)
-                )),
+                RustExpr::str_lit(format!("invoke_decoder @ {}", name_for_decoder(other))),
             );
             RustExpr::BlockScope(
                 vec![let_tmp],
