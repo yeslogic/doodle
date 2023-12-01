@@ -9,7 +9,9 @@ pub struct ParseCtxt<'a> {
 
 impl<'a> ParseCtxt<'a> {
     pub fn new(bytes: &'a [u8]) -> ParseCtxt<'a> {
-        Self { input: ReadCtxt::new(bytes) }
+        Self {
+            input: ReadCtxt::new(bytes),
+        }
     }
 
     pub const fn offset(&self) -> usize {
@@ -17,7 +19,7 @@ impl<'a> ParseCtxt<'a> {
     }
 
     pub fn read_byte(&mut self) -> Option<u8> {
-        let (ret, new_input) =  self.input.read_byte()?;
+        let (ret, new_input) = self.input.read_byte()?;
         self.input = new_input;
         Some(ret)
     }
