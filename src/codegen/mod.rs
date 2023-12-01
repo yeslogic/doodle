@@ -299,7 +299,11 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
                 let ty = {
                     let mut params = RustParams::<RustLt, RustType>::new();
                     params.push_lifetime(RustLt::Parametric("'input".into()));
-                    RustType::Atom(AtomType::Comp(CompType::Borrow(None, Mut::Mutable, Box::new(RustType::verbatim("ParseCtxt", Some(params))))))
+                    RustType::Atom(AtomType::Comp(CompType::Borrow(
+                        None,
+                        Mut::Mutable,
+                        Box::new(RustType::verbatim("ParseCtxt", Some(params))),
+                    )))
                 };
                 (name, ty)
             };
@@ -357,29 +361,27 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
         Decoder::EndOfInput => {
             let call = RustExpr::local(input_varname.clone()).call_method("read_byte");
             let cond = call.call_method("is_none");
-            let b_true = [
-                RustStmt::Return(false, RustExpr::UNIT),
-            ];
+            let b_true = [RustStmt::Return(false, RustExpr::UNIT)];
             let b_false = [RustStmt::Return(true, RustExpr::NONE)];
-                RustExpr::Control(Box::new(RustControl::If(
-                    cond,
-                    b_true.to_vec(),
-                    Some(b_false.to_vec()),
-                )))
+            RustExpr::Control(Box::new(RustControl::If(
+                cond,
+                b_true.to_vec(),
+                Some(b_false.to_vec()),
+            )))
         }
         Decoder::Byte(bs) => {
             // FIXME - we have multiple options to handle this, none of them simple
             let bs_let = RustStmt::assign("bs", embed_byteset(bs));
 
-            let call = RustExpr::local(input_varname.clone()).call_method("read_byte").wrap_try();
+            let call = RustExpr::local(input_varname.clone())
+                .call_method("read_byte")
+                .wrap_try();
             let b_let = RustStmt::assign("b", call);
 
             let logic = {
                 let cond =
                     RustExpr::local("bs").call_method_with("contains", [RustExpr::local("b")]);
-                let b_true = vec![
-                    RustStmt::Return(false, RustExpr::local("b")),
-                ];
+                let b_true = vec![RustStmt::Return(false, RustExpr::local("b"))];
                 let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
                 RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
             };
@@ -395,12 +397,22 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
             ]);
             call.wrap_try()
         }
-        Decoder::Tuple(elts) if elts.is_empty() => {
-            RustExpr::UNIT
-        }
+        Decoder::Tuple(elts) if elts.is_empty() => RustExpr::UNIT,
         other => {
-            let let_tmp = RustStmt::assign("tmp", RustExpr::str_lit(format!("invoke_decoder @ {:?}", std::mem::discriminant(other))));
-            RustExpr::BlockScope(vec![let_tmp], Box::new(RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("{}"), RustExpr::local("tmp")])))
+            let let_tmp = RustStmt::assign(
+                "tmp",
+                RustExpr::str_lit(format!(
+                    "invoke_decoder @ {:?}",
+                    std::mem::discriminant(other)
+                )),
+            );
+            RustExpr::BlockScope(
+                vec![let_tmp],
+                Box::new(
+                    RustExpr::local("unimplemented!")
+                        .call_with([RustExpr::str_lit("{}"), RustExpr::local("tmp")]),
+                ),
+            )
         }
     }
 }
