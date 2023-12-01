@@ -1,91 +1,68 @@
 use doodle::prelude::*;
 
-struct Type86 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type62,
-    crc: u32,
+enum Type36 {
+    other(Vec<u8>),
+    xmp { xmp: Vec<u8> },
+    exif { padding: u8, exif: Type35 },
 }
 
-enum Type23 {
-    dynamic_huffman {
-        hlit: u8,
-        hdist: u8,
-        hclen: u8,
-        code_length_alphabet_code_lengths: Vec<u8>,
-        literal_length_distance_alphabet_code_lengths: Vec<Type15>,
-        literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
-        literal_length_alphabet_code_lengths_value: Vec<u8>,
-        distance_alphabet_code_lengths_value: Vec<u8>,
-        codes: Vec<Type18>,
-        codes_values: Vec<Type19>,
-    },
-    fixed_huffman {
-        codes: Vec<Type21>,
-        codes_values: Vec<Type19>,
-    },
-    uncompressed {
-        align: (),
-        len: u16,
-        nlen: u16,
-        bytes: Vec<u8>,
-        codes_values: Vec<Type22>,
-    },
+struct Type41 {
+    class_table_id: u8,
+    value: u8,
 }
 
-struct Type92 {
+struct Type94 {
     marker: Type28,
     length: u16,
-    data: Type40,
+    data: Type42,
 }
 
-struct Type84 {
+struct Type82 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Vec<Type2>,
+    data: Type58,
     crc: u32,
 }
 
-enum Type30 {
-    other(Vec<u8>),
-    jfif {
-        version_major: u8,
-        version_minor: u8,
-        density_units: u8,
-        density_x: u16,
-        density_y: u16,
-        thumbnail_width: u8,
-        thumbnail_height: u8,
-        thumbnail_pixels: Vec<Vec<Type2>>,
-    },
+struct Type64 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Vec<u8>,
+    crc: u32,
 }
 
-struct Type99 {
-    align: (),
-    len: u16,
-    nlen: u16,
-    bytes: Vec<u8>,
-    codes_values: Vec<Type22>,
-}
-
-struct Type39 {
-    precision_table_id: u8,
-    elements: Vec<u8>,
-}
-
-struct Type100 {
-    codes: Vec<Type21>,
-    codes_values: Vec<Type19>,
-}
-
-struct Type21 {
-    code: u16,
-    extra: Type20,
+struct Type1 {
+    screen_width: u16,
+    screen_height: u16,
+    flags: u8,
+    bg_color_index: u8,
+    pixel_aspect_ratio: u8,
 }
 
 struct Type7 {
     len_bytes: u8,
     data: Vec<u8>,
+}
+
+struct Type68 {
+    tag: (u8, u8, u8, u8),
+    chunks: Vec<Type67>,
+}
+
+enum Type32 {
+    le(u8, u8),
+    be(u8, u8),
+}
+
+enum Type74 {
+    ascii(Vec<u8>),
+    utf8(Vec<char>),
+}
+
+struct Type88 {
+    marker: Type28,
+    length: u16,
+    data: Type37,
 }
 
 enum Type43 {
@@ -196,177 +173,6 @@ enum Type43 {
     },
 }
 
-struct Type28 {
-    ff: u8,
-    marker: u8,
-}
-
-struct Type57 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type56,
-    crc: u32,
-}
-
-struct Type77 {
-    header: Type0,
-    logical_screen: Type4,
-    blocks: Vec<Type11>,
-    trailer: Type12,
-}
-
-struct Type59 {
-    pixels_per_unit_x: u32,
-    pixels_per_unit_y: u32,
-    unit_specifier: u8,
-}
-
-struct Type67 {
-    tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Vec<u8>,
-    pad: Type66,
-}
-
-struct Type88 {
-    marker: Type28,
-    length: u16,
-    data: Type37,
-}
-
-struct Type35 {
-    byte_order: Type32,
-    magic: u16,
-    offset: u32,
-    ifd: Type34,
-}
-
-enum Type11 {
-    graphic_block {
-        graphic_control_extension: Type5,
-        graphic_rendering_block: Type9,
-    },
-    special_purpose_block(Type10),
-}
-
-struct Type26 {
-    crc: u32,
-    length: u32,
-}
-
-struct Type87 {
-    marker: Type28,
-    length: u16,
-    data: Type31,
-}
-
-struct Type93 {
-    marker: Type28,
-    length: u16,
-    data: Type41,
-}
-
-struct Type107 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    text_grid_left_position: u16,
-    text_grid_top_position: u16,
-    text_grid_width: u16,
-    text_grid_height: u16,
-    character_cell_width: u8,
-    character_cell_height: u8,
-    text_foreground_color_index: u8,
-    text_background_color_index: u8,
-    plain_text_data: Vec<Type7>,
-    terminator: u8,
-}
-
-enum Type5 {
-    some {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        flags: u8,
-        delay_time: u16,
-        transparent_color_index: u8,
-        terminator: u8,
-    },
-    none(),
-}
-
-struct Type89 {
-    marker: Type28,
-    length: u16,
-    data: Type53,
-}
-
-enum Type10 {
-    application_extension {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        identifier: Vec<u8>,
-        authentication_code: Vec<u8>,
-        application_data: Vec<Type7>,
-        terminator: u8,
-    },
-    comment_extension {
-        separator: u8,
-        label: u8,
-        comment_data: Vec<Type7>,
-        terminator: u8,
-    },
-}
-
-struct Type25 {
-    blocks: Vec<Type24>,
-    codes: Vec<Type19>,
-    inflate: Vec<u8>,
-}
-
-struct Type33 {
-    tag: u16,
-    r#type: u16,
-    length: u32,
-    offset_or_data: u32,
-}
-
-struct Type41 {
-    class_table_id: u8,
-    value: u8,
-}
-
-struct Type2 {
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
-struct Type45 {
-    sample_precision: u8,
-    num_lines: u16,
-    num_samples_per_line: u16,
-    num_image_components: u8,
-    image_components: Vec<Type44>,
-}
-
-struct Type96 {
-    padding: u8,
-    exif: Type35,
-}
-
-struct Type98 {
-    version_major: u8,
-    version_minor: u8,
-    density_units: u8,
-    density_x: u16,
-    density_y: u16,
-    thumbnail_width: u8,
-    thumbnail_height: u8,
-    thumbnail_pixels: Vec<Vec<Type2>>,
-}
-
 enum Type20 {
     none(),
     some {
@@ -377,317 +183,28 @@ enum Type20 {
     },
 }
 
-enum Type36 {
-    other(Vec<u8>),
-    xmp { xmp: Vec<u8> },
-    exif { padding: u8, exif: Type35 },
+struct Type61 {
+    palette_index: u8,
 }
 
-struct Type72 {
-    name: Type69,
-    mode: Type70,
-    uid: Type70,
-    gid: Type70,
-    size: u32,
-    mtime: Type70,
-    chksum: Type70,
-    typeflag: u8,
-    linkname: Type69,
-    magic: (u8, u8, u8, u8, u8, u8),
-    version: (u8, u8),
-    uname: Type71,
-    gname: Type71,
-    devmajor: Type70,
-    devminor: Type70,
-    prefix: Type69,
-    pad: Vec<u8>,
+struct Type25 {
+    blocks: Vec<Type24>,
+    codes: Vec<Type19>,
+    inflate: Vec<u8>,
 }
 
-struct Type82 {
+struct Type27 {
+    header: Type13,
+    fname: Type14,
+    data: Type25,
+    footer: Type26,
+}
+
+struct Type33 {
+    tag: u16,
+    r#type: u16,
     length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type58,
-    crc: u32,
-}
-
-struct Type42 {
-    restart_interval: u16,
-}
-
-enum Type19 {
-    literal(u8),
-    reference { length: u16, distance: u16 },
-}
-
-struct Type44 {
-    id: u8,
-    sampling_factor: u8,
-    quantization_table_id: u8,
-}
-
-struct Type60 {
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-}
-
-struct Type6 {
-    separator: u8,
-    image_left_position: u16,
-    image_top_position: u16,
-    image_width: u16,
-    image_height: u16,
-    flags: u8,
-}
-
-enum Type54 {
-    some {
-        marker: Type28,
-        length: u16,
-        data: Type53,
-    },
-    none(),
-}
-
-struct Type31 {
-    identifier: Type29,
-    data: Type30,
-}
-
-struct Type103 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    identifier: Vec<u8>,
-    authentication_code: Vec<u8>,
-    application_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type0 {
-    signature: (u8, u8, u8),
-    version: Vec<u8>,
-}
-
-struct Type55 {
-    initial_segment: Type38,
-    segments: Vec<Type43>,
-    header: Type46,
-    scan: Type52,
-    dnl: Type54,
-    scans: Vec<Type52>,
-}
-
-enum Type38 {
-    app0 {
-        marker: Type28,
-        length: u16,
-        data: Type31,
-    },
-    app1 {
-        marker: Type28,
-        length: u16,
-        data: Type37,
-    },
-}
-
-struct Type51 {
-    scan_data: Vec<Type50>,
-    scan_data_stream: Vec<u8>,
-}
-
-enum Type58 {
-    color_type_3 { palette_index: u8 },
-    color_type_6 { red: u16, green: u16, blue: u16 },
-    color_type_2 { red: u16, green: u16, blue: u16 },
-    color_type_4 { greyscale: u16 },
-    color_type_0 { greyscale: u16 },
-}
-
-struct Type13 {
-    magic: (u8, u8),
-    method: u8,
-    file_flags: u8,
-    timestamp: u32,
-    compression_flags: u8,
-    os_id: u8,
-}
-
-struct Type49 {
-    marker: Type28,
-    length: u16,
-    data: Type48,
-}
-
-enum Type66 {
-    no(u8),
-    yes(),
-}
-
-struct Type68 {
-    tag: (u8, u8, u8, u8),
-    chunks: Vec<Type67>,
-}
-
-struct Type81 {
-    contents: Vec<Type73>,
-    __padding: Vec<u8>,
-    __trailing: Vec<u8>,
-}
-
-struct Type101 {
-    hlit: u8,
-    hdist: u8,
-    hclen: u8,
-    code_length_alphabet_code_lengths: Vec<u8>,
-    literal_length_distance_alphabet_code_lengths: Vec<Type15>,
-    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
-    literal_length_alphabet_code_lengths_value: Vec<u8>,
-    distance_alphabet_code_lengths_value: Vec<u8>,
-    codes: Vec<Type18>,
-    codes_values: Vec<Type19>,
-}
-
-struct Type105 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    flags: u8,
-    delay_time: u16,
-    transparent_color_index: u8,
-    terminator: u8,
-}
-
-struct Type12 {
-    separator: u8,
-}
-
-struct Type106 {
-    descriptor: Type6,
-    local_color_table: Type3,
-    data: Type8,
-}
-
-enum Type9 {
-    table_based_image {
-        descriptor: Type6,
-        local_color_table: Type3,
-        data: Type8,
-    },
-    plain_text_extension {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        text_grid_left_position: u16,
-        text_grid_top_position: u16,
-        text_grid_width: u16,
-        text_grid_height: u16,
-        character_cell_width: u8,
-        character_cell_height: u8,
-        text_foreground_color_index: u8,
-        text_background_color_index: u8,
-        plain_text_data: Vec<Type7>,
-        terminator: u8,
-    },
-}
-
-struct Type56 {
-    width: u32,
-    height: u32,
-    bit_depth: u8,
-    color_type: u8,
-    compression_method: u8,
-    filter_method: u8,
-    interlace_method: u8,
-}
-
-enum Type32 {
-    le(u8, u8),
-    be(u8, u8),
-}
-
-struct Type8 {
-    lzw_min_code_size: u8,
-    image_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type24 {
-    r#final: u8,
-    r#type: u8,
-    data: Type23,
-}
-
-enum Type50 {
-    mcu(u8),
-    rst0 { ff: u8, marker: u8 },
-    rst1 { ff: u8, marker: u8 },
-    rst2 { ff: u8, marker: u8 },
-    rst3 { ff: u8, marker: u8 },
-    rst4 { ff: u8, marker: u8 },
-    rst5 { ff: u8, marker: u8 },
-    rst6 { ff: u8, marker: u8 },
-    rst7 { ff: u8, marker: u8 },
-}
-
-struct Type94 {
-    marker: Type28,
-    length: u16,
-    data: Type42,
-}
-
-struct Type83 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type59,
-    crc: u32,
-}
-
-struct Type53 {
-    num_lines: u16,
-}
-
-struct Type79 {
-    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-    ihdr: Type57,
-    chunks: Vec<Type63>,
-    idat: Vec<Type64>,
-    more_chunks: Vec<Type63>,
-    iend: Type65,
-}
-
-struct Type85 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type60,
-    crc: u32,
-}
-
-struct Type4 {
-    descriptor: Type1,
-    global_color_table: Type3,
-}
-
-struct Type15 {
-    code: u16,
-    extra: u8,
-}
-
-enum Type17 {
-    none(),
-    some {
-        length_extra_bits: u8,
-        length: u16,
-        distance_code: u16,
-        distance_record: Type16,
-    },
-}
-
-enum Type22 {
-    literal(u8),
+    offset_or_data: u32,
 }
 
 struct Type29 {
@@ -695,108 +212,11 @@ struct Type29 {
     null: u8,
 }
 
-enum Type3 {
-    no(),
-    yes(Vec<Type2>),
-}
-
-struct Type37 {
-    identifier: Type29,
-    data: Type36,
-}
-
-struct Type73 {
-    header: Type72,
-    file: Vec<u8>,
-    __padding: (),
-}
-
-struct Type102 {
-    graphic_control_extension: Type5,
-    graphic_rendering_block: Type9,
-}
-
-struct Type69 {
-    string: Vec<u8>,
-    __padding: Vec<u8>,
-}
-
-struct Type104 {
-    separator: u8,
-    label: u8,
-    comment_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type48 {
-    num_image_components: u8,
-    image_components: Vec<Type47>,
-    start_spectral_selection: u8,
-    end_spectral_selection: u8,
-    approximation_bit_position: u8,
-}
-
-enum Type62 {
-    color_type_3(Vec<Type61>),
-    color_type_2 { red: u16, green: u16, blue: u16 },
-    color_type_0 { greyscale: u16 },
-}
-
-struct Type52 {
-    segments: Vec<Type43>,
-    sos: Type49,
-    data: Type51,
-}
-
-enum Type75 {
-    gif {
-        header: Type0,
-        logical_screen: Type4,
-        blocks: Vec<Type11>,
-        trailer: Type12,
-    },
-    gzip(Vec<Type27>),
-    jpeg {
-        soi: Type28,
-        frame: Type55,
-        eoi: Type28,
-    },
-    png {
-        signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-        ihdr: Type57,
-        chunks: Vec<Type63>,
-        idat: Vec<Type64>,
-        more_chunks: Vec<Type63>,
-        iend: Type65,
-    },
-    riff {
-        tag: (u8, u8, u8, u8),
-        length: u32,
-        data: Type68,
-        pad: Type66,
-    },
-    tar {
-        contents: Vec<Type73>,
-        __padding: Vec<u8>,
-        __trailing: Vec<u8>,
-    },
-    text(Type74),
-}
-
-struct Type91 {
-    marker: Type28,
-    length: u16,
-    data: Type39,
-}
-
-struct Type70 {
-    string: Vec<u8>,
-    __nul_or_wsp: u8,
-    __padding: Vec<u8>,
-}
-
-struct Type61 {
-    palette_index: u8,
+struct Type34 {
+    num_fields: u16,
+    fields: Vec<Type33>,
+    next_ifd_offset: u32,
+    next_ifd: Vec<u8>,
 }
 
 enum Type46 {
@@ -867,25 +287,262 @@ enum Type46 {
     },
 }
 
-struct Type71 {
-    string: Vec<u8>,
-    padding: Vec<u8>,
+struct Type80 {
+    tag: (u8, u8, u8, u8),
+    length: u32,
+    data: Type68,
+    pad: Type66,
 }
 
-struct Type16 {
-    distance_extra_bits: u16,
-    distance: u16,
+struct Type84 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Vec<Type2>,
+    crc: u32,
 }
 
-struct Type40 {
-    class_table_id: u8,
-    num_codes: Vec<u8>,
-    values: Vec<u8>,
+struct Type85 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type60,
+    crc: u32,
 }
 
-struct Type47 {
-    component_selector: u8,
-    entropy_coding_table_ids: u8,
+struct Type81 {
+    contents: Vec<Type73>,
+    __padding: Vec<u8>,
+    __trailing: Vec<u8>,
+}
+
+struct Type90 {
+    marker: Type28,
+    length: u16,
+    data: Type45,
+}
+
+struct Type100 {
+    codes: Vec<Type21>,
+    codes_values: Vec<Type19>,
+}
+
+struct Type4 {
+    descriptor: Type1,
+    global_color_table: Type3,
+}
+
+struct Type79 {
+    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
+    ihdr: Type57,
+    chunks: Vec<Type63>,
+    idat: Vec<Type64>,
+    more_chunks: Vec<Type63>,
+    iend: Type65,
+}
+
+struct Type103 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    identifier: Vec<u8>,
+    authentication_code: Vec<u8>,
+    application_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type78 {
+    soi: Type28,
+    frame: Type55,
+    eoi: Type28,
+}
+
+struct Type92 {
+    marker: Type28,
+    length: u16,
+    data: Type40,
+}
+
+struct Type45 {
+    sample_precision: u8,
+    num_lines: u16,
+    num_samples_per_line: u16,
+    num_image_components: u8,
+    image_components: Vec<Type44>,
+}
+
+enum Type3 {
+    no(),
+    yes(Vec<Type2>),
+}
+
+struct Type24 {
+    r#final: u8,
+    r#type: u8,
+    data: Type23,
+}
+
+struct Type8 {
+    lzw_min_code_size: u8,
+    image_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type55 {
+    initial_segment: Type38,
+    segments: Vec<Type43>,
+    header: Type46,
+    scan: Type52,
+    dnl: Type54,
+    scans: Vec<Type52>,
+}
+
+struct Type15 {
+    code: u16,
+    extra: u8,
+}
+
+enum Type58 {
+    color_type_3 { palette_index: u8 },
+    color_type_6 { red: u16, green: u16, blue: u16 },
+    color_type_2 { red: u16, green: u16, blue: u16 },
+    color_type_4 { greyscale: u16 },
+    color_type_0 { greyscale: u16 },
+}
+
+struct Type59 {
+    pixels_per_unit_x: u32,
+    pixels_per_unit_y: u32,
+    unit_specifier: u8,
+}
+
+struct Type48 {
+    num_image_components: u8,
+    image_components: Vec<Type47>,
+    start_spectral_selection: u8,
+    end_spectral_selection: u8,
+    approximation_bit_position: u8,
+}
+
+struct Type51 {
+    scan_data: Vec<Type50>,
+    scan_data_stream: Vec<u8>,
+}
+
+struct Type35 {
+    byte_order: Type32,
+    magic: u16,
+    offset: u32,
+    ifd: Type34,
+}
+
+enum Type19 {
+    literal(u8),
+    reference { length: u16, distance: u16 },
+}
+
+struct Type12 {
+    separator: u8,
+}
+
+struct Type72 {
+    name: Type69,
+    mode: Type70,
+    uid: Type70,
+    gid: Type70,
+    size: u32,
+    mtime: Type70,
+    chksum: Type70,
+    typeflag: u8,
+    linkname: Type69,
+    magic: (u8, u8, u8, u8, u8, u8),
+    version: (u8, u8),
+    uname: Type71,
+    gname: Type71,
+    devmajor: Type70,
+    devminor: Type70,
+    prefix: Type69,
+    pad: Vec<u8>,
+}
+
+struct Type95 {
+    marker: Type28,
+    length: u16,
+    data: Vec<u8>,
+}
+
+enum Type5 {
+    some {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        flags: u8,
+        delay_time: u16,
+        transparent_color_index: u8,
+        terminator: u8,
+    },
+    none(),
+}
+
+struct Type67 {
+    tag: (u8, u8, u8, u8),
+    length: u32,
+    data: Vec<u8>,
+    pad: Type66,
+}
+
+enum Type54 {
+    some {
+        marker: Type28,
+        length: u16,
+        data: Type53,
+    },
+    none(),
+}
+
+struct Type42 {
+    restart_interval: u16,
+}
+
+struct Type73 {
+    header: Type72,
+    file: Vec<u8>,
+    __padding: (),
+}
+
+struct Type93 {
+    marker: Type28,
+    length: u16,
+    data: Type41,
+}
+
+struct Type104 {
+    separator: u8,
+    label: u8,
+    comment_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type49 {
+    marker: Type28,
+    length: u16,
+    data: Type48,
+}
+
+struct Type31 {
+    identifier: Type29,
+    data: Type30,
+}
+
+enum Type38 {
+    app0 {
+        marker: Type28,
+        length: u16,
+        data: Type31,
+    },
+    app1 {
+        marker: Type28,
+        length: u16,
+        data: Type37,
+    },
 }
 
 struct Type65 {
@@ -895,70 +552,60 @@ struct Type65 {
     crc: u32,
 }
 
-struct Type80 {
-    tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Type68,
-    pad: Type66,
+struct Type70 {
+    string: Vec<u8>,
+    __nul_or_wsp: u8,
+    __padding: Vec<u8>,
 }
 
-struct Type90 {
-    marker: Type28,
-    length: u16,
-    data: Type45,
+enum Type17 {
+    none(),
+    some {
+        length_extra_bits: u8,
+        length: u16,
+        distance_code: u16,
+        distance_record: Type16,
+    },
 }
 
-struct Type27 {
-    header: Type13,
-    fname: Type14,
-    data: Type25,
-    footer: Type26,
-}
-
-enum Type74 {
-    ascii(Vec<u8>),
-    utf8(Vec<char>),
-}
-
-struct Type95 {
-    marker: Type28,
-    length: u16,
-    data: Vec<u8>,
-}
-
-struct Type97 {
-    xmp: Vec<u8>,
-}
-
-struct Type1 {
-    screen_width: u16,
-    screen_height: u16,
-    flags: u8,
-    bg_color_index: u8,
-    pixel_aspect_ratio: u8,
-}
-
-enum Type14 {
-    no(),
-    yes { string: Vec<u8>, null: u8 },
-}
-
-struct Type76 {
-    data: Type75,
-    end: (),
-}
-
-struct Type64 {
+struct Type86 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Vec<u8>,
+    data: Type62,
     crc: u32,
 }
 
-struct Type78 {
-    soi: Type28,
-    frame: Type55,
-    eoi: Type28,
+struct Type60 {
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+}
+
+struct Type96 {
+    padding: u8,
+    exif: Type35,
+}
+
+struct Type99 {
+    align: (),
+    len: u16,
+    nlen: u16,
+    bytes: Vec<u8>,
+    codes_values: Vec<Type22>,
+}
+
+struct Type106 {
+    descriptor: Type6,
+    local_color_table: Type3,
+    data: Type8,
+}
+
+struct Type39 {
+    precision_table_id: u8,
+    elements: Vec<u8>,
 }
 
 enum Type63 {
@@ -994,16 +641,369 @@ enum Type63 {
     },
 }
 
+enum Type10 {
+    application_extension {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        identifier: Vec<u8>,
+        authentication_code: Vec<u8>,
+        application_data: Vec<Type7>,
+        terminator: u8,
+    },
+    comment_extension {
+        separator: u8,
+        label: u8,
+        comment_data: Vec<Type7>,
+        terminator: u8,
+    },
+}
+
+struct Type0 {
+    signature: (u8, u8, u8),
+    version: Vec<u8>,
+}
+
+enum Type14 {
+    no(),
+    yes { string: Vec<u8>, null: u8 },
+}
+
 struct Type18 {
     code: u16,
     extra: Type17,
 }
 
-struct Type34 {
-    num_fields: u16,
-    fields: Vec<Type33>,
-    next_ifd_offset: u32,
-    next_ifd: Vec<u8>,
+struct Type57 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type56,
+    crc: u32,
+}
+
+struct Type13 {
+    magic: (u8, u8),
+    method: u8,
+    file_flags: u8,
+    timestamp: u32,
+    compression_flags: u8,
+    os_id: u8,
+}
+
+struct Type76 {
+    data: Type75,
+    end: (),
+}
+
+struct Type28 {
+    ff: u8,
+    marker: u8,
+}
+
+enum Type75 {
+    gif {
+        header: Type0,
+        logical_screen: Type4,
+        blocks: Vec<Type11>,
+        trailer: Type12,
+    },
+    gzip(Vec<Type27>),
+    jpeg {
+        soi: Type28,
+        frame: Type55,
+        eoi: Type28,
+    },
+    png {
+        signature: (u8, u8, u8, u8, u8, u8, u8, u8),
+        ihdr: Type57,
+        chunks: Vec<Type63>,
+        idat: Vec<Type64>,
+        more_chunks: Vec<Type63>,
+        iend: Type65,
+    },
+    riff {
+        tag: (u8, u8, u8, u8),
+        length: u32,
+        data: Type68,
+        pad: Type66,
+    },
+    tar {
+        contents: Vec<Type73>,
+        __padding: Vec<u8>,
+        __trailing: Vec<u8>,
+    },
+    text(Type74),
+}
+
+struct Type69 {
+    string: Vec<u8>,
+    __padding: Vec<u8>,
+}
+
+struct Type77 {
+    header: Type0,
+    logical_screen: Type4,
+    blocks: Vec<Type11>,
+    trailer: Type12,
+}
+
+struct Type87 {
+    marker: Type28,
+    length: u16,
+    data: Type31,
+}
+
+struct Type91 {
+    marker: Type28,
+    length: u16,
+    data: Type39,
+}
+
+struct Type97 {
+    xmp: Vec<u8>,
+}
+
+struct Type21 {
+    code: u16,
+    extra: Type20,
+}
+
+enum Type9 {
+    table_based_image {
+        descriptor: Type6,
+        local_color_table: Type3,
+        data: Type8,
+    },
+    plain_text_extension {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        text_grid_left_position: u16,
+        text_grid_top_position: u16,
+        text_grid_width: u16,
+        text_grid_height: u16,
+        character_cell_width: u8,
+        character_cell_height: u8,
+        text_foreground_color_index: u8,
+        text_background_color_index: u8,
+        plain_text_data: Vec<Type7>,
+        terminator: u8,
+    },
+}
+
+struct Type53 {
+    num_lines: u16,
+}
+
+struct Type52 {
+    segments: Vec<Type43>,
+    sos: Type49,
+    data: Type51,
+}
+
+struct Type47 {
+    component_selector: u8,
+    entropy_coding_table_ids: u8,
+}
+
+enum Type62 {
+    color_type_3(Vec<Type61>),
+    color_type_2 { red: u16, green: u16, blue: u16 },
+    color_type_0 { greyscale: u16 },
+}
+
+struct Type71 {
+    string: Vec<u8>,
+    padding: Vec<u8>,
+}
+
+struct Type98 {
+    version_major: u8,
+    version_minor: u8,
+    density_units: u8,
+    density_x: u16,
+    density_y: u16,
+    thumbnail_width: u8,
+    thumbnail_height: u8,
+    thumbnail_pixels: Vec<Vec<Type2>>,
+}
+
+struct Type2 {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+struct Type26 {
+    crc: u32,
+    length: u32,
+}
+
+enum Type22 {
+    literal(u8),
+}
+
+struct Type40 {
+    class_table_id: u8,
+    num_codes: Vec<u8>,
+    values: Vec<u8>,
+}
+
+enum Type30 {
+    other(Vec<u8>),
+    jfif {
+        version_major: u8,
+        version_minor: u8,
+        density_units: u8,
+        density_x: u16,
+        density_y: u16,
+        thumbnail_width: u8,
+        thumbnail_height: u8,
+        thumbnail_pixels: Vec<Vec<Type2>>,
+    },
+}
+
+struct Type6 {
+    separator: u8,
+    image_left_position: u16,
+    image_top_position: u16,
+    image_width: u16,
+    image_height: u16,
+    flags: u8,
+}
+
+struct Type44 {
+    id: u8,
+    sampling_factor: u8,
+    quantization_table_id: u8,
+}
+
+enum Type23 {
+    dynamic_huffman {
+        hlit: u8,
+        hdist: u8,
+        hclen: u8,
+        code_length_alphabet_code_lengths: Vec<u8>,
+        literal_length_distance_alphabet_code_lengths: Vec<Type15>,
+        literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
+        literal_length_alphabet_code_lengths_value: Vec<u8>,
+        distance_alphabet_code_lengths_value: Vec<u8>,
+        codes: Vec<Type18>,
+        codes_values: Vec<Type19>,
+    },
+    fixed_huffman {
+        codes: Vec<Type21>,
+        codes_values: Vec<Type19>,
+    },
+    uncompressed {
+        align: (),
+        len: u16,
+        nlen: u16,
+        bytes: Vec<u8>,
+        codes_values: Vec<Type22>,
+    },
+}
+
+struct Type16 {
+    distance_extra_bits: u16,
+    distance: u16,
+}
+
+enum Type50 {
+    mcu(u8),
+    rst0 { ff: u8, marker: u8 },
+    rst1 { ff: u8, marker: u8 },
+    rst2 { ff: u8, marker: u8 },
+    rst3 { ff: u8, marker: u8 },
+    rst4 { ff: u8, marker: u8 },
+    rst5 { ff: u8, marker: u8 },
+    rst6 { ff: u8, marker: u8 },
+    rst7 { ff: u8, marker: u8 },
+}
+
+enum Type66 {
+    no(u8),
+    yes(),
+}
+
+struct Type56 {
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    color_type: u8,
+    compression_method: u8,
+    filter_method: u8,
+    interlace_method: u8,
+}
+
+struct Type89 {
+    marker: Type28,
+    length: u16,
+    data: Type53,
+}
+
+struct Type37 {
+    identifier: Type29,
+    data: Type36,
+}
+
+struct Type101 {
+    hlit: u8,
+    hdist: u8,
+    hclen: u8,
+    code_length_alphabet_code_lengths: Vec<u8>,
+    literal_length_distance_alphabet_code_lengths: Vec<Type15>,
+    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
+    literal_length_alphabet_code_lengths_value: Vec<u8>,
+    distance_alphabet_code_lengths_value: Vec<u8>,
+    codes: Vec<Type18>,
+    codes_values: Vec<Type19>,
+}
+
+struct Type102 {
+    graphic_control_extension: Type5,
+    graphic_rendering_block: Type9,
+}
+
+struct Type105 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    flags: u8,
+    delay_time: u16,
+    transparent_color_index: u8,
+    terminator: u8,
+}
+
+struct Type107 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    text_grid_left_position: u16,
+    text_grid_top_position: u16,
+    text_grid_width: u16,
+    text_grid_height: u16,
+    character_cell_width: u8,
+    character_cell_height: u8,
+    text_foreground_color_index: u8,
+    text_background_color_index: u8,
+    plain_text_data: Vec<Type7>,
+    terminator: u8,
+}
+
+enum Type11 {
+    graphic_block {
+        graphic_control_extension: Type5,
+        graphic_rendering_block: Type9,
+    },
+    special_purpose_block(Type10),
+}
+
+struct Type83 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type59,
+    crc: u32,
 }
 
 fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type76> {
@@ -1012,7 +1012,7 @@ fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
 
 fn Decoder1<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type76> {
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(6)"#;
+        let tmp = r#"invoke_decoder @ Parallel"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let end = if input.read_byte().is_none() {
@@ -1027,7 +1027,7 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     let header = Decoder128(scope, input)?;
     let logical_screen = Decoder129(scope, input)?;
     let blocks = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let trailer = Decoder131(scope, input)?;
@@ -1041,7 +1041,7 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
 
 fn Decoder3<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<Type27>> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(11)"#;
+        let tmp = r#"invoke_decoder @ Until"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1057,15 +1057,15 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     let signature = Decoder27(scope, input)?;
     let ihdr = Decoder28(scope, input)?;
     let chunks = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let idat = {
-        let tmp = r#"invoke_decoder @ Discriminant(11)"#;
+        let tmp = r#"invoke_decoder @ Until"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let more_chunks = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let iend = Decoder31(scope, input)?;
@@ -1081,16 +1081,16 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
 
 fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type80> {
     let tag = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder23(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let pad = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type80 {
@@ -1103,15 +1103,15 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
 
 fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type81> {
     let contents = {
-        let tmp = r#"invoke_decoder @ Discriminant(11)"#;
+        let tmp = r#"invoke_decoder @ Until"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let __padding = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let __trailing = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type81 {
@@ -1123,35 +1123,35 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
 
 fn Decoder8<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type74> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(6)"#;
+        let tmp = r#"invoke_decoder @ Parallel"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
 
 fn Decoder9<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<u8>> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(11)"#;
+        let tmp = r#"invoke_decoder @ Until"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
 
 fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<char>> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
 
 fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<char> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
 
 fn Decoder12<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1171,7 +1171,7 @@ fn Decoder13<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder14<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type73> {
     let header = Decoder15(scope, input)?;
     let file = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let __padding = {
@@ -1189,7 +1189,7 @@ fn Decoder14<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder15<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type72> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1213,11 +1213,11 @@ fn Decoder16<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type69> {
     let string = {
-        let tmp = r#"invoke_decoder @ Discriminant(11)"#;
+        let tmp = r#"invoke_decoder @ Until"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let __padding = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type69 { string, __padding });
@@ -1266,11 +1266,11 @@ fn Decoder20<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type69> {
     let string = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let __padding = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type69 { string, __padding });
@@ -1278,11 +1278,11 @@ fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type71> {
     let string = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let padding = {
-        let tmp = r#"invoke_decoder @ Discriminant(11)"#;
+        let tmp = r#"invoke_decoder @ Until"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type71 { string, padding });
@@ -1290,7 +1290,7 @@ fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder23<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1298,7 +1298,7 @@ fn Decoder23<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder24<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let tag = Decoder25(scope, input)?;
     let chunks = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type68 { tag, chunks });
@@ -1316,11 +1316,11 @@ fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let tag = Decoder25(scope, input)?;
     let length = Decoder23(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let pad = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type67 {
@@ -1416,7 +1416,7 @@ fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let length = Decoder32(scope, input)?;
     let tag = Decoder43(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1430,7 +1430,7 @@ fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type63> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1439,7 +1439,7 @@ fn Decoder30<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let length = Decoder32(scope, input)?;
     let tag = Decoder35(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1455,7 +1455,7 @@ fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let length = Decoder32(scope, input)?;
     let tag = Decoder33(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1469,7 +1469,7 @@ fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder32<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1560,7 +1560,7 @@ fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<u8>> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1568,11 +1568,11 @@ fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type82> {
     let length = Decoder32(scope, input)?;
     let tag = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1587,11 +1587,11 @@ fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type83> {
     let length = Decoder32(scope, input)?;
     let tag = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1606,11 +1606,11 @@ fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type84> {
     let length = Decoder32(scope, input)?;
     let tag = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1625,11 +1625,11 @@ fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type85> {
     let length = Decoder32(scope, input)?;
     let tag = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1644,11 +1644,11 @@ fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type86> {
     let length = Decoder32(scope, input)?;
     let tag = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let crc = Decoder32(scope, input)?;
@@ -1662,7 +1662,7 @@ fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder42<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -1750,21 +1750,21 @@ fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type55> {
     let initial_segment = {
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let segments = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let header = Decoder51(scope, input)?;
     let scan = Decoder52(scope, input)?;
     let dnl = {
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let scans = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type55 {
@@ -1801,12 +1801,12 @@ fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type87> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type87 {
@@ -1818,12 +1818,12 @@ fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type88> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type88 {
@@ -1835,21 +1835,21 @@ fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type43> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
 
 fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type46> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
 
 fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type52> {
     let segments = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let sos = Decoder55(scope, input)?;
@@ -1863,12 +1863,12 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type89> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type89 {
@@ -1880,7 +1880,7 @@ fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type52> {
     let segments = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let sos = Decoder55(scope, input)?;
@@ -1894,12 +1894,12 @@ fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type49> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type49 {
@@ -1911,11 +1911,11 @@ fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type51> {
     let scan_data = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let scan_data_stream = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type51 {
@@ -1926,7 +1926,7 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -2110,7 +2110,7 @@ fn Decoder65<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder66<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
     let num_image_components = Decoder16(scope, input)?;
     let image_components = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let start_spectral_selection = Decoder16(scope, input)?;
@@ -2141,11 +2141,11 @@ fn Decoder68<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type51> {
     let scan_data = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let scan_data_stream = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type51 {
@@ -2156,12 +2156,12 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2173,12 +2173,12 @@ fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2190,12 +2190,12 @@ fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2207,12 +2207,12 @@ fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2224,12 +2224,12 @@ fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2241,12 +2241,12 @@ fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2258,12 +2258,12 @@ fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2275,12 +2275,12 @@ fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2292,12 +2292,12 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2309,12 +2309,12 @@ fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder79<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2326,12 +2326,12 @@ fn Decoder79<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder80<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2343,12 +2343,12 @@ fn Decoder80<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder81<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2360,12 +2360,12 @@ fn Decoder81<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder82<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type90 {
@@ -2381,7 +2381,7 @@ fn Decoder83<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let num_samples_per_line = Decoder42(scope, input)?;
     let num_image_components = Decoder16(scope, input)?;
     let image_components = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type45 {
@@ -2406,12 +2406,12 @@ fn Decoder84<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type91> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type91 {
@@ -2423,12 +2423,12 @@ fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type92> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type92 {
@@ -2440,12 +2440,12 @@ fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type93> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type93 {
@@ -2457,12 +2457,12 @@ fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type94> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type94 {
@@ -2474,12 +2474,12 @@ fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2491,12 +2491,12 @@ fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2508,12 +2508,12 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2525,12 +2525,12 @@ fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2542,12 +2542,12 @@ fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2559,12 +2559,12 @@ fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2576,12 +2576,12 @@ fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2593,12 +2593,12 @@ fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2610,12 +2610,12 @@ fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2627,12 +2627,12 @@ fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2644,12 +2644,12 @@ fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2661,12 +2661,12 @@ fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2678,12 +2678,12 @@ fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2695,12 +2695,12 @@ fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2712,12 +2712,12 @@ fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let marker = {
-        let tmp = r#"invoke_decoder @ Discriminant(9)"#;
+        let tmp = r#"invoke_decoder @ Record"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let length = Decoder42(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(17)"#;
+        let tmp = r#"invoke_decoder @ Slice"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type95 {
@@ -2744,11 +2744,11 @@ fn Decoder105<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type40> {
     let class_table_id = Decoder16(scope, input)?;
     let num_codes = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let values = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type40 {
@@ -2761,7 +2761,7 @@ fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type39> {
     let precision_table_id = Decoder16(scope, input)?;
     let elements = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type39 {
@@ -2773,7 +2773,7 @@ fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type37> {
     let identifier = Decoder109(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type37 { identifier, data });
@@ -2781,7 +2781,7 @@ fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type29> {
     let string = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let null = {
@@ -2812,7 +2812,7 @@ fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type97> {
     let xmp = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type97 { xmp });
@@ -2820,19 +2820,19 @@ fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type35> {
     let byte_order = {
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let magic = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let offset = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let ifd = {
-        let tmp = r#"invoke_decoder @ Discriminant(19)"#;
+        let tmp = r#"invoke_decoder @ WithRelativeOffset"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type35 {
@@ -2845,7 +2845,7 @@ fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -2853,7 +2853,7 @@ fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type31> {
     let identifier = Decoder115(scope, input)?;
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type31 { identifier, data });
@@ -2861,7 +2861,7 @@ fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type29> {
     let string = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let null = {
@@ -2885,7 +2885,7 @@ fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let thumbnail_width = Decoder16(scope, input)?;
     let thumbnail_height = Decoder16(scope, input)?;
     let thumbnail_pixels = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type98 {
@@ -2909,7 +2909,7 @@ fn Decoder117<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder118<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
     let magic = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let method = Decoder16(scope, input)?;
@@ -2933,15 +2933,15 @@ fn Decoder119<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type25> {
     let blocks = {
-        let tmp = r#"invoke_decoder @ Discriminant(13)"#;
+        let tmp = r#"invoke_decoder @ RepeatUntilLast"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let codes = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let inflate = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type25 {
@@ -2960,11 +2960,11 @@ fn Decoder121<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type24> {
     let r#final = Decoder123(scope, input)?;
     let r#type = {
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type24 {
@@ -2999,19 +2999,19 @@ fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         ()
     };
     let len = {
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let nlen = {
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let bytes = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let codes_values = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type99 {
@@ -3025,11 +3025,11 @@ fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type100> {
     let codes = {
-        let tmp = r#"invoke_decoder @ Discriminant(24)"#;
+        let tmp = r#"invoke_decoder @ Dynamic"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let codes_values = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type100 {
@@ -3040,43 +3040,43 @@ fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type101> {
     let hlit = {
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let hdist = {
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let hclen = {
-        let tmp = r#"invoke_decoder @ Discriminant(20)"#;
+        let tmp = r#"invoke_decoder @ Map"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let code_length_alphabet_code_lengths = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let literal_length_distance_alphabet_code_lengths = {
-        let tmp = r#"invoke_decoder @ Discriminant(24)"#;
+        let tmp = r#"invoke_decoder @ Dynamic"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let literal_length_distance_alphabet_code_lengths_value = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let literal_length_alphabet_code_lengths_value = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let distance_alphabet_code_lengths_value = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let codes = {
-        let tmp = r#"invoke_decoder @ Discriminant(24)"#;
+        let tmp = r#"invoke_decoder @ Dynamic"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let codes_values = {
-        let tmp = r#"invoke_decoder @ Discriminant(21)"#;
+        let tmp = r#"invoke_decoder @ Compute"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type101 {
@@ -3095,7 +3095,7 @@ fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type29> {
     let string = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let null = {
@@ -3112,11 +3112,11 @@ fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type0> {
     let signature = {
-        let tmp = r#"invoke_decoder @ Discriminant(8)"#;
+        let tmp = r#"invoke_decoder @ Tuple"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let version = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type0 { signature, version });
@@ -3125,7 +3125,7 @@ fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type4> {
     let descriptor = Decoder145(scope, input)?;
     let global_color_table = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type4 {
@@ -3136,7 +3136,7 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type11> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -3156,7 +3156,7 @@ fn Decoder131<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type102> {
     let graphic_control_extension = {
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let graphic_rendering_block = Decoder139(scope, input)?;
@@ -3168,7 +3168,7 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type10> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -3202,15 +3202,15 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let identifier = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let authentication_code = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let application_data = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let terminator = Decoder137(scope, input)?;
@@ -3245,7 +3245,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let comment_data = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let terminator = Decoder137(scope, input)?;
@@ -3273,7 +3273,7 @@ fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let data = {
-        let tmp = r#"invoke_decoder @ Discriminant(12)"#;
+        let tmp = r#"invoke_decoder @ RepeatCount"#;
         unimplemented!(r#"{}"#, tmp)
     };
     return Some(Type7 { len_bytes, data });
@@ -3336,7 +3336,7 @@ fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
     return Some({
-        let tmp = r#"invoke_decoder @ Discriminant(7)"#;
+        let tmp = r#"invoke_decoder @ Branch"#;
         unimplemented!(r#"{}"#, tmp)
     });
 }
@@ -3344,7 +3344,7 @@ fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type106> {
     let descriptor = Decoder142(scope, input)?;
     let local_color_table = {
-        let tmp = r#"invoke_decoder @ Discriminant(23)"#;
+        let tmp = r#"invoke_decoder @ Match"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let data = Decoder144(scope, input)?;
@@ -3392,7 +3392,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let text_foreground_color_index = Decoder16(scope, input)?;
     let text_background_color_index = Decoder16(scope, input)?;
     let plain_text_data = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let terminator = Decoder137(scope, input)?;
@@ -3448,7 +3448,7 @@ fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
     let lzw_min_code_size = Decoder16(scope, input)?;
     let image_data = {
-        let tmp = r#"invoke_decoder @ Discriminant(10)"#;
+        let tmp = r#"invoke_decoder @ While"#;
         unimplemented!(r#"{}"#, tmp)
     };
     let terminator = Decoder137(scope, input)?;
