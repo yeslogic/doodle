@@ -96,7 +96,7 @@ mod test {
         }
         data.push(mask);
 
-        let program = doodle::decoder::Compiler::compile(&module, &fref.call())
+        let program = doodle::decoder::Compiler::compile_program(&module, &fref.call())
             .unwrap_or_else(|msg| panic!("Failed to compile: {msg}"));
         let (output, _) = program.run(ReadCtxt::new(&data))?;
         match output {
