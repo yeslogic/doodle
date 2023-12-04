@@ -557,20 +557,6 @@ impl<'a> Compiler<'a> {
                     Err(format!("cannot build match tree for {:?}", format))
                 }
             }
-            Format::UnionVariant(branches) => {
-                let mut fs = Vec::with_capacity(branches.len());
-                let mut ds = Vec::with_capacity(branches.len());
-                for (label, f) in branches {
-                    let d = self.compile_format(f, next.clone())?;
-                    ds.push(Decoder::Variant(label.clone(), Box::new(d)));
-                    fs.push(f.clone());
-                }
-                if let Some(tree) = MatchTree::build(self.module, &fs, next) {
-                    Ok(Decoder::Branch(tree, ds))
-                } else {
-                    Err(format!("cannot build match tree for {:?}", format))
-                }
-            }
             Format::UnionNondet(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
@@ -686,19 +672,6 @@ impl<'a> Compiler<'a> {
                     .iter()
                     .map(|(pattern, f)| {
                         Ok((pattern.clone(), self.compile_format(f, next.clone())?))
-                    })
-                    .collect::<Result<_, String>>()?;
-                Ok(Decoder::Match(head.clone(), branches))
-            }
-            Format::MatchVariant(head, branches) => {
-                let branches = branches
-                    .iter()
-                    .map(|(pattern, label, f)| {
-                        let d = self.compile_format(f, next.clone())?;
-                        Ok((
-                            pattern.clone(),
-                            Decoder::Variant(label.clone(), Box::new(d)),
-                        ))
                     })
                     .collect::<Result<_, String>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
@@ -1224,9 +1197,9 @@ mod tests {
     use super::*;
 
     fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::UnionVariant(
+        Format::Union(
             (fields.into_iter())
-                .map(|(label, format)| (label.into(), format))
+                .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
                 .collect(),
         )
     }

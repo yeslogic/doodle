@@ -151,7 +151,7 @@ impl<'module> MonoidalPrinter<'module> {
                     let format = &branches[*n];
                     self.is_atomic_value(value, Some(format))
                 }
-                Some(Format::UnionVariant(branches)) | Some(Format::UnionNondet(branches)) => {
+                Some(Format::UnionNondet(branches)) => {
                     let (label, format) = &branches[*n];
                     match value.as_ref() {
                         Value::Variant(label2, value) => {
@@ -164,16 +164,6 @@ impl<'module> MonoidalPrinter<'module> {
                 Some(Format::Match(_head, branches)) => {
                     let (_pattern, format) = &branches[*n];
                     self.is_atomic_value(value, Some(format))
-                }
-                Some(Format::MatchVariant(_head, branches)) => {
-                    let (_pattern, label, format) = &branches[*n];
-                    match value.as_ref() {
-                        Value::Variant(label2, value) => {
-                            assert_eq!(label, label2);
-                            self.is_atomic_value(value, Some(format))
-                        }
-                        _ => panic!("expected variant value"),
-                    }
                 }
                 None => self.is_atomic_value(value, None),
                 f => panic!("expected format suitable for branch: {f:?}"),
@@ -248,7 +238,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected variant, found {value:?}"),
             },
-            Format::UnionVariant(branches) | Format::UnionNondet(branches) => match value {
+            Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
                     let (label, format) = &branches[*index];
                     match value.as_ref() {
@@ -339,27 +329,6 @@ impl<'module> MonoidalPrinter<'module> {
                             value,
                             format,
                         ));
-                        return frag;
-                    }
-                    panic!("pattern match failure");
-                }
-                _ => panic!("expected branch, found {value:?}"),
-            },
-            Format::MatchVariant(head, branches) => match value {
-                Value::Branch(index, value) => {
-                    let head = head.eval(scope);
-                    let (pattern, label, format) = &branches[*index];
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        if let Value::Variant(label2, value) = value.as_ref() {
-                            assert_eq!(label, label2);
-                            frag.encat(self.compile_decoded_value(
-                                &Scope::Multi(&pattern_scope),
-                                value,
-                                format,
-                            ));
-                        } else {
-                            panic!("expected variant, found {value:?}");
-                        }
                         return frag;
                     }
                     panic!("pattern match failure");
@@ -1087,7 +1056,7 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
-            Format::UnionVariant(_) | Format::UnionNondet(_) | Format::Union(_) => cond_paren(
+            Format::UnionNondet(_) | Format::Union(_) => cond_paren(
                 Fragment::String("_ |...| _".into()),
                 prec,
                 Precedence::FORMAT_COMPOUND,
@@ -1201,7 +1170,7 @@ impl<'module> MonoidalPrinter<'module> {
                     Precedence::FORMAT_COMPOUND,
                 )
             }
-            Format::Match(head, _) | Format::MatchVariant(head, _) => cond_paren(
+            Format::Match(head, _) => cond_paren(
                 Fragment::String("match ".into())
                     .cat(self.compile_expr(head, Precedence::PROJ))
                     .cat(Fragment::String(" { ... }".into()))

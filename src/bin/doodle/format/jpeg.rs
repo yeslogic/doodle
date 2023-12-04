@@ -198,17 +198,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ("identifier", base.asciiz_string()),
             (
                 "data",
-                Format::MatchVariant(
+                match_variant(
                     Expr::RecordProj(Box::new(var("identifier")), "string".into()),
                     vec![
-                        (
-                            Pattern::from_bytes(b"JFIF"),
-                            "jfif".into(),
-                            app0_jfif.call(),
-                        ),
+                        (Pattern::from_bytes(b"JFIF"), "jfif", app0_jfif.call()),
                         // FIXME: there are other APP0 formats
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, "other".into(), repeat(base.u8())),
+                        (Pattern::Wildcard, "other", repeat(base.u8())),
                     ],
                 ),
             ),
@@ -232,22 +228,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ("identifier", base.asciiz_string()),
             (
                 "data",
-                Format::MatchVariant(
+                match_variant(
                     Expr::RecordProj(Box::new(var("identifier")), "string".into()),
                     vec![
-                        (
-                            Pattern::from_bytes(b"Exif"),
-                            "exif".into(),
-                            app1_exif.call(),
-                        ),
+                        (Pattern::from_bytes(b"Exif"), "exif", app1_exif.call()),
                         (
                             Pattern::from_bytes(b"http://ns.adobe.com/xap/1.0/"),
-                            "xmp".into(),
+                            "xmp",
                             app1_xmp.call(),
                         ),
                         // FIXME: there are other APP1 formats
                         // see https://exiftool.org/TagNames/JPEG.html
-                        (Pattern::Wildcard, "other".into(), repeat(base.u8())),
+                        (Pattern::Wildcard, "other", repeat(base.u8())),
                     ],
                 ),
             ),

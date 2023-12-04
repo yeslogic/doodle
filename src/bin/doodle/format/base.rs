@@ -15,9 +15,23 @@ pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
 }
 
 pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-    Format::UnionVariant(
+    Format::Union(
         (fields.into_iter())
-            .map(|(label, format)| (label.into(), format))
+            .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
+            .collect(),
+    )
+}
+
+pub fn match_variant<Name: IntoLabel>(
+    head: Expr,
+    branches: impl IntoIterator<Item = (Pattern, Name, Format)>,
+) -> Format {
+    Format::Match(
+        head,
+        (branches.into_iter())
+            .map(|(pattern, label, format)| {
+                (pattern, Format::Variant(label.into(), Box::new(format)))
+            })
             .collect(),
     )
 }
@@ -61,11 +75,17 @@ pub fn repeat_until_seq(cond: Expr, format: Format) -> Format {
 }
 
 pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
-    Format::MatchVariant(
+    Format::Match(
         cond,
         vec![
-            (Pattern::Bool(true), "yes".into(), format0),
-            (Pattern::Bool(false), "no".into(), format1),
+            (
+                Pattern::Bool(true),
+                Format::Variant("yes".into(), Box::new(format0)),
+            ),
+            (
+                Pattern::Bool(false),
+                Format::Variant("no".into(), Box::new(format1)),
+            ),
         ],
     )
 }
