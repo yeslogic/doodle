@@ -1,20 +1,210 @@
 use doodle::prelude::*;
 
-enum Type36 {
+struct Type7 {
+    len_bytes: u8,
+    data: Vec<u8>,
+}
+
+enum Type23 {
+    dynamic_huffman {
+        hlit: u8,
+        hdist: u8,
+        hclen: u8,
+        code_length_alphabet_code_lengths: Vec<u8>,
+        literal_length_distance_alphabet_code_lengths: Vec<Type15>,
+        literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
+        literal_length_alphabet_code_lengths_value: Vec<u8>,
+        distance_alphabet_code_lengths_value: Vec<u8>,
+        codes: Vec<Type18>,
+        codes_values: Vec<Type19>,
+    },
+    fixed_huffman {
+        codes: Vec<Type21>,
+        codes_values: Vec<Type19>,
+    },
+    uncompressed {
+        align: (),
+        len: u16,
+        nlen: u16,
+        bytes: Vec<u8>,
+        codes_values: Vec<Type22>,
+    },
+}
+
+struct Type29 {
+    string: Vec<u8>,
+    null: u8,
+}
+
+struct Type45 {
+    sample_precision: u8,
+    num_lines: u16,
+    num_samples_per_line: u16,
+    num_image_components: u8,
+    image_components: Vec<Type44>,
+}
+
+enum Type58 {
+    color_type_3 { palette_index: u8 },
+    color_type_6 { red: u16, green: u16, blue: u16 },
+    color_type_2 { red: u16, green: u16, blue: u16 },
+    color_type_4 { greyscale: u16 },
+    color_type_0 { greyscale: u16 },
+}
+
+struct Type86 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type62,
+    crc: u32,
+}
+
+struct Type88 {
+    marker: Type28,
+    length: u16,
+    data: Type37,
+}
+
+struct Type101 {
+    hlit: u8,
+    hdist: u8,
+    hclen: u8,
+    code_length_alphabet_code_lengths: Vec<u8>,
+    literal_length_distance_alphabet_code_lengths: Vec<Type15>,
+    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
+    literal_length_alphabet_code_lengths_value: Vec<u8>,
+    distance_alphabet_code_lengths_value: Vec<u8>,
+    codes: Vec<Type18>,
+    codes_values: Vec<Type19>,
+}
+
+enum Type50 {
+    mcu(u8),
+    rst0 { ff: u8, marker: u8 },
+    rst1 { ff: u8, marker: u8 },
+    rst2 { ff: u8, marker: u8 },
+    rst3 { ff: u8, marker: u8 },
+    rst4 { ff: u8, marker: u8 },
+    rst5 { ff: u8, marker: u8 },
+    rst6 { ff: u8, marker: u8 },
+    rst7 { ff: u8, marker: u8 },
+}
+
+struct Type107 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    text_grid_left_position: u16,
+    text_grid_top_position: u16,
+    text_grid_width: u16,
+    text_grid_height: u16,
+    character_cell_width: u8,
+    character_cell_height: u8,
+    text_foreground_color_index: u8,
+    text_background_color_index: u8,
+    plain_text_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type48 {
+    num_image_components: u8,
+    image_components: Vec<Type47>,
+    start_spectral_selection: u8,
+    end_spectral_selection: u8,
+    approximation_bit_position: u8,
+}
+
+struct Type0 {
+    signature: (u8, u8, u8),
+    version: Vec<u8>,
+}
+
+struct Type80 {
+    tag: (u8, u8, u8, u8),
+    length: u32,
+    data: Type68,
+    pad: Type66,
+}
+
+struct Type39 {
+    precision_table_id: u8,
+    elements: Vec<u8>,
+}
+
+struct Type105 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    flags: u8,
+    delay_time: u16,
+    transparent_color_index: u8,
+    terminator: u8,
+}
+
+struct Type103 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    identifier: Vec<u8>,
+    authentication_code: Vec<u8>,
+    application_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type59 {
+    pixels_per_unit_x: u32,
+    pixels_per_unit_y: u32,
+    unit_specifier: u8,
+}
+
+enum Type30 {
     other(Vec<u8>),
-    xmp { xmp: Vec<u8> },
-    exif { padding: u8, exif: Type35 },
+    jfif {
+        version_major: u8,
+        version_minor: u8,
+        density_units: u8,
+        density_x: u16,
+        density_y: u16,
+        thumbnail_width: u8,
+        thumbnail_height: u8,
+        thumbnail_pixels: Vec<Vec<Type2>>,
+    },
+}
+
+struct Type65 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: (),
+    crc: u32,
+}
+
+struct Type93 {
+    marker: Type28,
+    length: u16,
+    data: Type41,
+}
+
+struct Type90 {
+    marker: Type28,
+    length: u16,
+    data: Type45,
+}
+
+struct Type71 {
+    string: Vec<u8>,
+    padding: Vec<u8>,
+}
+
+struct Type67 {
+    tag: (u8, u8, u8, u8),
+    length: u32,
+    data: Vec<u8>,
+    pad: Type66,
 }
 
 struct Type41 {
     class_table_id: u8,
     value: u8,
-}
-
-struct Type94 {
-    marker: Type28,
-    length: u16,
-    data: Type42,
 }
 
 struct Type82 {
@@ -24,11 +214,97 @@ struct Type82 {
     crc: u32,
 }
 
+struct Type95 {
+    marker: Type28,
+    length: u16,
+    data: Vec<u8>,
+}
+
+enum Type3 {
+    no(),
+    yes(Vec<Type2>),
+}
+
+struct Type61 {
+    palette_index: u8,
+}
+
+enum Type9 {
+    table_based_image {
+        descriptor: Type6,
+        local_color_table: Type3,
+        data: Type8,
+    },
+    plain_text_extension {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        text_grid_left_position: u16,
+        text_grid_top_position: u16,
+        text_grid_width: u16,
+        text_grid_height: u16,
+        character_cell_width: u8,
+        character_cell_height: u8,
+        text_foreground_color_index: u8,
+        text_background_color_index: u8,
+        plain_text_data: Vec<Type7>,
+        terminator: u8,
+    },
+}
+
+struct Type15 {
+    code: u16,
+    extra: u8,
+}
+
+struct Type44 {
+    id: u8,
+    sampling_factor: u8,
+    quantization_table_id: u8,
+}
+
+enum Type54 {
+    some {
+        marker: Type28,
+        length: u16,
+        data: Type53,
+    },
+    none(),
+}
+
 struct Type64 {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: Vec<u8>,
     crc: u32,
+}
+
+struct Type78 {
+    soi: Type28,
+    frame: Type55,
+    eoi: Type28,
+}
+
+struct Type100 {
+    codes: Vec<Type21>,
+    codes_values: Vec<Type19>,
+}
+
+struct Type12 {
+    separator: u8,
+}
+
+struct Type89 {
+    marker: Type28,
+    length: u16,
+    data: Type53,
+}
+
+struct Type34 {
+    num_fields: u16,
+    fields: Vec<Type33>,
+    next_ifd_offset: u32,
+    next_ifd: Vec<u8>,
 }
 
 struct Type1 {
@@ -39,9 +315,109 @@ struct Type1 {
     pixel_aspect_ratio: u8,
 }
 
-struct Type7 {
-    len_bytes: u8,
-    data: Vec<u8>,
+struct Type69 {
+    string: Vec<u8>,
+    __padding: Vec<u8>,
+}
+
+struct Type91 {
+    marker: Type28,
+    length: u16,
+    data: Type39,
+}
+
+struct Type94 {
+    marker: Type28,
+    length: u16,
+    data: Type42,
+}
+
+struct Type81 {
+    contents: Vec<Type73>,
+    __padding: Vec<u8>,
+    __trailing: Vec<u8>,
+}
+
+enum Type38 {
+    app0 {
+        marker: Type28,
+        length: u16,
+        data: Type31,
+    },
+    app1 {
+        marker: Type28,
+        length: u16,
+        data: Type37,
+    },
+}
+
+struct Type72 {
+    name: Type69,
+    mode: Type70,
+    uid: Type70,
+    gid: Type70,
+    size: u32,
+    mtime: Type70,
+    chksum: Type70,
+    typeflag: u8,
+    linkname: Type69,
+    magic: (u8, u8, u8, u8, u8, u8),
+    version: (u8, u8),
+    uname: Type71,
+    gname: Type71,
+    devmajor: Type70,
+    devminor: Type70,
+    prefix: Type69,
+    pad: Vec<u8>,
+}
+
+struct Type87 {
+    marker: Type28,
+    length: u16,
+    data: Type31,
+}
+
+struct Type31 {
+    identifier: Type29,
+    data: Type30,
+}
+
+struct Type60 {
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+}
+
+struct Type97 {
+    xmp: Vec<u8>,
+}
+
+struct Type85 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type60,
+    crc: u32,
+}
+
+struct Type49 {
+    marker: Type28,
+    length: u16,
+    data: Type48,
+}
+
+struct Type76 {
+    data: Type75,
+    end: (),
+}
+
+struct Type104 {
+    separator: u8,
+    label: u8,
+    comment_data: Vec<Type7>,
+    terminator: u8,
 }
 
 struct Type68 {
@@ -49,9 +425,399 @@ struct Type68 {
     chunks: Vec<Type67>,
 }
 
+struct Type53 {
+    num_lines: u16,
+}
+
+struct Type27 {
+    header: Type13,
+    fname: Type14,
+    data: Type25,
+    footer: Type26,
+}
+
+struct Type57 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type56,
+    crc: u32,
+}
+
+enum Type17 {
+    none(),
+    some {
+        length_extra_bits: u8,
+        length: u16,
+        distance_code: u16,
+        distance_record: Type16,
+    },
+}
+
+struct Type2 {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+enum Type36 {
+    other(Vec<u8>),
+    xmp { xmp: Vec<u8> },
+    exif { padding: u8, exif: Type35 },
+}
+
+struct Type18 {
+    code: u16,
+    extra: Type17,
+}
+
+struct Type56 {
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    color_type: u8,
+    compression_method: u8,
+    filter_method: u8,
+    interlace_method: u8,
+}
+
+struct Type70 {
+    string: Vec<u8>,
+    __nul_or_wsp: u8,
+    __padding: Vec<u8>,
+}
+
+struct Type106 {
+    descriptor: Type6,
+    local_color_table: Type3,
+    data: Type8,
+}
+
+struct Type52 {
+    segments: Vec<Type43>,
+    sos: Type49,
+    data: Type51,
+}
+
+struct Type73 {
+    header: Type72,
+    file: Vec<u8>,
+    __padding: (),
+}
+
+struct Type13 {
+    magic: (u8, u8),
+    method: u8,
+    file_flags: u8,
+    timestamp: u32,
+    compression_flags: u8,
+    os_id: u8,
+}
+
+struct Type16 {
+    distance_extra_bits: u16,
+    distance: u16,
+}
+
+struct Type84 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Vec<Type2>,
+    crc: u32,
+}
+
+struct Type96 {
+    padding: u8,
+    exif: Type35,
+}
+
+struct Type102 {
+    graphic_control_extension: Type5,
+    graphic_rendering_block: Type9,
+}
+
+struct Type42 {
+    restart_interval: u16,
+}
+
+enum Type63 {
+    bKGD {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type58,
+        crc: u32,
+    },
+    pHYs {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type59,
+        crc: u32,
+    },
+    PLTE {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Vec<Type2>,
+        crc: u32,
+    },
+    tIME {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type60,
+        crc: u32,
+    },
+    tRNS {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type62,
+        crc: u32,
+    },
+}
+
+struct Type79 {
+    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
+    ihdr: Type57,
+    chunks: Vec<Type63>,
+    idat: Vec<Type64>,
+    more_chunks: Vec<Type63>,
+    iend: Type65,
+}
+
+struct Type4 {
+    descriptor: Type1,
+    global_color_table: Type3,
+}
+
+struct Type6 {
+    separator: u8,
+    image_left_position: u16,
+    image_top_position: u16,
+    image_width: u16,
+    image_height: u16,
+    flags: u8,
+}
+
+struct Type24 {
+    r#final: u8,
+    r#type: u8,
+    data: Type23,
+}
+
+enum Type10 {
+    application_extension {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        identifier: Vec<u8>,
+        authentication_code: Vec<u8>,
+        application_data: Vec<Type7>,
+        terminator: u8,
+    },
+    comment_extension {
+        separator: u8,
+        label: u8,
+        comment_data: Vec<Type7>,
+        terminator: u8,
+    },
+}
+
+struct Type47 {
+    component_selector: u8,
+    entropy_coding_table_ids: u8,
+}
+
+struct Type55 {
+    initial_segment: Type38,
+    segments: Vec<Type43>,
+    header: Type46,
+    scan: Type52,
+    dnl: Type54,
+    scans: Vec<Type52>,
+}
+
+enum Type11 {
+    graphic_block {
+        graphic_control_extension: Type5,
+        graphic_rendering_block: Type9,
+    },
+    special_purpose_block(Type10),
+}
+
+enum Type62 {
+    color_type_3(Vec<Type61>),
+    color_type_2 { red: u16, green: u16, blue: u16 },
+    color_type_0 { greyscale: u16 },
+}
+
+enum Type14 {
+    no(),
+    yes { string: Vec<u8>, null: u8 },
+}
+
+enum Type19 {
+    literal(u8),
+    reference { length: u16, distance: u16 },
+}
+
+struct Type35 {
+    byte_order: Type32,
+    magic: u16,
+    offset: u32,
+    ifd: Type34,
+}
+
+enum Type5 {
+    some {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        flags: u8,
+        delay_time: u16,
+        transparent_color_index: u8,
+        terminator: u8,
+    },
+    none(),
+}
+
+struct Type37 {
+    identifier: Type29,
+    data: Type36,
+}
+
+enum Type75 {
+    gif {
+        header: Type0,
+        logical_screen: Type4,
+        blocks: Vec<Type11>,
+        trailer: Type12,
+    },
+    gzip(Vec<Type27>),
+    jpeg {
+        soi: Type28,
+        frame: Type55,
+        eoi: Type28,
+    },
+    png {
+        signature: (u8, u8, u8, u8, u8, u8, u8, u8),
+        ihdr: Type57,
+        chunks: Vec<Type63>,
+        idat: Vec<Type64>,
+        more_chunks: Vec<Type63>,
+        iend: Type65,
+    },
+    riff {
+        tag: (u8, u8, u8, u8),
+        length: u32,
+        data: Type68,
+        pad: Type66,
+    },
+    tar {
+        contents: Vec<Type73>,
+        __padding: Vec<u8>,
+        __trailing: Vec<u8>,
+    },
+    text(Type74),
+}
+
+struct Type99 {
+    align: (),
+    len: u16,
+    nlen: u16,
+    bytes: Vec<u8>,
+    codes_values: Vec<Type22>,
+}
+
 enum Type32 {
     le(u8, u8),
     be(u8, u8),
+}
+
+enum Type22 {
+    literal(u8),
+}
+
+enum Type46 {
+    sof0 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof1 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof2 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof3 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof5 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof6 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof7 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof9 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof10 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof11 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof13 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof14 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+    sof15 {
+        marker: Type28,
+        length: u16,
+        data: Type45,
+    },
+}
+
+enum Type66 {
+    no(u8),
+    yes(),
+}
+
+struct Type83 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type59,
+    crc: u32,
+}
+
+struct Type92 {
+    marker: Type28,
+    length: u16,
+    data: Type40,
 }
 
 enum Type74 {
@@ -59,10 +825,49 @@ enum Type74 {
     utf8(Vec<char>),
 }
 
-struct Type88 {
-    marker: Type28,
-    length: u16,
-    data: Type37,
+struct Type8 {
+    lzw_min_code_size: u8,
+    image_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type28 {
+    ff: u8,
+    marker: u8,
+}
+
+enum Type20 {
+    none(),
+    some {
+        length_extra_bits: u8,
+        length: u16,
+        distance_code: u8,
+        distance_record: Type16,
+    },
+}
+
+struct Type25 {
+    blocks: Vec<Type24>,
+    codes: Vec<Type19>,
+    inflate: Vec<u8>,
+}
+
+struct Type77 {
+    header: Type0,
+    logical_screen: Type4,
+    blocks: Vec<Type11>,
+    trailer: Type12,
+}
+
+struct Type26 {
+    crc: u32,
+    length: u32,
+}
+
+struct Type40 {
+    class_table_id: u8,
+    num_codes: Vec<u8>,
+    values: Vec<u8>,
 }
 
 enum Type43 {
@@ -173,650 +978,6 @@ enum Type43 {
     },
 }
 
-enum Type20 {
-    none(),
-    some {
-        length_extra_bits: u8,
-        length: u16,
-        distance_code: u8,
-        distance_record: Type16,
-    },
-}
-
-struct Type61 {
-    palette_index: u8,
-}
-
-struct Type25 {
-    blocks: Vec<Type24>,
-    codes: Vec<Type19>,
-    inflate: Vec<u8>,
-}
-
-struct Type27 {
-    header: Type13,
-    fname: Type14,
-    data: Type25,
-    footer: Type26,
-}
-
-struct Type33 {
-    tag: u16,
-    r#type: u16,
-    length: u32,
-    offset_or_data: u32,
-}
-
-struct Type29 {
-    string: Vec<u8>,
-    null: u8,
-}
-
-struct Type34 {
-    num_fields: u16,
-    fields: Vec<Type33>,
-    next_ifd_offset: u32,
-    next_ifd: Vec<u8>,
-}
-
-enum Type46 {
-    sof0 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof1 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof2 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof3 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof5 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof6 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof7 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof9 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof10 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof11 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof13 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof14 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-    sof15 {
-        marker: Type28,
-        length: u16,
-        data: Type45,
-    },
-}
-
-struct Type80 {
-    tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Type68,
-    pad: Type66,
-}
-
-struct Type84 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Vec<Type2>,
-    crc: u32,
-}
-
-struct Type85 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type60,
-    crc: u32,
-}
-
-struct Type81 {
-    contents: Vec<Type73>,
-    __padding: Vec<u8>,
-    __trailing: Vec<u8>,
-}
-
-struct Type90 {
-    marker: Type28,
-    length: u16,
-    data: Type45,
-}
-
-struct Type100 {
-    codes: Vec<Type21>,
-    codes_values: Vec<Type19>,
-}
-
-struct Type4 {
-    descriptor: Type1,
-    global_color_table: Type3,
-}
-
-struct Type79 {
-    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-    ihdr: Type57,
-    chunks: Vec<Type63>,
-    idat: Vec<Type64>,
-    more_chunks: Vec<Type63>,
-    iend: Type65,
-}
-
-struct Type103 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    identifier: Vec<u8>,
-    authentication_code: Vec<u8>,
-    application_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type78 {
-    soi: Type28,
-    frame: Type55,
-    eoi: Type28,
-}
-
-struct Type92 {
-    marker: Type28,
-    length: u16,
-    data: Type40,
-}
-
-struct Type45 {
-    sample_precision: u8,
-    num_lines: u16,
-    num_samples_per_line: u16,
-    num_image_components: u8,
-    image_components: Vec<Type44>,
-}
-
-enum Type3 {
-    no(),
-    yes(Vec<Type2>),
-}
-
-struct Type24 {
-    r#final: u8,
-    r#type: u8,
-    data: Type23,
-}
-
-struct Type8 {
-    lzw_min_code_size: u8,
-    image_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type55 {
-    initial_segment: Type38,
-    segments: Vec<Type43>,
-    header: Type46,
-    scan: Type52,
-    dnl: Type54,
-    scans: Vec<Type52>,
-}
-
-struct Type15 {
-    code: u16,
-    extra: u8,
-}
-
-enum Type58 {
-    color_type_3 { palette_index: u8 },
-    color_type_6 { red: u16, green: u16, blue: u16 },
-    color_type_2 { red: u16, green: u16, blue: u16 },
-    color_type_4 { greyscale: u16 },
-    color_type_0 { greyscale: u16 },
-}
-
-struct Type59 {
-    pixels_per_unit_x: u32,
-    pixels_per_unit_y: u32,
-    unit_specifier: u8,
-}
-
-struct Type48 {
-    num_image_components: u8,
-    image_components: Vec<Type47>,
-    start_spectral_selection: u8,
-    end_spectral_selection: u8,
-    approximation_bit_position: u8,
-}
-
-struct Type51 {
-    scan_data: Vec<Type50>,
-    scan_data_stream: Vec<u8>,
-}
-
-struct Type35 {
-    byte_order: Type32,
-    magic: u16,
-    offset: u32,
-    ifd: Type34,
-}
-
-enum Type19 {
-    literal(u8),
-    reference { length: u16, distance: u16 },
-}
-
-struct Type12 {
-    separator: u8,
-}
-
-struct Type72 {
-    name: Type69,
-    mode: Type70,
-    uid: Type70,
-    gid: Type70,
-    size: u32,
-    mtime: Type70,
-    chksum: Type70,
-    typeflag: u8,
-    linkname: Type69,
-    magic: (u8, u8, u8, u8, u8, u8),
-    version: (u8, u8),
-    uname: Type71,
-    gname: Type71,
-    devmajor: Type70,
-    devminor: Type70,
-    prefix: Type69,
-    pad: Vec<u8>,
-}
-
-struct Type95 {
-    marker: Type28,
-    length: u16,
-    data: Vec<u8>,
-}
-
-enum Type5 {
-    some {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        flags: u8,
-        delay_time: u16,
-        transparent_color_index: u8,
-        terminator: u8,
-    },
-    none(),
-}
-
-struct Type67 {
-    tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Vec<u8>,
-    pad: Type66,
-}
-
-enum Type54 {
-    some {
-        marker: Type28,
-        length: u16,
-        data: Type53,
-    },
-    none(),
-}
-
-struct Type42 {
-    restart_interval: u16,
-}
-
-struct Type73 {
-    header: Type72,
-    file: Vec<u8>,
-    __padding: (),
-}
-
-struct Type93 {
-    marker: Type28,
-    length: u16,
-    data: Type41,
-}
-
-struct Type104 {
-    separator: u8,
-    label: u8,
-    comment_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type49 {
-    marker: Type28,
-    length: u16,
-    data: Type48,
-}
-
-struct Type31 {
-    identifier: Type29,
-    data: Type30,
-}
-
-enum Type38 {
-    app0 {
-        marker: Type28,
-        length: u16,
-        data: Type31,
-    },
-    app1 {
-        marker: Type28,
-        length: u16,
-        data: Type37,
-    },
-}
-
-struct Type65 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: (),
-    crc: u32,
-}
-
-struct Type70 {
-    string: Vec<u8>,
-    __nul_or_wsp: u8,
-    __padding: Vec<u8>,
-}
-
-enum Type17 {
-    none(),
-    some {
-        length_extra_bits: u8,
-        length: u16,
-        distance_code: u16,
-        distance_record: Type16,
-    },
-}
-
-struct Type86 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type62,
-    crc: u32,
-}
-
-struct Type60 {
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-}
-
-struct Type96 {
-    padding: u8,
-    exif: Type35,
-}
-
-struct Type99 {
-    align: (),
-    len: u16,
-    nlen: u16,
-    bytes: Vec<u8>,
-    codes_values: Vec<Type22>,
-}
-
-struct Type106 {
-    descriptor: Type6,
-    local_color_table: Type3,
-    data: Type8,
-}
-
-struct Type39 {
-    precision_table_id: u8,
-    elements: Vec<u8>,
-}
-
-enum Type63 {
-    bKGD {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type58,
-        crc: u32,
-    },
-    pHYs {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type59,
-        crc: u32,
-    },
-    PLTE {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Vec<Type2>,
-        crc: u32,
-    },
-    tIME {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type60,
-        crc: u32,
-    },
-    tRNS {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type62,
-        crc: u32,
-    },
-}
-
-enum Type10 {
-    application_extension {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        identifier: Vec<u8>,
-        authentication_code: Vec<u8>,
-        application_data: Vec<Type7>,
-        terminator: u8,
-    },
-    comment_extension {
-        separator: u8,
-        label: u8,
-        comment_data: Vec<Type7>,
-        terminator: u8,
-    },
-}
-
-struct Type0 {
-    signature: (u8, u8, u8),
-    version: Vec<u8>,
-}
-
-enum Type14 {
-    no(),
-    yes { string: Vec<u8>, null: u8 },
-}
-
-struct Type18 {
-    code: u16,
-    extra: Type17,
-}
-
-struct Type57 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type56,
-    crc: u32,
-}
-
-struct Type13 {
-    magic: (u8, u8),
-    method: u8,
-    file_flags: u8,
-    timestamp: u32,
-    compression_flags: u8,
-    os_id: u8,
-}
-
-struct Type76 {
-    data: Type75,
-    end: (),
-}
-
-struct Type28 {
-    ff: u8,
-    marker: u8,
-}
-
-enum Type75 {
-    gif {
-        header: Type0,
-        logical_screen: Type4,
-        blocks: Vec<Type11>,
-        trailer: Type12,
-    },
-    gzip(Vec<Type27>),
-    jpeg {
-        soi: Type28,
-        frame: Type55,
-        eoi: Type28,
-    },
-    png {
-        signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-        ihdr: Type57,
-        chunks: Vec<Type63>,
-        idat: Vec<Type64>,
-        more_chunks: Vec<Type63>,
-        iend: Type65,
-    },
-    riff {
-        tag: (u8, u8, u8, u8),
-        length: u32,
-        data: Type68,
-        pad: Type66,
-    },
-    tar {
-        contents: Vec<Type73>,
-        __padding: Vec<u8>,
-        __trailing: Vec<u8>,
-    },
-    text(Type74),
-}
-
-struct Type69 {
-    string: Vec<u8>,
-    __padding: Vec<u8>,
-}
-
-struct Type77 {
-    header: Type0,
-    logical_screen: Type4,
-    blocks: Vec<Type11>,
-    trailer: Type12,
-}
-
-struct Type87 {
-    marker: Type28,
-    length: u16,
-    data: Type31,
-}
-
-struct Type91 {
-    marker: Type28,
-    length: u16,
-    data: Type39,
-}
-
-struct Type97 {
-    xmp: Vec<u8>,
-}
-
-struct Type21 {
-    code: u16,
-    extra: Type20,
-}
-
-enum Type9 {
-    table_based_image {
-        descriptor: Type6,
-        local_color_table: Type3,
-        data: Type8,
-    },
-    plain_text_extension {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        text_grid_left_position: u16,
-        text_grid_top_position: u16,
-        text_grid_width: u16,
-        text_grid_height: u16,
-        character_cell_width: u8,
-        character_cell_height: u8,
-        text_foreground_color_index: u8,
-        text_background_color_index: u8,
-        plain_text_data: Vec<Type7>,
-        terminator: u8,
-    },
-}
-
-struct Type53 {
-    num_lines: u16,
-}
-
-struct Type52 {
-    segments: Vec<Type43>,
-    sos: Type49,
-    data: Type51,
-}
-
-struct Type47 {
-    component_selector: u8,
-    entropy_coding_table_ids: u8,
-}
-
-enum Type62 {
-    color_type_3(Vec<Type61>),
-    color_type_2 { red: u16, green: u16, blue: u16 },
-    color_type_0 { greyscale: u16 },
-}
-
-struct Type71 {
-    string: Vec<u8>,
-    padding: Vec<u8>,
-}
-
 struct Type98 {
     version_major: u8,
     version_minor: u8,
@@ -828,182 +989,21 @@ struct Type98 {
     thumbnail_pixels: Vec<Vec<Type2>>,
 }
 
-struct Type2 {
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
-struct Type26 {
-    crc: u32,
+struct Type33 {
+    tag: u16,
+    r#type: u16,
     length: u32,
+    offset_or_data: u32,
 }
 
-enum Type22 {
-    literal(u8),
+struct Type51 {
+    scan_data: Vec<Type50>,
+    scan_data_stream: Vec<u8>,
 }
 
-struct Type40 {
-    class_table_id: u8,
-    num_codes: Vec<u8>,
-    values: Vec<u8>,
-}
-
-enum Type30 {
-    other(Vec<u8>),
-    jfif {
-        version_major: u8,
-        version_minor: u8,
-        density_units: u8,
-        density_x: u16,
-        density_y: u16,
-        thumbnail_width: u8,
-        thumbnail_height: u8,
-        thumbnail_pixels: Vec<Vec<Type2>>,
-    },
-}
-
-struct Type6 {
-    separator: u8,
-    image_left_position: u16,
-    image_top_position: u16,
-    image_width: u16,
-    image_height: u16,
-    flags: u8,
-}
-
-struct Type44 {
-    id: u8,
-    sampling_factor: u8,
-    quantization_table_id: u8,
-}
-
-enum Type23 {
-    dynamic_huffman {
-        hlit: u8,
-        hdist: u8,
-        hclen: u8,
-        code_length_alphabet_code_lengths: Vec<u8>,
-        literal_length_distance_alphabet_code_lengths: Vec<Type15>,
-        literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
-        literal_length_alphabet_code_lengths_value: Vec<u8>,
-        distance_alphabet_code_lengths_value: Vec<u8>,
-        codes: Vec<Type18>,
-        codes_values: Vec<Type19>,
-    },
-    fixed_huffman {
-        codes: Vec<Type21>,
-        codes_values: Vec<Type19>,
-    },
-    uncompressed {
-        align: (),
-        len: u16,
-        nlen: u16,
-        bytes: Vec<u8>,
-        codes_values: Vec<Type22>,
-    },
-}
-
-struct Type16 {
-    distance_extra_bits: u16,
-    distance: u16,
-}
-
-enum Type50 {
-    mcu(u8),
-    rst0 { ff: u8, marker: u8 },
-    rst1 { ff: u8, marker: u8 },
-    rst2 { ff: u8, marker: u8 },
-    rst3 { ff: u8, marker: u8 },
-    rst4 { ff: u8, marker: u8 },
-    rst5 { ff: u8, marker: u8 },
-    rst6 { ff: u8, marker: u8 },
-    rst7 { ff: u8, marker: u8 },
-}
-
-enum Type66 {
-    no(u8),
-    yes(),
-}
-
-struct Type56 {
-    width: u32,
-    height: u32,
-    bit_depth: u8,
-    color_type: u8,
-    compression_method: u8,
-    filter_method: u8,
-    interlace_method: u8,
-}
-
-struct Type89 {
-    marker: Type28,
-    length: u16,
-    data: Type53,
-}
-
-struct Type37 {
-    identifier: Type29,
-    data: Type36,
-}
-
-struct Type101 {
-    hlit: u8,
-    hdist: u8,
-    hclen: u8,
-    code_length_alphabet_code_lengths: Vec<u8>,
-    literal_length_distance_alphabet_code_lengths: Vec<Type15>,
-    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
-    literal_length_alphabet_code_lengths_value: Vec<u8>,
-    distance_alphabet_code_lengths_value: Vec<u8>,
-    codes: Vec<Type18>,
-    codes_values: Vec<Type19>,
-}
-
-struct Type102 {
-    graphic_control_extension: Type5,
-    graphic_rendering_block: Type9,
-}
-
-struct Type105 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    flags: u8,
-    delay_time: u16,
-    transparent_color_index: u8,
-    terminator: u8,
-}
-
-struct Type107 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    text_grid_left_position: u16,
-    text_grid_top_position: u16,
-    text_grid_width: u16,
-    text_grid_height: u16,
-    character_cell_width: u8,
-    character_cell_height: u8,
-    text_foreground_color_index: u8,
-    text_background_color_index: u8,
-    plain_text_data: Vec<Type7>,
-    terminator: u8,
-}
-
-enum Type11 {
-    graphic_block {
-        graphic_control_extension: Type5,
-        graphic_rendering_block: Type9,
-    },
-    special_purpose_block(Type10),
-}
-
-struct Type83 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type59,
-    crc: u32,
+struct Type21 {
+    code: u16,
+    extra: Type20,
 }
 
 fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type76> {
@@ -1196,12 +1196,7 @@ fn Decoder15<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder16<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     return Some({
-        let bs = ByteSet::from_bits([
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-        ]);
+        let bs = ByteSet::full();
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1249,12 +1244,7 @@ fn Decoder19<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder20<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     return Some({
-        let bs = ByteSet::from_bits([
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-        ]);
+        let bs = ByteSet::full();
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1336,7 +1326,7 @@ fn Decoder27<'input>(
     input: &mut ParseCtxt<'input>,
 ) -> Option<(u8, u8, u8, u8, u8, u8, u8, u8)> {
     let field0 = {
-        let bs = ByteSet::from_bits([0, 0, 512, 0]);
+        let bs = ByteSet::singleton(137);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1345,7 +1335,7 @@ fn Decoder27<'input>(
         }
     };
     let field1 = {
-        let bs = ByteSet::from_bits([0, 65536, 0, 0]);
+        let bs = ByteSet::singleton(80);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1354,7 +1344,7 @@ fn Decoder27<'input>(
         }
     };
     let field2 = {
-        let bs = ByteSet::from_bits([0, 16384, 0, 0]);
+        let bs = ByteSet::singleton(78);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1363,7 +1353,7 @@ fn Decoder27<'input>(
         }
     };
     let field3 = {
-        let bs = ByteSet::from_bits([0, 128, 0, 0]);
+        let bs = ByteSet::singleton(71);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1372,7 +1362,7 @@ fn Decoder27<'input>(
         }
     };
     let field4 = {
-        let bs = ByteSet::from_bits([8192, 0, 0, 0]);
+        let bs = ByteSet::singleton(13);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1381,7 +1371,7 @@ fn Decoder27<'input>(
         }
     };
     let field5 = {
-        let bs = ByteSet::from_bits([1024, 0, 0, 0]);
+        let bs = ByteSet::singleton(10);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1390,7 +1380,7 @@ fn Decoder27<'input>(
         }
     };
     let field6 = {
-        let bs = ByteSet::from_bits([67108864, 0, 0, 0]);
+        let bs = ByteSet::singleton(26);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1399,7 +1389,7 @@ fn Decoder27<'input>(
         }
     };
     let field7 = {
-        let bs = ByteSet::from_bits([1024, 0, 0, 0]);
+        let bs = ByteSet::singleton(10);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1476,7 +1466,7 @@ fn Decoder32<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
     let field0 = {
-        let bs = ByteSet::from_bits([0, 512, 0, 0]);
+        let bs = ByteSet::singleton(73);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1485,7 +1475,7 @@ fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field1 = {
-        let bs = ByteSet::from_bits([0, 32, 0, 0]);
+        let bs = ByteSet::singleton(69);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1494,7 +1484,7 @@ fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field2 = {
-        let bs = ByteSet::from_bits([0, 16384, 0, 0]);
+        let bs = ByteSet::singleton(78);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1503,7 +1493,7 @@ fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field3 = {
-        let bs = ByteSet::from_bits([0, 16, 0, 0]);
+        let bs = ByteSet::singleton(68);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1520,7 +1510,7 @@ fn Decoder34<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
     let field0 = {
-        let bs = ByteSet::from_bits([0, 512, 0, 0]);
+        let bs = ByteSet::singleton(73);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1529,7 +1519,7 @@ fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field1 = {
-        let bs = ByteSet::from_bits([0, 16, 0, 0]);
+        let bs = ByteSet::singleton(68);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1538,7 +1528,7 @@ fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field2 = {
-        let bs = ByteSet::from_bits([0, 2, 0, 0]);
+        let bs = ByteSet::singleton(65);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1547,7 +1537,7 @@ fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field3 = {
-        let bs = ByteSet::from_bits([0, 1048576, 0, 0]);
+        let bs = ByteSet::singleton(84);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1669,7 +1659,7 @@ fn Decoder42<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
     let field0 = {
-        let bs = ByteSet::from_bits([0, 512, 0, 0]);
+        let bs = ByteSet::singleton(73);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1678,7 +1668,7 @@ fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field1 = {
-        let bs = ByteSet::from_bits([0, 256, 0, 0]);
+        let bs = ByteSet::singleton(72);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1687,7 +1677,7 @@ fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field2 = {
-        let bs = ByteSet::from_bits([0, 16, 0, 0]);
+        let bs = ByteSet::singleton(68);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1696,7 +1686,7 @@ fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let field3 = {
-        let bs = ByteSet::from_bits([0, 262144, 0, 0]);
+        let bs = ByteSet::singleton(82);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1728,7 +1718,7 @@ fn Decoder44<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1737,7 +1727,7 @@ fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 16777216]);
+        let bs = ByteSet::singleton(216);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1779,7 +1769,7 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1788,7 +1778,7 @@ fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 33554432]);
+        let bs = ByteSet::singleton(217);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1933,7 +1923,7 @@ fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1942,7 +1932,7 @@ fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 65536]);
+        let bs = ByteSet::singleton(208);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1955,7 +1945,7 @@ fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1964,7 +1954,7 @@ fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 131072]);
+        let bs = ByteSet::singleton(209);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1977,7 +1967,7 @@ fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1986,7 +1976,7 @@ fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 262144]);
+        let bs = ByteSet::singleton(210);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -1999,7 +1989,7 @@ fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2008,7 +1998,7 @@ fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 524288]);
+        let bs = ByteSet::singleton(211);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2021,7 +2011,7 @@ fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder62<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2030,7 +2020,7 @@ fn Decoder62<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 1048576]);
+        let bs = ByteSet::singleton(212);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2043,7 +2033,7 @@ fn Decoder62<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder63<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2052,7 +2042,7 @@ fn Decoder63<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 2097152]);
+        let bs = ByteSet::singleton(213);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2065,7 +2055,7 @@ fn Decoder63<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder64<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2074,7 +2064,7 @@ fn Decoder64<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 4194304]);
+        let bs = ByteSet::singleton(214);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2087,7 +2077,7 @@ fn Decoder64<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 
 fn Decoder65<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type28> {
     let ff = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2096,7 +2086,7 @@ fn Decoder65<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let marker = {
-        let bs = ByteSet::from_bits([0, 0, 0, 8388608]);
+        let bs = ByteSet::singleton(215);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2785,7 +2775,7 @@ fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         unimplemented!(r#"{}"#, tmp)
     };
     let null = {
-        let bs = ByteSet::from_bits([1, 0, 0, 0]);
+        let bs = ByteSet::singleton(0);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2798,7 +2788,7 @@ fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type96> {
     let padding = {
-        let bs = ByteSet::from_bits([1, 0, 0, 0]);
+        let bs = ByteSet::singleton(0);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2865,7 +2855,7 @@ fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         unimplemented!(r#"{}"#, tmp)
     };
     let null = {
-        let bs = ByteSet::from_bits([1, 0, 0, 0]);
+        let bs = ByteSet::singleton(0);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -2976,12 +2966,7 @@ fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder123<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     return Some({
-        let bs = ByteSet::from_bits([
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-        ]);
+        let bs = ByteSet::full();
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3099,7 +3084,7 @@ fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         unimplemented!(r#"{}"#, tmp)
     };
     let null = {
-        let bs = ByteSet::from_bits([1, 0, 0, 0]);
+        let bs = ByteSet::singleton(0);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3143,7 +3128,7 @@ fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder131<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
     let separator = {
-        let bs = ByteSet::from_bits([576460752303423488, 0, 0, 0]);
+        let bs = ByteSet::singleton(59);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3175,7 +3160,7 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type103> {
     let separator = {
-        let bs = ByteSet::from_bits([8589934592, 0, 0, 0]);
+        let bs = ByteSet::singleton(33);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3184,7 +3169,7 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let label = {
-        let bs = ByteSet::from_bits([0, 0, 0, 9223372036854775808]);
+        let bs = ByteSet::singleton(255);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3193,7 +3178,7 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let block_size = {
-        let bs = ByteSet::from_bits([2048, 0, 0, 0]);
+        let bs = ByteSet::singleton(11);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3227,7 +3212,7 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type104> {
     let separator = {
-        let bs = ByteSet::from_bits([8589934592, 0, 0, 0]);
+        let bs = ByteSet::singleton(33);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3236,7 +3221,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let label = {
-        let bs = ByteSet::from_bits([0, 0, 0, 4611686018427387904]);
+        let bs = ByteSet::singleton(254);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3281,7 +3266,7 @@ fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     return Some({
-        let bs = ByteSet::from_bits([1, 0, 0, 0]);
+        let bs = ByteSet::singleton(0);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3293,7 +3278,7 @@ fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type105> {
     let separator = {
-        let bs = ByteSet::from_bits([8589934592, 0, 0, 0]);
+        let bs = ByteSet::singleton(33);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3302,7 +3287,7 @@ fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let label = {
-        let bs = ByteSet::from_bits([0, 0, 0, 144115188075855872]);
+        let bs = ByteSet::singleton(249);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3311,7 +3296,7 @@ fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let block_size = {
-        let bs = ByteSet::from_bits([16, 0, 0, 0]);
+        let bs = ByteSet::singleton(4);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3357,7 +3342,7 @@ fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type107> {
     let separator = {
-        let bs = ByteSet::from_bits([8589934592, 0, 0, 0]);
+        let bs = ByteSet::singleton(33);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3366,7 +3351,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let label = {
-        let bs = ByteSet::from_bits([2, 0, 0, 0]);
+        let bs = ByteSet::singleton(1);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3375,7 +3360,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let block_size = {
-        let bs = ByteSet::from_bits([4096, 0, 0, 0]);
+        let bs = ByteSet::singleton(12);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
@@ -3415,7 +3400,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type6> {
     let separator = {
-        let bs = ByteSet::from_bits([17592186044416, 0, 0, 0]);
+        let bs = ByteSet::singleton(44);
         let b = input.read_byte()?;
         if bs.contains(b) {
             b
