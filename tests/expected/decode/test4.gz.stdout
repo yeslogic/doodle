@@ -8,435 +8,438 @@
 │           │   ├── timestamp <- base.u32le := 1684478387
 │           │   ├── compression-flags <- base.u8 := 0
 │           │   └── os-id <- base.u8 := 3
-│           ├── fname <- match (header.file-flags & 8 != 0) { ... } := "test4"
+│           ├── fname <- match (header.file-flags & 8 != 0) { ... } := { yes := "test4" }
 │           ├── data <- bits deflate.main :=
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   ├── 0 <- deflate.block :=
 │           │   │   │   ├── final <- base.bit := 0
 │           │   │   │   ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 2
 │           │   │   │   └── data <- match type { ... } :=
-│           │   │   │       ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
-│           │   │   │       ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 28
-│           │   │   │       ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 11
-│           │   │   │       ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
-│           │   │   │       │   ├── 0 := 3
-│           │   │   │       │   ├── 1 := 0
-│           │   │   │       │   ├── 2 := 0
-│           │   │   │       │   ├── 3 := 6
-│           │   │   │       │   ├── 4 := 2
-│           │   │   │       │   ├── 5 := 4
-│           │   │   │       │   ├── 6 := 2
-│           │   │   │       │   ├── 7 := 4
-│           │   │   │       │   ├── 8 := 4
-│           │   │   │       │   ├── 9 := 4
-│           │   │   │       │   ~
-│           │   │   │       │   └── 14 := 6
-│           │   │   │       ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
-│           │   │   │       │   ├── 0 :=
-│           │   │   │       │   │   ├── code <- apply := 5
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 1 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 2 :=
-│           │   │   │       │   │   ├── code <- apply := 16
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 3
-│           │   │   │       │   ├── 3 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 4 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 5 :=
-│           │   │   │       │   │   ├── code <- apply := 9
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 6 :=
-│           │   │   │       │   │   ├── code <- apply := 9
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 7 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 8 :=
-│           │   │   │       │   │   ├── code <- apply := 9
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 9 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ~
-│           │   │   │       │   └── 244 :=
-│           │   │   │       │       ├── code <- apply := 8
-│           │   │   │       │       └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) literal-length-distance-alphabet-code-lengths :=
-│           │   │   │       │   ├── 0 := 5
-│           │   │   │       │   ├── 1 := 8
-│           │   │   │       │   ├── 2 := 8
-│           │   │   │       │   ├── 3 := 8
-│           │   │   │       │   ├── 4 := 8
-│           │   │   │       │   ├── 5 := 8
-│           │   │   │       │   ├── 6 := 8
-│           │   │   │       │   ├── 7 := 8
-│           │   │   │       │   ├── 8 := 8
-│           │   │   │       │   ├── 9 := 8
-│           │   │   │       │   ~
-│           │   │   │       │   └── 314 := 8
-│           │   │   │       ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
-│           │   │   │       │   ├── 0 := 5
-│           │   │   │       │   ├── 1 := 8
-│           │   │   │       │   ├── 2 := 8
-│           │   │   │       │   ├── 3 := 8
-│           │   │   │       │   ├── 4 := 8
-│           │   │   │       │   ├── 5 := 8
-│           │   │   │       │   ├── 6 := 8
-│           │   │   │       │   ├── 7 := 8
-│           │   │   │       │   ├── 8 := 8
-│           │   │   │       │   ├── 9 := 8
-│           │   │   │       │   ~
-│           │   │   │       │   └── 285 := 8
-│           │   │   │       ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
-│           │   │   │       │   ├── 0 := 5
-│           │   │   │       │   ├── 1 := 9
-│           │   │   │       │   ├── 2 := 9
-│           │   │   │       │   ├── 3 := 6
-│           │   │   │       │   ├── 4 := 7
-│           │   │   │       │   ├── 5 := 6
-│           │   │   │       │   ├── 6 := 5
-│           │   │   │       │   ├── 7 := 5
-│           │   │   │       │   ├── 8 := 4
-│           │   │   │       │   ├── 9 := 4
-│           │   │   │       │   ~
-│           │   │   │       │   └── 28 := 8
-│           │   │   │       ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
-│           │   │   │       │   ├── 0 :=
-│           │   │   │       │   │   ├── code <- apply := 255
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 1 :=
-│           │   │   │       │   │   ├── code <- apply := 216
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 2 :=
-│           │   │   │       │   │   ├── code <- apply := 255
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 3 :=
-│           │   │   │       │   │   ├── code <- apply := 225
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 4 :=
-│           │   │   │       │   │   ├── code <- apply := 21
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 5 :=
-│           │   │   │       │   │   ├── code <- apply := 50
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 6 :=
-│           │   │   │       │   │   ├── code <- apply := 69
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 7 :=
-│           │   │   │       │   │   ├── code <- apply := 120
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 8 :=
-│           │   │   │       │   │   ├── code <- apply := 105
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 9 :=
-│           │   │   │       │   │   ├── code <- apply := 102
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ~
-│           │   │   │       │   └── 8192 :=
-│           │   │   │       │       ├── code <- apply := 256
-│           │   │   │       │       └── extra <- match code { ... } := ()
-│           │   │   │       └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
-│           │   │   │           ├── 0 := { literal := 255 }
-│           │   │   │           ├── 1 := { literal := 216 }
-│           │   │   │           ├── 2 := { literal := 255 }
-│           │   │   │           ├── 3 := { literal := 225 }
-│           │   │   │           ├── 4 := { literal := 21 }
-│           │   │   │           ├── 5 := { literal := 50 }
-│           │   │   │           ├── 6 := { literal := 69 }
-│           │   │   │           ├── 7 := { literal := 120 }
-│           │   │   │           ├── 8 := { literal := 105 }
-│           │   │   │           ├── 9 := { literal := 102 }
-│           │   │   │           ~
-│           │   │   │           └── 8191 := { literal := 15 }
+│           │   │   │       └── dynamic_huffman <- deflate.dynamic_huffman :=
+│           │   │   │           ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
+│           │   │   │           ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 28
+│           │   │   │           ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 11
+│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │   │           │   ├── 0 := 3
+│           │   │   │           │   ├── 1 := 0
+│           │   │   │           │   ├── 2 := 0
+│           │   │   │           │   ├── 3 := 6
+│           │   │   │           │   ├── 4 := 2
+│           │   │   │           │   ├── 5 := 4
+│           │   │   │           │   ├── 6 := 2
+│           │   │   │           │   ├── 7 := 4
+│           │   │   │           │   ├── 8 := 4
+│           │   │   │           │   ├── 9 := 4
+│           │   │   │           │   ~
+│           │   │   │           │   └── 14 := 6
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │   │           │   ├── 0 :=
+│           │   │   │           │   │   ├── code <- apply := 5
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 1 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 2 :=
+│           │   │   │           │   │   ├── code <- apply := 16
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 3
+│           │   │   │           │   ├── 3 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 4 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 5 :=
+│           │   │   │           │   │   ├── code <- apply := 9
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 6 :=
+│           │   │   │           │   │   ├── code <- apply := 9
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 7 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 8 :=
+│           │   │   │           │   │   ├── code <- apply := 9
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 9 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ~
+│           │   │   │           │   └── 244 :=
+│           │   │   │           │       ├── code <- apply := 8
+│           │   │   │           │       └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) literal-length-distance-alphabet-code-lengths :=
+│           │   │   │           │   ├── 0 := 5
+│           │   │   │           │   ├── 1 := 8
+│           │   │   │           │   ├── 2 := 8
+│           │   │   │           │   ├── 3 := 8
+│           │   │   │           │   ├── 4 := 8
+│           │   │   │           │   ├── 5 := 8
+│           │   │   │           │   ├── 6 := 8
+│           │   │   │           │   ├── 7 := 8
+│           │   │   │           │   ├── 8 := 8
+│           │   │   │           │   ├── 9 := 8
+│           │   │   │           │   ~
+│           │   │   │           │   └── 314 := 8
+│           │   │   │           ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │   │           │   ├── 0 := 5
+│           │   │   │           │   ├── 1 := 8
+│           │   │   │           │   ├── 2 := 8
+│           │   │   │           │   ├── 3 := 8
+│           │   │   │           │   ├── 4 := 8
+│           │   │   │           │   ├── 5 := 8
+│           │   │   │           │   ├── 6 := 8
+│           │   │   │           │   ├── 7 := 8
+│           │   │   │           │   ├── 8 := 8
+│           │   │   │           │   ├── 9 := 8
+│           │   │   │           │   ~
+│           │   │   │           │   └── 285 := 8
+│           │   │   │           ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │   │           │   ├── 0 := 5
+│           │   │   │           │   ├── 1 := 9
+│           │   │   │           │   ├── 2 := 9
+│           │   │   │           │   ├── 3 := 6
+│           │   │   │           │   ├── 4 := 7
+│           │   │   │           │   ├── 5 := 6
+│           │   │   │           │   ├── 6 := 5
+│           │   │   │           │   ├── 7 := 5
+│           │   │   │           │   ├── 8 := 4
+│           │   │   │           │   ├── 9 := 4
+│           │   │   │           │   ~
+│           │   │   │           │   └── 28 := 8
+│           │   │   │           ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
+│           │   │   │           │   ├── 0 :=
+│           │   │   │           │   │   ├── code <- apply := 255
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 1 :=
+│           │   │   │           │   │   ├── code <- apply := 216
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 2 :=
+│           │   │   │           │   │   ├── code <- apply := 255
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 3 :=
+│           │   │   │           │   │   ├── code <- apply := 225
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 4 :=
+│           │   │   │           │   │   ├── code <- apply := 21
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 5 :=
+│           │   │   │           │   │   ├── code <- apply := 50
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 6 :=
+│           │   │   │           │   │   ├── code <- apply := 69
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 7 :=
+│           │   │   │           │   │   ├── code <- apply := 120
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 8 :=
+│           │   │   │           │   │   ├── code <- apply := 105
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 9 :=
+│           │   │   │           │   │   ├── code <- apply := 102
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ~
+│           │   │   │           │   └── 8192 :=
+│           │   │   │           │       ├── code <- apply := 256
+│           │   │   │           │       └── extra <- match code { ... } := { none := () }
+│           │   │   │           └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
+│           │   │   │               ├── 0 := { literal := 255 }
+│           │   │   │               ├── 1 := { literal := 216 }
+│           │   │   │               ├── 2 := { literal := 255 }
+│           │   │   │               ├── 3 := { literal := 225 }
+│           │   │   │               ├── 4 := { literal := 21 }
+│           │   │   │               ├── 5 := { literal := 50 }
+│           │   │   │               ├── 6 := { literal := 69 }
+│           │   │   │               ├── 7 := { literal := 120 }
+│           │   │   │               ├── 8 := { literal := 105 }
+│           │   │   │               ├── 9 := { literal := 102 }
+│           │   │   │               ~
+│           │   │   │               └── 8191 := { literal := 15 }
 │           │   │   ├── 1 <- deflate.block :=
 │           │   │   │   ├── final <- base.bit := 0
 │           │   │   │   ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 2
 │           │   │   │   └── data <- match type { ... } :=
-│           │   │   │       ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 28
-│           │   │   │       ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
-│           │   │   │       ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 15
-│           │   │   │       ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
-│           │   │   │       │   ├── 0 := 3
-│           │   │   │       │   ├── 1 := 6
-│           │   │   │       │   ├── 2 := 0
-│           │   │   │       │   ├── 3 := 7
-│           │   │   │       │   ├── 4 := 2
-│           │   │   │       │   ├── 5 := 3
-│           │   │   │       │   ├── 6 := 2
-│           │   │   │       │   ├── 7 := 5
-│           │   │   │       │   ├── 8 := 4
-│           │   │   │       │   ├── 9 := 6
-│           │   │   │       │   ~
-│           │   │   │       │   └── 18 := 6
-│           │   │   │       ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
-│           │   │   │       │   ├── 0 :=
-│           │   │   │       │   │   ├── code <- apply := 6
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 1 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 2 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 3 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 4 :=
-│           │   │   │       │   │   ├── code <- apply := 9
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 5 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 6 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 7 :=
-│           │   │   │       │   │   ├── code <- apply := 8
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 8 :=
-│           │   │   │       │   │   ├── code <- apply := 9
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ├── 9 :=
-│           │   │   │       │   │   ├── code <- apply := 9
-│           │   │   │       │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       │   ~
-│           │   │   │       │   └── 228 :=
-│           │   │   │       │       ├── code <- apply := 6
-│           │   │   │       │       └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │       ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) literal-length-distance-alphabet-code-lengths :=
-│           │   │   │       │   ├── 0 := 6
-│           │   │   │       │   ├── 1 := 8
-│           │   │   │       │   ├── 2 := 8
-│           │   │   │       │   ├── 3 := 8
-│           │   │   │       │   ├── 4 := 9
-│           │   │   │       │   ├── 5 := 8
-│           │   │   │       │   ├── 6 := 8
-│           │   │   │       │   ├── 7 := 8
-│           │   │   │       │   ├── 8 := 9
-│           │   │   │       │   ├── 9 := 9
-│           │   │   │       │   ~
-│           │   │   │       │   └── 314 := 6
-│           │   │   │       ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
-│           │   │   │       │   ├── 0 := 6
-│           │   │   │       │   ├── 1 := 8
-│           │   │   │       │   ├── 2 := 8
-│           │   │   │       │   ├── 3 := 8
-│           │   │   │       │   ├── 4 := 9
-│           │   │   │       │   ├── 5 := 8
-│           │   │   │       │   ├── 6 := 8
-│           │   │   │       │   ├── 7 := 8
-│           │   │   │       │   ├── 8 := 9
-│           │   │   │       │   ├── 9 := 9
-│           │   │   │       │   ~
-│           │   │   │       │   └── 284 := 15
-│           │   │   │       ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
-│           │   │   │       │   ├── 0 := 0
-│           │   │   │       │   ├── 1 := 0
-│           │   │   │       │   ├── 2 := 0
-│           │   │   │       │   ├── 3 := 7
-│           │   │   │       │   ├── 4 := 0
-│           │   │   │       │   ├── 5 := 8
-│           │   │   │       │   ├── 6 := 9
-│           │   │   │       │   ├── 7 := 9
-│           │   │   │       │   ├── 8 := 7
-│           │   │   │       │   ├── 9 := 7
-│           │   │   │       │   ~
-│           │   │   │       │   └── 29 := 6
-│           │   │   │       ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
-│           │   │   │       │   ├── 0 :=
-│           │   │   │       │   │   ├── code <- apply := 207
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 1 :=
-│           │   │   │       │   │   ├── code <- apply := 174
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 2 :=
-│           │   │   │       │   │   ├── code <- apply := 248
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 3 :=
-│           │   │   │       │   │   ├── code <- apply := 241
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 4 :=
-│           │   │   │       │   │   ├── code <- apply := 41
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 5 :=
-│           │   │   │       │   │   ├── code <- apply := 21
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 6 :=
-│           │   │   │       │   │   ├── code <- apply := 205
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 7 :=
-│           │   │   │       │   │   ├── code <- apply := 247
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 8 :=
-│           │   │   │       │   │   ├── code <- apply := 31
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ├── 9 :=
-│           │   │   │       │   │   ├── code <- apply := 252
-│           │   │   │       │   │   └── extra <- match code { ... } := ()
-│           │   │   │       │   ~
-│           │   │   │       │   └── 32767 :=
-│           │   │   │       │       ├── code <- apply := 256
-│           │   │   │       │       └── extra <- match code { ... } := ()
-│           │   │   │       └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
-│           │   │   │           ├── 0 := { literal := 207 }
-│           │   │   │           ├── 1 := { literal := 174 }
-│           │   │   │           ├── 2 := { literal := 248 }
-│           │   │   │           ├── 3 := { literal := 241 }
-│           │   │   │           ├── 4 := { literal := 41 }
-│           │   │   │           ├── 5 := { literal := 21 }
-│           │   │   │           ├── 6 := { literal := 205 }
-│           │   │   │           ├── 7 := { literal := 247 }
-│           │   │   │           ├── 8 := { literal := 31 }
-│           │   │   │           ├── 9 := { literal := 252 }
-│           │   │   │           ~
-│           │   │   │           └── 32766 := { literal := 58 }
+│           │   │   │       └── dynamic_huffman <- deflate.dynamic_huffman :=
+│           │   │   │           ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 28
+│           │   │   │           ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
+│           │   │   │           ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 15
+│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │   │           │   ├── 0 := 3
+│           │   │   │           │   ├── 1 := 6
+│           │   │   │           │   ├── 2 := 0
+│           │   │   │           │   ├── 3 := 7
+│           │   │   │           │   ├── 4 := 2
+│           │   │   │           │   ├── 5 := 3
+│           │   │   │           │   ├── 6 := 2
+│           │   │   │           │   ├── 7 := 5
+│           │   │   │           │   ├── 8 := 4
+│           │   │   │           │   ├── 9 := 6
+│           │   │   │           │   ~
+│           │   │   │           │   └── 18 := 6
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │   │           │   ├── 0 :=
+│           │   │   │           │   │   ├── code <- apply := 6
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 1 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 2 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 3 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 4 :=
+│           │   │   │           │   │   ├── code <- apply := 9
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 5 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 6 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 7 :=
+│           │   │   │           │   │   ├── code <- apply := 8
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 8 :=
+│           │   │   │           │   │   ├── code <- apply := 9
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ├── 9 :=
+│           │   │   │           │   │   ├── code <- apply := 9
+│           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           │   ~
+│           │   │   │           │   └── 228 :=
+│           │   │   │           │       ├── code <- apply := 6
+│           │   │   │           │       └── extra <- match (as-u8 code) { ... } := 0
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) literal-length-distance-alphabet-code-lengths :=
+│           │   │   │           │   ├── 0 := 6
+│           │   │   │           │   ├── 1 := 8
+│           │   │   │           │   ├── 2 := 8
+│           │   │   │           │   ├── 3 := 8
+│           │   │   │           │   ├── 4 := 9
+│           │   │   │           │   ├── 5 := 8
+│           │   │   │           │   ├── 6 := 8
+│           │   │   │           │   ├── 7 := 8
+│           │   │   │           │   ├── 8 := 9
+│           │   │   │           │   ├── 9 := 9
+│           │   │   │           │   ~
+│           │   │   │           │   └── 314 := 6
+│           │   │   │           ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │   │           │   ├── 0 := 6
+│           │   │   │           │   ├── 1 := 8
+│           │   │   │           │   ├── 2 := 8
+│           │   │   │           │   ├── 3 := 8
+│           │   │   │           │   ├── 4 := 9
+│           │   │   │           │   ├── 5 := 8
+│           │   │   │           │   ├── 6 := 8
+│           │   │   │           │   ├── 7 := 8
+│           │   │   │           │   ├── 8 := 9
+│           │   │   │           │   ├── 9 := 9
+│           │   │   │           │   ~
+│           │   │   │           │   └── 284 := 15
+│           │   │   │           ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │   │           │   ├── 0 := 0
+│           │   │   │           │   ├── 1 := 0
+│           │   │   │           │   ├── 2 := 0
+│           │   │   │           │   ├── 3 := 7
+│           │   │   │           │   ├── 4 := 0
+│           │   │   │           │   ├── 5 := 8
+│           │   │   │           │   ├── 6 := 9
+│           │   │   │           │   ├── 7 := 9
+│           │   │   │           │   ├── 8 := 7
+│           │   │   │           │   ├── 9 := 7
+│           │   │   │           │   ~
+│           │   │   │           │   └── 29 := 6
+│           │   │   │           ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
+│           │   │   │           │   ├── 0 :=
+│           │   │   │           │   │   ├── code <- apply := 207
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 1 :=
+│           │   │   │           │   │   ├── code <- apply := 174
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 2 :=
+│           │   │   │           │   │   ├── code <- apply := 248
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 3 :=
+│           │   │   │           │   │   ├── code <- apply := 241
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 4 :=
+│           │   │   │           │   │   ├── code <- apply := 41
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 5 :=
+│           │   │   │           │   │   ├── code <- apply := 21
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 6 :=
+│           │   │   │           │   │   ├── code <- apply := 205
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 7 :=
+│           │   │   │           │   │   ├── code <- apply := 247
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 8 :=
+│           │   │   │           │   │   ├── code <- apply := 31
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ├── 9 :=
+│           │   │   │           │   │   ├── code <- apply := 252
+│           │   │   │           │   │   └── extra <- match code { ... } := { none := () }
+│           │   │   │           │   ~
+│           │   │   │           │   └── 32767 :=
+│           │   │   │           │       ├── code <- apply := 256
+│           │   │   │           │       └── extra <- match code { ... } := { none := () }
+│           │   │   │           └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
+│           │   │   │               ├── 0 := { literal := 207 }
+│           │   │   │               ├── 1 := { literal := 174 }
+│           │   │   │               ├── 2 := { literal := 248 }
+│           │   │   │               ├── 3 := { literal := 241 }
+│           │   │   │               ├── 4 := { literal := 41 }
+│           │   │   │               ├── 5 := { literal := 21 }
+│           │   │   │               ├── 6 := { literal := 205 }
+│           │   │   │               ├── 7 := { literal := 247 }
+│           │   │   │               ├── 8 := { literal := 31 }
+│           │   │   │               ├── 9 := { literal := 252 }
+│           │   │   │               ~
+│           │   │   │               └── 32766 := { literal := 58 }
 │           │   │   └── 2 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
 │           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 2
 │           │   │       └── data <- match type { ... } :=
-│           │   │           ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 26
-│           │   │           ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
-│           │   │           ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 13
-│           │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
-│           │   │           │   ├── 0 := 3
-│           │   │           │   ├── 1 := 7
-│           │   │           │   ├── 2 := 0
-│           │   │           │   ├── 3 := 6
-│           │   │           │   ├── 4 := 2
-│           │   │           │   ├── 5 := 3
-│           │   │           │   ├── 6 := 2
-│           │   │           │   ├── 7 := 5
-│           │   │           │   ├── 8 := 4
-│           │   │           │   ├── 9 := 5
-│           │   │           │   ~
-│           │   │           │   └── 16 := 5
-│           │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
-│           │   │           │   ├── 0 :=
-│           │   │           │   │   ├── code <- apply := 7
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 1 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 2 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 3 :=
-│           │   │           │   │   ├── code <- apply := 8
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 4 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 5 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 6 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 7 :=
-│           │   │           │   │   ├── code <- apply := 8
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 8 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ├── 9 :=
-│           │   │           │   │   ├── code <- apply := 9
-│           │   │           │   │   └── extra <- match (as-u8 code) { ... } := 0
-│           │   │           │   ~
-│           │   │           │   └── 246 :=
-│           │   │           │       ├── code <- apply := 16
-│           │   │           │       └── extra <- match (as-u8 code) { ... } := 1
-│           │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) literal-length-distance-alphabet-code-lengths :=
-│           │   │           │   ├── 0 := 7
-│           │   │           │   ├── 1 := 9
-│           │   │           │   ├── 2 := 9
-│           │   │           │   ├── 3 := 8
-│           │   │           │   ├── 4 := 9
-│           │   │           │   ├── 5 := 9
-│           │   │           │   ├── 6 := 9
-│           │   │           │   ├── 7 := 8
-│           │   │           │   ├── 8 := 9
-│           │   │           │   ├── 9 := 9
-│           │   │           │   ~
-│           │   │           │   └── 312 := 5
-│           │   │           ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
-│           │   │           │   ├── 0 := 7
-│           │   │           │   ├── 1 := 9
-│           │   │           │   ├── 2 := 9
-│           │   │           │   ├── 3 := 8
-│           │   │           │   ├── 4 := 9
-│           │   │           │   ├── 5 := 9
-│           │   │           │   ├── 6 := 9
-│           │   │           │   ├── 7 := 8
-│           │   │           │   ├── 8 := 9
-│           │   │           │   ├── 9 := 9
-│           │   │           │   ~
-│           │   │           │   └── 282 := 14
-│           │   │           ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
-│           │   │           │   ├── 0 := 0
-│           │   │           │   ├── 1 := 0
-│           │   │           │   ├── 2 := 11
-│           │   │           │   ├── 3 := 10
-│           │   │           │   ├── 4 := 11
-│           │   │           │   ├── 5 := 9
-│           │   │           │   ├── 6 := 8
-│           │   │           │   ├── 7 := 7
-│           │   │           │   ├── 8 := 7
-│           │   │           │   ├── 9 := 7
-│           │   │           │   ~
-│           │   │           │   └── 29 := 5
-│           │   │           ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
-│           │   │           │   ├── 0 :=
-│           │   │           │   │   ├── code <- apply := 252
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 1 :=
-│           │   │           │   │   ├── code <- apply := 44
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 2 :=
-│           │   │           │   │   ├── code <- apply := 118
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 3 :=
-│           │   │           │   │   ├── code <- apply := 216
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 4 :=
-│           │   │           │   │   ├── code <- apply := 26
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 5 :=
-│           │   │           │   │   ├── code <- apply := 154
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 6 :=
-│           │   │           │   │   ├── code <- apply := 82
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 7 :=
-│           │   │           │   │   ├── code <- apply := 148
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 8 :=
-│           │   │           │   │   ├── code <- apply := 216
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ├── 9 :=
-│           │   │           │   │   ├── code <- apply := 157
-│           │   │           │   │   └── extra <- match code { ... } := ()
-│           │   │           │   ~
-│           │   │           │   └── 28981 :=
-│           │   │           │       ├── code <- apply := 256
-│           │   │           │       └── extra <- match code { ... } := ()
-│           │   │           └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
-│           │   │               ├── 0 := { literal := 252 }
-│           │   │               ├── 1 := { literal := 44 }
-│           │   │               ├── 2 := { literal := 118 }
-│           │   │               ├── 3 := { literal := 216 }
-│           │   │               ├── 4 := { literal := 26 }
-│           │   │               ├── 5 := { literal := 154 }
-│           │   │               ├── 6 := { literal := 82 }
-│           │   │               ├── 7 := { literal := 148 }
-│           │   │               ├── 8 := { literal := 216 }
-│           │   │               ├── 9 := { literal := 157 }
-│           │   │               ~
-│           │   │               └── 28980 := { literal := 217 }
+│           │   │           └── dynamic_huffman <- deflate.dynamic_huffman :=
+│           │   │               ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 26
+│           │   │               ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
+│           │   │               ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 13
+│           │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │               │   ├── 0 := 3
+│           │   │               │   ├── 1 := 7
+│           │   │               │   ├── 2 := 0
+│           │   │               │   ├── 3 := 6
+│           │   │               │   ├── 4 := 2
+│           │   │               │   ├── 5 := 3
+│           │   │               │   ├── 6 := 2
+│           │   │               │   ├── 7 := 5
+│           │   │               │   ├── 8 := 4
+│           │   │               │   ├── 9 := 5
+│           │   │               │   ~
+│           │   │               │   └── 16 := 5
+│           │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │               │   ├── 0 :=
+│           │   │               │   │   ├── code <- apply := 7
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 1 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 2 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 3 :=
+│           │   │               │   │   ├── code <- apply := 8
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 4 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 5 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 6 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 7 :=
+│           │   │               │   │   ├── code <- apply := 8
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 8 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ├── 9 :=
+│           │   │               │   │   ├── code <- apply := 9
+│           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
+│           │   │               │   ~
+│           │   │               │   └── 246 :=
+│           │   │               │       ├── code <- apply := 16
+│           │   │               │       └── extra <- match (as-u8 code) { ... } := 1
+│           │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, { none := (...) }) literal-length-distance-alphabet-code-lengths :=
+│           │   │               │   ├── 0 := 7
+│           │   │               │   ├── 1 := 9
+│           │   │               │   ├── 2 := 9
+│           │   │               │   ├── 3 := 8
+│           │   │               │   ├── 4 := 9
+│           │   │               │   ├── 5 := 9
+│           │   │               │   ├── 6 := 9
+│           │   │               │   ├── 7 := 8
+│           │   │               │   ├── 8 := 9
+│           │   │               │   ├── 9 := 9
+│           │   │               │   ~
+│           │   │               │   └── 312 := 5
+│           │   │               ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │               │   ├── 0 := 7
+│           │   │               │   ├── 1 := 9
+│           │   │               │   ├── 2 := 9
+│           │   │               │   ├── 3 := 8
+│           │   │               │   ├── 4 := 9
+│           │   │               │   ├── 5 := 9
+│           │   │               │   ├── 6 := 9
+│           │   │               │   ├── 7 := 8
+│           │   │               │   ├── 8 := 9
+│           │   │               │   ├── 9 := 9
+│           │   │               │   ~
+│           │   │               │   └── 282 := 14
+│           │   │               ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │               │   ├── 0 := 0
+│           │   │               │   ├── 1 := 0
+│           │   │               │   ├── 2 := 11
+│           │   │               │   ├── 3 := 10
+│           │   │               │   ├── 4 := 11
+│           │   │               │   ├── 5 := 9
+│           │   │               │   ├── 6 := 8
+│           │   │               │   ├── 7 := 7
+│           │   │               │   ├── 8 := 7
+│           │   │               │   ├── 9 := 7
+│           │   │               │   ~
+│           │   │               │   └── 29 := 5
+│           │   │               ├── codes <- dynamic distance-alphabet-format huffman (dynamic literal-length-alphabet-format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... })) :=
+│           │   │               │   ├── 0 :=
+│           │   │               │   │   ├── code <- apply := 252
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 1 :=
+│           │   │               │   │   ├── code <- apply := 44
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 2 :=
+│           │   │               │   │   ├── code <- apply := 118
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 3 :=
+│           │   │               │   │   ├── code <- apply := 216
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 4 :=
+│           │   │               │   │   ├── code <- apply := 26
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 5 :=
+│           │   │               │   │   ├── code <- apply := 154
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 6 :=
+│           │   │               │   │   ├── code <- apply := 82
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 7 :=
+│           │   │               │   │   ├── code <- apply := 148
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 8 :=
+│           │   │               │   │   ├── code <- apply := 216
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ├── 9 :=
+│           │   │               │   │   ├── code <- apply := 157
+│           │   │               │   │   └── extra <- match code { ... } := { none := () }
+│           │   │               │   ~
+│           │   │               │   └── 28981 :=
+│           │   │               │       ├── code <- apply := 256
+│           │   │               │       └── extra <- match code { ... } := { none := () }
+│           │   │               └── codes-values <- compute flat-map (x -> match x.code { ... }) codes :=
+│           │   │                   ├── 0 := { literal := 252 }
+│           │   │                   ├── 1 := { literal := 44 }
+│           │   │                   ├── 2 := { literal := 118 }
+│           │   │                   ├── 3 := { literal := 216 }
+│           │   │                   ├── 4 := { literal := 26 }
+│           │   │                   ├── 5 := { literal := 154 }
+│           │   │                   ├── 6 := { literal := 82 }
+│           │   │                   ├── 7 := { literal := 148 }
+│           │   │                   ├── 8 := { literal := 216 }
+│           │   │                   ├── 9 := { literal := 157 }
+│           │   │                   ~
+│           │   │                   └── 28980 := { literal := 217 }
 │           │   ├── codes <- compute flat-map (x -> match x.data { ... }) blocks :=
 │           │   │   ├── 0 := { literal := 255 }
 │           │   │   ├── 1 := { literal := 216 }

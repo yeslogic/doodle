@@ -548,8 +548,6 @@ pub enum Format {
     Variant(Label, Box<Format>),
     /// Matches the union of all the formats, which must have the same type
     Union(Vec<Format>),
-    /// Matches the union of all the formats wrapped in variants
-    UnionVariant(Vec<(Label, Format)>),
     /// Temporary hack for nondeterministic variant unions
     UnionNondet(Vec<(Label, Format)>),
     /// Matches a sequence of concatenated formats
@@ -585,8 +583,6 @@ pub enum Format {
     Let(Label, Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(Pattern, Format)>),
-    /// Pattern match on an expression and return a variant
-    MatchVariant(Expr, Vec<(Pattern, Label, Format)>),
     /// Format generated dynamically
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
@@ -597,9 +593,9 @@ impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
     pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::UnionVariant(
+        Format::Union(
             (fields.into_iter())
-                .map(|(label, format)| (label.into(), format))
+                .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
                 .collect(),
         )
     }
@@ -623,7 +619,7 @@ impl Format {
             Format::Align(n) => Bounds::new(0, Some(n - 1)),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
-            Format::UnionVariant(branches) | Format::UnionNondet(branches) => branches
+            Format::UnionNondet(branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
@@ -661,11 +657,6 @@ impl Format {
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::union)
                 .unwrap(),
-            Format::MatchVariant(_, branches) => branches
-                .iter()
-                .map(|(_, _, f)| f.match_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
             Format::Dynamic(_name, _dynformat, f) => f.match_bounds(module),
             Format::Apply(_) => Bounds::new(1, None),
         }
@@ -685,9 +676,7 @@ impl Format {
             Format::Align(_) => false,
             Format::Byte(_) => false,
             Format::Variant(_label, f) => f.depends_on_next(module),
-            Format::UnionVariant(branches) | Format::UnionNondet(branches) => {
-                Format::union_depends_on_next(branches, module)
-            }
+            Format::UnionNondet(branches) => Format::union_depends_on_next(branches, module),
             Format::Union(branches) => Format::iso_union_depends_on_next(branches, module),
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
@@ -705,9 +694,6 @@ impl Format {
             Format::Compute(_) => false,
             Format::Let(_name, _expr, f) => f.depends_on_next(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
-            Format::MatchVariant(_, branches) => {
-                branches.iter().any(|(_, _, f)| f.depends_on_next(module))
-            }
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(_) => false,
         }
@@ -867,7 +853,7 @@ impl FormatModule {
                 label.clone(),
                 self.infer_format_type(scope, f)?,
             )])),
-            Format::UnionVariant(branches) | Format::UnionNondet(branches) => {
+            Format::UnionNondet(branches) => {
                 let mut ts = Vec::with_capacity(branches.len());
                 for (label, f) in branches {
                     ts.push((label.clone(), self.infer_format_type(scope, f)?));
@@ -941,20 +927,6 @@ impl FormatModule {
                     t = t.unify(
                         &pattern.infer_format_branch_type(scope, &head_type, self, branch)?,
                     )?;
-                }
-                Ok(t)
-            }
-            Format::MatchVariant(head, branches) => {
-                if branches.is_empty() {
-                    return Err("infer_format_type: empty MatchVariant".to_string());
-                }
-                let head_type = head.infer_type(scope)?;
-                let mut t = ValueType::Any;
-                for (pattern, label, branch) in branches {
-                    t = t.unify(&ValueType::Union(vec![(
-                        label.clone(),
-                        pattern.infer_format_branch_type(scope, &head_type, self, branch)?,
-                    )]))?;
                 }
                 Ok(t)
             }
@@ -1258,7 +1230,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
-            Format::UnionVariant(branches) | Format::UnionNondet(branches) => {
+            Format::UnionNondet(branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
                     tree = tree.union(Self::from_format(module, f, next.clone()));
@@ -1347,13 +1319,6 @@ impl<'a> MatchTreeStep<'a> {
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
-                    tree = tree.union(Self::from_format(module, f, next.clone()));
-                }
-                tree
-            }
-            Format::MatchVariant(_, branches) => {
-                let mut tree = Self::reject();
-                for (_, _, f) in branches {
                     tree = tree.union(Self::from_format(module, f, next.clone()));
                 }
                 tree

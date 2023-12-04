@@ -41,7 +41,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let iend_data = module.define_format("png.iend-data", Format::EMPTY); // FIXME ensure IEND length = 0
     let iend = module.define_format("png.iend", chunk(iend_tag.call(), iend_data.call()));
 
-    let bkgd_data = Format::MatchVariant(
+    let bkgd_data = match_variant(
         Expr::RecordProj(
             Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".into())),
             "color-type".into(),
@@ -49,17 +49,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         vec![
             (
                 Pattern::U8(0),
-                "color-type-0".into(),
+                "color-type-0",
                 record([("greyscale", base.u16be())]),
             ),
             (
                 Pattern::U8(4),
-                "color-type-4".into(),
+                "color-type-4",
                 record([("greyscale", base.u16be())]),
             ),
             (
                 Pattern::U8(2),
-                "color-type-2".into(),
+                "color-type-2",
                 record([
                     ("red", base.u16be()),
                     ("green", base.u16be()),
@@ -68,7 +68,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 Pattern::U8(6),
-                "color-type-6".into(),
+                "color-type-6",
                 record([
                     ("red", base.u16be()),
                     ("green", base.u16be()),
@@ -77,7 +77,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 Pattern::U8(3),
-                "color-type-3".into(),
+                "color-type-3",
                 record([("palette-index", base.u8())]),
             ),
         ],
@@ -109,7 +109,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     ]);
     let time = module.define_format("png.time", chunk(is_bytes(b"tIME"), time_data));
 
-    let trns_data = Format::MatchVariant(
+    let trns_data = match_variant(
         Expr::RecordProj(
             Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".into())),
             "color-type".into(),
@@ -117,12 +117,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         vec![
             (
                 Pattern::U8(0),
-                "color-type-0".into(),
+                "color-type-0",
                 record([("greyscale", base.u16be())]),
             ),
             (
                 Pattern::U8(2),
-                "color-type-2".into(),
+                "color-type-2",
                 record([
                     ("red", base.u16be()),
                     ("green", base.u16be()),
@@ -131,7 +131,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 Pattern::U8(3),
-                "color-type-3".into(),
+                "color-type-3",
                 repeat(record([("palette-index", base.u8())])),
             ),
         ],

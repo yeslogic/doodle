@@ -55,15 +55,17 @@
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
-│       │   │       │   └──  palette-index
-│       │   │       │                    0
+│       │   │       │   └── color-type-3 <- repeat { ... } :=
+│       │   │       │       └──  palette-index
+│       │   │       │                        0
 │       │   │       └── crc <- base.u32be := 1088870502
 │       │   ├── 2 <- png.chunk(...) :=
 │       │   │   └── bKGD <- png.bkgd(...) :=
 │       │   │       ├── length <- base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
-│       │   │       │   └── palette-index <- base.u8 := 0
+│       │   │       │   └── color-type-3 <- { ... } :=
+│       │   │       │       └── palette-index <- base.u8 := 0
 │       │   │       └── crc <- base.u32be := 2282036552
 │       │   ├── 3 <- png.chunk(...) :=
 │       │   │   └── pHYs <- png.phys :=

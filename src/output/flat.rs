@@ -130,7 +130,7 @@ fn check_covered(
             check_covered(module, path, format)?;
             path.pop();
         }
-        Format::UnionVariant(branches) | Format::UnionNondet(branches) => {
+        Format::UnionNondet(branches) => {
             for (label, format) in branches {
                 path.push(label.clone());
                 check_covered(module, path, format)?;
@@ -179,11 +179,6 @@ fn check_covered(
                 check_covered(module, path, format)?;
             }
         }
-        Format::MatchVariant(_head, branches) => {
-            for (_pattern, _label, format) in branches {
-                check_covered(module, path, format)?;
-            }
-        }
         Format::Dynamic(_name, _dynformat, format) => check_covered(module, path, format)?,
         Format::Apply(_) => {}
     }
@@ -224,7 +219,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected variant, found {value:?}"),
             },
-            Format::UnionVariant(branches) | Format::UnionNondet(branches) => match value {
+            Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
                     let (label, format) = &branches[*index];
                     match value.as_ref() {
@@ -297,23 +292,6 @@ impl<'module, W: io::Write> Context<'module, W> {
                     let (pattern, format) = &branches[*index];
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
                         self.write_flat(&Scope::Multi(&pattern_scope), value, format)?;
-                        return Ok(());
-                    }
-                    panic!("pattern match failure");
-                }
-                _ => panic!("expected branch, found {value:?}"),
-            },
-            Format::MatchVariant(head, branches) => match value {
-                Value::Branch(index, value) => {
-                    let head = head.eval(scope);
-                    let (pattern, label, format) = &branches[*index];
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        if let Value::Variant(label2, value) = value.as_ref() {
-                            assert_eq!(label, label2);
-                            self.write_flat(&Scope::Multi(&pattern_scope), value, format)?;
-                        } else {
-                            panic!("expected variant, found {value:?}");
-                        }
                         return Ok(());
                     }
                     panic!("pattern match failure");
