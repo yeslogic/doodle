@@ -218,7 +218,7 @@ impl Codegen {
                                         let cl_inner = self.translate(inner, Some(&RustType::AnonTuple(typs.clone())));
                                         CaseLogic::Derived(DerivedLogic::VariantOf(qname, Box::new(cl_inner)))
                                     }
-                                    Some(RustVariant::Record(_, fields)) => {
+                                    Some(RustVariant::Record(_, _fields)) => {
                                         // FIXME - this is much harder to implement as Records cannot be anonymous
                                         todo!("VariantOf @ RustVariant::Record")
                                     }
@@ -308,9 +308,11 @@ impl Codegen {
     }
 }
 
+#[allow(dead_code)]
 type RustBlock = (Vec<RustStmt>, Option<RustExpr>);
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 struct ProdCtxt<'a> {
     input_varname: &'a Label,
     scope_varname: &'a Label,
@@ -325,6 +327,7 @@ impl CaseLogic {
     ///
     /// Local bindings and control flow are allowed, as long as an explicit return
     /// or a concrete, consistently typed return value are used
+    #[allow(dead_code)]
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             CaseLogic::Simple(s) => s.to_ast(ctxt),
@@ -760,7 +763,7 @@ impl OtherLogic {
 
 /// this production should be a RustExpr whose compiled type is usize, and whose
 /// runtime value is the index of the successful match relative to the input
-fn invoke_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustExpr {
+fn invoke_matchtree(_tree: &MatchTree, _ctxt: ProdCtxt<'_>) -> RustExpr {
     RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("invoke_matchtree")])
 }
 
@@ -770,9 +773,9 @@ enum ParallelLogic {
     Alts(Vec<CaseLogic>),
 }
 impl ParallelLogic {
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
+    fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            ParallelLogic::Alts(alts) => {
+            ParallelLogic::Alts(_alts) => {
                 // FIMXE - no proper model for Parallel parsing yet
                 (
                     Vec::new(),
@@ -803,10 +806,10 @@ enum DerivedLogic {
 }
 
 impl DerivedLogic {
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> (Vec<RustStmt>, Option<RustExpr>) {
+    fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> (Vec<RustStmt>, Option<RustExpr>) {
         match self {
             // FIXME - variants cannot be modelled as atomic operations within the current framework
-            DerivedLogic::VariantOf(vname, logic) => (
+            DerivedLogic::VariantOf(_vname, _logic) => (
                 Vec::new(),
                 Some(
                     RustExpr::local("unimplemented!")
