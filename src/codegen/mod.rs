@@ -199,10 +199,40 @@ impl Codegen {
             Decoder::Variant(vname, inner) => {
                 // FIXME - not sure quite what logic to employ for unwrapping type-hints on variants
                 match type_hint {
-                    _ => CaseLogic::Derived(DerivedLogic::VariantOf(
-                        vname.clone(),
-                        Box::new(self.translate(inner.as_ref(), type_hint.clone())),
-                    )),
+                    Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
+                        let qname = RustExpr::scoped([lab.clone()], vname.clone());
+                        let tdef = &self.defined_types[*ix];
+                        match tdef {
+                            RustTypeDef::Enum(vars) => {
+                                let matching = vars
+                                    .iter()
+                                    .find(|var| var.get_label().as_ref() == vname.as_ref());
+                                // REVIEW - should we force an exact match?
+                                match matching {
+                                    Some(RustVariant::Unit(_)) => {
+                                        let _inner = self.translate(inner, Some(&RustType::UNIT));
+                                        CaseLogic::Derived(DerivedLogic::VariantOf(qname, Box::new(_inner)))
+                                    }
+                                    Some(RustVariant::Tuple(_, typs)) => {
+                                        // FIXME - is this correct?
+                                        let cl_inner = self.translate(inner, Some(&RustType::AnonTuple(typs.clone())));
+                                        CaseLogic::Derived(DerivedLogic::VariantOf(qname, Box::new(cl_inner)))
+                                    }
+                                    Some(RustVariant::Record(_, fields)) => {
+                                        // FIXME - this is much harder to implement as Records cannot be anonymous
+                                        todo!("VariantOf @ RustVariant::Record")
+                                    }
+                                    None => unreachable!("VariantOf called for nonexistent variant `{vname}` of enum-type `{lab}`"),
+                                }
+                            }
+                            RustTypeDef::Struct(_) => {
+                                unreachable!("VariantOf not coherent on type defined as struct")
+                            }
+                        }
+                    }
+                    _ => unreachable!(
+                        "insufficient type information to translate Decoder::VariantOf"
+                    ),
                 }
             }
             Decoder::Parallel(alts) => CaseLogic::Parallel(ParallelLogic::Alts(
@@ -590,7 +620,7 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
 /// is more resilient to changes both upstream (in the Decoder model)
 /// and downstream (in the API made available for generated code to use)
 #[derive(Clone, Debug)]
-pub enum CaseLogic {
+enum CaseLogic {
     Simple(SimpleLogic),
     Derived(DerivedLogic),
     Sequential(SequentialLogic),
@@ -600,7 +630,7 @@ pub enum CaseLogic {
 
 /// Cases that apply other case-logic in sequence to an incrementally updated input
 #[derive(Clone, Debug)]
-pub enum SequentialLogic {
+enum SequentialLogic {
     AccumTuple {
         constructor: Option<Label>,
         elements: Vec<CaseLogic>,
@@ -699,7 +729,7 @@ impl SequentialLogic {
 
 /// Catch-all for hard-to-classify cases
 #[derive(Clone, Debug)]
-pub enum OtherLogic {
+enum OtherLogic {
     Descend(MatchTree, Vec<CaseLogic>),
 }
 impl OtherLogic {
@@ -736,7 +766,7 @@ fn invoke_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustExpr {
 
 /// Cases that require processing of multiple cases in parallel (on the same input-state)
 #[derive(Clone, Debug)]
-pub enum ParallelLogic {
+enum ParallelLogic {
     Alts(Vec<CaseLogic>),
 }
 impl ParallelLogic {
@@ -758,7 +788,7 @@ impl ParallelLogic {
 
 /// Cases that require no recursion into other case-logic
 #[derive(Clone, Debug)]
-pub enum SimpleLogic {
+enum SimpleLogic {
     Fail,
     ExpectEnd,
     Invoke(usize, Vec<(Label, Expr)>),
@@ -768,8 +798,8 @@ pub enum SimpleLogic {
 
 /// Cases that recurse into other case-logic only once
 #[derive(Clone, Debug)]
-pub enum DerivedLogic {
-    VariantOf(Label, Box<CaseLogic>),
+enum DerivedLogic {
+    VariantOf(RustExpr, Box<CaseLogic>),
 }
 
 impl DerivedLogic {
