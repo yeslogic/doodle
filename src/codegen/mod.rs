@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use rust_ast::{CompType, PrimType, RustType, RustTypeDef, ToFragment};
 
 use self::rust_ast::{
-    AtomType, DefParams, FnSig, RustExpr, RustFn, RustLt, RustParams, RustStmt, RustStruct,
-    RustVariant,
+    AtomType, DefParams, FnSig, RustExpr, RustFn, RustLt, RustParams, RustPattern, RustStmt,
+    RustStruct, RustVariant,
 };
 
 #[repr(transparent)]
@@ -277,6 +277,123 @@ impl Codegen {
     }
 }
 
+type RustBlock = (Vec<RustStmt>, Option<RustExpr>);
+
+#[derive(Clone, Copy)]
+struct ProdCtxt<'a> {
+    input_varname: &'a Label,
+    scope_varname: &'a Label,
+}
+
+impl CaseLogic {
+    /// Produces an RustExpr-valued AST for the given CaseLogic instance.
+    ///
+    /// The Expr should have the bare type of the value being parsed (i.e. not Option-wrapped),
+    /// but it is implicitly assumed to be contained in a block whose ultimate return value
+    /// is `Option<_>`, allowing `return None` and `?` expressions to be used anyway.
+    ///
+    /// Local bindings and control flow are allowed, as long as an explicit return
+    /// or a concrete, consistently typed return value are used
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
+        match self {
+            CaseLogic::Simple(s) => s.to_ast(ctxt),
+            CaseLogic::Derived(d) => d.to_ast(ctxt),
+            CaseLogic::Sequential(sq) => sq.to_ast(ctxt),
+            CaseLogic::Parallel(p) => p.to_ast(ctxt),
+            CaseLogic::Other(o) => o.to_ast(ctxt),
+        }
+    }
+}
+
+impl SimpleLogic {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
+        match self {
+            SimpleLogic::Fail => (vec![RustStmt::Return(true, RustExpr::NONE)], None),
+            SimpleLogic::ExpectEnd => {
+                let call = RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte");
+                let cond = call.call_method("is_none");
+                let b_true = [RustStmt::Return(false, RustExpr::UNIT)];
+                let b_false = [RustStmt::Return(true, RustExpr::NONE)];
+                (
+                    Vec::new(),
+                    Some(RustExpr::Control(Box::new(RustControl::If(
+                        cond,
+                        b_true.to_vec(),
+                        Some(b_false.to_vec()),
+                    )))),
+                )
+            }
+            // FIXME - not sure what should be done with _args
+            SimpleLogic::Invoke(ix_dec, _args) => {
+                let fname = format!("Decoder{ix_dec}");
+                let call = RustExpr::local(fname).call_with([
+                    RustExpr::local(ctxt.scope_varname.clone()),
+                    RustExpr::local(ctxt.input_varname.clone()),
+                ]);
+                (Vec::new(), Some(call.wrap_try()))
+            }
+            SimpleLogic::SkipToNextMultiple(n) => {
+                // FIXME - this currently produces correct but inefficient code
+                // it is harder to write, but much more efficient, to cut the buffer at the right place
+                // in order to do so, we would need a more advanced Parser model or more complex inline logic
+                let cond = RustExpr::infix(
+                    RustExpr::infix(
+                        RustExpr::local("input").call_method("offset"),
+                        " % ",
+                        RustExpr::NumericLit(*n),
+                    ),
+                    " != ",
+                    RustExpr::NumericLit(0),
+                );
+                let body = {
+                    let let_tmp = RustStmt::assign(
+                        "_",
+                        RustExpr::local(ctxt.input_varname.clone())
+                            .call_method("read_byte")
+                            .wrap_try(),
+                    );
+                    vec![let_tmp]
+                };
+                (
+                    vec![RustStmt::Control(RustControl::While(cond, body))],
+                    Some(RustExpr::UNIT),
+                )
+            }
+            SimpleLogic::ByteIn(bs) => {
+                let call = RustExpr::local(ctxt.input_varname.clone())
+                    .call_method("read_byte")
+                    .wrap_try();
+                let b_let = RustStmt::assign("b", call);
+
+                let logic = if bs.is_full() {
+                    RustExpr::local("b")
+                } else {
+                    let cond = {
+                        if bs.len() == 1 {
+                            let Some(elt) = bs.min_elem() else {
+                                unreachable!("len == 1 but no min_elem")
+                            };
+                            RustExpr::Operation(RustOp::InfixOp(
+                                " == ",
+                                Box::new(RustExpr::local("b")),
+                                Box::new(RustExpr::NumericLit(elt as usize)),
+                            ))
+                        } else {
+                            embed_byteset(bs).call_method_with("contains", [RustExpr::local("b")])
+                        }
+                    };
+
+                    let b_true = vec![RustStmt::Return(false, RustExpr::local("b"))];
+                    let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
+                    RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
+                };
+
+                ([b_let].to_vec(), Some(logic))
+            }
+        }
+    }
+}
+
 fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
     let name = Label::from(format!("Decoder{ix}"));
     let params = {
@@ -451,6 +568,7 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
             call.wrap_try()
         }
         Decoder::Tuple(elts) if elts.is_empty() => RustExpr::UNIT,
+        // FIXME - there are still cases to split out of here
         other => {
             let let_tmp = RustStmt::assign(
                 "tmp",
@@ -492,16 +610,149 @@ pub enum SequentialLogic {
     },
 }
 
+impl SequentialLogic {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> (Vec<RustStmt>, Option<RustExpr>) {
+        match self {
+            SequentialLogic::AccumTuple {
+                constructor,
+                elements,
+            } => {
+                if elements.is_empty() {
+                    return (Vec::new(), Some(RustExpr::UNIT));
+                }
+
+                let mut names: Vec<Label> = Vec::new();
+                let mut body = Vec::new();
+
+                for (ix, elt_cl) in elements.iter().enumerate() {
+                    let varname = format!("field{}", ix);
+                    names.push(varname.clone().into());
+                    let (mut preamble, o_val) = elt_cl.to_ast(ctxt);
+                    if let Some(val) = o_val {
+                        body.push(RustStmt::assign(
+                            varname,
+                            RustExpr::BlockScope(preamble, Box::new(val)),
+                        ));
+                    } else {
+                        // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of elt_cl)
+                        body.append(&mut preamble);
+                    }
+                }
+
+                if let Some(con) = constructor {
+                    // FIXME - this may be incorrect since we don't always know the type-context (e.g. if we are in an enum)
+                    (
+                        body,
+                        Some(RustExpr::local(con.clone()).call_with([RustExpr::Tuple(
+                            names.into_iter().map(RustExpr::local).collect(),
+                        )])),
+                    )
+                } else {
+                    (
+                        body,
+                        Some(RustExpr::Tuple(
+                            names.into_iter().map(RustExpr::local).collect(),
+                        )),
+                    )
+                }
+            }
+            SequentialLogic::AccumRecord {
+                constructor,
+                fields,
+            } => {
+                if fields.is_empty() {
+                    unreachable!(
+                        "SequentialLogic::AccumRecord has no fields, which is not an expected case"
+                    );
+                }
+
+                let mut names: Vec<Label> = Vec::new();
+                let mut body = Vec::new();
+
+                for (fname, fld_cl) in fields.iter() {
+                    let varname = rust_ast::sanitize_label(fname);
+                    names.push(varname.clone());
+                    let (mut preamble, o_val) = fld_cl.to_ast(ctxt);
+                    if let Some(val) = o_val {
+                        body.push(RustStmt::assign(
+                            varname,
+                            RustExpr::BlockScope(preamble, Box::new(val)),
+                        ));
+                    } else {
+                        // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of fld_cl)
+                        body.append(&mut preamble);
+                    }
+                }
+
+                (
+                    body,
+                    Some(RustExpr::Struct(
+                        constructor.clone(),
+                        names.into_iter().map(|l| (l, None)).collect(),
+                    )),
+                )
+            }
+        }
+    }
+}
+
 /// Catch-all for hard-to-classify cases
 #[derive(Clone, Debug)]
 pub enum OtherLogic {
     Descend(MatchTree, Vec<CaseLogic>),
+}
+impl OtherLogic {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> (Vec<RustStmt>, Option<RustExpr>) {
+        match self {
+            OtherLogic::Descend(tree, cases) => {
+                // FIXME - we don't have a transformation from MatchTree to AST, so this is incomplete
+                let mut branches = Vec::new();
+                for (ix, case) in cases.iter().enumerate() {
+                    let (mut rhs, o_val) = case.to_ast(ctxt);
+                    match o_val {
+                        Some(val) => {
+                            rhs.push(RustStmt::Return(false, val));
+                        }
+                        None => (),
+                    };
+                    branches.push((RustPattern::NumLiteral(ix), rhs));
+                }
+                let ret = RustExpr::Control(Box::new(RustControl::Match(
+                    invoke_matchtree(tree, ctxt),
+                    branches,
+                )));
+                (Vec::new(), Some(ret))
+            }
+        }
+    }
+}
+
+/// this production should be a RustExpr whose compiled type is usize, and whose
+/// runtime value is the index of the successful match relative to the input
+fn invoke_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustExpr {
+    RustExpr::local("unimplemented!").call_with([RustExpr::str_lit("invoke_matchtree")])
 }
 
 /// Cases that require processing of multiple cases in parallel (on the same input-state)
 #[derive(Clone, Debug)]
 pub enum ParallelLogic {
     Alts(Vec<CaseLogic>),
+}
+impl ParallelLogic {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
+        match self {
+            ParallelLogic::Alts(alts) => {
+                // FIMXE - no proper model for Parallel parsing yet
+                (
+                    Vec::new(),
+                    Some(
+                        RustExpr::local("unimplemented!")
+                            .call_with([RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)")]),
+                    ),
+                )
+            }
+        }
+    }
 }
 
 /// Cases that require no recursion into other case-logic
@@ -518,6 +769,21 @@ pub enum SimpleLogic {
 #[derive(Clone, Debug)]
 pub enum DerivedLogic {
     VariantOf(Label, Box<CaseLogic>),
+}
+
+impl DerivedLogic {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> (Vec<RustStmt>, Option<RustExpr>) {
+        match self {
+            // FIXME - variants cannot be modelled as atomic operations within the current framework
+            DerivedLogic::VariantOf(vname, logic) => (
+                Vec::new(),
+                Some(
+                    RustExpr::local("unimplemented!")
+                        .call_with([RustExpr::str_lit("DerivedLogic::VariantOf.to_ast(..)")]),
+                ),
+            ),
+        }
+    }
 }
 
 fn decoder_body(decoder: &Decoder, return_type: &RustType) -> Vec<rust_ast::RustStmt> {
