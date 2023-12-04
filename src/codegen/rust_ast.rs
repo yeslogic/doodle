@@ -889,6 +889,23 @@ impl RustStmt {
 pub(crate) enum RustControl {
     While(RustExpr, Vec<RustStmt>),
     If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
+    Match(RustExpr, Vec<(RustPattern, Vec<RustStmt>)>),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustPattern {
+    NumLiteral(usize),
+    CatchAll(Option<Label>), // None <- `_`, Some("x") for `x`
+}
+
+impl ToFragment for RustPattern {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustPattern::NumLiteral(n) => Fragment::DisplayAtom(Rc::new(*n)),
+            RustPattern::CatchAll(None) => Fragment::Char('_'),
+            RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
+        }
+    }
 }
 
 impl ToFragment for RustControl {
@@ -904,7 +921,21 @@ impl ToFragment for RustControl {
                     Fragment::string(" else "),
                     Fragment::opt(b_else.as_ref(), |branch| RustStmt::block(branch.iter())),
                 ),
+            Self::Match(expr, cases) => Fragment::string("match")
+                .intervene(Fragment::Char(' '), expr.to_fragment())
+                .intervene(
+                    Fragment::Char(' '),
+                    <(RustPattern, Vec<RustStmt>)>::block_sep(cases, Fragment::string(",\n")),
+                ),
         }
+    }
+}
+
+impl ToFragment for (RustPattern, Vec<RustStmt>) {
+    fn to_fragment(&self) -> Fragment {
+        self.0
+            .to_fragment()
+            .intervene(Fragment::string(" => "), RustStmt::block(self.1.iter()))
     }
 }
 
