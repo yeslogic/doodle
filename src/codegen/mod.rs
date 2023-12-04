@@ -316,13 +316,22 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
 }
 
 fn embed_byteset(bs: &ByteSet) -> RustExpr {
-    let [q0, q1, q2, q3] = bs.to_bits();
-    RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
-        RustExpr::NumericLit(q0 as usize),
-        RustExpr::NumericLit(q1 as usize),
-        RustExpr::NumericLit(q2 as usize),
-        RustExpr::NumericLit(q3 as usize),
-    ])])
+    if bs.is_full() {
+        RustExpr::scoped(["ByteSet"], "full").call()
+    } else if bs.len() == 1 {
+        let Some(elt) = bs.min_elem() else {
+            unreachable!("len == 1 but no min_elem")
+        };
+        RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::NumericLit(elt as usize)])
+    } else {
+        let [q0, q1, q2, q3] = bs.to_bits();
+        RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
+            RustExpr::NumericLit(q0 as usize),
+            RustExpr::NumericLit(q1 as usize),
+            RustExpr::NumericLit(q2 as usize),
+            RustExpr::NumericLit(q3 as usize),
+        ])])
+    }
 }
 
 fn name_for_decoder(dec: &Decoder) -> &'static str {
@@ -595,5 +604,16 @@ pub fn print_program(program: &Program) {
         uses: RustImportItems::Wildcard,
     });
 
-    print!("{}", content.to_fragment())
+    let extra = r#"
+#[test]
+fn test_decoder_27() {
+    // PNG signature
+    let input = b"\x89PNG\r\n\x1A\n";
+    let mut parse_ctxt = ParseCtxt::new(input);
+    let mut scope = Scope::Empty;
+    let ret = Decoder27(&mut scope, &mut parse_ctxt);
+    assert!(ret.is_some());
+}"#;
+
+    print!("{}{}", content.to_fragment(), extra)
 }
