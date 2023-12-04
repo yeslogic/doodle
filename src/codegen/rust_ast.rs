@@ -746,6 +746,7 @@ pub(crate) enum RustExpr {
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustOp {
+    // scaffolding to allow for flexible infix operations from operator tokens; should contain spaces already
     InfixOp(&'static str, Box<RustExpr>, Box<RustExpr>),
 }
 
