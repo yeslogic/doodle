@@ -425,6 +425,16 @@ pub(crate) enum RustVariant {
     Record(Label, Vec<(Label, RustType)>),
 }
 
+impl RustVariant {
+    pub(crate) fn get_label(&self) -> &Label {
+        match self {
+            RustVariant::Unit(lab) | RustVariant::Tuple(lab, _) | RustVariant::Record(lab, _) => {
+                lab
+            }
+        }
+    }
+}
+
 impl ToFragment for RustVariant {
     fn to_fragment(&self) -> Fragment {
         match self {
