@@ -1,39 +1,12 @@
 use doodle::prelude::*;
 
-struct Type28 {
-    ff: u8,
-    marker: u8,
-}
-
-struct Type1 {
-    screen_width: u16,
-    screen_height: u16,
-    flags: u8,
-    bg_color_index: u8,
-    pixel_aspect_ratio: u8,
-}
-
-enum Type9 {
-    table_based_image {
-        descriptor: Type6,
-        local_color_table: Type3,
-        data: Type8,
-    },
-    plain_text_extension {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        text_grid_left_position: u16,
-        text_grid_top_position: u16,
-        text_grid_width: u16,
-        text_grid_height: u16,
-        character_cell_width: u8,
-        character_cell_height: u8,
-        text_foreground_color_index: u8,
-        text_background_color_index: u8,
-        plain_text_data: Vec<Type7>,
-        terminator: u8,
-    },
+struct Type13 {
+    magic: (u8, u8),
+    method: u8,
+    file_flags: u8,
+    timestamp: u32,
+    compression_flags: u8,
+    os_id: u8,
 }
 
 struct Type89 {
@@ -42,138 +15,10 @@ struct Type89 {
     data: Type53,
 }
 
-struct Type42 {
-    restart_interval: u16,
-}
-
-struct Type91 {
+struct Type92 {
     marker: Type28,
     length: u16,
-    data: Type39,
-}
-
-struct Type77 {
-    header: Type0,
-    logical_screen: Type4,
-    blocks: Vec<Type11>,
-    trailer: Type12,
-}
-
-enum Type54 {
-    some {
-        marker: Type28,
-        length: u16,
-        data: Type53,
-    },
-    none(),
-}
-
-struct Type98 {
-    version_major: u8,
-    version_minor: u8,
-    density_units: u8,
-    density_x: u16,
-    density_y: u16,
-    thumbnail_width: u8,
-    thumbnail_height: u8,
-    thumbnail_pixels: Vec<Vec<Type2>>,
-}
-
-struct Type49 {
-    marker: Type28,
-    length: u16,
-    data: Type48,
-}
-
-struct Type82 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type58,
-    crc: u32,
-}
-
-enum Type5 {
-    some {
-        separator: u8,
-        label: u8,
-        block_size: u8,
-        flags: u8,
-        delay_time: u16,
-        transparent_color_index: u8,
-        terminator: u8,
-    },
-    none(),
-}
-
-enum Type3 {
-    no(),
-    yes(Vec<Type2>),
-}
-
-struct Type90 {
-    marker: Type28,
-    length: u16,
-    data: Type45,
-}
-
-struct Type48 {
-    num_image_components: u8,
-    image_components: Vec<Type47>,
-    start_spectral_selection: u8,
-    end_spectral_selection: u8,
-    approximation_bit_position: u8,
-}
-
-struct Type69 {
-    string: Vec<u8>,
-    __padding: Vec<u8>,
-}
-
-enum Type38 {
-    app0 {
-        marker: Type28,
-        length: u16,
-        data: Type31,
-    },
-    app1 {
-        marker: Type28,
-        length: u16,
-        data: Type37,
-    },
-}
-
-struct Type6 {
-    separator: u8,
-    image_left_position: u16,
-    image_top_position: u16,
-    image_width: u16,
-    image_height: u16,
-    flags: u8,
-}
-
-struct Type41 {
-    class_table_id: u8,
-    value: u8,
-}
-
-struct Type44 {
-    id: u8,
-    sampling_factor: u8,
-    quantization_table_id: u8,
-}
-
-enum Type58 {
-    color_type_3 { palette_index: u8 },
-    color_type_6 { red: u16, green: u16, blue: u16 },
-    color_type_2 { red: u16, green: u16, blue: u16 },
-    color_type_4 { greyscale: u16 },
-    color_type_0 { greyscale: u16 },
-}
-
-struct Type81 {
-    contents: Vec<Type73>,
-    __padding: Vec<u8>,
-    __trailing: Vec<u8>,
+    data: Type40,
 }
 
 enum Type23 {
@@ -202,167 +47,45 @@ enum Type23 {
     },
 }
 
-struct Type40 {
-    class_table_id: u8,
-    num_codes: Vec<u8>,
-    values: Vec<u8>,
+struct Type44 {
+    id: u8,
+    sampling_factor: u8,
+    quantization_table_id: u8,
 }
 
-struct Type55 {
-    initial_segment: Type38,
-    segments: Vec<Type43>,
-    header: Type46,
-    scan: Type52,
-    dnl: Type54,
-    scans: Vec<Type52>,
+struct Type1 {
+    screen_width: u16,
+    screen_height: u16,
+    flags: u8,
+    bg_color_index: u8,
+    pixel_aspect_ratio: u8,
 }
 
-struct Type56 {
-    width: u32,
-    height: u32,
-    bit_depth: u8,
-    color_type: u8,
-    compression_method: u8,
-    filter_method: u8,
-    interlace_method: u8,
+struct Type81 {
+    contents: Vec<Type73>,
+    __padding: Vec<u8>,
+    __trailing: Vec<u8>,
 }
 
-struct Type71 {
-    string: Vec<u8>,
-    padding: Vec<u8>,
-}
-
-struct Type76 {
-    data: Type75,
-    end: (),
-}
-
-enum Type36 {
-    other(Vec<u8>),
-    xmp { xmp: Vec<u8> },
-    exif { padding: u8, exif: Type35 },
-}
-
-struct Type25 {
-    blocks: Vec<Type24>,
-    codes: Vec<Type19>,
-    inflate: Vec<u8>,
-}
-
-enum Type50 {
-    mcu(u8),
-    rst0 { ff: u8, marker: u8 },
-    rst1 { ff: u8, marker: u8 },
-    rst2 { ff: u8, marker: u8 },
-    rst3 { ff: u8, marker: u8 },
-    rst4 { ff: u8, marker: u8 },
-    rst5 { ff: u8, marker: u8 },
-    rst6 { ff: u8, marker: u8 },
-    rst7 { ff: u8, marker: u8 },
-}
-
-struct Type45 {
-    sample_precision: u8,
-    num_lines: u16,
-    num_samples_per_line: u16,
-    num_image_components: u8,
-    image_components: Vec<Type44>,
-}
-
-struct Type73 {
-    header: Type72,
-    file: Vec<u8>,
-    __padding: (),
-}
-
-struct Type80 {
-    tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Type68,
-    pad: Type66,
-}
-
-struct Type99 {
-    align: (),
-    len: u16,
-    nlen: u16,
-    bytes: Vec<u8>,
-    codes_values: Vec<Type22>,
-}
-
-struct Type7 {
-    len_bytes: u8,
+struct Type95 {
+    marker: Type28,
+    length: u16,
     data: Vec<u8>,
 }
 
-enum Type19 {
-    literal(u8),
-    reference { length: u16, distance: u16 },
+enum Type17 {
+    none(),
+    some {
+        length_extra_bits: u8,
+        length: u16,
+        distance_code: u16,
+        distance_record: Type16,
+    },
 }
 
 struct Type21 {
     code: u16,
     extra: Type20,
-}
-
-struct Type107 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    text_grid_left_position: u16,
-    text_grid_top_position: u16,
-    text_grid_width: u16,
-    text_grid_height: u16,
-    character_cell_width: u8,
-    character_cell_height: u8,
-    text_foreground_color_index: u8,
-    text_background_color_index: u8,
-    plain_text_data: Vec<Type7>,
-    terminator: u8,
-}
-
-struct Type57 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type56,
-    crc: u32,
-}
-
-struct Type27 {
-    header: Type13,
-    fname: Type14,
-    data: Type25,
-    footer: Type26,
-}
-
-struct Type0 {
-    signature: (u8, u8, u8),
-    version: Vec<u8>,
-}
-
-struct Type53 {
-    num_lines: u16,
-}
-
-struct Type8 {
-    lzw_min_code_size: u8,
-    image_data: Vec<Type7>,
-    terminator: u8,
-}
-
-enum Type20 {
-    none(),
-    some {
-        length_extra_bits: u8,
-        length: u16,
-        distance_code: u8,
-        distance_record: Type16,
-    },
-}
-
-struct Type47 {
-    component_selector: u8,
-    entropy_coding_table_ids: u8,
 }
 
 struct Type33 {
@@ -372,96 +95,23 @@ struct Type33 {
     offset_or_data: u32,
 }
 
-enum Type22 {
-    literal(u8),
-}
-
-struct Type60 {
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-}
-
-enum Type63 {
-    bKGD {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type58,
-        crc: u32,
-    },
-    pHYs {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type59,
-        crc: u32,
-    },
-    PLTE {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Vec<Type2>,
-        crc: u32,
-    },
-    tIME {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type60,
-        crc: u32,
-    },
-    tRNS {
-        length: u32,
-        tag: (u8, u8, u8, u8),
-        data: Type62,
-        crc: u32,
-    },
-}
-
-enum Type30 {
-    other(Vec<u8>),
-    jfif {
-        version_major: u8,
-        version_minor: u8,
-        density_units: u8,
-        density_x: u16,
-        density_y: u16,
-        thumbnail_width: u8,
-        thumbnail_height: u8,
-        thumbnail_pixels: Vec<Vec<Type2>>,
-    },
-}
-
-struct Type65 {
+struct Type57 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: (),
+    data: Type56,
     crc: u32,
 }
 
-struct Type72 {
-    name: Type69,
-    mode: Type70,
-    uid: Type70,
-    gid: Type70,
-    size: u32,
-    mtime: Type70,
-    chksum: Type70,
-    typeflag: u8,
-    linkname: Type69,
-    magic: (u8, u8, u8, u8, u8, u8),
-    version: (u8, u8),
-    uname: Type71,
-    gname: Type71,
-    devmajor: Type70,
-    devminor: Type70,
-    prefix: Type69,
-    pad: Vec<u8>,
+struct Type87 {
+    marker: Type28,
+    length: u16,
+    data: Type31,
 }
 
-struct Type37 {
-    identifier: Type29,
-    data: Type36,
+struct Type70 {
+    string: Vec<u8>,
+    __nul_or_wsp: u8,
+    __padding: Vec<u8>,
 }
 
 enum Type75 {
@@ -499,151 +149,68 @@ enum Type75 {
     text(Type74),
 }
 
-struct Type13 {
-    magic: (u8, u8),
-    method: u8,
-    file_flags: u8,
-    timestamp: u32,
-    compression_flags: u8,
-    os_id: u8,
-}
-
-enum Type10 {
-    application_extension {
+enum Type9 {
+    table_based_image {
+        descriptor: Type6,
+        local_color_table: Type3,
+        data: Type8,
+    },
+    plain_text_extension {
         separator: u8,
         label: u8,
         block_size: u8,
-        identifier: Vec<u8>,
-        authentication_code: Vec<u8>,
-        application_data: Vec<Type7>,
-        terminator: u8,
-    },
-    comment_extension {
-        separator: u8,
-        label: u8,
-        comment_data: Vec<Type7>,
+        text_grid_left_position: u16,
+        text_grid_top_position: u16,
+        text_grid_width: u16,
+        text_grid_height: u16,
+        character_cell_width: u8,
+        character_cell_height: u8,
+        text_foreground_color_index: u8,
+        text_background_color_index: u8,
+        plain_text_data: Vec<Type7>,
         terminator: u8,
     },
 }
 
-struct Type85 {
-    length: u32,
+struct Type76 {
+    data: Type75,
+    end: (),
+}
+
+struct Type16 {
+    distance_extra_bits: u16,
+    distance: u16,
+}
+
+struct Type67 {
     tag: (u8, u8, u8, u8),
-    data: Type60,
-    crc: u32,
-}
-
-struct Type87 {
-    marker: Type28,
-    length: u16,
-    data: Type31,
-}
-
-struct Type93 {
-    marker: Type28,
-    length: u16,
-    data: Type41,
-}
-
-struct Type96 {
-    padding: u8,
-    exif: Type35,
-}
-
-struct Type95 {
-    marker: Type28,
-    length: u16,
+    length: u32,
     data: Vec<u8>,
+    pad: Type66,
 }
 
-struct Type101 {
-    hlit: u8,
-    hdist: u8,
-    hclen: u8,
-    code_length_alphabet_code_lengths: Vec<u8>,
-    literal_length_distance_alphabet_code_lengths: Vec<Type15>,
-    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
-    literal_length_alphabet_code_lengths_value: Vec<u8>,
-    distance_alphabet_code_lengths_value: Vec<u8>,
-    codes: Vec<Type18>,
-    codes_values: Vec<Type19>,
-}
-
-enum Type14 {
-    no(),
-    yes { string: Vec<u8>, null: u8 },
-}
-
-struct Type29 {
-    string: Vec<u8>,
-    null: u8,
-}
-
-struct Type31 {
-    identifier: Type29,
-    data: Type30,
-}
-
-struct Type68 {
-    tag: (u8, u8, u8, u8),
-    chunks: Vec<Type67>,
-}
-
-struct Type83 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type59,
-    crc: u32,
-}
-
-struct Type52 {
-    segments: Vec<Type43>,
-    sos: Type49,
-    data: Type51,
-}
-
-enum Type32 {
-    le(u8, u8),
-    be(u8, u8),
-}
-
-struct Type103 {
+struct Type104 {
     separator: u8,
     label: u8,
-    block_size: u8,
-    identifier: Vec<u8>,
-    authentication_code: Vec<u8>,
-    application_data: Vec<Type7>,
+    comment_data: Vec<Type7>,
     terminator: u8,
 }
 
-enum Type62 {
-    color_type_3(Vec<Type61>),
-    color_type_2 { red: u16, green: u16, blue: u16 },
-    color_type_0 { greyscale: u16 },
+struct Type4 {
+    descriptor: Type1,
+    global_color_table: Type3,
 }
 
-struct Type61 {
-    palette_index: u8,
-}
-
-struct Type79 {
-    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-    ihdr: Type57,
-    chunks: Vec<Type63>,
-    idat: Vec<Type64>,
-    more_chunks: Vec<Type63>,
-    iend: Type65,
-}
-
-enum Type74 {
-    ascii(Vec<u8>),
-    utf8(Vec<char>),
-}
-
-struct Type102 {
-    graphic_control_extension: Type5,
-    graphic_rendering_block: Type9,
+enum Type50 {
+    mcu(u8),
+    rst0 { ff: u8, marker: u8 },
+    rst1 { ff: u8, marker: u8 },
+    rst2 { ff: u8, marker: u8 },
+    rst3 { ff: u8, marker: u8 },
+    rst4 { ff: u8, marker: u8 },
+    rst5 { ff: u8, marker: u8 },
+    rst6 { ff: u8, marker: u8 },
+    rst7 { ff: u8, marker: u8 },
 }
 
 struct Type34 {
@@ -653,10 +220,34 @@ struct Type34 {
     next_ifd: Vec<u8>,
 }
 
-struct Type88 {
-    marker: Type28,
-    length: u16,
-    data: Type37,
+struct Type28 {
+    ff: u8,
+    marker: u8,
+}
+
+struct Type8 {
+    lzw_min_code_size: u8,
+    image_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type55 {
+    initial_segment: Type38,
+    segments: Vec<Type43>,
+    header: Type46,
+    scan: Type52,
+    dnl: Type54,
+    scans: Vec<Type52>,
+}
+
+enum Type14 {
+    no(),
+    yes { string: Vec<u8>, null: u8 },
+}
+
+struct Type47 {
+    component_selector: u8,
+    entropy_coding_table_ids: u8,
 }
 
 enum Type43 {
@@ -767,9 +358,142 @@ enum Type43 {
     },
 }
 
-struct Type51 {
-    scan_data: Vec<Type50>,
-    scan_data_stream: Vec<u8>,
+struct Type64 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Vec<u8>,
+    crc: u32,
+}
+
+struct Type40 {
+    class_table_id: u8,
+    num_codes: Vec<u8>,
+    values: Vec<u8>,
+}
+
+enum Type10 {
+    application_extension {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        identifier: Vec<u8>,
+        authentication_code: Vec<u8>,
+        application_data: Vec<Type7>,
+        terminator: u8,
+    },
+    comment_extension {
+        separator: u8,
+        label: u8,
+        comment_data: Vec<Type7>,
+        terminator: u8,
+    },
+}
+
+enum Type22 {
+    literal(u8),
+}
+
+struct Type12 {
+    separator: u8,
+}
+
+struct Type15 {
+    code: u16,
+    extra: u8,
+}
+
+struct Type18 {
+    code: u16,
+    extra: Type17,
+}
+
+struct Type25 {
+    blocks: Vec<Type24>,
+    codes: Vec<Type19>,
+    inflate: Vec<u8>,
+}
+
+struct Type26 {
+    crc: u32,
+    length: u32,
+}
+
+struct Type31 {
+    identifier: Type29,
+    data: Type30,
+}
+
+struct Type6 {
+    separator: u8,
+    image_left_position: u16,
+    image_top_position: u16,
+    image_width: u16,
+    image_height: u16,
+    flags: u8,
+}
+
+struct Type41 {
+    class_table_id: u8,
+    value: u8,
+}
+
+struct Type37 {
+    identifier: Type29,
+    data: Type36,
+}
+
+struct Type45 {
+    sample_precision: u8,
+    num_lines: u16,
+    num_samples_per_line: u16,
+    num_image_components: u8,
+    image_components: Vec<Type44>,
+}
+
+struct Type59 {
+    pixels_per_unit_x: u32,
+    pixels_per_unit_y: u32,
+    unit_specifier: u8,
+}
+
+struct Type68 {
+    tag: (u8, u8, u8, u8),
+    chunks: Vec<Type67>,
+}
+
+struct Type29 {
+    string: Vec<u8>,
+    null: u8,
+}
+
+struct Type69 {
+    string: Vec<u8>,
+    __padding: Vec<u8>,
+}
+
+struct Type0 {
+    signature: (u8, u8, u8),
+    version: Vec<u8>,
+}
+
+struct Type72 {
+    name: Type69,
+    mode: Type70,
+    uid: Type70,
+    gid: Type70,
+    size: u32,
+    mtime: Type70,
+    chksum: Type70,
+    typeflag: u8,
+    linkname: Type69,
+    magic: (u8, u8, u8, u8, u8, u8),
+    version: (u8, u8),
+    uname: Type71,
+    gname: Type71,
+    devmajor: Type70,
+    devminor: Type70,
+    prefix: Type69,
+    pad: Vec<u8>,
 }
 
 struct Type35 {
@@ -779,29 +503,18 @@ struct Type35 {
     ifd: Type34,
 }
 
-struct Type70 {
-    string: Vec<u8>,
-    __nul_or_wsp: u8,
-    __padding: Vec<u8>,
+struct Type24 {
+    r#final: u8,
+    r#type: u8,
+    data: Type23,
 }
 
-struct Type78 {
-    soi: Type28,
-    frame: Type55,
-    eoi: Type28,
-}
-
-struct Type84 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Vec<Type2>,
-    crc: u32,
-}
-
-struct Type2 {
-    r: u8,
-    g: u8,
-    b: u8,
+enum Type58 {
+    color_type_3 { palette_index: u8 },
+    color_type_6 { red: u16, green: u16, blue: u16 },
+    color_type_2 { red: u16, green: u16, blue: u16 },
+    color_type_4 { greyscale: u16 },
+    color_type_0 { greyscale: u16 },
 }
 
 enum Type46 {
@@ -872,113 +585,70 @@ enum Type46 {
     },
 }
 
-struct Type104 {
-    separator: u8,
-    label: u8,
-    comment_data: Vec<Type7>,
-    terminator: u8,
+struct Type71 {
+    string: Vec<u8>,
+    padding: Vec<u8>,
 }
 
-enum Type11 {
-    graphic_block {
-        graphic_control_extension: Type5,
-        graphic_rendering_block: Type9,
-    },
-    special_purpose_block(Type10),
+struct Type52 {
+    segments: Vec<Type43>,
+    sos: Type49,
+    data: Type51,
 }
 
-struct Type94 {
-    marker: Type28,
-    length: u16,
-    data: Type42,
+struct Type51 {
+    scan_data: Vec<Type50>,
+    scan_data_stream: Vec<u8>,
 }
 
-struct Type106 {
-    descriptor: Type6,
-    local_color_table: Type3,
-    data: Type8,
+struct Type61 {
+    palette_index: u8,
 }
 
-struct Type4 {
-    descriptor: Type1,
-    global_color_table: Type3,
+struct Type73 {
+    header: Type72,
+    file: Vec<u8>,
+    __padding: (),
 }
 
-struct Type12 {
-    separator: u8,
+struct Type78 {
+    soi: Type28,
+    frame: Type55,
+    eoi: Type28,
 }
 
-struct Type18 {
-    code: u16,
-    extra: Type17,
-}
-
-struct Type67 {
+struct Type80 {
     tag: (u8, u8, u8, u8),
     length: u32,
-    data: Vec<u8>,
+    data: Type68,
     pad: Type66,
 }
 
-struct Type16 {
-    distance_extra_bits: u16,
-    distance: u16,
-}
-
-struct Type64 {
+struct Type84 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Vec<u8>,
+    data: Vec<Type2>,
     crc: u32,
 }
 
-enum Type17 {
-    none(),
-    some {
-        length_extra_bits: u8,
-        length: u16,
-        distance_code: u16,
-        distance_record: Type16,
-    },
-}
-
-struct Type92 {
+struct Type88 {
     marker: Type28,
     length: u16,
-    data: Type40,
+    data: Type37,
 }
 
-struct Type39 {
-    precision_table_id: u8,
-    elements: Vec<u8>,
+struct Type91 {
+    marker: Type28,
+    length: u16,
+    data: Type39,
 }
 
-struct Type24 {
-    r#final: u8,
-    r#type: u8,
-    data: Type23,
-}
-
-enum Type66 {
-    no(u8),
-    yes(),
-}
-
-struct Type86 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type62,
-    crc: u32,
-}
-
-struct Type100 {
-    codes: Vec<Type21>,
-    codes_values: Vec<Type19>,
-}
-
-struct Type26 {
-    crc: u32,
-    length: u32,
+struct Type99 {
+    align: (),
+    len: u16,
+    nlen: u16,
+    bytes: Vec<u8>,
+    codes_values: Vec<Type22>,
 }
 
 struct Type105 {
@@ -991,19 +661,349 @@ struct Type105 {
     terminator: u8,
 }
 
+struct Type27 {
+    header: Type13,
+    fname: Type14,
+    data: Type25,
+    footer: Type26,
+}
+
+enum Type32 {
+    le(u8, u8),
+    be(u8, u8),
+}
+
+struct Type49 {
+    marker: Type28,
+    length: u16,
+    data: Type48,
+}
+
+struct Type107 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    text_grid_left_position: u16,
+    text_grid_top_position: u16,
+    text_grid_width: u16,
+    text_grid_height: u16,
+    character_cell_width: u8,
+    character_cell_height: u8,
+    text_foreground_color_index: u8,
+    text_background_color_index: u8,
+    plain_text_data: Vec<Type7>,
+    terminator: u8,
+}
+
+enum Type11 {
+    graphic_block {
+        graphic_control_extension: Type5,
+        graphic_rendering_block: Type9,
+    },
+    special_purpose_block(Type10),
+}
+
+struct Type39 {
+    precision_table_id: u8,
+    elements: Vec<u8>,
+}
+
+enum Type66 {
+    no(u8),
+    yes(),
+}
+
+struct Type83 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type59,
+    crc: u32,
+}
+
+struct Type56 {
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    color_type: u8,
+    compression_method: u8,
+    filter_method: u8,
+    interlace_method: u8,
+}
+
 struct Type97 {
     xmp: Vec<u8>,
 }
 
-struct Type15 {
-    code: u16,
-    extra: u8,
+enum Type3 {
+    no(),
+    yes(Vec<Type2>),
 }
 
-struct Type59 {
-    pixels_per_unit_x: u32,
-    pixels_per_unit_y: u32,
-    unit_specifier: u8,
+struct Type98 {
+    version_major: u8,
+    version_minor: u8,
+    density_units: u8,
+    density_x: u16,
+    density_y: u16,
+    thumbnail_width: u8,
+    thumbnail_height: u8,
+    thumbnail_pixels: Vec<Vec<Type2>>,
+}
+
+struct Type82 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type58,
+    crc: u32,
+}
+
+enum Type36 {
+    other(Vec<u8>),
+    xmp { xmp: Vec<u8> },
+    exif { padding: u8, exif: Type35 },
+}
+
+enum Type63 {
+    bKGD {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type58,
+        crc: u32,
+    },
+    pHYs {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type59,
+        crc: u32,
+    },
+    PLTE {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Vec<Type2>,
+        crc: u32,
+    },
+    tIME {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type60,
+        crc: u32,
+    },
+    tRNS {
+        length: u32,
+        tag: (u8, u8, u8, u8),
+        data: Type62,
+        crc: u32,
+    },
+}
+
+enum Type30 {
+    other(Vec<u8>),
+    jfif {
+        version_major: u8,
+        version_minor: u8,
+        density_units: u8,
+        density_x: u16,
+        density_y: u16,
+        thumbnail_width: u8,
+        thumbnail_height: u8,
+        thumbnail_pixels: Vec<Vec<Type2>>,
+    },
+}
+
+enum Type62 {
+    color_type_3(Vec<Type61>),
+    color_type_2 { red: u16, green: u16, blue: u16 },
+    color_type_0 { greyscale: u16 },
+}
+
+struct Type42 {
+    restart_interval: u16,
+}
+
+struct Type2 {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+struct Type7 {
+    len_bytes: u8,
+    data: Vec<u8>,
+}
+
+enum Type19 {
+    literal(u8),
+    reference { length: u16, distance: u16 },
+}
+
+struct Type65 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: (),
+    crc: u32,
+}
+
+struct Type53 {
+    num_lines: u16,
+}
+
+enum Type74 {
+    ascii(Vec<u8>),
+    utf8(Vec<char>),
+}
+
+struct Type77 {
+    header: Type0,
+    logical_screen: Type4,
+    blocks: Vec<Type11>,
+    trailer: Type12,
+}
+
+struct Type60 {
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+}
+
+struct Type79 {
+    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
+    ihdr: Type57,
+    chunks: Vec<Type63>,
+    idat: Vec<Type64>,
+    more_chunks: Vec<Type63>,
+    iend: Type65,
+}
+
+struct Type86 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type62,
+    crc: u32,
+}
+
+struct Type90 {
+    marker: Type28,
+    length: u16,
+    data: Type45,
+}
+
+struct Type94 {
+    marker: Type28,
+    length: u16,
+    data: Type42,
+}
+
+struct Type96 {
+    padding: u8,
+    exif: Type35,
+}
+
+enum Type20 {
+    none(),
+    some {
+        length_extra_bits: u8,
+        length: u16,
+        distance_code: u8,
+        distance_record: Type16,
+    },
+}
+
+enum Type54 {
+    some {
+        marker: Type28,
+        length: u16,
+        data: Type53,
+    },
+    none(),
+}
+
+struct Type48 {
+    num_image_components: u8,
+    image_components: Vec<Type47>,
+    start_spectral_selection: u8,
+    end_spectral_selection: u8,
+    approximation_bit_position: u8,
+}
+
+struct Type100 {
+    codes: Vec<Type21>,
+    codes_values: Vec<Type19>,
+}
+
+struct Type101 {
+    hlit: u8,
+    hdist: u8,
+    hclen: u8,
+    code_length_alphabet_code_lengths: Vec<u8>,
+    literal_length_distance_alphabet_code_lengths: Vec<Type15>,
+    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
+    literal_length_alphabet_code_lengths_value: Vec<u8>,
+    distance_alphabet_code_lengths_value: Vec<u8>,
+    codes: Vec<Type18>,
+    codes_values: Vec<Type19>,
+}
+
+struct Type103 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    identifier: Vec<u8>,
+    authentication_code: Vec<u8>,
+    application_data: Vec<Type7>,
+    terminator: u8,
+}
+
+struct Type102 {
+    graphic_control_extension: Type5,
+    graphic_rendering_block: Type9,
+}
+
+struct Type106 {
+    descriptor: Type6,
+    local_color_table: Type3,
+    data: Type8,
+}
+
+struct Type93 {
+    marker: Type28,
+    length: u16,
+    data: Type41,
+}
+
+enum Type5 {
+    some {
+        separator: u8,
+        label: u8,
+        block_size: u8,
+        flags: u8,
+        delay_time: u16,
+        transparent_color_index: u8,
+        terminator: u8,
+    },
+    none(),
+}
+
+struct Type85 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type60,
+    crc: u32,
+}
+
+enum Type38 {
+    app0 {
+        marker: Type28,
+        length: u16,
+        data: Type31,
+    },
+    app1 {
+        marker: Type28,
+        length: u16,
+        data: Type37,
+    },
 }
 
 fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type76> {
@@ -3177,14 +3177,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
     let len_bytes = {
         let b = input.read_byte()?;
-        if ByteSet::from_bits([
-            18446744073709551614,
-            18446744073709551615,
-            18446744073709551615,
-            18446744073709551615,
-        ])
-        .contains(b)
-        {
+        if b != 0 {
             b
         } else {
             return None;
