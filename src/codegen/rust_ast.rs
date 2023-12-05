@@ -736,10 +736,27 @@ impl ToFragment for SubIdent {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum RustExpr {
-    Entity(RustEntity),
+pub(crate) enum RustPrimLit {
+    BooleanLit(bool),
     NumericLit(usize),
     StringLit(Label),
+}
+
+impl ToFragment for RustPrimLit {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustPrimLit::BooleanLit(b) => Fragment::DisplayAtom(Rc::new(*b)),
+            RustPrimLit::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
+            RustPrimLit::StringLit(s) => Fragment::String(s.clone())
+                .delimit(Fragment::string("r#\""), Fragment::string("\"#")),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum RustExpr {
+    Entity(RustEntity),
+    PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
     FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
@@ -760,6 +777,16 @@ pub(crate) enum RustOp {
     InfixOp(&'static str, Box<RustExpr>, Box<RustExpr>),
 }
 
+impl RustOp {
+    pub fn op_eq(lhs: RustExpr, rhs: RustExpr) -> Self {
+        Self::InfixOp(" == ", Box::new(lhs), Box::new(rhs))
+    }
+
+    pub fn op_neq(lhs: RustExpr, rhs: RustExpr) -> Self {
+        Self::InfixOp(" != ", Box::new(lhs), Box::new(rhs))
+    }
+}
+
 impl ToFragment for RustOp {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -775,12 +802,20 @@ impl RustExpr {
 
     pub const NONE: Self = Self::Entity(RustEntity::Local(Label::Borrowed("None")));
 
+    pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::BooleanLit(true));
+
+    pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::BooleanLit(false));
+
     pub fn some(inner: Self) -> Self {
         Self::local("Some").call_with([inner])
     }
 
     pub fn local(name: impl Into<Label>) -> Self {
         Self::Entity(RustEntity::Local(name.into()))
+    }
+
+    pub fn num_lit<N: Into<usize>>(num: N) -> Self {
+        Self::PrimitiveLit(RustPrimLit::NumericLit(num.into()))
     }
 
     pub fn scoped<Name: Into<Label>>(
@@ -830,7 +865,7 @@ impl RustExpr {
     }
 
     pub fn str_lit(str: impl Into<Label>) -> Self {
-        Self::StringLit(str.into())
+        Self::PrimitiveLit(RustPrimLit::StringLit(str.into()))
     }
 }
 
@@ -838,9 +873,7 @@ impl ToFragment for RustExpr {
     fn to_fragment(&self) -> Fragment {
         match self {
             RustExpr::Entity(e) => e.to_fragment(),
-            RustExpr::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
-            RustExpr::StringLit(s) => Fragment::String(s.clone())
-                .delimit(Fragment::string("r#\""), Fragment::string("\"#")),
+            RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
             RustExpr::ArrayLit(elts) => Fragment::seq(
                 elts.iter().map(RustExpr::to_fragment),
                 Some(Fragment::string(", ")),

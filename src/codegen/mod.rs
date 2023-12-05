@@ -373,10 +373,10 @@ impl SimpleLogic {
                     RustExpr::infix(
                         RustExpr::local("input").call_method("offset"),
                         " % ",
-                        RustExpr::NumericLit(*n),
+                        RustExpr::num_lit(*n),
                     ),
                     " != ",
-                    RustExpr::NumericLit(0),
+                    RustExpr::num_lit(0usize),
                 );
                 let body = {
                     let let_tmp = RustStmt::assign(
@@ -397,30 +397,15 @@ impl SimpleLogic {
                     .call_method("read_byte")
                     .wrap_try();
                 let b_let = RustStmt::assign("b", call);
-
-                let logic = if bs.is_full() {
+                let (cond, always_true) =
+                    ByteCriterion::from(bs).as_predicate(RustExpr::local("b"));
+                let logic = if always_true {
                     RustExpr::local("b")
                 } else {
-                    let cond = {
-                        if bs.len() == 1 {
-                            let Some(elt) = bs.min_elem() else {
-                                unreachable!("len == 1 but no min_elem")
-                            };
-                            RustExpr::Operation(RustOp::InfixOp(
-                                " == ",
-                                Box::new(RustExpr::local("b")),
-                                Box::new(RustExpr::NumericLit(elt as usize)),
-                            ))
-                        } else {
-                            embed_byteset(bs).call_method_with("contains", [RustExpr::local("b")])
-                        }
-                    };
-
                     let b_true = vec![RustStmt::Return(false, RustExpr::local("b"))];
                     let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
-
                 ([b_let].to_vec(), Some(logic))
             }
         }
@@ -466,6 +451,59 @@ fn decoder_fn(ix: usize, t: &RustType, decoder: &Decoder) -> RustFn {
     RustFn::new(name, Some(params), sig, body)
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+enum ByteCriterion {
+    Any,
+    MustBe(u8),         // singleton
+    OtherThan(u8),      // negated singleton
+    WithinSet(ByteSet), // use embed_byteset to bridge to RustExpr
+}
+
+impl From<&ByteSet> for ByteCriterion {
+    fn from(value: &ByteSet) -> Self {
+        if value.is_full() {
+            ByteCriterion::Any
+        } else {
+            match value.len() {
+                1 => {
+                    let elt = value.min_elem().expect("len == 1 but no min_elem");
+                    ByteCriterion::MustBe(elt)
+                }
+                255 => {
+                    let elt = (!value)
+                        .min_elem()
+                        .expect("len == 255 but no min_elem (on negation)");
+                    ByteCriterion::OtherThan(elt)
+                }
+                2..=254 => ByteCriterion::WithinSet(*value),
+                other => unreachable!("unexpected byteset len in catch-all: {other}"),
+            }
+        }
+    }
+}
+
+impl ByteCriterion {
+    /// Returns a tuple consisting of a RustExpr that evaluates to `true` if the argument satisfies the criterion
+    /// that `self` represents, and whose second element is a flag indicating whether the expression
+    /// is unconditionally true (and therefore may be elided in 'else-if' or case guard contexts)
+    fn as_predicate(&self, arg: RustExpr) -> (RustExpr, bool) {
+        match self {
+            ByteCriterion::Any => (RustExpr::TRUE, true),
+            ByteCriterion::MustBe(byte) => (
+                RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))),
+                false,
+            ),
+            ByteCriterion::OtherThan(byte) => (
+                RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))),
+                false,
+            ),
+            ByteCriterion::WithinSet(bs) => {
+                (embed_byteset(bs).call_method_with("contains", [arg]), false)
+            }
+        }
+    }
+}
+
 fn embed_byteset(bs: &ByteSet) -> RustExpr {
     if bs.is_full() {
         RustExpr::scoped(["ByteSet"], "full").call()
@@ -473,14 +511,14 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
         let Some(elt) = bs.min_elem() else {
             unreachable!("len == 1 but no min_elem")
         };
-        RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::NumericLit(elt as usize)])
+        RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::num_lit(elt)])
     } else {
         let [q0, q1, q2, q3] = bs.to_bits();
         RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
-            RustExpr::NumericLit(q0 as usize),
-            RustExpr::NumericLit(q1 as usize),
-            RustExpr::NumericLit(q2 as usize),
-            RustExpr::NumericLit(q3 as usize),
+            RustExpr::num_lit(q0 as usize),
+            RustExpr::num_lit(q1 as usize),
+            RustExpr::num_lit(q2 as usize),
+            RustExpr::num_lit(q3 as usize),
         ])])
     }
 }
@@ -526,10 +564,10 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
                 RustExpr::infix(
                     RustExpr::local("input").call_method("offset"),
                     " % ",
-                    RustExpr::NumericLit(*factor),
+                    RustExpr::num_lit(*factor),
                 ),
                 " != ",
-                RustExpr::NumericLit(0),
+                RustExpr::num_lit(0usize),
             );
             let body = {
                 let let_tmp = RustStmt::assign(
@@ -565,30 +603,14 @@ fn invoke_decoder(decoder: &Decoder, input_varname: &Label) -> RustExpr {
                 .call_method("read_byte")
                 .wrap_try();
             let b_let = RustStmt::assign("b", call);
-
-            let logic = if bs.is_full() {
+            let (cond, always_true) = ByteCriterion::from(bs).as_predicate(RustExpr::local("b"));
+            let logic = if always_true {
                 RustExpr::local("b")
             } else {
-                let cond = {
-                    if bs.len() == 1 {
-                        let Some(elt) = bs.min_elem() else {
-                            unreachable!("len == 1 but no min_elem")
-                        };
-                        RustExpr::Operation(RustOp::InfixOp(
-                            " == ",
-                            Box::new(RustExpr::local("b")),
-                            Box::new(RustExpr::NumericLit(elt as usize)),
-                        ))
-                    } else {
-                        embed_byteset(bs).call_method_with("contains", [RustExpr::local("b")])
-                    }
-                };
-
                 let b_true = vec![RustStmt::Return(false, RustExpr::local("b"))];
                 let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
                 RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
             };
-
             RustExpr::BlockScope([b_let].to_vec(), Box::new(logic))
         }
         // FIXME - not sure what to do with _args ...
