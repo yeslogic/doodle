@@ -323,6 +323,10 @@ impl RustType {
     pub fn option_of(inner: RustType) -> RustType {
         Self::Atom(AtomType::Comp(CompType::Option(Box::new(inner))))
     }
+
+    pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
+        Self::Atom(AtomType::Comp(CompType::Borrow(lt, m, Box::new(ty))))
+    }
 }
 
 impl ToFragment for RustType {
@@ -761,7 +765,7 @@ pub(crate) enum RustExpr {
     FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
-    Struct(Label, Vec<(Label, Option<Box<RustExpr>>)>),
+    Struct(RustEntity, Vec<(Label, Option<Box<RustExpr>>)>),
     Paren(Box<RustExpr>),
     Borrow(Box<RustExpr>),
     BorrowMut(Box<RustExpr>),
@@ -932,7 +936,24 @@ impl RustStmt {
 pub(crate) enum RustControl {
     While(RustExpr, Vec<RustStmt>),
     If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
-    Match(RustExpr, Vec<(RustPattern, Vec<RustStmt>)>),
+    Match(RustExpr, Vec<(MatchCaseLHS, Vec<RustStmt>)>),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum MatchCaseLHS {
+    Pattern(RustPattern),
+    WithGuard(RustPattern, RustExpr),
+}
+
+impl ToFragment for MatchCaseLHS {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            MatchCaseLHS::Pattern(pat) => pat.to_fragment(),
+            MatchCaseLHS::WithGuard(pat, guard) => pat
+                .to_fragment()
+                .intervene(Fragment::string(" if "), guard.to_fragment()),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -968,13 +989,13 @@ impl ToFragment for RustControl {
                 .intervene(Fragment::Char(' '), expr.to_fragment())
                 .intervene(
                     Fragment::Char(' '),
-                    <(RustPattern, Vec<RustStmt>)>::block_sep(cases, Fragment::string(",\n")),
+                    <(MatchCaseLHS, Vec<RustStmt>)>::block_sep(cases, Fragment::string(",\n")),
                 ),
         }
     }
 }
 
-impl ToFragment for (RustPattern, Vec<RustStmt>) {
+impl ToFragment for (MatchCaseLHS, Vec<RustStmt>) {
     fn to_fragment(&self) -> Fragment {
         self.0
             .to_fragment()
