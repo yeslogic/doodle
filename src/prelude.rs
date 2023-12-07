@@ -3,6 +3,7 @@ pub use crate::decoder::Scope;
 pub use crate::read::ReadCtxt;
 
 // FIXME - this model does not support split_at or backtracking to previous ReadCtxt states
+#[derive(Clone)]
 pub struct ParseCtxt<'a> {
     input: ReadCtxt<'a>,
 }
