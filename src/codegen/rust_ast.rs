@@ -1096,7 +1096,7 @@ pub(crate) enum RustPattern {
     PrimLiteral(RustPrimLit),
     TupleLiteral(Vec<RustPattern>),
     ArrayLiteral(Vec<RustPattern>),
-    CatchAll(Option<Label>), // None <- `_`, Some("x") for `x`
+    CatchAll(Option<Label>),          // None <- `_`, Some("x") for `x`
     Variant(Label, Box<RustPattern>), // FIXME - need to attach enum scope
 }
 

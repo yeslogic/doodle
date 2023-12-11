@@ -880,7 +880,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 
         let bind = RustStmt::assign(
             "b",
-            RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte"),
+            RustExpr::local(ctxt.input_varname.clone())
+                .call_method("read_byte")
+                .wrap_try(),
         );
 
         if tree.branches.len() == 1 {
