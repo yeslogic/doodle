@@ -18,6 +18,7 @@ pub mod decoder;
 pub mod error;
 
 pub mod output;
+mod precedence;
 pub mod prelude;
 pub mod read;
 
