@@ -1096,8 +1096,32 @@ pub(crate) enum RustPattern {
     PrimLiteral(RustPrimLit),
     TupleLiteral(Vec<RustPattern>),
     ArrayLiteral(Vec<RustPattern>),
-    CatchAll(Option<Label>),          // None <- `_`, Some("x") for `x`
-    Variant(Label, Box<RustPattern>), // FIXME - need to attach enum scope
+    CatchAll(Option<Label>),                // None <- `_`, Some("x") for `x`
+    Variant(Constructor, Box<RustPattern>), // FIXME - need to attach enum scope
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum Constructor {
+    Simple(Label),
+    Compound(Label, Label),
+}
+
+impl From<Constructor> for RustEntity {
+    fn from(value: Constructor) -> Self {
+        match value {
+            Constructor::Simple(lab) => RustEntity::Local(lab),
+            Constructor::Compound(path, lab) => RustEntity::Scoped(vec![path], lab),
+        }
+    }
+}
+
+impl From<Constructor> for Label {
+    fn from(value: Constructor) -> Self {
+        match value {
+            Constructor::Simple(lab) => lab,
+            Constructor::Compound(path, var) => format!("{path}::{var}").into(),
+        }
+    }
 }
 
 impl ToFragment for RustPattern {
@@ -1106,11 +1130,15 @@ impl ToFragment for RustPattern {
             RustPattern::PrimLiteral(pl) => pl.to_fragment(),
             RustPattern::TupleLiteral(tup) => RustPattern::paren_list(tup),
             RustPattern::ArrayLiteral(tup) => RustPattern::brace_list(tup),
-            RustPattern::Variant(lab, inner) => lab.to_fragment().cat(
-                inner
+            RustPattern::Variant(constr, inner) => {
+                RustExpr::Entity(RustEntity::from(constr.clone()))
                     .to_fragment()
-                    .delimit(Fragment::Char('('), Fragment::Char(')')),
-            ),
+                    .cat(
+                        inner
+                            .to_fragment()
+                            .delimit(Fragment::Char('('), Fragment::Char(')')),
+                    )
+            }
             RustPattern::CatchAll(None) => Fragment::Char('_'),
             RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
         }
