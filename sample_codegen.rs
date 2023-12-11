@@ -1,78 +1,9 @@
 use doodle::prelude::*;
 
-struct Type21 {
-    string: Vec<u8>,
-    null: u8,
-}
-
-enum Type6 {
-    some(Type5),
-    none,
-}
-
-enum Type32 {
-    none,
-    some(Type31),
-}
-
-enum Type87 {
-    color_type_3(Type84),
-    color_type_6(Type85),
-    color_type_2(Type85),
-    color_type_4(Type86),
-    color_type_0(Type86),
-}
-
-struct Type91 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Vec<Type2>,
-    crc: u32,
-}
-
-struct Type28 {
-    length: u16,
-    distance: u16,
-}
-
-struct Type69 {
-    marker: Type42,
-    length: u16,
-    data: Type68,
-}
-
-struct Type77 {
-    num_lines: u16,
-}
-
 enum Type94 {
     color_type_3(Vec<Type84>),
     color_type_2(Type85),
     color_type_0(Type86),
-}
-
-struct Type39 {
-    blocks: Vec<Type38>,
-    codes: Vec<Type29>,
-    inflate: Vec<u8>,
-}
-
-struct Type41 {
-    header: Type20,
-    fname: Type22,
-    data: Type39,
-    footer: Type40,
-}
-
-enum Type48 {
-    le(u8, u8),
-    be(u8, u8),
-}
-
-struct Type58 {
-    marker: Type42,
-    length: u16,
-    data: Type57,
 }
 
 struct Type72 {
@@ -83,56 +14,67 @@ struct Type72 {
     approximation_bit_position: u8,
 }
 
-struct Type51 {
-    byte_order: Type48,
-    magic: u16,
-    offset: u32,
-    ifd: Type50,
+struct Type50 {
+    num_fields: u16,
+    fields: Vec<Type49>,
+    next_ifd_offset: u32,
+    next_ifd: Vec<u8>,
 }
 
-struct Type40 {
-    crc: u32,
-    length: u32,
+struct Type52 {
+    padding: u8,
+    exif: Type51,
 }
 
-struct Type49 {
-    tag: u16,
-    r#type: u16,
-    length: u32,
-    offset_or_data: u32,
+struct Type67 {
+    id: u8,
+    sampling_factor: u8,
+    quantization_table_id: u8,
 }
 
-struct Type101 {
+struct Type34 {
+    codes: Vec<Type33>,
+    codes_values: Vec<Type29>,
+}
+
+struct Type102 {
     tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Vec<u8>,
-    pad: Type100,
+    chunks: Vec<Type101>,
 }
 
-enum Type37 {
-    dynamic_huffman(Type30),
-    fixed_huffman(Type34),
-    uncompressed(Type36),
+struct Type2 {
+    r: u8,
+    g: u8,
+    b: u8,
 }
 
-enum Type100 {
-    no(u8),
-    yes,
+struct Type57 {
+    precision_table_id: u8,
+    elements: Vec<u8>,
 }
 
-enum Type111 {
-    gif(Type19),
-    gzip(Vec<Type41>),
-    jpeg(Type81),
-    png(Type99),
-    riff(Type103),
-    tar(Type109),
-    text(Type110),
+enum Type79 {
+    some(Type78),
+    none,
 }
 
-enum Type12 {
-    table_based_image(Type10),
-    plain_text_extension(Type11),
+struct Type4 {
+    descriptor: Type1,
+    global_color_table: Type3,
+}
+
+struct Type36 {
+    align: (),
+    len: u16,
+    nlen: u16,
+    bytes: Vec<u8>,
+    codes_values: Vec<Type35>,
+}
+
+struct Type64 {
+    marker: Type42,
+    length: u16,
+    data: Type63,
 }
 
 struct Type75 {
@@ -152,58 +94,8 @@ enum Type74 {
     rst7(Type42),
 }
 
-struct Type38 {
-    r#final: u8,
-    r#type: u8,
-    data: Type37,
-}
-
-struct Type60 {
-    marker: Type42,
-    length: u16,
-    data: Type59,
-}
-
-struct Type27 {
-    code: u16,
-    extra: Type26,
-}
-
-enum Type26 {
-    none,
-    some(Type25),
-}
-
-struct Type31 {
-    length_extra_bits: u8,
-    length: u16,
-    distance_code: u8,
-    distance_record: Type24,
-}
-
-enum Type56 {
-    app0(Type46),
-    app1(Type55),
-}
-
-struct Type65 {
-    marker: Type42,
-    length: u16,
-    data: Vec<u8>,
-}
-
-enum Type44 {
-    other(Vec<u8>),
-    jfif(Type43),
-}
-
-struct Type99 {
-    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-    ihdr: Type83,
-    chunks: Vec<Type96>,
-    idat: Vec<Type97>,
-    more_chunks: Vec<Type96>,
-    iend: Type98,
+struct Type86 {
+    greyscale: u16,
 }
 
 struct Type107 {
@@ -226,99 +118,24 @@ struct Type107 {
     pad: Vec<u8>,
 }
 
-enum Type3 {
+enum Type22 {
     no,
-    yes(Vec<Type2>),
+    yes(Type21),
 }
 
-struct Type54 {
-    identifier: Type21,
-    data: Type53,
+struct Type21 {
+    string: Vec<u8>,
+    null: u8,
 }
 
-struct Type55 {
-    marker: Type42,
-    length: u16,
-    data: Type54,
-}
-
-struct Type88 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type87,
-    crc: u32,
-}
-
-struct Type62 {
-    marker: Type42,
-    length: u16,
-    data: Type61,
-}
-
-struct Type92 {
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
-}
-
-struct Type24 {
-    distance_extra_bits: u16,
-    distance: u16,
-}
-
-enum Type70 {
-    sof0(Type69),
-    sof1(Type69),
-    sof2(Type69),
-    sof3(Type69),
-    sof5(Type69),
-    sof6(Type69),
-    sof7(Type69),
-    sof9(Type69),
-    sof10(Type69),
-    sof11(Type69),
-    sof13(Type69),
-    sof14(Type69),
-    sof15(Type69),
+enum Type12 {
+    table_based_image(Type10),
+    plain_text_extension(Type11),
 }
 
 enum Type16 {
     application_extension(Type14),
     comment_extension(Type15),
-}
-
-struct Type23 {
-    code: u16,
-    extra: u8,
-}
-
-enum Type110 {
-    ascii(Vec<u8>),
-    utf8(Vec<char>),
-}
-
-struct Type11 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    text_grid_left_position: u16,
-    text_grid_top_position: u16,
-    text_grid_width: u16,
-    text_grid_height: u16,
-    character_cell_width: u8,
-    character_cell_height: u8,
-    text_foreground_color_index: u8,
-    text_background_color_index: u8,
-    plain_text_data: Vec<Type8>,
-    terminator: u8,
-}
-
-struct Type13 {
-    graphic_control_extension: Type6,
-    graphic_rendering_block: Type12,
 }
 
 struct Type30 {
@@ -332,6 +149,371 @@ struct Type30 {
     distance_alphabet_code_lengths_value: Vec<u8>,
     codes: Vec<Type27>,
     codes_values: Vec<Type29>,
+}
+
+struct Type38 {
+    r#final: u8,
+    r#type: u8,
+    data: Type37,
+}
+
+struct Type8 {
+    len_bytes: u8,
+    data: Vec<u8>,
+}
+
+struct Type51 {
+    byte_order: Type48,
+    magic: u16,
+    offset: u32,
+    ifd: Type50,
+}
+
+struct Type0 {
+    signature: (u8, u8, u8),
+    version: Vec<u8>,
+}
+
+enum Type56 {
+    app0(Type46),
+    app1(Type55),
+}
+
+struct Type65 {
+    marker: Type42,
+    length: u16,
+    data: Vec<u8>,
+}
+
+struct Type19 {
+    header: Type0,
+    logical_screen: Type4,
+    blocks: Vec<Type17>,
+    trailer: Type18,
+}
+
+enum Type26 {
+    none,
+    some(Type25),
+}
+
+enum Type48 {
+    le(u8, u8),
+    be(u8, u8),
+}
+
+struct Type99 {
+    signature: (u8, u8, u8, u8, u8, u8, u8, u8),
+    ihdr: Type83,
+    chunks: Vec<Type96>,
+    idat: Vec<Type97>,
+    more_chunks: Vec<Type96>,
+    iend: Type98,
+}
+
+enum Type37 {
+    dynamic_huffman(Type30),
+    fixed_huffman(Type34),
+    uncompressed(Type36),
+}
+
+struct Type58 {
+    marker: Type42,
+    length: u16,
+    data: Type57,
+}
+
+struct Type62 {
+    marker: Type42,
+    length: u16,
+    data: Type61,
+}
+
+enum Type3 {
+    no,
+    yes(Vec<Type2>),
+}
+
+struct Type104 {
+    string: Vec<u8>,
+    __padding: Vec<u8>,
+}
+
+struct Type13 {
+    graphic_control_extension: Type6,
+    graphic_rendering_block: Type12,
+}
+
+struct Type27 {
+    code: u16,
+    extra: Type26,
+}
+
+struct Type83 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type82,
+    crc: u32,
+}
+
+enum Type29 {
+    literal(u8),
+    reference(Type28),
+}
+
+struct Type78 {
+    marker: Type42,
+    length: u16,
+    data: Type77,
+}
+
+struct Type39 {
+    blocks: Vec<Type38>,
+    codes: Vec<Type29>,
+    inflate: Vec<u8>,
+}
+
+struct Type25 {
+    length_extra_bits: u8,
+    length: u16,
+    distance_code: u16,
+    distance_record: Type24,
+}
+
+struct Type77 {
+    num_lines: u16,
+}
+
+struct Type101 {
+    tag: (u8, u8, u8, u8),
+    length: u32,
+    data: Vec<u8>,
+    pad: Type100,
+}
+
+struct Type95 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type94,
+    crc: u32,
+}
+
+struct Type41 {
+    header: Type20,
+    fname: Type22,
+    data: Type39,
+    footer: Type40,
+}
+
+enum Type44 {
+    other(Vec<u8>),
+    jfif(Type43),
+}
+
+struct Type10 {
+    descriptor: Type7,
+    local_color_table: Type3,
+    data: Type9,
+}
+
+struct Type55 {
+    marker: Type42,
+    length: u16,
+    data: Type54,
+}
+
+struct Type80 {
+    initial_segment: Type56,
+    segments: Vec<Type66>,
+    header: Type70,
+    scan: Type76,
+    dnl: Type79,
+    scans: Vec<Type76>,
+}
+
+struct Type82 {
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    color_type: u8,
+    compression_method: u8,
+    filter_method: u8,
+    interlace_method: u8,
+}
+
+struct Type109 {
+    contents: Vec<Type108>,
+    __padding: Vec<u8>,
+    __trailing: Vec<u8>,
+}
+
+struct Type5 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    flags: u8,
+    delay_time: u16,
+    transparent_color_index: u8,
+    terminator: u8,
+}
+
+struct Type18 {
+    separator: u8,
+}
+
+struct Type28 {
+    length: u16,
+    distance: u16,
+}
+
+enum Type110 {
+    ascii(Vec<u8>),
+    utf8(Vec<char>),
+}
+
+struct Type33 {
+    code: u16,
+    extra: Type32,
+}
+
+struct Type60 {
+    marker: Type42,
+    length: u16,
+    data: Type59,
+}
+
+struct Type49 {
+    tag: u16,
+    r#type: u16,
+    length: u32,
+    offset_or_data: u32,
+}
+
+struct Type69 {
+    marker: Type42,
+    length: u16,
+    data: Type68,
+}
+
+struct Type23 {
+    code: u16,
+    extra: u8,
+}
+
+struct Type89 {
+    pixels_per_unit_x: u32,
+    pixels_per_unit_y: u32,
+    unit_specifier: u8,
+}
+
+enum Type35 {
+    literal(u8),
+}
+
+enum Type17 {
+    graphic_block(Type13),
+    special_purpose_block(Type16),
+}
+
+struct Type93 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type92,
+    crc: u32,
+}
+
+struct Type106 {
+    string: Vec<u8>,
+    padding: Vec<u8>,
+}
+
+struct Type112 {
+    data: Type111,
+    end: (),
+}
+
+struct Type54 {
+    identifier: Type21,
+    data: Type53,
+}
+
+struct Type46 {
+    marker: Type42,
+    length: u16,
+    data: Type45,
+}
+
+struct Type31 {
+    length_extra_bits: u8,
+    length: u16,
+    distance_code: u8,
+    distance_record: Type24,
+}
+
+struct Type15 {
+    separator: u8,
+    label: u8,
+    comment_data: Vec<Type8>,
+    terminator: u8,
+}
+
+struct Type71 {
+    component_selector: u8,
+    entropy_coding_table_ids: u8,
+}
+
+struct Type103 {
+    tag: (u8, u8, u8, u8),
+    length: u32,
+    data: Type102,
+    pad: Type100,
+}
+
+struct Type43 {
+    version_major: u8,
+    version_minor: u8,
+    density_units: u8,
+    density_x: u16,
+    density_y: u16,
+    thumbnail_width: u8,
+    thumbnail_height: u8,
+    thumbnail_pixels: Vec<Vec<Type2>>,
+}
+
+struct Type88 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type87,
+    crc: u32,
+}
+
+struct Type47 {
+    xmp: Vec<u8>,
+}
+
+enum Type96 {
+    bKGD(Type88),
+    pHYs(Type90),
+    PLTE(Type91),
+    tIME(Type93),
+    tRNS(Type95),
+}
+
+struct Type108 {
+    header: Type107,
+    file: Vec<u8>,
+    __padding: (),
+}
+
+struct Type45 {
+    identifier: Type21,
+    data: Type44,
+}
+
+struct Type9 {
+    lzw_min_code_size: u8,
+    image_data: Vec<Type8>,
+    terminator: u8,
 }
 
 enum Type66 {
@@ -358,81 +540,16 @@ enum Type66 {
     com(Type65),
 }
 
-struct Type71 {
-    component_selector: u8,
-    entropy_coding_table_ids: u8,
+struct Type59 {
+    class_table_id: u8,
+    num_codes: Vec<u8>,
+    values: Vec<u8>,
 }
 
-struct Type80 {
-    initial_segment: Type56,
-    segments: Vec<Type66>,
-    header: Type70,
-    scan: Type76,
-    dnl: Type79,
-    scans: Vec<Type76>,
-}
-
-struct Type64 {
-    marker: Type42,
-    length: u16,
-    data: Type63,
-}
-
-struct Type112 {
-    data: Type111,
-    end: (),
-}
-
-struct Type82 {
-    width: u32,
-    height: u32,
-    bit_depth: u8,
-    color_type: u8,
-    compression_method: u8,
-    filter_method: u8,
-    interlace_method: u8,
-}
-
-struct Type0 {
-    signature: (u8, u8, u8),
-    version: Vec<u8>,
-}
-
-struct Type95 {
+struct Type91 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Type94,
-    crc: u32,
-}
-
-struct Type1 {
-    screen_width: u16,
-    screen_height: u16,
-    flags: u8,
-    bg_color_index: u8,
-    pixel_aspect_ratio: u8,
-}
-
-struct Type34 {
-    codes: Vec<Type33>,
-    codes_values: Vec<Type29>,
-}
-
-struct Type102 {
-    tag: (u8, u8, u8, u8),
-    chunks: Vec<Type101>,
-}
-
-struct Type9 {
-    lzw_min_code_size: u8,
-    image_data: Vec<Type8>,
-    terminator: u8,
-}
-
-struct Type93 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type92,
+    data: Vec<Type2>,
     crc: u32,
 }
 
@@ -442,166 +559,9 @@ struct Type85 {
     blue: u16,
 }
 
-struct Type109 {
-    contents: Vec<Type108>,
-    __padding: Vec<u8>,
-    __trailing: Vec<u8>,
-}
-
-struct Type63 {
-    restart_interval: u16,
-}
-
-struct Type52 {
-    padding: u8,
-    exif: Type51,
-}
-
-struct Type76 {
-    segments: Vec<Type66>,
-    sos: Type73,
-    data: Type75,
-}
-
-struct Type4 {
-    descriptor: Type1,
-    global_color_table: Type3,
-}
-
-struct Type57 {
-    precision_table_id: u8,
-    elements: Vec<u8>,
-}
-
-enum Type53 {
-    other(Vec<u8>),
-    xmp(Type47),
-    exif(Type52),
-}
-
-struct Type47 {
-    xmp: Vec<u8>,
-}
-
-struct Type89 {
-    pixels_per_unit_x: u32,
-    pixels_per_unit_y: u32,
-    unit_specifier: u8,
-}
-
-enum Type96 {
-    bKGD(Type88),
-    pHYs(Type90),
-    PLTE(Type91),
-    tIME(Type93),
-    tRNS(Type95),
-}
-
-enum Type17 {
-    graphic_block(Type13),
-    special_purpose_block(Type16),
-}
-
-struct Type108 {
-    header: Type107,
-    file: Vec<u8>,
-    __padding: (),
-}
-
-struct Type81 {
-    soi: Type42,
-    frame: Type80,
-    eoi: Type42,
-}
-
-struct Type15 {
-    separator: u8,
-    label: u8,
-    comment_data: Vec<Type8>,
-    terminator: u8,
-}
-
-struct Type46 {
-    marker: Type42,
-    length: u16,
-    data: Type45,
-}
-
-struct Type90 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type89,
-    crc: u32,
-}
-
-struct Type84 {
-    palette_index: u8,
-}
-
-struct Type20 {
-    magic: (u8, u8),
-    method: u8,
-    file_flags: u8,
-    timestamp: u32,
-    compression_flags: u8,
-    os_id: u8,
-}
-
-struct Type103 {
-    tag: (u8, u8, u8, u8),
-    length: u32,
-    data: Type102,
-    pad: Type100,
-}
-
-struct Type10 {
-    descriptor: Type7,
-    local_color_table: Type3,
-    data: Type9,
-}
-
-struct Type83 {
-    length: u32,
-    tag: (u8, u8, u8, u8),
-    data: Type82,
-    crc: u32,
-}
-
-struct Type61 {
-    class_table_id: u8,
-    value: u8,
-}
-
-struct Type106 {
-    string: Vec<u8>,
-    padding: Vec<u8>,
-}
-
-struct Type68 {
-    sample_precision: u8,
-    num_lines: u16,
-    num_samples_per_line: u16,
-    num_image_components: u8,
-    image_components: Vec<Type67>,
-}
-
-enum Type22 {
-    no,
-    yes(Type21),
-}
-
-struct Type19 {
-    header: Type0,
-    logical_screen: Type4,
-    blocks: Vec<Type17>,
-    trailer: Type18,
-}
-
-struct Type25 {
-    length_extra_bits: u8,
-    length: u16,
-    distance_code: u16,
-    distance_record: Type24,
+struct Type42 {
+    ff: u8,
+    marker: u8,
 }
 
 struct Type14 {
@@ -614,31 +574,24 @@ struct Type14 {
     terminator: u8,
 }
 
-struct Type33 {
-    code: u16,
-    extra: Type32,
+enum Type70 {
+    sof0(Type69),
+    sof1(Type69),
+    sof2(Type69),
+    sof3(Type69),
+    sof5(Type69),
+    sof6(Type69),
+    sof7(Type69),
+    sof9(Type69),
+    sof10(Type69),
+    sof11(Type69),
+    sof13(Type69),
+    sof14(Type69),
+    sof15(Type69),
 }
 
-enum Type35 {
-    literal(u8),
-}
-
-struct Type50 {
-    num_fields: u16,
-    fields: Vec<Type49>,
-    next_ifd_offset: u32,
-    next_ifd: Vec<u8>,
-}
-
-enum Type79 {
-    some(Type78),
-    none,
-}
-
-struct Type73 {
-    marker: Type42,
-    length: u16,
-    data: Type72,
+struct Type84 {
+    palette_index: u8,
 }
 
 struct Type7 {
@@ -650,39 +603,34 @@ struct Type7 {
     flags: u8,
 }
 
-struct Type36 {
-    align: (),
-    len: u16,
-    nlen: u16,
-    bytes: Vec<u8>,
-    codes_values: Vec<Type35>,
+struct Type63 {
+    restart_interval: u16,
 }
 
-struct Type43 {
-    version_major: u8,
-    version_minor: u8,
-    density_units: u8,
-    density_x: u16,
-    density_y: u16,
-    thumbnail_width: u8,
-    thumbnail_height: u8,
-    thumbnail_pixels: Vec<Vec<Type2>>,
+struct Type73 {
+    marker: Type42,
+    length: u16,
+    data: Type72,
 }
 
-struct Type45 {
-    identifier: Type21,
-    data: Type44,
+struct Type90 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type89,
+    crc: u32,
 }
 
-struct Type59 {
+struct Type1 {
+    screen_width: u16,
+    screen_height: u16,
+    flags: u8,
+    bg_color_index: u8,
+    pixel_aspect_ratio: u8,
+}
+
+struct Type61 {
     class_table_id: u8,
-    num_codes: Vec<u8>,
-    values: Vec<u8>,
-}
-
-struct Type104 {
-    string: Vec<u8>,
-    __padding: Vec<u8>,
+    value: u8,
 }
 
 struct Type98 {
@@ -692,46 +640,25 @@ struct Type98 {
     crc: u32,
 }
 
-struct Type78 {
-    marker: Type42,
-    length: u16,
-    data: Type77,
+enum Type111 {
+    gif(Type19),
+    gzip(Vec<Type41>),
+    jpeg(Type81),
+    png(Type99),
+    riff(Type103),
+    tar(Type109),
+    text(Type110),
 }
 
-struct Type86 {
-    greyscale: u16,
+struct Type76 {
+    segments: Vec<Type66>,
+    sos: Type73,
+    data: Type75,
 }
 
-struct Type8 {
-    len_bytes: u8,
-    data: Vec<u8>,
-}
-
-struct Type67 {
-    id: u8,
-    sampling_factor: u8,
-    quantization_table_id: u8,
-}
-
-struct Type5 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    flags: u8,
-    delay_time: u16,
-    transparent_color_index: u8,
-    terminator: u8,
-}
-
-enum Type29 {
-    literal(u8),
-    reference(Type28),
-}
-
-struct Type2 {
-    r: u8,
-    g: u8,
-    b: u8,
+enum Type100 {
+    no(u8),
+    yes,
 }
 
 struct Type97 {
@@ -741,19 +668,92 @@ struct Type97 {
     crc: u32,
 }
 
-struct Type42 {
-    ff: u8,
-    marker: u8,
+struct Type24 {
+    distance_extra_bits: u16,
+    distance: u16,
 }
 
-struct Type18 {
+struct Type11 {
     separator: u8,
+    label: u8,
+    block_size: u8,
+    text_grid_left_position: u16,
+    text_grid_top_position: u16,
+    text_grid_width: u16,
+    text_grid_height: u16,
+    character_cell_width: u8,
+    character_cell_height: u8,
+    text_foreground_color_index: u8,
+    text_background_color_index: u8,
+    plain_text_data: Vec<Type8>,
+    terminator: u8,
+}
+
+enum Type6 {
+    some(Type5),
+    none,
+}
+
+enum Type32 {
+    none,
+    some(Type31),
+}
+
+struct Type81 {
+    soi: Type42,
+    frame: Type80,
+    eoi: Type42,
+}
+
+struct Type20 {
+    magic: (u8, u8),
+    method: u8,
+    file_flags: u8,
+    timestamp: u32,
+    compression_flags: u8,
+    os_id: u8,
+}
+
+struct Type92 {
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+}
+
+struct Type40 {
+    crc: u32,
+    length: u32,
+}
+
+enum Type53 {
+    other(Vec<u8>),
+    xmp(Type47),
+    exif(Type52),
+}
+
+struct Type68 {
+    sample_precision: u8,
+    num_lines: u16,
+    num_samples_per_line: u16,
+    num_image_components: u8,
+    image_components: Vec<Type67>,
 }
 
 struct Type105 {
     string: Vec<u8>,
     __nul_or_wsp: u8,
     __padding: Vec<u8>,
+}
+
+enum Type87 {
+    color_type_3(Type84),
+    color_type_6(Type85),
+    color_type_2(Type85),
+    color_type_4(Type86),
+    color_type_0(Type86),
 }
 
 fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type112> {
@@ -780,13 +780,13 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    59 => 1,
-
                     33 => 0,
 
                     44 => 0,
+
+                    59 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -812,7 +812,7 @@ fn Decoder3<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     while true {
         let matching_ix = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             if (b == 31) {
                 1
             } else {
@@ -867,10 +867,8 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    73 => 1,
-
                     98 => 0,
 
                     112 => 0,
@@ -878,6 +876,8 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                     80 => 0,
 
                     116 => 0,
+
+                    73 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -894,14 +894,14 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     73 => {
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
-                            69 => 0,
-
                             68 => 1,
+
+                            69 => 0,
                         }
                     }
 
@@ -928,8 +928,10 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
+                    73 => 1,
+
                     98 => 0,
 
                     112 => 0,
@@ -937,8 +939,6 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                     80 => 0,
 
                     116 => 0,
-
-                    73 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -1033,11 +1033,11 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    tmp if (tmp != 0) => 1,
-
                     0 => 0,
+
+                    tmp if (tmp != 0) => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -1068,7 +1068,7 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 0) {
                     0
                 } else {
@@ -1107,7 +1107,7 @@ fn Decoder9<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     while true {
         let matching_ix = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             if ((ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0]))
                 .contains(b))
             {
@@ -1131,7 +1131,7 @@ fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     while true {
         let matching_ix = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
                 tmp if ((ByteSet::from_bits([
                     18446744073709551615,
@@ -1175,7 +1175,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let inner = {
         let tree_index = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
                 tmp if ((ByteSet::from_bits([
                     18446744073709551615,
@@ -1188,6 +1188,12 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     0
                 }
 
+                240 => 3,
+
+                tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184])).contains(tmp)) => 3,
+
+                244 => 3,
+
                 tmp if ((ByteSet::from_bits([0, 0, 0, 4294967292])).contains(tmp)) => 1,
 
                 224 => 2,
@@ -1197,12 +1203,6 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 237 => 2,
 
                 tmp if ((ByteSet::from_bits([0, 0, 0, 211106232532992])).contains(tmp)) => 2,
-
-                240 => 3,
-
-                tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184])).contains(tmp)) => 3,
-
-                244 => 3,
             }
         };
         match tree_index {
@@ -1247,17 +1247,17 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let inner = {
                     let tree_index = {
                         let lookahead = (input.clone());
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
+                            224 => 0,
+
+                            237 => 2,
+
                             tmp if ((ByteSet::from_bits([0, 0, 0, 211106232532992]))
                                 .contains(tmp)) =>
                             {
                                 3
                             }
-
-                            224 => 0,
-
-                            237 => 2,
 
                             tmp if ((ByteSet::from_bits([0, 0, 0, 35175782154240]))
                                 .contains(tmp)) =>
@@ -1372,17 +1372,17 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let inner = {
                     let tree_index = {
                         let lookahead = (input.clone());
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
+                            244 => 2,
+
+                            240 => 0,
+
                             tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184]))
                                 .contains(tmp)) =>
                             {
                                 1
                             }
-
-                            244 => 2,
-
-                            240 => 0,
                         }
                     };
                     match tree_index {
@@ -1536,11 +1536,11 @@ fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    tmp if (tmp != 0) => 1,
-
                     0 => 0,
+
+                    tmp if (tmp != 0) => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -1564,7 +1564,7 @@ fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 0) {
                     0
                 } else {
@@ -1623,11 +1623,11 @@ fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    0 => 1,
-
                     tmp if (tmp != 0) => 0,
+
+                    0 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -1651,7 +1651,7 @@ fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 0) {
                     0
                 } else {
@@ -1683,7 +1683,7 @@ fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     tmp if (tmp != 0) => 0,
 
@@ -1711,7 +1711,7 @@ fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 0) {
                     1
                 } else {
@@ -1898,20 +1898,20 @@ fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type96> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         match b {
+            116 => {
+                let b = (lookahead.read_byte())?;
+                match b {
+                    82 => 4,
+
+                    73 => 3,
+                }
+            }
+
             98 => 0,
 
             80 => 2,
-
-            116 => {
-                let b = (lookahead.read_byte());
-                match b {
-                    73 => 3,
-
-                    82 => 4,
-                }
-            }
 
             112 => 1,
         }
@@ -2397,13 +2397,13 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let initial_segment = {
         let tree_index = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             if (b == 255) {
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    225 => 1,
-
                     224 => 0,
+
+                    225 => 1,
                 }
             } else {
                 return None;
@@ -2426,10 +2426,36 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 255) {
-                    let b = (lookahead.read_byte());
+                    let b = (lookahead.read_byte())?;
                     match b {
+                        192 => 1,
+
+                        193 => 1,
+
+                        194 => 1,
+
+                        195 => 1,
+
+                        197 => 1,
+
+                        198 => 1,
+
+                        199 => 1,
+
+                        201 => 1,
+
+                        202 => 1,
+
+                        203 => 1,
+
+                        205 => 1,
+
+                        206 => 1,
+
+                        207 => 1,
+
                         219 => 0,
 
                         196 => 0,
@@ -2471,32 +2497,6 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         239 => 0,
 
                         254 => 0,
-
-                        192 => 1,
-
-                        193 => 1,
-
-                        194 => 1,
-
-                        195 => 1,
-
-                        197 => 1,
-
-                        198 => 1,
-
-                        199 => 1,
-
-                        201 => 1,
-
-                        202 => 1,
-
-                        203 => 1,
-
-                        205 => 1,
-
-                        206 => 1,
-
-                        207 => 1,
                     }
                 } else {
                     return None;
@@ -2516,9 +2516,9 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let dnl = {
         let tree_index = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             if (b == 255) {
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     220 => 0,
 
@@ -2589,12 +2589,10 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 255) {
-                    let b = (lookahead.read_byte());
+                    let b = (lookahead.read_byte())?;
                     match b {
-                        217 => 1,
-
                         218 => 0,
 
                         219 => 0,
@@ -2638,6 +2636,8 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         239 => 0,
 
                         254 => 0,
+
+                        217 => 1,
                     }
                 } else {
                     return None;
@@ -2743,51 +2743,51 @@ fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type66> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         if (b == 255) {
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
-                233 => 13,
-
-                196 => 1,
-
-                235 => 15,
-
                 254 => 20,
-
-                221 => 3,
-
-                219 => 0,
-
-                237 => 17,
-
-                231 => 11,
-
-                230 => 10,
-
-                234 => 14,
-
-                238 => 18,
 
                 236 => 16,
 
-                224 => 4,
+                204 => 2,
 
-                239 => 19,
+                234 => 14,
+
+                237 => 17,
 
                 232 => 12,
 
-                225 => 5,
+                230 => 10,
+
+                235 => 15,
+
+                228 => 8,
 
                 227 => 7,
 
-                204 => 2,
+                196 => 1,
 
-                229 => 9,
+                224 => 4,
+
+                238 => 18,
+
+                239 => 19,
+
+                233 => 13,
+
+                219 => 0,
+
+                231 => 11,
 
                 226 => 6,
 
-                228 => 8,
+                225 => 5,
+
+                221 => 3,
+
+                229 => 9,
             }
         } else {
             return None;
@@ -2904,35 +2904,35 @@ fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type70> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         if (b == 255) {
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
-                197 => 4,
-
-                203 => 9,
-
                 199 => 6,
 
-                193 => 1,
+                198 => 5,
 
-                202 => 8,
+                194 => 2,
+
+                197 => 4,
 
                 206 => 11,
 
                 207 => 12,
 
+                202 => 8,
+
                 201 => 7,
 
-                205 => 10,
+                193 => 1,
 
-                194 => 2,
+                203 => 9,
 
                 195 => 3,
 
-                192 => 0,
+                205 => 10,
 
-                198 => 5,
+                192 => 0,
             }
         } else {
             return None;
@@ -3012,9 +3012,9 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 255) {
-                    let b = (lookahead.read_byte());
+                    let b = (lookahead.read_byte())?;
                     match b {
                         219 => 0,
 
@@ -3117,9 +3117,9 @@ fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 if (b == 255) {
-                    let b = (lookahead.read_byte());
+                    let b = (lookahead.read_byte())?;
                     match b {
                         218 => 1,
 
@@ -3222,11 +3222,31 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
+                    tmp if (tmp != 255) => 0,
+
                     255 => {
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
+                            0 => 0,
+
+                            208 => 0,
+
+                            209 => 0,
+
+                            210 => 0,
+
+                            211 => 0,
+
+                            212 => 0,
+
+                            213 => 0,
+
+                            214 => 0,
+
+                            215 => 0,
+
                             217 => 1,
 
                             218 => 1,
@@ -3272,60 +3292,40 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                             239 => 1,
 
                             254 => 1,
-
-                            0 => 0,
-
-                            208 => 0,
-
-                            209 => 0,
-
-                            210 => 0,
-
-                            211 => 0,
-
-                            212 => 0,
-
-                            213 => 0,
-
-                            214 => 0,
-
-                            215 => 0,
                         }
                     }
-
-                    tmp if (tmp != 255) => 0,
                 }
             };
             if (matching_ix == 0) {
                 let next_elem = {
                     let tree_index = {
                         let lookahead = (input.clone());
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
+                            tmp if (tmp != 255) => 0,
+
                             255 => {
-                                let b = (lookahead.read_byte());
+                                let b = (lookahead.read_byte())?;
                                 match b {
-                                    214 => 7,
-
-                                    210 => 3,
-
-                                    211 => 4,
-
-                                    215 => 8,
-
-                                    212 => 5,
-
-                                    209 => 2,
+                                    0 => 0,
 
                                     213 => 6,
 
-                                    0 => 0,
+                                    210 => 3,
+
+                                    212 => 5,
 
                                     208 => 1,
+
+                                    215 => 8,
+
+                                    211 => 4,
+
+                                    209 => 2,
+
+                                    214 => 7,
                                 }
                             }
-
-                            tmp if (tmp != 255) => 0,
                         }
                     };
                     match tree_index {
@@ -3433,7 +3433,7 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         match b {
             255 => 1,
 
@@ -3676,10 +3676,10 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     255 => {
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
                             0 => 0,
 
@@ -3756,28 +3756,28 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let next_elem = {
                     let tree_index = {
                         let lookahead = (input.clone());
-                        let b = (lookahead.read_byte());
+                        let b = (lookahead.read_byte())?;
                         match b {
                             255 => {
-                                let b = (lookahead.read_byte());
+                                let b = (lookahead.read_byte())?;
                                 match b {
                                     214 => 7,
-
-                                    212 => 5,
-
-                                    210 => 3,
-
-                                    208 => 1,
-
-                                    215 => 8,
-
-                                    209 => 2,
-
-                                    0 => 0,
 
                                     211 => 4,
 
                                     213 => 6,
+
+                                    215 => 8,
+
+                                    208 => 1,
+
+                                    210 => 3,
+
+                                    0 => 0,
+
+                                    212 => 5,
+
+                                    209 => 2,
                                 }
                             }
 
@@ -4961,11 +4961,11 @@ fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    tmp if (tmp != 0) => 0,
-
                     0 => 1,
+
+                    tmp if (tmp != 0) => 0,
                 }
             };
             if (matching_ix == 0) {
@@ -5032,7 +5032,7 @@ fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let byte_order = {
         let tree_index = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
                 73 => 0,
 
@@ -5152,7 +5152,7 @@ fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     tmp if (tmp != 0) => 0,
 
@@ -6338,7 +6338,7 @@ fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     0 => 1,
 
@@ -6440,18 +6440,18 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type17> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         match b {
             33 => {
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    249 => 0,
-
-                    1 => 0,
-
                     255 => 1,
 
                     254 => 1,
+
+                    249 => 0,
+
+                    1 => 0,
                 }
             }
 
@@ -6487,18 +6487,18 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let graphic_control_extension = {
         let tree_index = {
             let lookahead = (input.clone());
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
-                44 => 1,
-
                 33 => {
-                    let b = (lookahead.read_byte());
+                    let b = (lookahead.read_byte())?;
                     match b {
                         249 => 0,
 
                         1 => 1,
                     }
                 }
+
+                44 => 1,
             }
         };
         match tree_index {
@@ -6523,9 +6523,9 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         if (b == 33) {
-            let b = (lookahead.read_byte());
+            let b = (lookahead.read_byte())?;
             match b {
                 255 => 0,
 
@@ -6592,7 +6592,7 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     tmp if (tmp != 0) => 0,
 
@@ -6642,7 +6642,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     0 => 1,
 
@@ -6738,7 +6738,7 @@ fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
     let tree_index = {
         let lookahead = (input.clone());
-        let b = (lookahead.read_byte());
+        let b = (lookahead.read_byte())?;
         match b {
             44 => 0,
 
@@ -6825,7 +6825,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
                     tmp if (tmp != 0) => 0,
 
@@ -6897,11 +6897,11 @@ fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         while true {
             let matching_ix = {
                 let lookahead = (input.clone());
-                let b = (lookahead.read_byte());
+                let b = (lookahead.read_byte())?;
                 match b {
-                    0 => 1,
-
                     tmp if (tmp != 0) => 0,
+
+                    0 => 1,
                 }
             };
             if (matching_ix == 0) {
