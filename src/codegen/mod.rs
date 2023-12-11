@@ -1022,7 +1022,7 @@ impl RepeatLogic {
                     ))
                 };
                 stmts.push(ctrl);
-                (stmts, Some(RustExpr::some(RustExpr::local("accum"))))
+                (stmts, Some(RustExpr::local("accum")))
             }
             RepeatLogic::BreakOnMatch(btree, elt) => {
                 let mut stmts = Vec::new();
@@ -1059,7 +1059,7 @@ impl RepeatLogic {
                     ))
                 };
                 stmts.push(ctrl);
-                (stmts, Some(RustExpr::some(RustExpr::local("accum"))))
+                (stmts, Some(RustExpr::local("accum")))
             }
             RepeatLogic::ExactCount(expr_n, elt) => {
                 let mut stmts = Vec::new();
@@ -1082,7 +1082,7 @@ impl RepeatLogic {
                     body,
                 )));
 
-                (stmts, Some(RustExpr::some(RustExpr::local("accum"))))
+                (stmts, Some(RustExpr::local("accum")))
             }
             RepeatLogic::ConditionTerminal(tpred, elt) => {
                 let mut stmts = Vec::new();
@@ -1120,7 +1120,7 @@ impl RepeatLogic {
                     ))
                 };
                 stmts.push(ctrl);
-                (stmts, Some(RustExpr::some(RustExpr::local("accum"))))
+                (stmts, Some(RustExpr::local("accum")))
             }
             RepeatLogic::ConditionComplete(cpred, elt) => {
                 let mut stmts = Vec::new();
@@ -1150,7 +1150,7 @@ impl RepeatLogic {
                     ))
                 };
                 stmts.push(ctrl);
-                (stmts, Some(RustExpr::some(RustExpr::local("accum"))))
+                (stmts, Some(RustExpr::local("accum")))
             }
         }
     }
