@@ -1,6 +1,7 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::decoder::{MultiScope, Scope, SingleScope, Value};
+use crate::precedence::{cond_paren, Precedence};
 use crate::Label;
 use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};
 
@@ -900,42 +901,42 @@ impl<'module> MonoidalPrinter<'module> {
             Expr::AsU8(expr) => cond_paren(
                 self.compile_prefix("as-u8", None, expr),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::AsU16(expr) => cond_paren(
                 self.compile_prefix("as-u16", None, expr),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::AsU32(expr) => cond_paren(
                 self.compile_prefix("as-u32", None, expr),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::AsChar(expr) => cond_paren(
                 self.compile_prefix("as-char", None, expr),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::U16Be(bytes) => cond_paren(
                 self.compile_prefix("u16be", None, bytes),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::U16Le(bytes) => cond_paren(
                 self.compile_prefix("u16le", None, bytes),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::U32Be(bytes) => cond_paren(
                 self.compile_prefix("u32be", None, bytes),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::U32Le(bytes) => cond_paren(
                 self.compile_prefix("u32le", None, bytes),
                 prec,
-                Precedence::CAST,
+                Precedence::CAST_PREFIX,
             ),
             Expr::SeqLength(seq) => cond_paren(
                 self.compile_prefix("seq-length", None, seq),
@@ -1215,199 +1216,5 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Record(fields) if fields.is_empty() => Fragment::String("{}".into()),
             Format::Record(_) => Fragment::String("{ ... }".into()),
         }
-    }
-}
-
-/// Operator Precedence classes
-///
-///
-#[derive(Copy, Clone, Debug, Default)]
-enum Precedence {
-    Atomic, // Highest precedence
-    Projection,
-    Prefix, // Highest natural precedence
-    ArithInfix(ArithLevel),
-    BitwiseInfix(BitwiseLevel),
-    Comparison(CompareLevel), // Unsound when chained
-    Calculus,                 // Arrow and Match
-    #[default]
-    Top,        // Entry level for neutral context
-}
-
-#[derive(Copy, Clone, Debug)]
-enum CompareLevel {
-    Comparison = 0, // Highest comparative precedence
-    Equality,
-}
-
-#[derive(Copy, Clone, Debug)]
-enum ArithLevel {
-    DivRem = 0, // Highest arithmetic precedence
-    Mul,
-    AddSub,
-}
-
-#[derive(Copy, Clone, Debug)]
-#[repr(u8)]
-enum BitwiseLevel {
-    Shift = 0, // Highest bitwise precedence
-    And = 1,
-    Or = 2,
-}
-
-/// Intransitive partial relation over operator subclasses
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Relation {
-    /// `.<`
-    Inferior,
-    /// `.=`
-    Congruent,
-    /// ``.>`
-    Superior,
-    /// ``><``
-    Disjoint,
-}
-
-trait IntransitiveOrd {
-    fn relate(&self, other: &Self) -> Relation;
-
-    fn inferior(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Inferior)
-    }
-
-    fn superior(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Superior)
-    }
-
-    fn congruent(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Congruent)
-    }
-
-    fn disjoint(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Disjoint)
-    }
-}
-
-impl IntransitiveOrd for CompareLevel {
-    fn relate(&self, other: &Self) -> Relation {
-        match (self, other) {
-            (Self::Comparison, Self::Comparison) | (Self::Equality, Self::Equality) => {
-                Relation::Congruent
-            }
-            (Self::Comparison, Self::Equality) => Relation::Disjoint,
-            (Self::Equality, Self::Comparison) => Relation::Disjoint,
-        }
-    }
-}
-
-impl IntransitiveOrd for ArithLevel {
-    fn relate(&self, other: &Self) -> Relation {
-        match (self, other) {
-            (Self::DivRem, Self::DivRem)
-            | (Self::Mul, Self::Mul)
-            | (Self::AddSub, Self::AddSub) => Relation::Congruent,
-            (Self::DivRem, Self::Mul) | (Self::Mul, Self::DivRem) => Relation::Disjoint,
-            (Self::AddSub, _) => Relation::Inferior,
-            (_, Self::AddSub) => Relation::Superior,
-        }
-    }
-}
-
-impl IntransitiveOrd for BitwiseLevel {
-    fn relate(&self, other: &Self) -> Relation {
-        match (self, other) {
-            (BitwiseLevel::Shift, BitwiseLevel::Shift) => Relation::Congruent,
-            (BitwiseLevel::Shift, _) => Relation::Superior,
-            (_, BitwiseLevel::Shift) => Relation::Inferior,
-            (BitwiseLevel::And, BitwiseLevel::And) => Relation::Congruent,
-            (BitwiseLevel::And, BitwiseLevel::Or) => Relation::Superior,
-            (BitwiseLevel::Or, BitwiseLevel::And) => Relation::Inferior,
-            (BitwiseLevel::Or, BitwiseLevel::Or) => Relation::Congruent,
-        }
-    }
-}
-
-/// Rules:
-///   x .= x
-///   Atomic .> Proj .> Prefix .> *Infix .> Comparison .> Calculus .> Top
-///   rel(x, y) = rel(ArithInfix(x), ArithInfix(y))
-///   rel(x, y) = rel(BitwiseInfix(x), BitwiseInfix(y))
-///   Bitwise(_) >< Arith(_)
-impl IntransitiveOrd for Precedence {
-    fn relate(&self, other: &Self) -> Relation {
-        match (self, other) {
-            // Trivial Congruences
-            (Self::Atomic, Self::Atomic) => Relation::Congruent,
-            (Self::Projection, Self::Projection) => Relation::Congruent,
-            (Self::Prefix, Self::Prefix) => Relation::Congruent,
-            (Self::Calculus, Self::Calculus) => Relation::Congruent,
-            (Self::Top, Self::Top) => Relation::Congruent,
-
-            // Descending relations
-            (Self::Atomic, _) => Relation::Superior,
-            (_, Self::Atomic) => Relation::Superior,
-            (Self::Projection, _) => Relation::Superior,
-            (_, Self::Projection) => Relation::Inferior,
-            (Self::Prefix, _) => Relation::Superior,
-            (_, Self::Prefix) => Relation::Inferior,
-
-            // Ascending relations
-            (Self::Top, _) => Relation::Inferior,
-            (_, Self::Top) => Relation::Superior,
-            (Self::Calculus, _) => Relation::Inferior,
-            (_, Self::Calculus) => Relation::Superior,
-
-            // Implications
-            (Self::ArithInfix(x), Self::ArithInfix(y)) => x.relate(y),
-            (Self::BitwiseInfix(x), Self::BitwiseInfix(y)) => x.relate(y),
-            (Self::Comparison(x), Self::Comparison(y)) => x.relate(y),
-
-            // Ascending relations (continued)
-            (Self::Comparison(_), _) => Relation::Inferior,
-            (_, Self::Comparison(_)) => Relation::Superior,
-
-            // Disjunctions
-            (Self::ArithInfix(_), Self::BitwiseInfix(_)) => Relation::Disjoint,
-            (Self::BitwiseInfix(_), Self::ArithInfix(_)) => Relation::Disjoint,
-        }
-    }
-}
-
-impl Precedence {
-    #![allow(dead_code)]
-    const TOP: Self = Precedence::Top;
-    const ARROW: Self = Precedence::Calculus;
-    const MATCH: Self = Precedence::Calculus;
-    const COMPARE: Self = Precedence::Comparison(CompareLevel::Comparison);
-    const EQUALITY: Self = Precedence::Comparison(CompareLevel::Equality);
-    const BITOR: Self = Precedence::BitwiseInfix(BitwiseLevel::Or);
-    const ADDSUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
-    const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
-    const DIVREM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
-    const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
-    const BITSHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
-    const FUNAPP: Self = Precedence::Prefix;
-    const CAST: Self = Precedence::Prefix;
-    const PROJ: Self = Precedence::Projection;
-    const ATOM: Self = Precedence::Atomic;
-
-    const FORMAT_COMPOUND: Self = Self::Top;
-    const FORMAT_ATOM: Self = Self::Atomic;
-
-    fn bump_format(&self) -> Self {
-        match self {
-            Precedence::Top => Precedence::Atomic,
-            Precedence::Atomic => Precedence::Atomic,
-            _ => unreachable!("Unexpected non-format precedence level {self:?}"),
-        }
-    }
-}
-
-fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
-    match current.relate(&cutoff) {
-        Relation::Disjoint | Relation::Superior => {
-            Fragment::Char('(').cat(frag).cat(Fragment::Char(')'))
-        }
-        Relation::Congruent | Relation::Inferior => frag,
     }
 }
