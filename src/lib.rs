@@ -19,6 +19,7 @@ pub mod error;
 pub mod helper;
 
 pub mod output;
+mod precedence;
 pub mod prelude;
 pub mod read;
 
