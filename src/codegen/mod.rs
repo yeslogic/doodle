@@ -10,11 +10,10 @@ use crate::{Expr, Label, MatchTree, Pattern, ValueType};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use rust_ast::{CompType, PrimType, RustType, RustTypeDef, ToFragment};
-
-use self::rust_ast::{
-    AtomType, DefParams, FnSig, Operator, RustEntity, RustExpr, RustFn, RustLt, RustParams,
-    RustPattern, RustPrimLit, RustStmt, RustStruct, RustVariant,
+use rust_ast::{
+    AtomType, CompType, Constructor, DefParams, FnSig, Operator, PrimType, RustEntity, RustExpr,
+    RustFn, RustLt, RustParams, RustPattern, RustPrimLit, RustStmt, RustStruct, RustType,
+    RustTypeDef, RustVariant, ToFragment,
 };
 
 #[repr(transparent)]
@@ -451,7 +450,8 @@ impl Codegen {
                 let mut cl_cases = Vec::new();
                 for (pat, dec) in cases.iter() {
                     cl_cases.push((
-                        MatchCaseLHS::Pattern(embed_pattern(pat)),
+                        // FIXME - add type_hint for scrutinee when possible
+                        MatchCaseLHS::Pattern(embed_pattern(pat, None)),
                         self.translate(dec, type_hint),
                     ));
                 }
@@ -474,7 +474,14 @@ impl Codegen {
     }
 }
 
-fn embed_pattern(pat: &Pattern) -> RustPattern {
+fn get_enum_name<'a>(typ: &'a RustType) -> &'a Label {
+    match typ {
+        RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_, name))) => name,
+        other => unreachable!("get_enum_name: non-LocalDef type {other:?}"),
+    }
+}
+
+fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
     match pat {
         Pattern::Wildcard => RustPattern::CatchAll(None),
         Pattern::Binding(name) => RustPattern::CatchAll(Some(name.clone())),
@@ -483,11 +490,23 @@ fn embed_pattern(pat: &Pattern) -> RustPattern {
         Pattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::NumericLit(*n as usize)),
         Pattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::NumericLit(*n as usize)),
         Pattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::CharLit(*c)),
-        Pattern::Tuple(pats) => RustPattern::TupleLiteral(pats.iter().map(embed_pattern).collect()),
-        Pattern::Seq(pats) => RustPattern::ArrayLiteral(pats.iter().map(embed_pattern).collect()),
+        Pattern::Tuple(pats) => {
+            RustPattern::TupleLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
+        }
+        Pattern::Seq(pats) => {
+            RustPattern::ArrayLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
+        }
         Pattern::Variant(vname, pat) => {
-            let inner = embed_pattern(pat);
-            RustPattern::Variant(vname.clone(), Box::new(inner))
+            let constr = match type_hint {
+                Some(ty) => {
+                    let tname = get_enum_name(ty).clone();
+                    Constructor::Compound(tname, vname.clone())
+                }
+                // FIXME - figure out a way to get around this
+                None => Constructor::Simple(vname.clone()),
+            };
+            let inner = embed_pattern(pat, None);
+            RustPattern::Variant(constr, Box::new(inner))
         }
     }
 }
@@ -504,7 +523,7 @@ fn embed_expr(expr: &Expr) -> RustExpr {
         Expr::U32(n) => RustExpr::num_lit(*n as usize),
         Expr::Tuple(tup) => RustExpr::Tuple(tup.iter().map(embed_expr).collect()),
         Expr::TupleProj(expr_tup, ix) => embed_expr(expr_tup).nth(*ix),
-        Expr::Record(fields) => unreachable!("Record not bound in Variant"),
+        Expr::Record(_fields) => unreachable!("Record not bound in Variant"),
         Expr::RecordProj(expr_rec, fld) => embed_expr(expr_rec).field(fld.clone()),
         Expr::Variant(vname, inner) => match inner.as_ref() {
             Expr::Record(fields) => RustExpr::Struct(
@@ -525,7 +544,8 @@ fn embed_expr(expr: &Expr) -> RustExpr {
                 .iter()
                 .map(|(pat, rhs)| {
                     (
-                        MatchCaseLHS::Pattern(embed_pattern(pat)),
+                        // FIXME - add actual type_hint when possible
+                        MatchCaseLHS::Pattern(embed_pattern(pat, None)),
                         vec![RustStmt::Expr(embed_expr(rhs))],
                     )
                 })
@@ -577,7 +597,6 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             .call_method("unwrap"),
         Expr::SeqLength(seq) => embed_expr(seq).call_method("len"),
         Expr::SubSeq(seq, ix, len) => {
-            let seq_expr = embed_expr(seq);
             let start_expr = embed_expr(ix);
             let bind_ix = RustStmt::assign("ix", start_expr);
             let end_expr = RustExpr::infix(RustExpr::local("ix"), Operator::Add, embed_expr(len));
@@ -921,7 +940,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 }
                 ByteCriterion::MustBe(b) => {
                     let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
-                        RustPrimLit::NumericLit((b as usize)),
+                        RustPrimLit::NumericLit(b as usize),
                     ));
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
                     cases.push((lhs, rhs))
@@ -943,7 +962,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 
     let b_lookahead = RustStmt::assign(
         "lookahead",
-        RustExpr::local(ctxt.input_varname.clone()).call_method("clone"),
+        RustExpr::BorrowMut(Box::new(
+            RustExpr::local(ctxt.input_varname.clone()).call_method("clone"),
+        )),
     );
     let ll_context = ProdCtxt {
         input_varname: &Label::from("lookahead"),
@@ -1345,30 +1366,6 @@ enum SimpleLogic {
     SkipToNextMultiple(usize),
     ByteIn(ByteSet),
     Eval(RustExpr),
-}
-
-#[derive(Debug, Clone)]
-enum Constructor {
-    Simple(Label),
-    Compound(Label, Label),
-}
-
-impl From<Constructor> for RustEntity {
-    fn from(value: Constructor) -> Self {
-        match value {
-            Constructor::Simple(lab) => RustEntity::Local(lab),
-            Constructor::Compound(path, lab) => RustEntity::Scoped(vec![path], lab),
-        }
-    }
-}
-
-impl From<Constructor> for Label {
-    fn from(value: Constructor) -> Self {
-        match value {
-            Constructor::Simple(lab) => lab,
-            Constructor::Compound(path, var) => format!("{path}::{var}").into(),
-        }
-    }
 }
 
 /// Cases that recurse into other case-logic only once
