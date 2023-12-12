@@ -30,6 +30,33 @@ struct Type4 {
 }
 
 struct Type5 {
+    len_bytes: u8,
+    data: Vec<u8>,
+}
+
+struct Type6 {
+    separator: u8,
+    label: u8,
+    comment_data: Vec<Type5>,
+    terminator: u8,
+}
+
+struct Type7 {
+    separator: u8,
+    label: u8,
+    block_size: u8,
+    identifier: Vec<u8>,
+    authentication_code: Vec<u8>,
+    application_data: Vec<Type5>,
+    terminator: u8,
+}
+
+enum Type8 {
+    comment_extension(Type6),
+    application_extension(Type7),
+}
+
+struct Type9 {
     separator: u8,
     label: u8,
     block_size: u8,
@@ -39,35 +66,9 @@ struct Type5 {
     terminator: u8,
 }
 
-enum Type6 {
-    some(Type5),
+enum Type10 {
     none,
-}
-
-struct Type7 {
-    separator: u8,
-    image_left_position: u16,
-    image_top_position: u16,
-    image_width: u16,
-    image_height: u16,
-    flags: u8,
-}
-
-struct Type8 {
-    len_bytes: u8,
-    data: Vec<u8>,
-}
-
-struct Type9 {
-    lzw_min_code_size: u8,
-    image_data: Vec<Type8>,
-    terminator: u8,
-}
-
-struct Type10 {
-    descriptor: Type7,
-    local_color_table: Type3,
-    data: Type9,
+    some(Type9),
 }
 
 struct Type11 {
@@ -82,45 +83,44 @@ struct Type11 {
     character_cell_height: u8,
     text_foreground_color_index: u8,
     text_background_color_index: u8,
-    plain_text_data: Vec<Type8>,
+    plain_text_data: Vec<Type5>,
     terminator: u8,
 }
 
-enum Type12 {
-    table_based_image(Type10),
-    plain_text_extension(Type11),
+struct Type12 {
+    separator: u8,
+    image_left_position: u16,
+    image_top_position: u16,
+    image_width: u16,
+    image_height: u16,
+    flags: u8,
 }
 
 struct Type13 {
-    graphic_control_extension: Type6,
-    graphic_rendering_block: Type12,
+    lzw_min_code_size: u8,
+    image_data: Vec<Type5>,
+    terminator: u8,
 }
 
 struct Type14 {
-    separator: u8,
-    label: u8,
-    block_size: u8,
-    identifier: Vec<u8>,
-    authentication_code: Vec<u8>,
-    application_data: Vec<Type8>,
-    terminator: u8,
+    descriptor: Type12,
+    local_color_table: Type3,
+    data: Type13,
 }
 
-struct Type15 {
-    separator: u8,
-    label: u8,
-    comment_data: Vec<Type8>,
-    terminator: u8,
+enum Type15 {
+    plain_text_extension(Type11),
+    table_based_image(Type14),
 }
 
-enum Type16 {
-    application_extension(Type14),
-    comment_extension(Type15),
+struct Type16 {
+    graphic_control_extension: Type10,
+    graphic_rendering_block: Type15,
 }
 
 enum Type17 {
-    graphic_block(Type13),
-    special_purpose_block(Type16),
+    special_purpose_block(Type8),
+    graphic_block(Type16),
 }
 
 struct Type18 {
@@ -273,6 +273,58 @@ struct Type42 {
 }
 
 struct Type43 {
+    xmp: Vec<u8>,
+}
+
+enum Type44 {
+    be(u8, u8),
+    le(u8, u8),
+}
+
+struct Type45 {
+    tag: u16,
+    r#type: u16,
+    length: u32,
+    offset_or_data: u32,
+}
+
+struct Type46 {
+    num_fields: u16,
+    fields: Vec<Type45>,
+    next_ifd_offset: u32,
+    next_ifd: Vec<u8>,
+}
+
+struct Type47 {
+    byte_order: Type44,
+    magic: u16,
+    offset: u32,
+    ifd: Type46,
+}
+
+struct Type48 {
+    padding: u8,
+    exif: Type47,
+}
+
+enum Type49 {
+    other(Vec<u8>),
+    xmp(Type43),
+    exif(Type48),
+}
+
+struct Type50 {
+    identifier: Type21,
+    data: Type49,
+}
+
+struct Type51 {
+    marker: Type42,
+    length: u16,
+    data: Type50,
+}
+
+struct Type52 {
     version_major: u8,
     version_minor: u8,
     density_units: u8,
@@ -283,61 +335,9 @@ struct Type43 {
     thumbnail_pixels: Vec<Vec<Type2>>,
 }
 
-enum Type44 {
-    other(Vec<u8>),
-    jfif(Type43),
-}
-
-struct Type45 {
-    identifier: Type21,
-    data: Type44,
-}
-
-struct Type46 {
-    marker: Type42,
-    length: u16,
-    data: Type45,
-}
-
-struct Type47 {
-    xmp: Vec<u8>,
-}
-
-enum Type48 {
-    le(u8, u8),
-    be(u8, u8),
-}
-
-struct Type49 {
-    tag: u16,
-    r#type: u16,
-    length: u32,
-    offset_or_data: u32,
-}
-
-struct Type50 {
-    num_fields: u16,
-    fields: Vec<Type49>,
-    next_ifd_offset: u32,
-    next_ifd: Vec<u8>,
-}
-
-struct Type51 {
-    byte_order: Type48,
-    magic: u16,
-    offset: u32,
-    ifd: Type50,
-}
-
-struct Type52 {
-    padding: u8,
-    exif: Type51,
-}
-
 enum Type53 {
     other(Vec<u8>),
-    xmp(Type47),
-    exif(Type52),
+    jfif(Type52),
 }
 
 struct Type54 {
@@ -352,82 +352,82 @@ struct Type55 {
 }
 
 enum Type56 {
-    app0(Type46),
-    app1(Type55),
+    app1(Type51),
+    app0(Type55),
 }
 
 struct Type57 {
-    precision_table_id: u8,
-    elements: Vec<u8>,
-}
-
-struct Type58 {
-    marker: Type42,
-    length: u16,
-    data: Type57,
-}
-
-struct Type59 {
-    class_table_id: u8,
-    num_codes: Vec<u8>,
-    values: Vec<u8>,
-}
-
-struct Type60 {
-    marker: Type42,
-    length: u16,
-    data: Type59,
-}
-
-struct Type61 {
-    class_table_id: u8,
-    value: u8,
-}
-
-struct Type62 {
-    marker: Type42,
-    length: u16,
-    data: Type61,
-}
-
-struct Type63 {
-    restart_interval: u16,
-}
-
-struct Type64 {
-    marker: Type42,
-    length: u16,
-    data: Type63,
-}
-
-struct Type65 {
     marker: Type42,
     length: u16,
     data: Vec<u8>,
 }
 
+struct Type58 {
+    restart_interval: u16,
+}
+
+struct Type59 {
+    marker: Type42,
+    length: u16,
+    data: Type58,
+}
+
+struct Type60 {
+    class_table_id: u8,
+    value: u8,
+}
+
+struct Type61 {
+    marker: Type42,
+    length: u16,
+    data: Type60,
+}
+
+struct Type62 {
+    class_table_id: u8,
+    num_codes: Vec<u8>,
+    values: Vec<u8>,
+}
+
+struct Type63 {
+    marker: Type42,
+    length: u16,
+    data: Type62,
+}
+
+struct Type64 {
+    precision_table_id: u8,
+    elements: Vec<u8>,
+}
+
+struct Type65 {
+    marker: Type42,
+    length: u16,
+    data: Type64,
+}
+
 enum Type66 {
-    dqt(Type58),
-    dht(Type60),
-    dac(Type62),
-    dri(Type64),
-    app0(Type46),
-    app1(Type55),
-    app2(Type65),
-    app3(Type65),
-    app4(Type65),
-    app5(Type65),
-    app6(Type65),
-    app7(Type65),
-    app8(Type65),
-    app9(Type65),
-    app10(Type65),
-    app11(Type65),
-    app12(Type65),
-    app13(Type65),
-    app14(Type65),
-    app15(Type65),
-    com(Type65),
+    com(Type57),
+    app15(Type57),
+    app14(Type57),
+    app13(Type57),
+    app12(Type57),
+    app11(Type57),
+    app10(Type57),
+    app9(Type57),
+    app8(Type57),
+    app7(Type57),
+    app6(Type57),
+    app5(Type57),
+    app4(Type57),
+    app3(Type57),
+    app2(Type57),
+    app1(Type51),
+    app0(Type55),
+    dri(Type59),
+    dac(Type61),
+    dht(Type63),
+    dqt(Type65),
 }
 
 struct Type67 {
@@ -451,19 +451,19 @@ struct Type69 {
 }
 
 enum Type70 {
-    sof0(Type69),
-    sof1(Type69),
-    sof2(Type69),
-    sof3(Type69),
-    sof5(Type69),
-    sof6(Type69),
-    sof7(Type69),
-    sof9(Type69),
-    sof10(Type69),
-    sof11(Type69),
-    sof13(Type69),
-    sof14(Type69),
     sof15(Type69),
+    sof14(Type69),
+    sof13(Type69),
+    sof11(Type69),
+    sof10(Type69),
+    sof9(Type69),
+    sof7(Type69),
+    sof6(Type69),
+    sof5(Type69),
+    sof3(Type69),
+    sof2(Type69),
+    sof1(Type69),
+    sof0(Type69),
 }
 
 struct Type71 {
@@ -486,15 +486,15 @@ struct Type73 {
 }
 
 enum Type74 {
-    mcu(u8),
-    rst0(Type42),
-    rst1(Type42),
-    rst2(Type42),
-    rst3(Type42),
-    rst4(Type42),
-    rst5(Type42),
-    rst6(Type42),
     rst7(Type42),
+    rst6(Type42),
+    rst5(Type42),
+    rst4(Type42),
+    rst3(Type42),
+    rst2(Type42),
+    rst1(Type42),
+    rst0(Type42),
+    mcu(u8),
 }
 
 struct Type75 {
@@ -519,8 +519,8 @@ struct Type78 {
 }
 
 enum Type79 {
-    some(Type78),
     none,
+    some(Type78),
 }
 
 struct Type80 {
@@ -570,10 +570,8 @@ struct Type86 {
 }
 
 enum Type87 {
-    color_type_3(Type84),
-    color_type_6(Type85),
+    color_type_3(Vec<Type84>),
     color_type_2(Type85),
-    color_type_4(Type86),
     color_type_0(Type86),
 }
 
@@ -585,9 +583,12 @@ struct Type88 {
 }
 
 struct Type89 {
-    pixels_per_unit_x: u32,
-    pixels_per_unit_y: u32,
-    unit_specifier: u8,
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
 }
 
 struct Type90 {
@@ -605,12 +606,9 @@ struct Type91 {
 }
 
 struct Type92 {
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
+    pixels_per_unit_x: u32,
+    pixels_per_unit_y: u32,
+    unit_specifier: u8,
 }
 
 struct Type93 {
@@ -621,8 +619,10 @@ struct Type93 {
 }
 
 enum Type94 {
-    color_type_3(Vec<Type84>),
+    color_type_3(Type84),
+    color_type_6(Type85),
     color_type_2(Type85),
+    color_type_4(Type86),
     color_type_0(Type86),
 }
 
@@ -634,11 +634,11 @@ struct Type95 {
 }
 
 enum Type96 {
-    bKGD(Type88),
-    pHYs(Type90),
+    tRNS(Type88),
+    tIME(Type90),
     PLTE(Type91),
-    tIME(Type93),
-    tRNS(Type95),
+    pHYs(Type93),
+    bKGD(Type95),
 }
 
 struct Type97 {
@@ -1188,6 +1188,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     0
                 }
 
+                tmp if ((ByteSet::from_bits([0, 0, 0, 4294967292])).contains(tmp)) => 1,
+
                 224 => 2,
 
                 tmp if ((ByteSet::from_bits([0, 0, 0, 35175782154240])).contains(tmp)) => 2,
@@ -1201,8 +1203,6 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184])).contains(tmp)) => 3,
 
                 244 => 3,
-
-                tmp if ((ByteSet::from_bits([0, 0, 0, 4294967292])).contains(tmp)) => 1,
             }
         };
         match tree_index {
@@ -1237,9 +1237,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     (field0, field1)
                 };
                 ((|bytes| match bytes {
-                    (x1, x0) => {
-                        ((x1 as u32) << 6 | (x0 as u32));
-                    }
+                    (x1, x0) => ((x1 as u32) << 6 | (x0 as u32)),
                 })(inner))
             }
 
@@ -1249,20 +1247,20 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut (input.clone());
                         let b = (lookahead.read_byte())?;
                         match b {
-                            tmp if ((ByteSet::from_bits([0, 0, 0, 211106232532992]))
-                                .contains(tmp)) =>
-                            {
-                                3
-                            }
-
-                            237 => 2,
-
                             224 => 0,
 
                             tmp if ((ByteSet::from_bits([0, 0, 0, 35175782154240]))
                                 .contains(tmp)) =>
                             {
                                 1
+                            }
+
+                            237 => 2,
+
+                            tmp if ((ByteSet::from_bits([0, 0, 0, 211106232532992]))
+                                .contains(tmp)) =>
+                            {
+                                3
                             }
                         }
                     };
@@ -1362,9 +1360,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     }
                 };
                 ((|bytes| match bytes {
-                    (x2, x1, x0) => {
-                        ((x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32));
-                    }
+                    (x2, x1, x0) => ((x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32)),
                 })(inner))
             }
 
@@ -1374,8 +1370,6 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut (input.clone());
                         let b = (lookahead.read_byte())?;
                         match b {
-                            244 => 2,
-
                             240 => 0,
 
                             tmp if ((ByteSet::from_bits([0, 0, 0, 3940649673949184]))
@@ -1383,6 +1377,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                             {
                                 1
                             }
+
+                            244 => 2,
                         }
                     };
                     match tree_index {
@@ -1467,7 +1463,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 };
                 ((|bytes| match bytes {
                     (x3, x2, x1, x0) => {
-                        ((x3 as u32) << 18 | (x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32));
+                        ((x3 as u32) << 18 | (x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32))
                     }
                 })(inner))
             }
@@ -1538,9 +1534,9 @@ fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut (input.clone());
                 let b = (lookahead.read_byte())?;
                 match b {
-                    tmp if (tmp != 0) => 1,
-
                     0 => 0,
+
+                    tmp if (tmp != 0) => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -1685,9 +1681,9 @@ fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut (input.clone());
                 let b = (lookahead.read_byte())?;
                 match b {
-                    0 => 1,
-
                     tmp if (tmp != 0) => 0,
+
+                    0 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -1900,11 +1896,11 @@ fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
         match b {
-            80 => 2,
+            98 => 0,
 
             112 => 1,
 
-            98 => 0,
+            80 => 2,
 
             116 => {
                 let b = (lookahead.read_byte())?;
@@ -2074,7 +2070,7 @@ fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(accum))
 }
 
-fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type88> {
+fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
     let length = { (Decoder32(scope, input))? };
     let tag = {
         let field0 = {
@@ -2113,7 +2109,7 @@ fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
     let crc = { (Decoder32(scope, input))? };
-    (Some(Type88 {
+    (Some(Type95 {
         length,
         tag,
         data,
@@ -2121,7 +2117,7 @@ fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
+fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type93> {
     let length = { (Decoder32(scope, input))? };
     let tag = {
         let field0 = {
@@ -2160,7 +2156,7 @@ fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
     let crc = { (Decoder32(scope, input))? };
-    (Some(Type90 {
+    (Some(Type93 {
         length,
         tag,
         data,
@@ -2215,7 +2211,7 @@ fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type93> {
+fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type90> {
     let length = { (Decoder32(scope, input))? };
     let tag = {
         let field0 = {
@@ -2254,7 +2250,7 @@ fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
     let crc = { (Decoder32(scope, input))? };
-    (Some(Type93 {
+    (Some(Type90 {
         length,
         tag,
         data,
@@ -2262,7 +2258,7 @@ fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
+fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type88> {
     let length = { (Decoder32(scope, input))? };
     let tag = {
         let field0 = {
@@ -2301,7 +2297,7 @@ fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
     let crc = { (Decoder32(scope, input))? };
-    (Some(Type95 {
+    (Some(Type88 {
         length,
         tag,
         data,
@@ -2520,6 +2516,8 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             if (b == 255) {
                 let b = (lookahead.read_byte())?;
                 match b {
+                    220 => 0,
+
                     217 => 1,
 
                     218 => 1,
@@ -2565,8 +2563,6 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     239 => 1,
 
                     254 => 1,
-
-                    220 => 0,
                 }
             } else {
                 return None;
@@ -2682,7 +2678,7 @@ fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(Type42 { ff, marker }))
 }
 
-fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type46> {
+fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type55> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -2704,14 +2700,14 @@ fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type46 {
+    (Some(Type55 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type55> {
+fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type51> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -2733,7 +2729,7 @@ fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type55 {
+    (Some(Type51 {
         marker,
         length,
         data,
@@ -2747,47 +2743,47 @@ fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         if (b == 255) {
             let b = (lookahead.read_byte())?;
             match b {
-                227 => 7,
-
-                224 => 4,
-
-                239 => 19,
-
-                228 => 8,
+                219 => 0,
 
                 196 => 1,
 
-                236 => 16,
-
-                235 => 15,
-
                 204 => 2,
-
-                234 => 14,
-
-                225 => 5,
-
-                233 => 13,
 
                 221 => 3,
 
-                231 => 11,
+                224 => 4,
 
-                238 => 18,
-
-                229 => 9,
-
-                219 => 0,
-
-                230 => 10,
+                225 => 5,
 
                 226 => 6,
 
-                254 => 20,
+                227 => 7,
+
+                228 => 8,
+
+                229 => 9,
+
+                230 => 10,
+
+                231 => 11,
+
+                232 => 12,
+
+                233 => 13,
+
+                234 => 14,
+
+                235 => 15,
+
+                236 => 16,
 
                 237 => 17,
 
-                232 => 12,
+                238 => 18,
+
+                239 => 19,
+
+                254 => 20,
             }
         } else {
             return None;
@@ -2908,31 +2904,31 @@ fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         if (b == 255) {
             let b = (lookahead.read_byte())?;
             match b {
-                198 => 5,
+                192 => 0,
 
                 193 => 1,
 
-                202 => 8,
-
-                205 => 10,
-
-                197 => 4,
-
-                192 => 0,
-
-                201 => 7,
-
-                207 => 12,
-
-                203 => 9,
+                194 => 2,
 
                 195 => 3,
 
-                194 => 2,
+                197 => 4,
+
+                198 => 5,
+
+                199 => 6,
+
+                201 => 7,
+
+                202 => 8,
+
+                203 => 9,
+
+                205 => 10,
 
                 206 => 11,
 
-                199 => 6,
+                207 => 12,
             }
         } else {
             return None;
@@ -3016,8 +3012,6 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 if (b == 255) {
                     let b = (lookahead.read_byte())?;
                     match b {
-                        218 => 1,
-
                         219 => 0,
 
                         196 => 0,
@@ -3059,6 +3053,8 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         239 => 0,
 
                         254 => 0,
+
+                        218 => 1,
                     }
                 } else {
                     return None;
@@ -3121,8 +3117,6 @@ fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 if (b == 255) {
                     let b = (lookahead.read_byte())?;
                     match b {
-                        218 => 1,
-
                         219 => 0,
 
                         196 => 0,
@@ -3164,6 +3158,8 @@ fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         239 => 0,
 
                         254 => 0,
+
+                        218 => 1,
                     }
                 } else {
                     return None;
@@ -3302,30 +3298,30 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut (input.clone());
                         let b = (lookahead.read_byte())?;
                         match b {
+                            tmp if (tmp != 255) => 0,
+
                             255 => {
                                 let b = (lookahead.read_byte())?;
                                 match b {
-                                    215 => 8,
-
-                                    214 => 7,
-
-                                    211 => 4,
-
-                                    210 => 3,
-
                                     0 => 0,
 
-                                    213 => 6,
-
-                                    212 => 5,
+                                    208 => 1,
 
                                     209 => 2,
 
-                                    208 => 1,
+                                    210 => 3,
+
+                                    211 => 4,
+
+                                    212 => 5,
+
+                                    213 => 6,
+
+                                    214 => 7,
+
+                                    215 => 8,
                                 }
                             }
-
-                            tmp if (tmp != 255) => 0,
                         }
                     };
                     match tree_index {
@@ -3385,41 +3381,23 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let scan_data_stream = {
         (((scan_data.into_iter()).flat_map(
             (|x| match x {
-                mcu(v) => {
-                    ([v].to_vec());
-                }
+                mcu(v) => ([v].to_vec()),
 
-                rst0(_) => {
-                    ([].to_vec());
-                }
+                rst0(_) => ([].to_vec()),
 
-                rst1(_) => {
-                    ([].to_vec());
-                }
+                rst1(_) => ([].to_vec()),
 
-                rst2(_) => {
-                    ([].to_vec());
-                }
+                rst2(_) => ([].to_vec()),
 
-                rst3(_) => {
-                    ([].to_vec());
-                }
+                rst3(_) => ([].to_vec()),
 
-                rst4(_) => {
-                    ([].to_vec());
-                }
+                rst4(_) => ([].to_vec()),
 
-                rst5(_) => {
-                    ([].to_vec());
-                }
+                rst5(_) => ([].to_vec()),
 
-                rst6(_) => {
-                    ([].to_vec());
-                }
+                rst6(_) => ([].to_vec()),
 
-                rst7(_) => {
-                    ([].to_vec());
-                }
+                rst7(_) => ([].to_vec()),
             }),
         ))
         .collect())
@@ -3435,9 +3413,9 @@ fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
         match b {
-            255 => 1,
-
             tmp if (tmp != 255) => 0,
+
+            255 => 1,
         }
     };
     (Some(match tree_index {
@@ -3678,6 +3656,8 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut (input.clone());
                 let b = (lookahead.read_byte())?;
                 match b {
+                    tmp if (tmp != 255) => 0,
+
                     255 => {
                         let b = (lookahead.read_byte())?;
                         match b {
@@ -3748,8 +3728,6 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                             254 => 1,
                         }
                     }
-
-                    tmp if (tmp != 255) => 0,
                 }
             };
             if (matching_ix == 0) {
@@ -3758,30 +3736,30 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut (input.clone());
                         let b = (lookahead.read_byte())?;
                         match b {
+                            tmp if (tmp != 255) => 0,
+
                             255 => {
                                 let b = (lookahead.read_byte())?;
                                 match b {
-                                    215 => 8,
+                                    0 => 0,
+
+                                    208 => 1,
+
+                                    209 => 2,
+
+                                    210 => 3,
+
+                                    211 => 4,
+
+                                    212 => 5,
 
                                     213 => 6,
 
                                     214 => 7,
 
-                                    208 => 1,
-
-                                    210 => 3,
-
-                                    209 => 2,
-
-                                    0 => 0,
-
-                                    212 => 5,
-
-                                    211 => 4,
+                                    215 => 8,
                                 }
                             }
-
-                            tmp if (tmp != 255) => 0,
                         }
                     };
                     match tree_index {
@@ -3841,41 +3819,23 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let scan_data_stream = {
         (((scan_data.into_iter()).flat_map(
             (|x| match x {
-                mcu(v) => {
-                    ([v].to_vec());
-                }
+                mcu(v) => ([v].to_vec()),
 
-                rst0(_) => {
-                    ([].to_vec());
-                }
+                rst0(_) => ([].to_vec()),
 
-                rst1(_) => {
-                    ([].to_vec());
-                }
+                rst1(_) => ([].to_vec()),
 
-                rst2(_) => {
-                    ([].to_vec());
-                }
+                rst2(_) => ([].to_vec()),
 
-                rst3(_) => {
-                    ([].to_vec());
-                }
+                rst3(_) => ([].to_vec()),
 
-                rst4(_) => {
-                    ([].to_vec());
-                }
+                rst4(_) => ([].to_vec()),
 
-                rst5(_) => {
-                    ([].to_vec());
-                }
+                rst5(_) => ([].to_vec()),
 
-                rst6(_) => {
-                    ([].to_vec());
-                }
+                rst6(_) => ([].to_vec()),
 
-                rst7(_) => {
-                    ([].to_vec());
-                }
+                rst7(_) => ([].to_vec()),
             }),
         ))
         .collect())
@@ -4295,7 +4255,7 @@ fn Decoder84<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type58> {
+fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4317,14 +4277,14 @@ fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type58 {
+    (Some(Type65 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type60> {
+fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type63> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4346,14 +4306,14 @@ fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type60 {
+    (Some(Type63 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type62> {
+fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type61> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4375,14 +4335,14 @@ fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type62 {
+    (Some(Type61 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type64> {
+fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type59> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4404,14 +4364,14 @@ fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type64 {
+    (Some(Type59 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4433,14 +4393,14 @@ fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4462,14 +4422,14 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4491,14 +4451,14 @@ fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4520,14 +4480,14 @@ fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4549,14 +4509,14 @@ fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4578,14 +4538,14 @@ fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4607,14 +4567,14 @@ fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4636,14 +4596,14 @@ fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4665,14 +4625,14 @@ fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4694,14 +4654,14 @@ fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4723,14 +4683,14 @@ fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4752,14 +4712,14 @@ fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4781,14 +4741,14 @@ fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4810,14 +4770,14 @@ fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
+fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4839,28 +4799,28 @@ fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { (Decoder42(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
+    (Some(Type57 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder104<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type63> {
+fn Decoder104<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type58> {
     let restart_interval = { (Decoder42(scope, input))? };
-    (Some(Type63 { restart_interval }))
+    (Some(Type58 { restart_interval }))
 }
 
-fn Decoder105<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type61> {
+fn Decoder105<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type60> {
     let class_table_id = { (Decoder16(scope, input))? };
     let value = { (Decoder16(scope, input))? };
-    (Some(Type61 {
+    (Some(Type60 {
         class_table_id,
         value,
     }))
 }
 
-fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type59> {
+fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type62> {
     let class_table_id = { (Decoder16(scope, input))? };
     let num_codes = {
         let mut accum = (Vec::new());
@@ -4885,14 +4845,14 @@ fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type59 {
+    (Some(Type62 {
         class_table_id,
         num_codes,
         values,
     }))
 }
 
-fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
+fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type64> {
     let precision_table_id = { (Decoder16(scope, input))? };
     let elements = {
         let mut accum = (Vec::new());
@@ -4910,25 +4870,216 @@ fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type57 {
+    (Some(Type64 {
         precision_table_id,
         elements,
     }))
 }
 
-fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
+fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type50> {
     let identifier = { (Decoder109(scope, input))? };
     let data = {
         match identifier.string {
             [69, 120, 105, 102] => {
                 let inner = (Decoder110(scope, input))?;
-                (Type53::exif(inner))
+                (Type49::exif(inner))
             }
 
             [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] =>
             {
                 let inner = (Decoder111(scope, input))?;
-                (Type53::xmp(inner))
+                (Type49::xmp(inner))
+            }
+
+            _ => {
+                let inner = {
+                    let mut accum = (Vec::new());
+                    while true {
+                        let matching_ix = {
+                            let lookahead = &mut (input.clone());
+                            0
+                        };
+                        if (matching_ix == 0) {
+                            let next_elem = (Decoder16(scope, input))?;
+                            (accum.push(next_elem));
+                        } else {
+                            break;
+                        }
+                    }
+                    accum
+                };
+                (Type49::other(inner))
+            }
+        }
+    };
+    (Some(Type50 { identifier, data }))
+}
+
+fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+    let string = {
+        let mut accum = (Vec::new());
+        while true {
+            let matching_ix = {
+                let lookahead = &mut (input.clone());
+                let b = (lookahead.read_byte())?;
+                match b {
+                    tmp if (tmp != 0) => 0,
+
+                    0 => 1,
+                }
+            };
+            if (matching_ix == 0) {
+                let next_elem = {
+                    let b = (input.read_byte())?;
+                    if (b != 0) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                (accum.push(next_elem));
+            } else {
+                break;
+            }
+        }
+        accum
+    };
+    let null = {
+        let b = (input.read_byte())?;
+        if (b == 0) {
+            b
+        } else {
+            return None;
+        }
+    };
+    (Some(Type21 { string, null }))
+}
+
+fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+    let padding = {
+        let b = (input.read_byte())?;
+        if (b == 0) {
+            b
+        } else {
+            return None;
+        }
+    };
+    let exif = { (Decoder112(scope, input))? };
+    (Some(Type48 { padding, exif }))
+}
+
+fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type43> {
+    let xmp = {
+        let mut accum = (Vec::new());
+        while true {
+            let matching_ix = {
+                let lookahead = &mut (input.clone());
+                0
+            };
+            if (matching_ix == 0) {
+                let next_elem = (Decoder16(scope, input))?;
+                (accum.push(next_elem));
+            } else {
+                break;
+            }
+        }
+        accum
+    };
+    (Some(Type43 { xmp }))
+}
+
+fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type47> {
+    let byte_order = {
+        let tree_index = {
+            let lookahead = &mut (input.clone());
+            let b = (lookahead.read_byte())?;
+            match b {
+                73 => 0,
+
+                77 => 1,
+            }
+        };
+        match tree_index {
+            0 => {
+                let field0 = {
+                    let b = (input.read_byte())?;
+                    if (b == 73) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                let field1 = {
+                    let b = (input.read_byte())?;
+                    if (b == 73) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                (Type44::le(field0, field1))
+            }
+
+            1 => {
+                let field0 = {
+                    let b = (input.read_byte())?;
+                    if (b == 77) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                let field1 = {
+                    let b = (input.read_byte())?;
+                    if (b == 77) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                (Type44::be(field0, field1))
+            }
+        }
+    };
+    let magic = {
+        match byte_order {
+            le(_) => (Decoder113(scope, input))?,
+
+            be(_) => (Decoder42(scope, input))?,
+        }
+    };
+    let offset = {
+        match byte_order {
+            le(_) => (Decoder23(scope, input))?,
+
+            be(_) => (Decoder32(scope, input))?,
+        }
+    };
+    let ifd = { (unimplemented!(r#"translate @ Decoder::WithRelativeOffset"#)) };
+    (Some(Type47 {
+        byte_order,
+        magic,
+        offset,
+        ifd,
+    }))
+}
+
+fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
+    let inner = {
+        let field0 = { (Decoder16(scope, input))? };
+        let field1 = { (Decoder16(scope, input))? };
+        (field0, field1)
+    };
+    (Some(((|x| u16::from_le_bytes(x))(inner))))
+}
+
+fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
+    let identifier = { (Decoder115(scope, input))? };
+    let data = {
+        match identifier.string {
+            [74, 70, 73, 70] => {
+                let inner = (Decoder116(scope, input))?;
+                (Type53::jfif(inner))
             }
 
             _ => {
@@ -4955,197 +5106,6 @@ fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type54 { identifier, data }))
 }
 
-fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
-    let string = {
-        let mut accum = (Vec::new());
-        while true {
-            let matching_ix = {
-                let lookahead = &mut (input.clone());
-                let b = (lookahead.read_byte())?;
-                match b {
-                    0 => 1,
-
-                    tmp if (tmp != 0) => 0,
-                }
-            };
-            if (matching_ix == 0) {
-                let next_elem = {
-                    let b = (input.read_byte())?;
-                    if (b != 0) {
-                        b
-                    } else {
-                        return None;
-                    }
-                };
-                (accum.push(next_elem));
-            } else {
-                break;
-            }
-        }
-        accum
-    };
-    let null = {
-        let b = (input.read_byte())?;
-        if (b == 0) {
-            b
-        } else {
-            return None;
-        }
-    };
-    (Some(Type21 { string, null }))
-}
-
-fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type52> {
-    let padding = {
-        let b = (input.read_byte())?;
-        if (b == 0) {
-            b
-        } else {
-            return None;
-        }
-    };
-    let exif = { (Decoder112(scope, input))? };
-    (Some(Type52 { padding, exif }))
-}
-
-fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type47> {
-    let xmp = {
-        let mut accum = (Vec::new());
-        while true {
-            let matching_ix = {
-                let lookahead = &mut (input.clone());
-                0
-            };
-            if (matching_ix == 0) {
-                let next_elem = (Decoder16(scope, input))?;
-                (accum.push(next_elem));
-            } else {
-                break;
-            }
-        }
-        accum
-    };
-    (Some(Type47 { xmp }))
-}
-
-fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type51> {
-    let byte_order = {
-        let tree_index = {
-            let lookahead = &mut (input.clone());
-            let b = (lookahead.read_byte())?;
-            match b {
-                77 => 1,
-
-                73 => 0,
-            }
-        };
-        match tree_index {
-            0 => {
-                let field0 = {
-                    let b = (input.read_byte())?;
-                    if (b == 73) {
-                        b
-                    } else {
-                        return None;
-                    }
-                };
-                let field1 = {
-                    let b = (input.read_byte())?;
-                    if (b == 73) {
-                        b
-                    } else {
-                        return None;
-                    }
-                };
-                (Type48::le(field0, field1))
-            }
-
-            1 => {
-                let field0 = {
-                    let b = (input.read_byte())?;
-                    if (b == 77) {
-                        b
-                    } else {
-                        return None;
-                    }
-                };
-                let field1 = {
-                    let b = (input.read_byte())?;
-                    if (b == 77) {
-                        b
-                    } else {
-                        return None;
-                    }
-                };
-                (Type48::be(field0, field1))
-            }
-        }
-    };
-    let magic = {
-        match byte_order {
-            le(_) => (Decoder113(scope, input))?,
-
-            be(_) => (Decoder42(scope, input))?,
-        }
-    };
-    let offset = {
-        match byte_order {
-            le(_) => (Decoder23(scope, input))?,
-
-            be(_) => (Decoder32(scope, input))?,
-        }
-    };
-    let ifd = { (unimplemented!(r#"translate @ Decoder::WithRelativeOffset"#)) };
-    (Some(Type51 {
-        byte_order,
-        magic,
-        offset,
-        ifd,
-    }))
-}
-
-fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
-    let inner = {
-        let field0 = { (Decoder16(scope, input))? };
-        let field1 = { (Decoder16(scope, input))? };
-        (field0, field1)
-    };
-    (Some(((|x| u16::from_le_bytes(x))(inner))))
-}
-
-fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type45> {
-    let identifier = { (Decoder115(scope, input))? };
-    let data = {
-        match identifier.string {
-            [74, 70, 73, 70] => {
-                let inner = (Decoder116(scope, input))?;
-                (Type44::jfif(inner))
-            }
-
-            _ => {
-                let inner = {
-                    let mut accum = (Vec::new());
-                    while true {
-                        let matching_ix = {
-                            let lookahead = &mut (input.clone());
-                            0
-                        };
-                        if (matching_ix == 0) {
-                            let next_elem = (Decoder16(scope, input))?;
-                            (accum.push(next_elem));
-                        } else {
-                            break;
-                        }
-                    }
-                    accum
-                };
-                (Type44::other(inner))
-            }
-        }
-    };
-    (Some(Type45 { identifier, data }))
-}
-
 fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
     let string = {
         let mut accum = (Vec::new());
@@ -5154,9 +5114,9 @@ fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut (input.clone());
                 let b = (lookahead.read_byte())?;
                 match b {
-                    0 => 1,
-
                     tmp if (tmp != 0) => 0,
+
+                    0 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -5186,7 +5146,7 @@ fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type21 { string, null }))
 }
 
-fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type43> {
+fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type52> {
     let version_major = { (Decoder16(scope, input))? };
     let version_minor = { (Decoder16(scope, input))? };
     let density_units = { (Decoder16(scope, input))? };
@@ -5207,7 +5167,7 @@ fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type43 {
+    (Some(Type52 {
         version_major,
         version_minor,
         density_units,
@@ -5282,17 +5242,11 @@ fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let codes = {
         (((blocks.into_iter()).flat_map(
             (|x| match x.data {
-                uncompressed(y) => {
-                    y.codes_values;
-                }
+                uncompressed(y) => y.codes_values,
 
-                fixed_huffman(y) => {
-                    y.codes_values;
-                }
+                fixed_huffman(y) => y.codes_values,
 
-                dynamic_huffman(y) => {
-                    y.codes_values;
-                }
+                dynamic_huffman(y) => y.codes_values,
             }),
         ))
         .collect())
@@ -5489,361 +5443,299 @@ fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let codes_values = {
         (((codes.into_iter()).flat_map(
             (|x| match x.code {
-                256 => {
-                    ([].to_vec());
-                }
+                256 => ([].to_vec()),
 
-                257 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                257 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                258 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                258 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                259 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                259 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                260 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                260 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                261 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                261 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                262 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                262 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                263 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                263 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                264 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                264 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                265 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                265 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                266 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                266 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                267 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                267 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                268 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                268 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                269 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                269 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                270 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                270 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                271 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                271 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                272 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                272 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                273 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                273 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                274 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                274 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                275 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                275 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                276 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                276 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                277 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                277 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                278 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                278 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                279 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                279 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                280 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                280 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                281 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                281 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                282 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                282 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                283 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                283 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                284 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                284 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                285 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                285 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                _ => {
-                    ([(literal((x.code as u8)))].to_vec());
-                }
+                _ => ([(literal((x.code as u8)))].to_vec()),
             }),
         ))
         .collect())
@@ -5908,37 +5800,27 @@ fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         (((literal_length_distance_alphabet_code_lengths.into_iter()).fold(
             (none(())),
             (|x| match (x.1.code as u8) {
-                16 => {
-                    (
-                        x.0,
-                        (Vec::from_iter(
-                            ((std::iter::repeat(match x.0 {
-                                some(y) => {
-                                    y;
-                                }
-                            }))
-                            .take((x.1.extra + 3))),
-                        )),
-                    );
-                }
+                16 => (
+                    x.0,
+                    (Vec::from_iter(
+                        ((std::iter::repeat(match x.0 {
+                            some(y) => y,
+                        }))
+                        .take((x.1.extra + 3))),
+                    )),
+                ),
 
-                17 => {
-                    (
-                        x.0,
-                        (Vec::from_iter(((std::iter::repeat(0)).take((x.1.extra + 3))))),
-                    );
-                }
+                17 => (
+                    x.0,
+                    (Vec::from_iter(((std::iter::repeat(0)).take((x.1.extra + 3))))),
+                ),
 
-                18 => {
-                    (
-                        x.0,
-                        (Vec::from_iter(((std::iter::repeat(0)).take((x.1.extra + 11))))),
-                    );
-                }
+                18 => (
+                    x.0,
+                    (Vec::from_iter(((std::iter::repeat(0)).take((x.1.extra + 11))))),
+                ),
 
-                v => {
-                    ((some(v)), ([v].to_vec()));
-                }
+                v => ((some(v)), ([v].to_vec())),
             }),
         ))
         .collect())
@@ -5959,361 +5841,299 @@ fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let codes_values = {
         (((codes.into_iter()).flat_map(
             (|x| match x.code {
-                256 => {
-                    ([].to_vec());
-                }
+                256 => ([].to_vec()),
 
-                257 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                257 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                258 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                258 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                259 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                259 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                260 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                260 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                261 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                261 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                262 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                262 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                263 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                263 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                264 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                264 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                265 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                265 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                266 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                266 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                267 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                267 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                268 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                268 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                269 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                269 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                270 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                270 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                271 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                271 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                272 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                272 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                273 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                273 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                274 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                274 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                275 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                275 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                276 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                276 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                277 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                277 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                278 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                278 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                279 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                279 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                280 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                280 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                281 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                281 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                282 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                282 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                283 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                283 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                284 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                284 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                285 => {
-                    match x.extra {
-                        some(rec) => {
-                            ([reference {
-                                length: rec.length,
-                                distance: rec.distance_record.distance,
-                            }]
-                            .to_vec());
-                        }
-                    };
-                }
+                285 => match x.extra {
+                    some(rec) => {
+                        ([reference {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }]
+                        .to_vec())
+                    }
+                },
 
-                _ => {
-                    ([(literal((x.code as u8)))].to_vec());
-                }
+                _ => ([(literal((x.code as u8)))].to_vec()),
             }),
         ))
         .collect())
@@ -6445,13 +6265,13 @@ fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             33 => {
                 let b = (lookahead.read_byte())?;
                 match b {
-                    255 => 1,
-
-                    254 => 1,
-
                     249 => 0,
 
                     1 => 0,
+
+                    255 => 1,
+
+                    254 => 1,
                 }
             }
 
@@ -6483,7 +6303,7 @@ fn Decoder131<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type18 { separator }))
 }
 
-fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
+fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
     let graphic_control_extension = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -6504,32 +6324,32 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         match tree_index {
             0 => {
                 let inner = (Decoder138(scope, input))?;
-                (Type6::some(inner))
+                (Type10::some(inner))
             }
 
             1 => {
                 let inner = ();
-                (Type6::none(inner))
+                (Type10::none(inner))
             }
         }
     };
     let graphic_rendering_block = { (Decoder139(scope, input))? };
-    (Some(Type13 {
+    (Some(Type16 {
         graphic_control_extension,
         graphic_rendering_block,
     }))
 }
 
-fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
+fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
         if (b == 33) {
             let b = (lookahead.read_byte())?;
             match b {
-                254 => 1,
-
                 255 => 0,
+
+                254 => 1,
             }
         } else {
             return None;
@@ -6538,17 +6358,17 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(match tree_index {
         0 => {
             let inner = (Decoder134(scope, input))?;
-            (Type16::application_extension(inner))
+            (Type8::application_extension(inner))
         }
 
         1 => {
             let inner = (Decoder135(scope, input))?;
-            (Type16::comment_extension(inner))
+            (Type8::comment_extension(inner))
         }
     }))
 }
 
-fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type14> {
+fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -6609,7 +6429,7 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         accum
     };
     let terminator = { (Decoder137(scope, input))? };
-    (Some(Type14 {
+    (Some(Type7 {
         separator,
         label,
         block_size,
@@ -6620,7 +6440,7 @@ fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type15> {
+fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type6> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -6644,9 +6464,9 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut (input.clone());
                 let b = (lookahead.read_byte())?;
                 match b {
-                    0 => 1,
-
                     tmp if (tmp != 0) => 0,
+
+                    0 => 1,
                 }
             };
             if (matching_ix == 0) {
@@ -6659,7 +6479,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         accum
     };
     let terminator = { (Decoder137(scope, input))? };
-    (Some(Type15 {
+    (Some(Type6 {
         separator,
         label,
         comment_data,
@@ -6667,7 +6487,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
+fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
     let len_bytes = {
         let b = (input.read_byte())?;
         if (b != 0) {
@@ -6683,7 +6503,7 @@ fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type8 { len_bytes, data }))
+    (Some(Type5 { len_bytes, data }))
 }
 
 fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
@@ -6695,7 +6515,7 @@ fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
+fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -6724,7 +6544,7 @@ fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let delay_time = { (Decoder113(scope, input))? };
     let transparent_color_index = { (Decoder16(scope, input))? };
     let terminator = { (Decoder137(scope, input))? };
-    (Some(Type5 {
+    (Some(Type9 {
         separator,
         label,
         block_size,
@@ -6735,7 +6555,7 @@ fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
+fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type15> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -6748,17 +6568,17 @@ fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(match tree_index {
         0 => {
             let inner = (Decoder140(scope, input))?;
-            (Type12::table_based_image(inner))
+            (Type15::table_based_image(inner))
         }
 
         1 => {
             let inner = (Decoder141(scope, input))?;
-            (Type12::plain_text_extension(inner))
+            (Type15::plain_text_extension(inner))
         }
     }))
 }
 
-fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type10> {
+fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type14> {
     let descriptor = { (Decoder142(scope, input))? };
     let local_color_table = {
         match (descriptor.flags & 128 != 0) {
@@ -6780,7 +6600,7 @@ fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let data = { (Decoder144(scope, input))? };
-    (Some(Type10 {
+    (Some(Type14 {
         descriptor,
         local_color_table,
         data,
@@ -6859,7 +6679,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
+fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 44) {
@@ -6873,7 +6693,7 @@ fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let image_width = { (Decoder113(scope, input))? };
     let image_height = { (Decoder113(scope, input))? };
     let flags = { (Decoder16(scope, input))? };
-    (Some(Type7 {
+    (Some(Type12 {
         separator,
         image_left_position,
         image_top_position,
@@ -6890,7 +6710,7 @@ fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type2 { r, g, b }))
 }
 
-fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
+fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
     let lzw_min_code_size = { (Decoder16(scope, input))? };
     let image_data = {
         let mut accum = (Vec::new());
@@ -6914,7 +6734,7 @@ fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         accum
     };
     let terminator = { (Decoder137(scope, input))? };
-    (Some(Type9 {
+    (Some(Type13 {
         lzw_min_code_size,
         image_data,
         terminator,
