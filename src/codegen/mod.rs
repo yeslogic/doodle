@@ -217,8 +217,8 @@ impl Codegen {
                         match matching {
                             Some(RustVariant::Unit(_)) => {
                                 // FIXME - this is not quite correct, as it calls `Var(inner)` where `inner = ()` instead of `Var`
-                                let _inner = self.translate(inner, Some(&RustType::UNIT));
-                                CaseLogic::Derived(DerivedLogic::VariantOf(constr, Box::new(_inner)))
+                                let inner = self.translate(inner, Some(&RustType::UNIT));
+                                CaseLogic::Derived(DerivedLogic::UnitVariantOf(constr, Box::new(inner)))
                             }
                             Some(RustVariant::Tuple(_, typs)) => {
                                 if typs.is_empty() {
@@ -1373,6 +1373,7 @@ enum SimpleLogic {
 #[derive(Clone, Debug)]
 enum DerivedLogic {
     VariantOf(Constructor, Box<CaseLogic>),
+    UnitVariantOf(Constructor, Box<CaseLogic>),
     MapOf(RustExpr, Box<CaseLogic>),
     Let(Label, RustExpr, Box<CaseLogic>),
 }
@@ -1388,6 +1389,13 @@ impl DerivedLogic {
                         RustExpr::local(Label::from(constr.clone()))
                             .call_with([RustExpr::local("inner")]),
                     ),
+                )
+            }
+            DerivedLogic::UnitVariantOf(constr, inner) => {
+                let assign_inner = RustStmt::assign("_", RustExpr::from(inner.to_ast(ctxt)));
+                (
+                    vec![assign_inner],
+                    Some(RustExpr::local(Label::from(constr.clone()))),
                 )
             }
             DerivedLogic::MapOf(f, inner) => {

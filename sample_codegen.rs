@@ -832,8 +832,8 @@ fn Decoder3<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                         }
 
                         false => {
-                            let inner = ();
-                            (Type22::no(inner))
+                            let _ = ();
+                            Type22::no
                         }
                     }
                 };
@@ -1002,8 +1002,8 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     let pad = {
         match (length % 2 == 0) {
             true => {
-                let inner = ();
-                (Type100::yes(inner))
+                let _ = ();
+                Type100::yes
             }
 
             false => {
@@ -1780,8 +1780,8 @@ fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let pad = {
         match (length % 2 == 0) {
             true => {
-                let inner = ();
-                (Type100::yes(inner))
+                let _ = ();
+                Type100::yes
             }
 
             false => {
@@ -2575,8 +2575,8 @@ fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             }
 
             1 => {
-                let inner = ();
-                (Type79::none(inner))
+                let _ = ();
+                Type79::none
             }
         }
     };
@@ -6246,8 +6246,8 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
 
             false => {
-                let inner = ();
-                (Type3::no(inner))
+                let _ = ();
+                Type3::no
             }
         }
     };
@@ -6328,8 +6328,8 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
 
             1 => {
-                let inner = ();
-                (Type10::none(inner))
+                let _ = ();
+                Type10::none
             }
         }
     };
@@ -6594,8 +6594,8 @@ fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
 
             false => {
-                let inner = ();
-                (Type3::no(inner))
+                let _ = ();
+                Type3::no
             }
         }
     };
