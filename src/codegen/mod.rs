@@ -190,7 +190,6 @@ impl Codegen {
         }
     }
 
-    #[allow(dead_code)]
     fn translate(&self, decoder: &Decoder, type_hint: Option<&RustType>) -> CaseLogic {
         match decoder {
             Decoder::Call(ix, args) => CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
@@ -547,7 +546,7 @@ fn embed_expr(expr: &Expr) -> RustExpr {
                     (
                         // FIXME - add actual type_hint when possible
                         MatchCaseLHS::Pattern(embed_pattern(pat, None)),
-                        vec![RustStmt::Expr(embed_expr(rhs))],
+                        vec![RustStmt::Return(false, embed_expr(rhs))],
                     )
                 })
                 .collect(),
