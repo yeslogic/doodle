@@ -217,6 +217,7 @@ impl Codegen {
                         // REVIEW - should we force an exact match?
                         match matching {
                             Some(RustVariant::Unit(_)) => {
+                                // FIXME - this is not quite correct, as it calls `Var(inner)` where `inner = ()` instead of `Var`
                                 let _inner = self.translate(inner, Some(&RustType::UNIT));
                                 CaseLogic::Derived(DerivedLogic::VariantOf(constr, Box::new(_inner)))
                             }
@@ -1222,9 +1223,10 @@ impl SequentialLogic {
                     // FIXME - this may be incorrect since we don't always know the type-context (e.g. if we are in an enum)
                     (
                         body,
-                        Some(RustExpr::local(con.clone()).call_with([RustExpr::Tuple(
-                            names.into_iter().map(RustExpr::local).collect(),
-                        )])),
+                        Some(
+                            RustExpr::local(con.clone())
+                                .call_with(names.into_iter().map(RustExpr::local)),
+                        ),
                     )
                 } else {
                     (
@@ -1411,7 +1413,9 @@ pub fn print_program(program: &Program) {
     let mut codegen = Codegen::new();
     let mut items = Vec::new();
     codegen.populate_decoder_types(program);
-    for (tdef, ixlab) in codegen.namegen.revmap.iter() {
+    let mut tdefs = Vec::from_iter(codegen.namegen.revmap.iter());
+    tdefs.sort_by_key(|(_, ix)| *ix);
+    for (tdef, ixlab) in tdefs.into_iter() {
         let it = RustItem::from_decl(RustDecl::TypeDef(ixlab.into(), tdef.clone()));
         items.push(it);
     }
