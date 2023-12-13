@@ -1741,7 +1741,7 @@ fn Decoder23<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let field3 = { (Decoder16(scope, input))? };
         (field0, field1, field2, field3)
     };
-    (Some(((|x| u32::from_le_bytes(x))(inner))))
+    (Some(((|x| u32le(x))(inner))))
 }
 
 fn Decoder24<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type102> {
@@ -1974,7 +1974,7 @@ fn Decoder32<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let field3 = { (Decoder16(scope, input))? };
         (field0, field1, field2, field3)
     };
-    (Some(((|x| u32::from_be_bytes(x))(inner))))
+    (Some(((|x| u32be(x))(inner))))
 }
 
 fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
@@ -2311,7 +2311,7 @@ fn Decoder42<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let field1 = { (Decoder16(scope, input))? };
         (field0, field1)
     };
-    (Some(((|x| u16::from_be_bytes(x))(inner))))
+    (Some(((|x| u16be(x))(inner))))
 }
 
 fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
@@ -5070,7 +5070,7 @@ fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         let field1 = { (Decoder16(scope, input))? };
         (field0, field1)
     };
-    (Some(((|x| u16::from_le_bytes(x))(inner))))
+    (Some(((|x| u16le(x))(inner))))
 }
 
 fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
