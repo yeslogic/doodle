@@ -25,3 +25,19 @@ impl<'a> ParseCtxt<'a> {
         Some(ret)
     }
 }
+
+pub fn u16le(input: (u8, u8)) -> u16 {
+    u16::from_le_bytes([input.0, input.1])
+}
+
+pub fn u16be(input: (u8, u8)) -> u16 {
+    u16::from_be_bytes([input.0, input.1])
+}
+
+pub fn u32le(input: (u8, u8, u8, u8)) -> u32 {
+    u32::from_le_bytes([input.0, input.1, input.2, input.3])
+}
+
+pub fn u32be(input: (u8, u8, u8, u8)) -> u32 {
+    u32::from_be_bytes([input.0, input.1, input.2, input.3])
+}
