@@ -580,18 +580,10 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             Box::new(embed_expr(x)),
             PrimType::U32.into(),
         )),
-        Expr::U16Be(be_bytes) => {
-            RustExpr::scoped(["u16"], "from_be_bytes").call_with([embed_expr(be_bytes)])
-        }
-        Expr::U16Le(le_bytes) => {
-            RustExpr::scoped(["u16"], "from_le_bytes").call_with([embed_expr(le_bytes)])
-        }
-        Expr::U32Be(be_bytes) => {
-            RustExpr::scoped(["u32"], "from_be_bytes").call_with([embed_expr(be_bytes)])
-        }
-        Expr::U32Le(le_bytes) => {
-            RustExpr::scoped(["u32"], "from_le_bytes").call_with([embed_expr(le_bytes)])
-        }
+        Expr::U16Be(be_bytes) => RustExpr::local("u16be").call_with([embed_expr(be_bytes)]),
+        Expr::U16Le(le_bytes) => RustExpr::local("u16le").call_with([embed_expr(le_bytes)]),
+        Expr::U32Be(be_bytes) => RustExpr::local("u32be").call_with([embed_expr(be_bytes)]),
+        Expr::U32Le(le_bytes) => RustExpr::local("u32le").call_with([embed_expr(le_bytes)]),
         Expr::AsChar(codepoint) => RustExpr::scoped(["char"], "from_u32")
             .call_with([embed_expr(codepoint)])
             .call_method("unwrap"),
