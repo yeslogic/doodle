@@ -1,20 +1,20 @@
 mod rust_ast;
 
-use crate::byte_set::ByteSet;
-use crate::codegen::rust_ast::{
-    LocalType, MatchCaseLHS, Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem,
-    RustOp, RustProgram,
+use crate::{
+    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label,
 };
+use std::rc::Rc;
+use crate::byte_set::ByteSet;
+
 use crate::decoder::{Decoder, Program};
-use crate::{Expr, Label, MatchTree, Pattern, ValueType};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
 use rust_ast::{
-    AtomType, CompType, Constructor, DefParams, FnSig, Operator, PrimType, RustEntity, RustExpr,
-    RustFn, RustLt, RustParams, RustPattern, RustPrimLit, RustStmt, RustStruct, RustType,
-    RustTypeDef, RustVariant, ToFragment,
+    LocalType, MatchCaseLHS, Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem,
+    RustOp, RustProgram, AtomType, CompType, Constructor, DefParams, FnSig, Operator, PrimType, RustEntity, RustExpr, RustFn, RustLt, RustParams, RustPattern, RustPrimLit, RustStmt, RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
 };
+use serde::de;
 
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
@@ -1444,4 +1444,306 @@ fn test_decoder_27() {
 }"#;
 
     print!("{}{}", content.to_fragment(), extra)
+}
+
+
+/// COPYPASTA
+
+/// Decoders with a fixed amount of lookahead
+
+
+pub struct DecoderFn(CaseLogic, RustType);
+
+pub struct SourceMap {
+    adhoc_types: Vec<RustTypeDef>,
+    decoder_skels: Vec<DecoderFn>,
+}
+
+impl SourceMap {
+    pub fn new() -> SourceMap {
+        SourceMap {
+            adhoc_types: Vec::new(),
+            decoder_skels: Vec::new(),
+        }
+    }
+}
+
+pub struct RustTypeScope<'a> {
+    parent: Option<&'a RustTypeScope<'a>>,
+    names: Vec<Label>,
+    rtypes: Vec<RustType>,
+}
+
+impl<'a> RustTypeScope<'a> {
+    fn new() -> Self {
+        let parent = None;
+        let names = Vec::new();
+        let rtypes = Vec::new();
+        RustTypeScope {
+            parent,
+            names,
+            rtypes,
+        }
+    }
+
+    fn child(parent: &'a RustTypeScope<'a>) -> Self {
+        let parent = Some(parent);
+        let names = Vec::new();
+        let rtypes = Vec::new();
+        RustTypeScope {
+            parent,
+            names,
+            rtypes,
+        }
+    }
+
+    fn push(&mut self, name: Label, rt: RustType) {
+        self.names.push(name);
+        self.rtypes.push(rt);
+    }
+
+    fn push_format(&mut self, name: Label, rt: RustType) {
+        self.names.push(name);
+        self.rtypes.push(rt);
+    }
+
+    fn get_type_by_name(&self, name: &str) -> &RustType {
+        for (i, n) in self.names.iter().enumerate().rev() {
+            if n == name {
+                return &self.rtypes[i];
+            }
+        }
+        if let Some(scope) = self.parent {
+            scope.get_type_by_name(name)
+        } else {
+            panic!("variable not found: {name}");
+        }
+    }
+}
+
+pub struct Generator<'a> {
+    module: &'a FormatModule,
+    module_ftypes: HashMap<usize, FormatType>,
+    codegen: Codegen,
+    sourcemap: SourceMap,
+}
+
+impl<'a> Generator<'a> {
+    fn new(module: &'a FormatModule) -> Self {
+        let module_ftypes = HashMap::new();
+        let codegen = Codegen::new();
+        let sourcemap = SourceMap::new();
+        Generator {
+            module,
+            module_ftypes,
+            codegen,
+            sourcemap,
+        }
+    }
+
+    fn generate_sourcemap(module: &FormatModule, format: &Format) -> Result<SourceMap, String> {
+        let mut generator = Generator::new(module);
+
+        let t_format = generator.infer_type_format(module, format);
+        generator.generate_toplevel_format(module, &t_format);
+        Ok(generator.sourcemap)
+    }
+
+    fn infer_type_format(&mut self, module: &FormatModule, format: &Format) -> TypedFormat {
+        match format {
+            Format::ItemVar(level, args) => {
+                let mut t_args = Vec::with_capacity(args.len());
+                for arg in args.iter() {
+                    t_args.push(self.infer_type_expr(arg));
+                }
+                let ft = match self.module_ftypes.get(level) {
+                    Some(ft) => ft.clone(),
+                    None => {
+                        let deref = module.get_format(*level);
+                        let ft = self.infer_type_format(module, deref).get_format_type();
+                        self.module_ftypes.insert(*level, ft.clone());
+                        ft
+                    }
+                };
+                TypedFormat::ItemVar(*level, t_args, ft)
+            }
+            Format::Fail => todo!(),
+            Format::EndOfInput => todo!(),
+            Format::Align(_) => todo!(),
+            Format::Byte(_) => todo!(),
+            Format::Variant(_, _) => todo!(),
+            Format::Union(_) => todo!(),
+            Format::UnionNondet(_) => todo!(),
+            Format::Tuple(_) => todo!(),
+            Format::Record(_) => todo!(),
+            Format::Repeat(_) => todo!(),
+            Format::Repeat1(_) => todo!(),
+            Format::RepeatCount(_, _) => todo!(),
+            Format::RepeatUntilLast(_, _) => todo!(),
+            Format::RepeatUntilSeq(_, _) => todo!(),
+            Format::Peek(_) => todo!(),
+            Format::PeekNot(_) => todo!(),
+            Format::Slice(_, _) => todo!(),
+            Format::Bits(_) => todo!(),
+            Format::WithRelativeOffset(_, _) => todo!(),
+            Format::Map(_, _) => todo!(),
+            Format::Compute(_) => todo!(),
+            Format::Let(_, _, _) => todo!(),
+            Format::Match(_, _) => todo!(),
+            Format::Dynamic(_, _, _) => todo!(),
+            Format::Apply(_) => todo!(),
+        }
+    }
+
+
+
+    fn predict_type(&self) -> RustType {
+        let type_ix = self.sourcemap.adhoc_types.len();
+        let type_name = Label::from(IxLabel(type_ix));
+        RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(type_ix, type_name)))
+    }
+
+    fn generate_toplevel_format(&mut self, module: &FormatModule, t_format: &TypedFormat) {
+        match t_format {
+            _ => todo!(),
+        }
+    }
+
+    fn infer_type_expr(&self, expr: &Expr) -> TypedExpr {
+        match expr {
+           _ => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum FormatType {
+    Known(Rc<RustType>),
+    AdHoc(Rc<RustTypeDef>),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum TypedPattern {
+    Binding(Label, FormatType),
+    Wildcard(FormatType),
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    Char(char),
+    Tuple(Vec<TypedPattern>, FormatType),
+    Variant(Label, Box<TypedPattern>, FormatType),
+    Seq(Vec<TypedPattern>, FormatType),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum TypedExpr {
+    Var(Label, FormatType),
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    Tuple(Vec<TypedExpr>, FormatType),
+    TupleProj(Box<TypedExpr>, usize, FormatType),
+    Record(Vec<(Label, TypedExpr)>, FormatType),
+    RecordProj(Box<TypedExpr>, Label, FormatType),
+    Variant(Label, Box<TypedExpr>, FormatType),
+    Seq(Vec<TypedExpr>, FormatType),
+    Match(Box<TypedExpr>, Vec<(TypedPattern, TypedExpr)>, FormatType),
+    Lambda(Label, Box<TypedExpr>, (FormatType, FormatType)),
+
+    BitAnd(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    BitOr(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Eq(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Neq(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Lt(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Gt(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Lte(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Gte(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Mul(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Div(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Rem(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Shl(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Shr(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Add(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Sub(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+
+    AsU8(Box<TypedExpr>, FormatType),
+    AsU16(Box<TypedExpr>, FormatType),
+    AsU32(Box<TypedExpr>, FormatType),
+
+    U16Be(Box<TypedExpr>, FormatType),
+    U16Le(Box<TypedExpr>, FormatType),
+    U32Be(Box<TypedExpr>, FormatType),
+    U32Le(Box<TypedExpr>, FormatType),
+    AsChar(Box<TypedExpr>, FormatType),
+
+    SeqLength(Box<TypedExpr>, FormatType),
+    SubSeq(Box<TypedExpr>, Box<TypedExpr>, Box<TypedExpr>, FormatType),
+
+    FlatMap(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    FlatMapAccum(Box<TypedExpr>, Box<TypedExpr>, ValueType, Box<TypedExpr>, FormatType),
+    Dup(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    Inflate(Box<TypedExpr>, FormatType)
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum TypedFormat {
+    ItemVar(usize, Vec<TypedExpr>, FormatType),
+    Fail,
+    EndOfInput,
+    Align(usize),
+    Byte(ByteSet),
+    Variant(Label, Box<TypedFormat>, FormatType),
+    Union(Vec<TypedFormat>, FormatType),
+    UnionNondet(Vec<(Label, TypedFormat)>, FormatType),
+    Tuple(Vec<TypedFormat>, FormatType),
+    Record(Vec<(Label, TypedFormat)>, Rc<RustTypeDef>, FormatType),
+    Repeat(Box<TypedFormat>, FormatType),
+    Repeat1(Box<TypedFormat>, FormatType),
+    RepeatCount(Box<TypedFormat>, FormatType),
+    RepeatUntilLast(TypedExpr, Box<TypedFormat>, FormatType),
+    RepeatUntilSeq(TypedExpr, Box<TypedFormat>, FormatType),
+    Peek(Box<TypedFormat>, FormatType),
+    PeekNot(Box<TypedFormat>, FormatType),
+    Slice(TypedExpr, Box<TypedFormat>, FormatType),
+    Bits(Box<TypedFormat>, FormatType),
+    WithRelativeOffset(TypedExpr, Box<TypedFormat>, FormatType),
+    Map(Box<TypedFormat>, TypedExpr, FormatType),
+    Compute(TypedExpr, FormatType),
+    Let(Label, TypedExpr, Box<TypedFormat>, FormatType),
+    Match(TypedExpr, Vec<(TypedPattern, TypedFormat)>, FormatType),
+    Dynamic(Label, DynFormat, Box<TypedFormat>, FormatType),
+    Apply(Label, FormatType),
+}
+
+impl TypedFormat {
+    pub fn get_format_type(&self) -> FormatType {
+        match self {
+            TypedFormat::ItemVar(_, _, ft)
+            | TypedFormat::Union(_, ft)
+            | TypedFormat::Tuple(_, ft)
+            | TypedFormat::Record(_, _, ft)
+            | TypedFormat::Repeat(_, ft)
+            | TypedFormat::Repeat1(_, ft)
+            | TypedFormat::RepeatCount(_, ft)
+            | TypedFormat::RepeatUntilLast(_, _, ft)
+            | TypedFormat::RepeatUntilSeq(_, _, ft)
+            | TypedFormat::Peek(_, ft)
+            | TypedFormat::PeekNot(_, ft)
+            | TypedFormat::Slice(_, _, ft)
+            | TypedFormat::Bits(_, ft)
+            | TypedFormat::WithRelativeOffset(_, _, ft)
+            | TypedFormat::Map(_, _, ft)
+            | TypedFormat::Compute(_, ft)
+            | TypedFormat::Let(_, _, _, ft)
+            | TypedFormat::Match(_, _, ft)
+            | TypedFormat::Dynamic(_, _, _, ft)
+            | TypedFormat::Apply(_, ft)
+            | TypedFormat::UnionNondet(_, ft)
+            | TypedFormat::Variant(_, _, ft) => ft.clone(),
+            TypedFormat::Fail | TypedFormat::Align(_) | TypedFormat::EndOfInput => FormatType::Known(Rc::new(RustType::Atom(AtomType::Prim(PrimType::Unit)))),
+            TypedFormat::Byte(_) => FormatType::Known(Rc::new(RustType::Atom(AtomType::Prim(PrimType::U8)))),
+        }
+    }
 }
