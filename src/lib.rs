@@ -793,6 +793,10 @@ impl FormatModule {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.names.len()
+    }
+
     pub fn define_format(&mut self, name: impl IntoLabel, format: Format) -> FormatRef {
         self.define_format_args(name, vec![], format)
     }
