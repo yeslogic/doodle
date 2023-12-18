@@ -7,7 +7,8 @@ use crate::{
 use crate::{IntoLabel, Label};
 use serde::Serialize;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::HashSet;
+use std::iter;
 use std::rc::Rc;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
@@ -447,37 +448,40 @@ pub enum Decoder {
 
 #[derive(Clone, Debug)]
 pub struct Program {
+    main: usize,
     pub decoders: Vec<(Decoder, ValueType)>,
 }
 
 impl Program {
     fn new() -> Self {
+        let main = 0;
         let decoders = Vec::new();
-        Program { decoders }
+        Program { main, decoders }
     }
 
     pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>)> {
-        self.decoders[0].0.parse(self, &Scope::Empty, input)
+        self.decoders[self.main].0.parse(self, &Scope::Empty, input)
     }
 }
 
 pub struct Compiler<'a> {
     module: &'a FormatModule,
     program: Program,
-    decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
-    compile_queue: Vec<(&'a Format, Rc<Next<'a>>, usize)>,
+    decoder_next: Vec<HashSet<Rc<Next<'a>>>>,
 }
 
 impl<'a> Compiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
-        let program = Program::new();
-        let decoder_map = HashMap::new();
-        let compile_queue = Vec::new();
+        let mut program = Program::new();
+        program.decoders = iter::repeat((Decoder::Fail, ValueType::Empty))
+            .take(module.len() + 1)
+            .collect();
+        program.main = module.len();
+        let decoder_next = iter::repeat(HashSet::new()).take(module.len()).collect();
         Compiler {
             module,
             program,
-            decoder_map,
-            compile_queue,
+            decoder_next,
         }
     }
 
@@ -487,19 +491,39 @@ impl<'a> Compiler<'a> {
         let scope = TypeScope::new();
         let t = module.infer_format_type(&scope, format)?;
         // decoder
-        compiler.queue_compile(t, format, Rc::new(Next::Empty));
-        while let Some((f, next, n)) = compiler.compile_queue.pop() {
-            let d = compiler.compile_format(f, next)?;
-            compiler.program.decoders[n].0 = d;
+        compiler.do_compile(module.len(), &t, format, Rc::new(Next::Empty))?;
+        for i in (0..module.len()).rev() {
+            let t = module.get_format_type(i);
+            let f = module.get_format(i);
+            let next = Compiler::make_next(&compiler.decoder_next[i]);
+            compiler.do_compile(i, t, f, next)?;
         }
         Ok(compiler.program)
     }
 
-    fn queue_compile(&mut self, t: ValueType, f: &'a Format, next: Rc<Next<'a>>) -> usize {
-        let n = self.program.decoders.len();
-        self.program.decoders.push((Decoder::Fail, t));
-        self.compile_queue.push((f, next, n));
-        n
+    fn make_next(set: &HashSet<Rc<Next<'a>>>) -> Rc<Next<'a>> {
+        if set.is_empty() {
+            Rc::new(Next::Empty)
+        } else {
+            let mut iter = set.iter();
+            let mut next = iter.next().unwrap().clone();
+            for n in iter {
+                next = Rc::new(Next::Union(next, n.clone()));
+            }
+            next
+        }
+    }
+
+    fn do_compile(
+        &mut self,
+        i: usize,
+        t: &ValueType,
+        f: &'a Format,
+        next: Rc<Next<'a>>,
+    ) -> Result<(), String> {
+        let d = self.compile_format(f, next)?;
+        self.program.decoders[i] = (d, t.clone());
+        Ok(())
     }
 
     pub fn compile_one(format: &Format) -> Result<Decoder, String> {
@@ -517,24 +541,17 @@ impl<'a> Compiler<'a> {
             Format::ItemVar(level, arg_exprs) => {
                 let f = self.module.get_format(*level);
                 let next = if f.depends_on_next(self.module) {
-                    next
+                    next.clone()
                 } else {
                     Rc::new(Next::Empty)
                 };
-                let n = if let Some(n) = self.decoder_map.get(&(*level, next.clone())) {
-                    *n
-                } else {
-                    let t = self.module.get_format_type(*level).clone();
-                    let n = self.queue_compile(t, f, next.clone());
-                    self.decoder_map.insert((*level, next.clone()), n);
-                    n
-                };
+                self.decoder_next[*level].insert(next);
                 let arg_names = self.module.get_args(*level);
                 let mut args = Vec::new();
                 for ((name, _type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     args.push((name.clone(), expr.clone()));
                 }
-                Ok(Decoder::Call(n, args))
+                Ok(Decoder::Call(*level, args))
             }
             Format::Fail => Ok(Decoder::Fail),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
