@@ -10,6 +10,24 @@ pub struct ByteSet {
     bits: [u64; 4],
 }
 
+const fn min_set_bit(x: u64) -> Option<u8> {
+    match x.trailing_zeros() {
+        64 => None,
+        i => Some(i as u8),
+    }
+}
+
+const fn bit_to_quad(bit: u8, offset: u8) -> u64 {
+    if offset > bit {
+        0
+    } else {
+        match 1u64.overflowing_shl((bit - offset) as u32) {
+            (n, false) => n,
+            (_, true) => 0,
+        }
+    }
+}
+
 impl ByteSet {
     pub const fn new() -> ByteSet {
         ByteSet::empty()
@@ -29,12 +47,38 @@ impl ByteSet {
         ByteSet::from_bits([0; 4])
     }
 
+    pub const fn singleton(bit: u8) -> ByteSet {
+        let bits = [
+            bit_to_quad(bit, 0),
+            bit_to_quad(bit, 0x40),
+            bit_to_quad(bit, 0x80),
+            bit_to_quad(bit, 0xc0),
+        ];
+        ByteSet { bits }
+    }
+
     pub const fn full() -> ByteSet {
         ByteSet::from_bits([u64::MAX; 4])
     }
 
     pub fn iter(&self) -> impl '_ + Iterator<Item = u8> {
         (0..=255).filter(|b| self.contains(*b))
+    }
+
+    pub const fn min_elem(&self) -> Option<u8> {
+        if let Some(i) = min_set_bit(self.bits[0]) {
+            return Some(i);
+        }
+        if let Some(i) = min_set_bit(self.bits[1]) {
+            return Some(0x40 + i);
+        }
+        if let Some(i) = min_set_bit(self.bits[2]) {
+            return Some(0x80 + i);
+        }
+        if let Some(i) = min_set_bit(self.bits[3]) {
+            return Some(0xc0 + i);
+        }
+        None
     }
 
     fn get_bit_with<T>(&self, b: u8, f: impl FnOnce(u64, u8) -> T) -> T {

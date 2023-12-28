@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use crate::output::{Fragment, FragmentBuilder};
 
+use crate::precedence::{cond_paren, CompareLevel, IntransitiveOrd, Precedence, Relation};
 use crate::{Label, ValueType};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -323,6 +324,10 @@ impl RustType {
     pub fn option_of(inner: RustType) -> RustType {
         Self::Atom(AtomType::Comp(CompType::Option(Box::new(inner))))
     }
+
+    pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
+        Self::Atom(AtomType::Comp(CompType::Borrow(lt, m, Box::new(ty))))
+    }
 }
 
 impl ToFragment for RustType {
@@ -407,7 +412,7 @@ fn replace_bad(input: &str) -> String {
             ret.push('_');
             ret.push(c);
             dashed = false;
-        } else if is_valid(0, c) {
+        } else if is_valid(ret.len(), c) {
             ret.push(c);
             dashed = false;
         } else if !dashed {
@@ -423,6 +428,16 @@ pub(crate) enum RustVariant {
     Unit(Label),
     Tuple(Label, Vec<RustType>),
     Record(Label, Vec<(Label, RustType)>),
+}
+
+impl RustVariant {
+    pub(crate) fn get_label(&self) -> &Label {
+        match self {
+            RustVariant::Unit(lab) | RustVariant::Tuple(lab, _) | RustVariant::Record(lab, _) => {
+                lab
+            }
+        }
+    }
 }
 
 impl ToFragment for RustVariant {
@@ -726,15 +741,35 @@ impl ToFragment for SubIdent {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum RustPrimLit {
+    BooleanLit(bool),
+    NumericLit(usize),
+    CharLit(char),
+    StringLit(Label),
+}
+
+impl ToFragment for RustPrimLit {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustPrimLit::BooleanLit(b) => Fragment::DisplayAtom(Rc::new(*b)),
+            RustPrimLit::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
+            RustPrimLit::CharLit(c) => Fragment::DisplayAtom(Rc::new(*c))
+                .delimit(Fragment::Char('\''), Fragment::Char('\'')),
+            RustPrimLit::StringLit(s) => Fragment::String(s.clone())
+                .delimit(Fragment::string("r#\""), Fragment::string("\"#")),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
     Entity(RustEntity),
-    NumericLit(usize),
-    StringLit(Label),
+    PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
     FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
-    Struct(Label, Vec<(Label, Option<Box<RustExpr>>)>),
+    Struct(RustEntity, Vec<(Label, Option<Box<RustExpr>>)>),
     Paren(Box<RustExpr>),
     Borrow(Box<RustExpr>),
     BorrowMut(Box<RustExpr>),
@@ -742,20 +777,116 @@ pub(crate) enum RustExpr {
     Operation(RustOp),
     BlockScope(Vec<RustStmt>, Box<RustExpr>), // scoped block with a final value as an implicit return
     Control(Box<RustControl>),                // for control blocks that return a value
+    Closure(Label, Option<RustType>, Box<RustExpr>), // only simple lambdas for now
+    Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Operator {
+    Eq,
+    Neq,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    Div,
+    Rem,
+    Add,
+    Sub,
+    Mul,
+    Shl,
+    Shr,
+    BitOr,
+    BitAnd,
+}
+
+impl Operator {
+    pub(crate) fn precedence(&self) -> Precedence {
+        match self {
+            Operator::Eq | Operator::Neq => Precedence::EQUALITY,
+            Operator::Lt | Operator::Lte | Operator::Gt | Operator::Gte => Precedence::COMPARE,
+            Operator::Div | Operator::Rem => Precedence::DIVREM,
+            Operator::Add | Operator::Sub => Precedence::ADDSUB,
+            Operator::Mul => Precedence::MUL,
+            Operator::Shl | Operator::Shr => Precedence::BITSHIFT,
+            Operator::BitOr => Precedence::BITOR,
+            Operator::BitAnd => Precedence::BITAND,
+        }
+    }
+}
+
+impl Operator {
+    pub(crate) fn token(&self) -> &'static str {
+        match self {
+            Operator::Eq => " == ",
+            Operator::Neq => " != ",
+            Operator::Lt => " < ",
+            Operator::Lte => " <= ",
+            Operator::Gt => " > ",
+            Operator::Gte => " >= ",
+            Operator::Div => " / ",
+            Operator::Rem => " % ",
+            Operator::Add => " + ",
+            Operator::Sub => " - ",
+            Operator::Mul => " * ",
+            Operator::Shl => " << ",
+            Operator::Shr => " >> ",
+            Operator::BitOr => " | ",
+            Operator::BitAnd => " & ",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustOp {
-    InfixOp(&'static str, Box<RustExpr>, Box<RustExpr>),
+    // scaffolding to allow for flexible infix operations from operator tokens; should contain spaces already
+    InfixOp(Operator, Box<RustExpr>, Box<RustExpr>),
+    AsCast(Box<RustExpr>, RustType),
+}
+
+impl RustOp {
+    pub(crate) fn precedence(&self) -> Precedence {
+        match self {
+            Self::InfixOp(op, _, _) => op.precedence(),
+            Self::AsCast(_, _) => Precedence::CAST_INFIX,
+        }
+    }
+}
+
+impl RustOp {
+    pub fn op_eq(lhs: RustExpr, rhs: RustExpr) -> Self {
+        Self::InfixOp(Operator::Eq, Box::new(lhs), Box::new(rhs))
+    }
+
+    pub fn op_neq(lhs: RustExpr, rhs: RustExpr) -> Self {
+        Self::InfixOp(Operator::Neq, Box::new(lhs), Box::new(rhs))
+    }
+}
+
+impl ToFragmentExt for RustOp {
+    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
+        let inherent = self.precedence();
+        match self {
+            RustOp::InfixOp(op, lhs, rhs) => cond_paren(
+                lhs.to_fragment_precedence(inherent)
+                    .cat(Fragment::string(op.token()))
+                    .cat(rhs.to_fragment_precedence(inherent)),
+                prec,
+                inherent,
+            ),
+            RustOp::AsCast(expr, typ) => cond_paren(
+                expr.to_fragment()
+                    .intervene(Fragment::string(" as "), typ.to_fragment()),
+                prec,
+                inherent,
+            ),
+        }
+    }
 }
 
 impl ToFragment for RustOp {
     fn to_fragment(&self) -> Fragment {
-        match self {
-            RustOp::InfixOp(op, lhs, rhs) => lhs
-                .to_fragment()
-                .intervene(Fragment::string(*op), rhs.to_fragment()),
-        }
+        self.to_fragment_precedence(Precedence::ATOM)
     }
 }
 
@@ -764,12 +895,33 @@ impl RustExpr {
 
     pub const NONE: Self = Self::Entity(RustEntity::Local(Label::Borrowed("None")));
 
+    pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::BooleanLit(true));
+
+    pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::BooleanLit(false));
+
+    pub fn cond_paren(&self, prec: Precedence) -> Self {
+        match &self {
+            Self::Operation(op) => {
+                let inherent = op.precedence();
+                match prec.relate(&inherent) {
+                    Relation::Superior | Relation::Disjoint => Self::Paren(Box::new(self.clone())),
+                    _ => self.clone(),
+                }
+            }
+            _ => self.clone(),
+        }
+    }
+
     pub fn some(inner: Self) -> Self {
         Self::local("Some").call_with([inner])
     }
 
     pub fn local(name: impl Into<Label>) -> Self {
         Self::Entity(RustEntity::Local(name.into()))
+    }
+
+    pub fn num_lit<N: Into<usize>>(num: N) -> Self {
+        Self::PrimitiveLit(RustPrimLit::NumericLit(num.into()))
     }
 
     pub fn scoped<Name: Into<Label>>(
@@ -810,7 +962,7 @@ impl RustExpr {
         self.field(name).call()
     }
 
-    pub fn infix(lhs: Self, op: &'static str, rhs: Self) -> Self {
+    pub fn infix(lhs: Self, op: Operator, rhs: Self) -> Self {
         Self::Operation(RustOp::InfixOp(op, Box::new(lhs), Box::new(rhs)))
     }
 
@@ -819,18 +971,16 @@ impl RustExpr {
     }
 
     pub fn str_lit(str: impl Into<Label>) -> Self {
-        Self::StringLit(str.into())
+        Self::PrimitiveLit(RustPrimLit::StringLit(str.into()))
     }
 }
 
-impl ToFragment for RustExpr {
-    fn to_fragment(&self) -> Fragment {
+impl ToFragmentExt for RustExpr {
+    // REVIEW - make sure we aren't leaving anything by the wayside
+    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
             RustExpr::Entity(e) => e.to_fragment(),
-            RustExpr::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
-            RustExpr::StringLit(s) => s
-                .to_fragment()
-                .delimit(Fragment::Char('"'), Fragment::Char('"')),
+            RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
             RustExpr::ArrayLit(elts) => Fragment::seq(
                 elts.iter().map(RustExpr::to_fragment),
                 Some(Fragment::string(", ")),
@@ -839,7 +989,12 @@ impl ToFragment for RustExpr {
             RustExpr::FieldAccess(x, name) => x
                 .to_fragment()
                 .intervene(Fragment::Char('.'), name.to_fragment()),
-            RustExpr::FunctionCall(f, args) => f.to_fragment().cat(ToFragment::paren_list(args)),
+            RustExpr::FunctionCall(f, args) => cond_paren(
+                f.to_fragment_precedence(prec)
+                    .cat(ToFragment::paren_list(args)),
+                prec,
+                Precedence::FUNAPP,
+            ),
             RustExpr::Tuple(elts) => Self::paren_list(elts),
             RustExpr::Struct(con, fields) => {
                 let f_fields = Fragment::seq(
@@ -857,15 +1012,41 @@ impl ToFragment for RustExpr {
                     .cat(f_fields.delimit(Fragment::string("{ "), Fragment::string(" }")))
             }
             RustExpr::Paren(expr) => Self::paren_list([expr.as_ref()]),
-            RustExpr::Borrow(expr) => Fragment::Char('&').cat(expr.to_fragment()),
+            RustExpr::Borrow(expr) => Fragment::Char('&').cat(expr.to_fragment_precedence(prec)),
             RustExpr::BorrowMut(expr) => Fragment::string("&mut ").cat(expr.to_fragment()),
             RustExpr::Try(expr) => expr.to_fragment().cat(Fragment::Char('?')),
-            RustExpr::Operation(op) => op.to_fragment(),
+            RustExpr::Operation(op) => op.to_fragment_precedence(prec),
             RustExpr::BlockScope(stmts, val) => RustStmt::block(stmts.iter().chain(
                 std::iter::once(&RustStmt::Return(false, val.as_ref().clone())),
             )),
             RustExpr::Control(ctrl) => ctrl.to_fragment(),
+            RustExpr::Closure(lab, sig, body) => cond_paren(
+                (lab.to_fragment().intervene(
+                    Fragment::string(": "),
+                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
+                ))
+                .delimit(Fragment::Char('|'), Fragment::Char('|'))
+                .intervene(
+                    Fragment::Char(' '),
+                    body.to_fragment_precedence(Precedence::ARROW),
+                ),
+                prec,
+                Precedence::ARROW,
+            ),
+            RustExpr::Slice(expr, start, stop) => expr.to_fragment().cat(
+                start
+                    .to_fragment()
+                    .cat(Fragment::string(".."))
+                    .cat(stop.to_fragment())
+                    .delimit(Fragment::Char('['), Fragment::Char(']')),
+            ),
         }
+    }
+}
+
+impl ToFragment for RustExpr {
+    fn to_fragment(&self) -> Fragment {
+        self.to_fragment_precedence(Precedence::ATOM)
     }
 }
 
@@ -873,7 +1054,6 @@ impl ToFragment for RustExpr {
 pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
     Reassign(Label, RustExpr),
-    #[allow(dead_code)]
     Expr(RustExpr),
     Return(bool, RustExpr), // bool: true for explicit return, false for implicit return
     Control(RustControl),
@@ -888,7 +1068,81 @@ impl RustStmt {
 #[derive(Clone, Debug)]
 pub(crate) enum RustControl {
     While(RustExpr, Vec<RustStmt>),
+    ForRange0(Label, RustExpr, Vec<RustStmt>), // index variable name, upper bound (exclusive), loop contents (0..N)
     If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
+    Match(RustExpr, Vec<(MatchCaseLHS, Vec<RustStmt>)>),
+    Break, // no support for break values or loop labels, yet
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum MatchCaseLHS {
+    Pattern(RustPattern),
+    WithGuard(RustPattern, RustExpr),
+}
+
+impl ToFragment for MatchCaseLHS {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            MatchCaseLHS::Pattern(pat) => pat.to_fragment(),
+            MatchCaseLHS::WithGuard(pat, guard) => pat
+                .to_fragment()
+                .intervene(Fragment::string(" if "), guard.to_fragment()),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustPattern {
+    PrimLiteral(RustPrimLit),
+    TupleLiteral(Vec<RustPattern>),
+    ArrayLiteral(Vec<RustPattern>),
+    CatchAll(Option<Label>),                // None <- `_`, Some("x") for `x`
+    Variant(Constructor, Box<RustPattern>), // FIXME - need to attach enum scope
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum Constructor {
+    Simple(Label),
+    Compound(Label, Label),
+}
+
+impl From<Constructor> for RustEntity {
+    fn from(value: Constructor) -> Self {
+        match value {
+            Constructor::Simple(lab) => RustEntity::Local(lab),
+            Constructor::Compound(path, lab) => RustEntity::Scoped(vec![path], lab),
+        }
+    }
+}
+
+impl From<Constructor> for Label {
+    fn from(value: Constructor) -> Self {
+        match value {
+            Constructor::Simple(lab) => lab,
+            Constructor::Compound(path, var) => format!("{path}::{var}").into(),
+        }
+    }
+}
+
+impl ToFragment for RustPattern {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustPattern::PrimLiteral(pl) => pl.to_fragment(),
+            RustPattern::TupleLiteral(tup) => RustPattern::paren_list(tup),
+            RustPattern::ArrayLiteral(tup) => RustPattern::brace_list(tup),
+            RustPattern::Variant(constr, inner) => {
+                RustExpr::Entity(RustEntity::from(constr.clone()))
+                    .to_fragment()
+                    .cat(
+                        inner
+                            .to_fragment()
+                            .delimit(Fragment::Char('('), Fragment::Char(')')),
+                    )
+            }
+            RustPattern::CatchAll(None) => Fragment::Char('_'),
+            RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
+        }
+    }
 }
 
 impl ToFragment for RustControl {
@@ -904,7 +1158,29 @@ impl ToFragment for RustControl {
                     Fragment::string(" else "),
                     Fragment::opt(b_else.as_ref(), |branch| RustStmt::block(branch.iter())),
                 ),
+            Self::Match(expr, cases) => Fragment::string("match")
+                .intervene(Fragment::Char(' '), expr.to_fragment())
+                .intervene(
+                    Fragment::Char(' '),
+                    <(MatchCaseLHS, Vec<RustStmt>)>::block_sep(cases, Fragment::string(",\n")),
+                ),
+            Self::ForRange0(ctr_name, ubound, body) => Fragment::string("for")
+                .intervene(Fragment::Char(' '), Fragment::String(ctr_name.clone()))
+                .intervene(
+                    Fragment::string(" in "),
+                    Fragment::cat(Fragment::string("0.."), ubound.to_fragment()),
+                )
+                .intervene(Fragment::Char(' '), RustStmt::block(body.iter())),
+            Self::Break => Fragment::string("break"),
         }
+    }
+}
+
+impl ToFragment for (MatchCaseLHS, Vec<RustStmt>) {
+    fn to_fragment(&self) -> Fragment {
+        self.0
+            .to_fragment()
+            .intervene(Fragment::string(" => "), RustStmt::block(self.1.iter()))
     }
 }
 
@@ -945,7 +1221,11 @@ impl ToFragment for RustStmt {
 pub trait ToFragment {
     fn to_fragment(&self) -> Fragment;
 
-    fn paren_list<'a>(items: impl IntoIterator<Item = &'a Self>) -> Fragment
+    fn delim_list<'a>(
+        items: impl IntoIterator<Item = &'a Self>,
+        before: Fragment,
+        after: Fragment,
+    ) -> Fragment
     where
         Self: 'a,
     {
@@ -953,7 +1233,21 @@ pub trait ToFragment {
             items.into_iter().map(Self::to_fragment),
             Some(Fragment::string(", ")),
         )
-        .delimit(Fragment::Char('('), Fragment::Char(')'))
+        .delimit(before, after)
+    }
+
+    fn paren_list<'a>(items: impl IntoIterator<Item = &'a Self>) -> Fragment
+    where
+        Self: 'a,
+    {
+        Self::delim_list(items, Fragment::Char('('), Fragment::Char(')'))
+    }
+
+    fn brace_list<'a>(items: impl IntoIterator<Item = &'a Self>) -> Fragment
+    where
+        Self: 'a,
+    {
+        Self::delim_list(items, Fragment::Char('['), Fragment::Char(']'))
     }
 
     fn block<'a>(items: impl IntoIterator<Item = &'a Self>) -> Fragment
@@ -973,12 +1267,25 @@ pub trait ToFragment {
     }
 }
 
+trait ToFragmentExt: ToFragment {
+    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment;
+}
+
 impl<T> ToFragment for Box<T>
 where
     T: ToFragment,
 {
     fn to_fragment(&self) -> Fragment {
         self.as_ref().to_fragment()
+    }
+}
+
+impl<T> ToFragmentExt for Box<T>
+where
+    T: ToFragmentExt,
+{
+    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
+        self.as_ref().to_fragment_precedence(prec)
     }
 }
 
