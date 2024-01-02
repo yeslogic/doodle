@@ -682,7 +682,7 @@ impl TryFrom<ValueType> for RustType {
                 let inner = Self::try_from(t.as_ref().clone())?;
                 Ok(CompType::<Box<RustType>>::Vec(Box::new(inner)).into())
             }
-            ValueType::Any | ValueType::Record(..) | ValueType::Union(..) => Err(value),
+            ValueType::Hole | ValueType::Record(..) | ValueType::Union(..) => Err(value),
         }
     }
 }

@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::ops::Add;
 use std::rc::Rc;
 
+use extension::{UD, TC, Extension, TotalExtension, HOInfo, MCInfo, NLInfo, Magic};
 use serde::Serialize;
 
 use crate::bounds::Bounds;
@@ -21,6 +22,7 @@ pub mod output;
 mod precedence;
 pub mod prelude;
 pub mod read;
+mod extension;
 
 pub type Label = std::borrow::Cow<'static, str>;
 
@@ -28,30 +30,37 @@ pub trait IntoLabel: Into<Label> {}
 
 impl<T> IntoLabel for T where T: Into<Label> {}
 
+
+
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
-pub enum Pattern {
-    Binding(Label),
-    Wildcard,
+pub enum Pattern<X: Extension<NLKind> = UD> {
+    Binding(X::Info, Label),
+    Wildcard(),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
     Char(char),
-    Tuple(Vec<Pattern>),
-    Variant(Label, Box<Pattern>),
-    Seq(Vec<Pattern>),
+    Tuple(X::Info, Vec<Pattern<X>>),
+    Variant(X::Info, Label, Box<Pattern<X>>),
+    Seq(X::Info, Vec<Pattern<X>>),
 }
+impl<X: Extension> Pattern<X> {
+    pub const UNIT: Pattern<UD> = Pattern::Tuple((), Vec::new());
+    pub const TC_UNIT: Pattern<TC> = Pattern::Tuple(ValueType::Tuple(Vec::new()), Vec::new());
 
-impl Pattern {
-    pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
-
-    pub fn from_bytes(bs: &[u8]) -> Pattern {
-        Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
+    pub fn from_bytes(bs: &[u8]) -> Pattern<X> {
+        Pattern::Seq(X::info(), bs.iter().copied().map(Pattern::U8).collect())
     }
 
-    pub fn variant(label: impl IntoLabel, value: impl Into<Box<Pattern>>) -> Pattern {
-        Pattern::Variant(label.into(), value.into())
+    pub fn variant(label: impl IntoLabel, value: impl Into<Box<Self>>) -> Self {
+        Pattern::Variant(X::info(), label.into(), value.into())
+    }
+
+    pub fn binding(name: impl IntoLabel) -> Self {
+        Pattern::Binding(X::info(), name.into())
     }
 
     pub fn binding(name: impl IntoLabel) -> Pattern {
@@ -60,25 +69,25 @@ impl Pattern {
 
     fn build_scope(&self, scope: &mut TypeScope<'_>, t: &ValueType) {
         match (self, t) {
-            (Pattern::Binding(name), t) => {
+            (Pattern::Binding(_i, name), t) => {
                 scope.push(name.clone(), t.clone());
             }
             (Pattern::Wildcard, _) => {}
-            (Pattern::Bool(_b0), ValueType::Bool) => {}
-            (Pattern::U8(_i0), ValueType::U8) => {}
-            (Pattern::U16(_i0), ValueType::U16) => {}
-            (Pattern::U32(_i0), ValueType::U32) => {}
-            (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
+            (Pattern::Bool(..), ValueType::Bool) => {}
+            (Pattern::U8(..), ValueType::U8) => {}
+            (Pattern::U16(..), ValueType::U16) => {}
+            (Pattern::U32(..), ValueType::U32) => {}
+            (Pattern::Tuple(_i, ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, t);
                 }
             }
-            (Pattern::Seq(ps), ValueType::Seq(t)) => {
+            (Pattern::Seq(_i, ps), ValueType::Seq(t)) => {
                 for p in ps {
                     p.build_scope(scope, t);
                 }
             }
-            (Pattern::Variant(label, p), ValueType::Union(branches)) => {
+            (Pattern::Variant(_i, label, p), ValueType::Union(branches)) => {
                 if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
                     p.build_scope(scope, t);
                 } else {
@@ -93,7 +102,7 @@ impl Pattern {
         &self,
         scope: &TypeScope<'_>,
         head_type: &ValueType,
-        expr: &Expr,
+        expr: &Expr<X>,
     ) -> Result<ValueType, String> {
         let mut pattern_scope = TypeScope::child(scope);
         self.build_scope(&mut pattern_scope, head_type);
@@ -105,7 +114,7 @@ impl Pattern {
         scope: &TypeScope<'_>,
         head_type: &ValueType,
         module: &FormatModule,
-        format: &Format,
+        format: &Format<X>,
     ) -> Result<ValueType, String> {
         let mut pattern_scope = TypeScope::child(scope);
         self.build_scope(&mut pattern_scope, head_type);
@@ -120,7 +129,7 @@ pub enum ValueKind {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum ValueType {
-    Any,
+    Hole,
     Empty,
     Bool,
     U8,
@@ -134,6 +143,8 @@ pub enum ValueType {
 }
 
 impl ValueType {
+    pub const UNIT : ValueType = ValueType::Tuple(Vec::new());
+
     fn record_proj(&self, label: &str) -> ValueType {
         match self {
             ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
@@ -157,8 +168,8 @@ impl ValueType {
 
     fn unify(&self, other: &ValueType) -> Result<ValueType, String> {
         match (self, other) {
-            (ValueType::Any, rhs) => Ok(rhs.clone()),
-            (lhs, ValueType::Any) => Ok(lhs.clone()),
+            (ValueType::Hole, rhs) => Ok(rhs.clone()),
+            (lhs, ValueType::Hole) => Ok(lhs.clone()),
             (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
             (ValueType::Bool, ValueType::Bool) => Ok(ValueType::Bool),
             (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
@@ -181,7 +192,7 @@ impl ValueType {
                         "records must have same number of fields {fs1:?} vs. {fs2:?}"
                     ));
                 }
-                // FIXME field order
+                // NOTE - because fields are parsed in declared order, two records with conflicting field orders are not operationally equivalent
                 let mut fs = Vec::new();
                 for ((l1, t1), (l2, t2)) in Iterator::zip(fs1.iter(), fs2.iter()) {
                     if l1 != l2 {
@@ -239,54 +250,176 @@ pub enum Arith {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
-pub enum Expr {
-    Var(Label),
+pub enum Expr<X: TotalExtension = UD> {
+    Var(NLInfo<X>, Label),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
-    Tuple(Vec<Expr>),
-    TupleProj(Box<Expr>, usize),
-    Record(Vec<(Label, Expr)>),
-    RecordProj(Box<Expr>, Label),
-    Variant(Label, Box<Expr>),
-    Seq(Vec<Expr>),
-    Match(Box<Expr>, Vec<(Pattern, Expr)>),
-    Lambda(Label, Box<Expr>),
+    Tuple(NLInfo<X>, Vec<Expr<X>>),
+    TupleProj(NLINfo<X>, Box<Expr<X>>, usize),
+    Record(NLInfo<X>, Vec<(Label, Expr<X>)>),
+    RecordProj(NLInfo<X>, Box<Expr<X>>, Label),
+    Variant(NLinfo<X>, Label, Box<Expr<X>>),
+    Seq(NLInfo<X>, Vec<Expr<X>>),
+    Match(NLInfo<X>, Box<Expr<X>>, Vec<(Pattern<X>, Expr<X>)>),
+    Lambda(HOInfo<X>, Label, Box<Expr<X>>),
 
-    IntRel(IntRel, Box<Expr>, Box<Expr>),
-    Arith(Arith, Box<Expr>, Box<Expr>),
+    IntRel(IntRel, Box<Expr<X>>, Box<Expr<X>>),
+    Arith(Arith, Box<Expr<X>>, Box<Expr<X>>),
 
-    AsU8(Box<Expr>),
-    AsU16(Box<Expr>),
-    AsU32(Box<Expr>),
-    AsChar(Box<Expr>),
+    AsU8(Box<Expr<X>>),
+    AsU16(Box<Expr<X>>),
+    AsU32(Box<Expr<X>>),
+    AsChar(Box<Expr<X>>),
 
-    U16Be(Box<Expr>),
-    U16Le(Box<Expr>),
-    U32Be(Box<Expr>),
-    U32Le(Box<Expr>),
+    U16Be(Box<Expr<X>>),
+    U16Le(Box<Expr<X>>),
+    U32Be(Box<Expr<X>>),
+    U32Le(Box<Expr<X>>),
 
-    SeqLength(Box<Expr>),
-    SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
-    FlatMap(Box<Expr>, Box<Expr>),
-    FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
-    Dup(Box<Expr>, Box<Expr>),
-    Inflate(Box<Expr>),
+    SeqLength(Box<Expr<X>>),
+    SubSeq(NLInfo<X>, Box<Expr<X>>, Box<Expr<X>>, Box<Expr<X>>),
+    FlatMap(NLINfo<X>, Box<Expr<X>>, Box<Expr<X>>),
+    FlatMapAccum(NLInfo<X>, Box<Expr<X>>, Box<Expr<X>>, ValueType, Box<Expr<X>>),
+    Dup(NLInfo<X>, Box<Expr<X>>, Box<Expr<X>>),
+    Inflate(Box<Expr<X>>),
 }
 
 impl Expr {
-    pub const UNIT: Expr = Expr::Tuple(Vec::new());
+    pub const UNIT: Expr<UD> = Expr::Tuple((), Vec::new());
+    pub const TC_UNIT: Expr<TC> = Expr::Tuple(ValueType::UNIT, Vec::new());
 
-    pub fn record_proj(head: impl Into<Box<Expr>>, label: impl IntoLabel) -> Expr {
+    pub fn record_proj(head: impl Into<Box<Expr<X>>>, label: impl IntoLabel) -> Expr<X> {
+        let head: Box<Expr<X>> = head.into();
+        let label: Label = label.into();
+
+        let info = match head.as_ref() {
+            Expr::Record(_, fields) => {
+                let proj_field = fields.iter().find_map(|(l, x)| (l == &label).then_some(x));
+                if let Some(tmp) = tmp
+            }
+        }
         Expr::RecordProj(head.into(), label.into())
     }
 }
 
-impl Expr {
+#[derive(Clone, Debug)]
+pub enum TypeError {
+    IncompatibleCast { target: ValueType, original: ValueType }, // overloaded for numeric and byte-level casts (AsU16 vs U16Be)
+    UnsolvableUnification(ValueType, ValueType),
+    UnexpectedLambda,
+}
+
+impl std::fmt::Display for TypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TypeError::IncompatibleCast { target, original } => write!(f, "expression of type {original:?} cannot be cast to {target:?}"),
+            TypeError::UnsolvableUnification(t0, t1) => write!(f, "unable to unify type {t0:?} with {t1:?}"),
+            TypeError::UnexpectedLambda => write!("unexpected lambda encountered")
+        }
+    }
+}
+
+impl std::error::Error for TypeError {}
+
+
+
+impl<X: TotalExtension> Expr<X> {
+    fn get_type_info(&self) -> Result<Option<ValueType>, TypeError> where X: Magic<TC> {
+        match self {
+            Expr::Bool(_) => Ok(Some(ValueType::Bool)),
+            Expr::U8(_) => Ok(Some(ValueType::U8)),
+            Expr::U16(_) => Ok(Some(ValueType::U16)),
+            Expr::U32(_) => Ok(Some(ValueType::U32)),
+
+            Expr::AsU8(x) => {
+                match x.get_type_info() {
+                    Some(ValueType::U8 | ValueType::U16 | ValueType::U32) => Ok(Some(ValueType::U8)),
+                    Some(other) => Err(TypeError::IncompatibleCast { original: other, target: ValueType::U8 }),
+                    _ => Ok(None),
+                }
+            }
+            Expr::AsU16(x) => {
+                match x.get_type_info() {
+                    Some(ValueType::U8 | ValueType::U16 | ValueType::U32) => Ok(Some(ValueType::U16)),
+                    Some(other) => Err(TypeError::IncompatibleCast { original: other, target: ValueType::U16 }),
+                    None => Ok(None),
+                }
+            }
+            Expr::AsU32(x) => {
+                match x.get_type_info() {
+                    Some(ValueType::U8 | ValueType::U16 | ValueType::U32) => Ok(Some(ValueType::U32)),
+                    Some(other) => Err(TypeError::IncompatibleCast { original: other, target: ValueType::U32 }),
+                    None => Ok(None),
+                }
+            }
+
+            Expr::U16Be(x) | Expr::U16Le(x) => {
+                match x.get_type_info() {
+                    Some(t @ ValueType::Vec(ref v)) => match v {
+                        &[ValueType::U8, ValueType::U8] => Ok(Some(ValueType::U16)),
+                        _ => Err(TypeError::IncompatibleCast { target: ValueType::U16, original: t })
+                    }
+                    Some(other) => Err(TypeError::IncompatibleCast { target: ValueType::U16, original: other }),
+                    None => Ok(None),
+                }
+            }
+            Expr::U32Be(x) | Expr::U32Le(x) => {
+                      match x.get_type_info() {
+                    Some(t @ ValueType::Vec(ref v)) => match v {
+                        &[ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(Some(ValueType::U32)),
+                        _ => Err(TypeError::IncompatibleCast { target: ValueType::U32, original: t })
+                    }
+                    Some(other) => Err(TypeError::IncompatibleCast { target: ValueType::U32, original: other }),
+                    None => Ok(None),
+                }
+            }
+            Expr::AsChar(x) => {
+                match x.get_type_info() {
+                    Some(ValueType::U32) => Ok(Some(ValueType::Char)),
+                    Some(other) => Err(TypeError::IncompatibleCast { target: ValueType::Char, original: other })
+                }
+            }
+
+            Expr::Lambda(..) => Err(TypeError::UnexpectedLambda),
+
+            Expr::Tuple(i, _)
+            | Expr::TupleProj(i, _, _)
+            | Expr::Record(i, _)
+            | Expr::RecordProj(i, _, _)
+            | Expr::Variant(i, _, _)
+            | Expr::Seq(i, _)
+            | Expr::Match(i, _, _)
+            | Expr::BitAnd(i, _, _)
+            | Expr::BitOr(i, _, _)
+            | Expr::Eq(i, _, _)
+            | Expr::Ne(i, _, _)
+            | Expr::Lt(i, _, _)
+            | Expr::Gt(i, _, _)
+            | Expr::Lte(i, _, _)
+            | Expr::Gte(i, _, _)
+            | Expr::Mul(i, _, _)
+            | Expr::Div(i, _, _)
+            | Expr::Rem(i, _, _)
+            | Expr::Shl(i, _, _)
+            | Expr::Shr(i, _, _)
+            | Expr::Add(i, _, _)
+            | Expr::Sub(i, _, _)
+            | Expr::Var(i, _) => <X as Magic<TC>>::cast(i),
+
+            Expr::SeqLength(_) => todo!(),
+            Expr::SubSeq(_, _, _, _) => todo!(),
+            Expr::FlatMap(_, _, _) => todo!(),
+            Expr::FlatMapAccum(_, _, _, _, _) => todo!(),
+            Expr::Dup(_, _, _) => todo!(),
+            Expr::Inflate(_) => todo!(),
+        }
+    }
+
     fn infer_type(&self, scope: &TypeScope<'_>) -> Result<ValueType, String> {
         match self {
-            Expr::Var(name) => match scope.get_type_by_name(name) {
+            Expr::Var(_, name) => match scope.get_type_by_name(name) {
                 ValueKind::Value(t) => Ok(t.clone()),
                 ValueKind::Format(_t) => Err("expected value type".to_string()),
             },
@@ -318,7 +451,7 @@ impl Expr {
                 expr.infer_type(scope)?,
             )])),
             Expr::Seq(exprs) => {
-                let mut t = ValueType::Any;
+                let mut t = ValueType::Hole;
                 for e in exprs {
                     t = t.unify(&e.infer_type(scope)?)?;
                 }
@@ -329,7 +462,7 @@ impl Expr {
                     return Err("infer_type: empty Match".to_string());
                 }
                 let head_type = head.infer_type(scope)?;
-                let mut t = ValueType::Any;
+                let mut t = ValueType::Hole;
                 for (pattern, branch) in branches {
                     t = t.unify(&pattern.infer_expr_branch_type(scope, &head_type, branch)?)?;
                 }
@@ -835,7 +968,7 @@ impl FormatModule {
                 self.infer_format_type(scope, f)?,
             )])),
             Format::Union(branches) | Format::UnionNondet(branches) => {
-                let mut t = ValueType::Any;
+                let mut t = ValueType::Hole;
                 for f in branches {
                     t = t.unify(&self.infer_format_type(scope, f)?)?;
                 }
@@ -896,7 +1029,7 @@ impl FormatModule {
                     return Err("infer_format_type: empty Match".to_string());
                 }
                 let head_type = head.infer_type(scope)?;
-                let mut t = ValueType::Any;
+                let mut t = ValueType::Hole;
                 for (pattern, branch) in branches {
                     t = t.unify(
                         &pattern.infer_format_branch_type(scope, &head_type, self, branch)?,

@@ -128,7 +128,7 @@ impl Codegen {
                 let inner = self.lift_type(t.as_ref());
                 CompType::Vec(Box::new(inner)).into()
             }
-            ValueType::Any => panic!("ValueType::Any"),
+            ValueType::Hole => panic!("ValueType::Any"),
             ValueType::Record(fields) => {
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
@@ -1523,7 +1523,7 @@ impl<'a> RustTypeScope<'a> {
 
 pub struct Generator<'a> {
     module: &'a FormatModule,
-    module_ftypes: HashMap<usize, FormatType>,
+    module_ftypes: HashMap<usize, ValueType>,
     codegen: Codegen,
     sourcemap: SourceMap,
 }
@@ -1549,24 +1549,39 @@ impl<'a> Generator<'a> {
         Ok(generator.sourcemap)
     }
 
-    fn infer_type_format(&mut self, module: &FormatModule, format: &Format) -> TypedFormat {
+    fn infer_type_format(&self, module: &FormatModule, format: &Format) -> TypedFormat {
+        let scope = TypeScope::new();
+        let ty = module.infer_format_type(&scope, format).expect("Could not infer Format type");
+        (format, ty).into()
+    }
+
+    fn generate_toplevel_format(&mut self, module: &FormatModule, t_format: &TypedFormat) {
+        todo!();
+    }
+
+
+
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum TypedPattern {
+    Binding(Label, ValueType),
+    Wildcard(ValueType),
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    Char(char),
+    Tuple(Vec<TypedPattern>, ValueType),
+    Variant(Label, Box<TypedPattern>, ValueType),
+    Seq(Vec<TypedPattern>, ValueType),
+}
+
+impl From<(&'_ Format, ValueType)> for TypedFormat {
+    fn from(value: (&'_ Format, ValueType)) -> Self {
+        let (format, ty) = value;
         match format {
-            Format::ItemVar(level, args) => {
-                let mut t_args = Vec::with_capacity(args.len());
-                for arg in args.iter() {
-                    t_args.push(self.infer_type_expr(arg));
-                }
-                let ft = match self.module_ftypes.get(level) {
-                    Some(ft) => ft.clone(),
-                    None => {
-                        let deref = module.get_format(*level);
-                        let ft = self.infer_type_format(module, deref).get_format_type();
-                        self.module_ftypes.insert(*level, ft.clone());
-                        ft
-                    }
-                };
-                TypedFormat::ItemVar(*level, t_args, ft)
-            }
+            Format::ItemVar_, _) => todo!(),
             Format::Fail => todo!(),
             Format::EndOfInput => todo!(),
             Format::Align(_) => todo!(),
@@ -1594,156 +1609,175 @@ impl<'a> Generator<'a> {
             Format::Apply(_) => todo!(),
         }
     }
+}
 
-
-
-    fn predict_type(&self) -> RustType {
-        let type_ix = self.sourcemap.adhoc_types.len();
-        let type_name = Label::from(IxLabel(type_ix));
-        RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(type_ix, type_name)))
-    }
-
-    fn generate_toplevel_format(&mut self, module: &FormatModule, t_format: &TypedFormat) {
-        match t_format {
-            _ => todo!(),
-        }
-    }
-
-    fn infer_type_expr(&self, expr: &Expr) -> TypedExpr {
+impl From<(&'_ Expr, ValueType)> for TypedExpr {
+    fn from(value: (&'_ Expr, ValueType)) -> Self {
+        let (expr, ty) = value;
         match expr {
-           _ => todo!(),
+            Expr::Var(lab) => TypedExpr::Var(lab.clone(), ty),
+            Expr::Bool(b) => {
+                debug_assert!(matches!(&ty, &ValueType::Bool));
+                TypedExpr::Bool(*b)
+            }
+            Expr::U8(n) => {
+                debug_assert!(matches!(&ty, &ValueType::U8));
+                TypedExpr::U8(*n)
+            }
+            Expr::U16(_) => todo!(),
+            Expr::U32(_) => todo!(),
+            Expr::Tuple(_) => todo!(),
+            Expr::TupleProj(_, _) => todo!(),
+            Expr::Record(_) => todo!(),
+            Expr::RecordProj(_, _) => todo!(),
+            Expr::Variant(_, _) => todo!(),
+            Expr::Seq(_) => todo!(),
+            Expr::Match(_, _) => todo!(),
+            Expr::Lambda(_, _) => todo!(),
+            Expr::BitAnd(_, _) => todo!(),
+            Expr::BitOr(_, _) => todo!(),
+            Expr::Eq(_, _) => todo!(),
+            Expr::Ne(_, _) => todo!(),
+            Expr::Lt(_, _) => todo!(),
+            Expr::Gt(_, _) => todo!(),
+            Expr::Lte(_, _) => todo!(),
+            Expr::Gte(_, _) => todo!(),
+            Expr::Mul(_, _) => todo!(),
+            Expr::Div(_, _) => todo!(),
+            Expr::Rem(_, _) => todo!(),
+            Expr::Shl(_, _) => todo!(),
+            Expr::Shr(_, _) => todo!(),
+            Expr::Add(_, _) => todo!(),
+            Expr::Sub(_, _) => todo!(),
+            Expr::AsU8(_) => todo!(),
+            Expr::AsU16(_) => todo!(),
+            Expr::AsU32(_) => todo!(),
+            Expr::U16Be(_) => todo!(),
+            Expr::U16Le(_) => todo!(),
+            Expr::U32Be(_) => todo!(),
+            Expr::U32Le(_) => todo!(),
+            Expr::AsChar(_) => todo!(),
+            Expr::SeqLength(_) => todo!(),
+            Expr::SubSeq(_, _, _) => todo!(),
+            Expr::FlatMap(_, _) => todo!(),
+            Expr::FlatMapAccum(_, _, _, _) => todo!(),
+            Expr::Dup(_, _) => todo!(),
+            Expr::Inflate(_) => todo!(),
+
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum FormatType {
-    Known(Rc<RustType>),
-    AdHoc(Rc<RustTypeDef>),
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum TypedPattern {
-    Binding(Label, FormatType),
-    Wildcard(FormatType),
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    Char(char),
-    Tuple(Vec<TypedPattern>, FormatType),
-    Variant(Label, Box<TypedPattern>, FormatType),
-    Seq(Vec<TypedPattern>, FormatType),
-}
 
 #[derive(Clone, Debug)]
 pub(crate) enum TypedExpr {
-    Var(Label, FormatType),
+    Var(Label, ValueType),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
-    Tuple(Vec<TypedExpr>, FormatType),
-    TupleProj(Box<TypedExpr>, usize, FormatType),
-    Record(Vec<(Label, TypedExpr)>, FormatType),
-    RecordProj(Box<TypedExpr>, Label, FormatType),
-    Variant(Label, Box<TypedExpr>, FormatType),
-    Seq(Vec<TypedExpr>, FormatType),
-    Match(Box<TypedExpr>, Vec<(TypedPattern, TypedExpr)>, FormatType),
-    Lambda(Label, Box<TypedExpr>, (FormatType, FormatType)),
+    Tuple(Vec<TypedExpr>, ValueType),
+    TupleProj(Box<TypedExpr>, usize, ValueType),
+    Record(Vec<(Label, TypedExpr)>, ValueType),
+    RecordProj(Box<TypedExpr>, Label, ValueType),
+    Variant(Label, Box<TypedExpr>, ValueType),
+    Seq(Vec<TypedExpr>, ValueType),
+    Match(Box<TypedExpr>, Vec<(TypedPattern, TypedExpr)>, ValueType),
+    Lambda(Label, Box<TypedExpr>, (ValueType, ValueType)),
 
-    BitAnd(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    BitOr(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Eq(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Neq(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Lt(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Gt(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Lte(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Gte(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Mul(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Div(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Rem(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Shl(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Shr(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Add(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Sub(Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    BitAnd(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    BitOr(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Eq(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Neq(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Lt(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Gt(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Lte(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Gte(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Mul(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Div(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Rem(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Shl(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Shr(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Add(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Sub(Box<TypedExpr>, Box<TypedExpr>, ValueType),
 
-    AsU8(Box<TypedExpr>, FormatType),
-    AsU16(Box<TypedExpr>, FormatType),
-    AsU32(Box<TypedExpr>, FormatType),
+    AsU8(Box<TypedExpr>, ValueType),
+    AsU16(Box<TypedExpr>, ValueType),
+    AsU32(Box<TypedExpr>, ValueType),
 
-    U16Be(Box<TypedExpr>, FormatType),
-    U16Le(Box<TypedExpr>, FormatType),
-    U32Be(Box<TypedExpr>, FormatType),
-    U32Le(Box<TypedExpr>, FormatType),
-    AsChar(Box<TypedExpr>, FormatType),
+    U16Be(Box<TypedExpr>, ValueType),
+    U16Le(Box<TypedExpr>, ValueType),
+    U32Be(Box<TypedExpr>, ValueType),
+    U32Le(Box<TypedExpr>, ValueType),
+    AsChar(Box<TypedExpr>, ValueType),
 
-    SeqLength(Box<TypedExpr>, FormatType),
-    SubSeq(Box<TypedExpr>, Box<TypedExpr>, Box<TypedExpr>, FormatType),
+    SeqLength(Box<TypedExpr>, ValueType),
+    SubSeq(Box<TypedExpr>, Box<TypedExpr>, Box<TypedExpr>, ValueType),
 
-    FlatMap(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    FlatMapAccum(Box<TypedExpr>, Box<TypedExpr>, ValueType, Box<TypedExpr>, FormatType),
-    Dup(Box<TypedExpr>, Box<TypedExpr>, FormatType),
-    Inflate(Box<TypedExpr>, FormatType)
+    FlatMap(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    FlatMapAccum(Box<TypedExpr>, Box<TypedExpr>, ValueType, Box<TypedExpr>, ValueType),
+    Dup(Box<TypedExpr>, Box<TypedExpr>, ValueType),
+    Inflate(Box<TypedExpr>, ValueType)
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum TypedFormat {
-    ItemVar(usize, Vec<TypedExpr>, FormatType),
+    ItemVar(usize, Vec<TypedExpr>, ValueType),
     Fail,
     EndOfInput,
     Align(usize),
     Byte(ByteSet),
-    Variant(Label, Box<TypedFormat>, FormatType),
-    Union(Vec<TypedFormat>, FormatType),
-    UnionNondet(Vec<(Label, TypedFormat)>, FormatType),
-    Tuple(Vec<TypedFormat>, FormatType),
-    Record(Vec<(Label, TypedFormat)>, Rc<RustTypeDef>, FormatType),
-    Repeat(Box<TypedFormat>, FormatType),
-    Repeat1(Box<TypedFormat>, FormatType),
-    RepeatCount(Box<TypedFormat>, FormatType),
-    RepeatUntilLast(TypedExpr, Box<TypedFormat>, FormatType),
-    RepeatUntilSeq(TypedExpr, Box<TypedFormat>, FormatType),
-    Peek(Box<TypedFormat>, FormatType),
-    PeekNot(Box<TypedFormat>, FormatType),
-    Slice(TypedExpr, Box<TypedFormat>, FormatType),
-    Bits(Box<TypedFormat>, FormatType),
-    WithRelativeOffset(TypedExpr, Box<TypedFormat>, FormatType),
-    Map(Box<TypedFormat>, TypedExpr, FormatType),
-    Compute(TypedExpr, FormatType),
-    Let(Label, TypedExpr, Box<TypedFormat>, FormatType),
-    Match(TypedExpr, Vec<(TypedPattern, TypedFormat)>, FormatType),
-    Dynamic(Label, DynFormat, Box<TypedFormat>, FormatType),
-    Apply(Label, FormatType),
+    Variant(Label, Box<TypedFormat>, ValueType),
+    Union(Vec<TypedFormat>, ValueType),
+    UnionNondet(Vec<(Label, TypedFormat)>, ValueType),
+    Tuple(Vec<TypedFormat>, ValueType),
+    Record(Vec<(Label, TypedFormat)>, Rc<RustTypeDef>, ValueType),
+    Repeat(Box<TypedFormat>, ValueType),
+    Repeat1(Box<TypedFormat>, ValueType),
+    RepeatCount(Box<TypedFormat>, ValueType),
+    RepeatUntilLast(TypedExpr, Box<TypedFormat>, ValueType),
+    RepeatUntilSeq(TypedExpr, Box<TypedFormat>, ValueType),
+    Peek(Box<TypedFormat>, ValueType),
+    PeekNot(Box<TypedFormat>, ValueType),
+    Slice(TypedExpr, Box<TypedFormat>, ValueType),
+    Bits(Box<TypedFormat>, ValueType),
+    WithRelativeOffset(TypedExpr, Box<TypedFormat>, ValueType),
+    Map(Box<TypedFormat>, TypedExpr, ValueType),
+    Compute(TypedExpr, ValueType),
+    Let(Label, TypedExpr, Box<TypedFormat>, ValueType),
+    Match(TypedExpr, Vec<(TypedPattern, TypedFormat)>, ValueType),
+    Dynamic(Label, DynFormat, Box<TypedFormat>, ValueType),
+    Apply(Label, ValueType),
 }
 
 impl TypedFormat {
-    pub fn get_format_type(&self) -> FormatType {
+    pub fn get_format_type(&self) -> ValueType {
         match self {
-            TypedFormat::ItemVar(_, _, ft)
-            | TypedFormat::Union(_, ft)
-            | TypedFormat::Tuple(_, ft)
-            | TypedFormat::Record(_, _, ft)
-            | TypedFormat::Repeat(_, ft)
-            | TypedFormat::Repeat1(_, ft)
-            | TypedFormat::RepeatCount(_, ft)
-            | TypedFormat::RepeatUntilLast(_, _, ft)
-            | TypedFormat::RepeatUntilSeq(_, _, ft)
-            | TypedFormat::Peek(_, ft)
-            | TypedFormat::PeekNot(_, ft)
-            | TypedFormat::Slice(_, _, ft)
-            | TypedFormat::Bits(_, ft)
-            | TypedFormat::WithRelativeOffset(_, _, ft)
-            | TypedFormat::Map(_, _, ft)
-            | TypedFormat::Compute(_, ft)
-            | TypedFormat::Let(_, _, _, ft)
-            | TypedFormat::Match(_, _, ft)
-            | TypedFormat::Dynamic(_, _, _, ft)
-            | TypedFormat::Apply(_, ft)
-            | TypedFormat::UnionNondet(_, ft)
-            | TypedFormat::Variant(_, _, ft) => ft.clone(),
-            TypedFormat::Fail | TypedFormat::Align(_) | TypedFormat::EndOfInput => FormatType::Known(Rc::new(RustType::Atom(AtomType::Prim(PrimType::Unit)))),
-            TypedFormat::Byte(_) => FormatType::Known(Rc::new(RustType::Atom(AtomType::Prim(PrimType::U8)))),
+            TypedFormat::ItemVar(_, _, vt)
+            | TypedFormat::Union(_, vt)
+            | TypedFormat::Tuple(_, vt)
+            | TypedFormat::Record(_, _, vt)
+            | TypedFormat::Repeat(_, vt)
+            | TypedFormat::Repeat1(_, vt)
+            | TypedFormat::RepeatCount(_, vt)
+            | TypedFormat::RepeatUntilLast(_, _, vt)
+            | TypedFormat::RepeatUntilSeq(_, _, vt)
+            | TypedFormat::Peek(_, vt)
+            | TypedFormat::PeekNot(_, vt)
+            | TypedFormat::Slice(_, _, vt)
+            | TypedFormat::Bits(_, vt)
+            | TypedFormat::WithRelativeOffset(_, _, vt)
+            | TypedFormat::Map(_, _, vt)
+            | TypedFormat::Compute(_, vt)
+            | TypedFormat::Let(_, _, _, vt)
+            | TypedFormat::Match(_, _, vt)
+            | TypedFormat::Dynamic(_, _, _, vt)
+            | TypedFormat::Apply(_, vt)
+            | TypedFormat::UnionNondet(_, vt)
+            | TypedFormat::Variant(_, _, vt) => vt.clone(),
+            TypedFormat::Fail => ValueType::Empty,
+            TypedFormat::Align(_) | TypedFormat::EndOfInput => ValueType::Tuple(Vec::new()),
+            TypedFormat::Byte(_) => ValueType::U8,
         }
     }
 }
