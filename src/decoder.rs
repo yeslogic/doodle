@@ -516,7 +516,7 @@ impl<'a> Compiler<'a> {
         let mut compiler = Compiler::new(module);
         // type
         let scope = TypeScope::new();
-        let t = module.infer_format_type(&scope, format)?;
+        let t = module.infer_format_type(&scope, format)?.to_value_type();
         // decoder
         compiler.queue_compile(t, format, Rc::new(Next::Empty));
         while let Some((f, next, n)) = compiler.compile_queue.pop() {
