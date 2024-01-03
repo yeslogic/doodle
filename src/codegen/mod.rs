@@ -128,7 +128,6 @@ impl Codegen {
                 let inner = self.lift_type(t.as_ref());
                 CompType::Vec(Box::new(inner)).into()
             }
-            ValueType::Any => panic!("ValueType::Any"),
             ValueType::Record(fields) => {
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
