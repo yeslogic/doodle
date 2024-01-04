@@ -211,7 +211,7 @@ impl VarUnion {
     fn with_branches<T>(&self, mut f: impl FnMut(&[(Label, VarType)]) -> T) -> T {
         match self {
             VarUnion::Var(v) => v.borrow().with_branches(f),
-            VarUnion::Union(r) => f(&*r.borrow()),
+            VarUnion::Union(r) => f(&r.borrow()),
         }
     }
 
@@ -344,7 +344,7 @@ impl VarType {
     }
 
     fn is_numeric_type(&self) -> bool {
-        matches!(self, VarType::U8 | VarType::U16 | VarType::U32)
+        matches!(self.expand_var(), VarType::U8 | VarType::U16 | VarType::U32)
     }
 
     fn unify(&self, other: &VarType) -> Result<VarType, String> {
@@ -595,11 +595,11 @@ impl Expr {
                     "U32Le: expected (U8, U8, U8, U8), found {other:#?}"
                 )),
             },
-            Expr::SeqLength(seq) => match seq.infer_type(scope)? {
+            Expr::SeqLength(seq) => match seq.infer_type(scope)?.expand_var() {
                 VarType::Seq(_t) => Ok(VarType::U32),
                 other => Err(format!("SeqLength: expected Seq, found {other:?}")),
             },
-            Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
+            Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)?.expand_var() {
                 VarType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
@@ -613,7 +613,7 @@ impl Expr {
                             "SubSeq length must be numeric, found {length_type:?}"
                         ));
                     }
-                    Ok(VarType::Seq(t))
+                    Ok(VarType::Seq(t.clone()))
                 }
                 other => Err(format!("SubSeq: expected Seq, found {other:?}")),
             },
@@ -621,7 +621,7 @@ impl Expr {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)?.expand_var() {
                     VarType::Seq(t) => {
                         let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(name.clone(), (&**t).clone());
+                        child_scope.push(name.clone(), (**t).clone());
                         match expr.infer_type(&child_scope)?.expand_var() {
                             VarType::Seq(t2) => Ok(VarType::Seq(t2.clone())),
                             other => Err(format!("FlatMap: expected Seq, found {other:?}")),
@@ -632,13 +632,15 @@ impl Expr {
                 other => Err(format!("FlatMap: expected Lambda, found {other:?}")),
             },
             Expr::FlatMapAccum(expr, accum, accum_type, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)?.expand_var() {
                     VarType::Seq(t) => {
                         let accum_type =
                             accum.infer_type(scope)?.unify(&accum_type.to_var_type())?;
                         let mut child_scope = TypeScope::child(scope);
-                        child_scope
-                            .push(name.clone(), VarType::Tuple(vec![accum_type.clone(), *t]));
+                        child_scope.push(
+                            name.clone(),
+                            VarType::Tuple(vec![accum_type.clone(), *t.clone()]),
+                        );
                         match expr
                             .infer_type(&child_scope)?
                             .unwrap_tuple_type()
@@ -662,7 +664,7 @@ impl Expr {
                 let t = expr.infer_type(scope)?;
                 Ok(VarType::Seq(Box::new(t)))
             }
-            Expr::Inflate(seq) => match seq.infer_type(scope)? {
+            Expr::Inflate(seq) => match seq.infer_type(scope)?.expand_var() {
                 // FIXME should check values are appropriate variants
                 VarType::Seq(_values) => Ok(VarType::Seq(Box::new(VarType::U8))),
                 other => Err(format!("Inflate: expected Seq, found {other:?}")),
