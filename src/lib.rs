@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::ops::{Add, Deref};
@@ -60,7 +60,7 @@ impl Pattern {
     }
 
     fn build_scope(&self, scope: &mut TypeScope<'_>, t: &VarType) {
-        match (self, t) {
+        match (self, t.expand_var()) {
             (Pattern::Binding(name), t) => {
                 scope.push(name.clone(), t.clone());
             }
@@ -79,12 +79,15 @@ impl Pattern {
                     p.build_scope(scope, t);
                 }
             }
-            (Pattern::Variant(label, p), VarType::Union(branches)) => {
-                if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
-                    p.build_scope(scope, t);
-                } else {
-                    panic!("no {label} in {branches:?}");
-                }
+            (Pattern::Variant(label, p), VarType::Union(r)) => {
+                let u = r.borrow();
+                u.with_branches(|branches: &[(Label, VarType)]| {
+                    if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
+                        p.build_scope(scope, t);
+                    } else {
+                        panic!("no {label} in {branches:?}");
+                    }
+                })
             }
             _ => panic!("pattern build_scope failed"),
         }
@@ -133,7 +136,13 @@ pub enum ValueType {
     Seq(Box<ValueType>),
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Debug)]
+pub enum VarUnion {
+    Var(Rc<RefCell<VarUnion>>),
+    Union(Rc<RefCell<Vec<(Label, VarType)>>>),
+}
+
+#[derive(Clone, PartialEq, Hash, Debug)]
 pub enum VarType {
     Var(HashHide<Rc<OnceCell<VarType>>>),
     Empty,
@@ -144,11 +153,11 @@ pub enum VarType {
     Char,
     Tuple(Vec<VarType>),
     Record(Vec<(Label, VarType)>),
-    Union(Vec<(Label, VarType)>),
+    Union(HashHide<Rc<RefCell<VarUnion>>>),
     Seq(Box<VarType>),
 }
 
-#[derive(Clone, Eq, Debug)]
+#[derive(Clone, Debug)]
 pub struct HashHide<T>(T);
 
 impl<T> PartialEq for HashHide<T> {
@@ -187,7 +196,7 @@ impl ValueType {
                     .map(|(l, t)| (l.clone(), t.to_var_type()))
                     .collect(),
             ),
-            ValueType::Union(branches) => VarType::Union(
+            ValueType::Union(branches) => VarType::union(
                 branches
                     .iter()
                     .map(|(l, t)| (l.clone(), t.to_var_type()))
@@ -198,7 +207,81 @@ impl ValueType {
     }
 }
 
+impl VarUnion {
+    fn with_branches<T>(&self, mut f: impl FnMut(&[(Label, VarType)]) -> T) -> T {
+        match self {
+            VarUnion::Var(v) => v.borrow().with_branches(f),
+            VarUnion::Union(r) => f(&*r.borrow()),
+        }
+    }
+
+    fn unify(r1: &Rc<RefCell<VarUnion>>, r2: &Rc<RefCell<VarUnion>>) -> Result<VarType, String> {
+        VarUnion::unify1(r1, r2)?;
+        if r1.as_ptr() != r2.as_ptr() {
+            *r1.borrow_mut() = VarUnion::Var(r2.clone());
+        }
+        Ok(VarType::Union(HashHide(r1.clone())))
+    }
+
+    fn unify1(r1: &Rc<RefCell<VarUnion>>, r2: &Rc<RefCell<VarUnion>>) -> Result<(), String> {
+        match &*r1.borrow() {
+            VarUnion::Var(v) => VarUnion::unify1(v, r2),
+            VarUnion::Union(u1) => VarUnion::unify2(u1, r2),
+        }
+    }
+
+    fn unify2(
+        u1: &Rc<RefCell<Vec<(Label, VarType)>>>,
+        r2: &Rc<RefCell<VarUnion>>,
+    ) -> Result<(), String> {
+        match &*r2.borrow() {
+            VarUnion::Var(v) => VarUnion::unify2(u1, v),
+            VarUnion::Union(u2) => {
+                let bs = VarUnion::unify3(u1, u2)?;
+                *u2.borrow_mut() = bs;
+                Ok(())
+            }
+        }
+    }
+
+    fn unify3(
+        r1: &Rc<RefCell<Vec<(Label, VarType)>>>,
+        r2: &Rc<RefCell<Vec<(Label, VarType)>>>,
+    ) -> Result<Vec<(Label, VarType)>, String> {
+        let bs1 = r1.borrow();
+        let bs2 = r2.borrow();
+        let mut bs: Vec<(Label, VarType)> = Vec::new();
+        for (label, t2) in bs2.iter() {
+            let t = if let Some((_l, t1)) = bs.iter().find(|(l, _)| label == l) {
+                t1.unify(t2)?
+            } else {
+                t2.clone()
+            };
+            bs.push((label.clone(), t));
+        }
+        for (label, t1) in bs1.iter() {
+            if !bs.iter().any(|(l, _)| label == l) {
+                bs.push((label.clone(), t1.clone()));
+            }
+        }
+        Ok(bs)
+    }
+}
+
 impl VarType {
+    // FIXME all uses of this function should probably be unifying type vars
+    fn expand_var(&self) -> &VarType {
+        if let VarType::Var(v) = self {
+            if let Some(v) = v.get() {
+                v.expand_var()
+            } else {
+                panic!("expand_var: unbound variable")
+            }
+        } else {
+            self
+        }
+    }
+
     fn to_value_type(&self) -> ValueType {
         match self {
             VarType::Var(v) => {
@@ -221,12 +304,14 @@ impl VarType {
                     .map(|(l, t)| (l.clone(), t.to_value_type()))
                     .collect(),
             ),
-            VarType::Union(branches) => ValueType::Union(
-                branches
-                    .iter()
-                    .map(|(l, t)| (l.clone(), t.to_value_type()))
-                    .collect(),
-            ),
+            VarType::Union(u) => {
+                ValueType::Union(u.borrow().with_branches(&|branches: &[(Label, VarType)]| {
+                    branches
+                        .iter()
+                        .map(|(l, t)| (l.clone(), t.to_value_type()))
+                        .collect()
+                }))
+            }
             VarType::Seq(t) => ValueType::Seq(Box::new(t.to_value_type())),
         }
     }
@@ -235,8 +320,14 @@ impl VarType {
         VarType::Var(HashHide(Rc::new(OnceCell::new())))
     }
 
+    fn union(branches: Vec<(Label, VarType)>) -> VarType {
+        VarType::Union(HashHide(Rc::new(RefCell::new(VarUnion::Union(Rc::new(
+            RefCell::new(branches),
+        ))))))
+    }
+
     fn record_proj(&self, label: &str) -> VarType {
-        match self {
+        match self.expand_var() {
             VarType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
                 Some((_, t)) => t.clone(),
                 None => panic!("{label} not found in record type"),
@@ -246,7 +337,7 @@ impl VarType {
     }
 
     fn unwrap_tuple_type(self) -> Vec<VarType> {
-        match self {
+        match self.expand_var().clone() {
             VarType::Tuple(ts) => ts,
             _ => panic!("type is not a tuple"),
         }
@@ -298,23 +389,7 @@ impl VarType {
                 }
                 Ok(VarType::Record(fs))
             }
-            (VarType::Union(bs1), VarType::Union(bs2)) => {
-                let mut bs: Vec<(Label, VarType)> = Vec::new();
-                for (label, t2) in bs2 {
-                    let t = if let Some((_l, t1)) = bs.iter().find(|(l, _)| label == l) {
-                        t1.unify(t2)?
-                    } else {
-                        t2.clone()
-                    };
-                    bs.push((label.clone(), t));
-                }
-                for (label, t1) in bs1 {
-                    if !bs.iter().any(|(l, _)| label == l) {
-                        bs.push((label.clone(), t1.clone()));
-                    }
-                }
-                Ok(VarType::Union(bs))
-            }
+            (VarType::Union(r1), VarType::Union(r2)) => VarUnion::unify(r1, r2),
             (VarType::Seq(t1), VarType::Seq(t2)) => Ok(VarType::Seq(Box::new(t1.unify(t2)?))),
             (t1, t2) => Err(format!("failed to unify types {t1:?} and {t2:?}")),
         }
@@ -410,7 +485,7 @@ impl Expr {
                 Ok(VarType::Record(fs))
             }
             Expr::RecordProj(head, label) => Ok(head.infer_type(scope)?.record_proj(label)),
-            Expr::Variant(label, expr) => Ok(VarType::Union(vec![(
+            Expr::Variant(label, expr) => Ok(VarType::union(vec![(
                 label.clone(),
                 expr.infer_type(scope)?,
             )])),
@@ -435,7 +510,10 @@ impl Expr {
             Expr::Lambda(_, _) => Err("cannot infer_type lambda".to_string()),
 
             Expr::BitAnd(x, y) | Expr::BitOr(x, y) => {
-                match (x.infer_type(scope)?, y.infer_type(scope)?) {
+                match (
+                    x.infer_type(scope)?.expand_var(),
+                    y.infer_type(scope)?.expand_var(),
+                ) {
                     (VarType::U8, VarType::U8) => Ok(VarType::U8),
                     (VarType::U16, VarType::U16) => Ok(VarType::U16),
                     (VarType::U32, VarType::U32) => Ok(VarType::U32),
@@ -447,7 +525,10 @@ impl Expr {
             | Expr::Lt(x, y)
             | Expr::Gt(x, y)
             | Expr::Lte(x, y)
-            | Expr::Gte(x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
+            | Expr::Gte(x, y) => match (
+                x.infer_type(scope)?.expand_var(),
+                y.infer_type(scope)?.expand_var(),
+            ) {
                 (VarType::U8, VarType::U8) => Ok(VarType::Bool),
                 (VarType::U16, VarType::U16) => Ok(VarType::Bool),
                 (VarType::U32, VarType::U32) => Ok(VarType::Bool),
@@ -459,32 +540,35 @@ impl Expr {
             | Expr::Div(x, y)
             | Expr::Rem(x, y)
             | Expr::Shl(x, y)
-            | Expr::Shr(x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
+            | Expr::Shr(x, y) => match (
+                x.infer_type(scope)?.expand_var(),
+                y.infer_type(scope)?.expand_var(),
+            ) {
                 (VarType::U8, VarType::U8) => Ok(VarType::U8),
                 (VarType::U16, VarType::U16) => Ok(VarType::U16),
                 (VarType::U32, VarType::U32) => Ok(VarType::U32),
                 (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
             },
 
-            Expr::AsU8(x) => match x.infer_type(scope)? {
+            Expr::AsU8(x) => match x.infer_type(scope)?.expand_var() {
                 VarType::U8 => Ok(VarType::U8),
                 VarType::U16 => Ok(VarType::U8),
                 VarType::U32 => Ok(VarType::U8),
                 x => Err(format!("cannot convert {x:?} to U8")),
             },
-            Expr::AsU16(x) => match x.infer_type(scope)? {
+            Expr::AsU16(x) => match x.infer_type(scope)?.expand_var() {
                 VarType::U8 => Ok(VarType::U16),
                 VarType::U16 => Ok(VarType::U16),
                 VarType::U32 => Ok(VarType::U16),
                 x => Err(format!("cannot convert {x:?} to U16")),
             },
-            Expr::AsU32(x) => match x.infer_type(scope)? {
+            Expr::AsU32(x) => match x.infer_type(scope)?.expand_var() {
                 VarType::U8 => Ok(VarType::U32),
                 VarType::U16 => Ok(VarType::U32),
                 VarType::U32 => Ok(VarType::U32),
                 x => Err(format!("cannot convert {x:?} to U32")),
             },
-            Expr::AsChar(x) => match x.infer_type(scope)? {
+            Expr::AsChar(x) => match x.infer_type(scope)?.expand_var() {
                 VarType::U8 => Ok(VarType::Char),
                 VarType::U16 => Ok(VarType::Char),
                 VarType::U32 => Ok(VarType::Char),
@@ -534,12 +618,12 @@ impl Expr {
                 other => Err(format!("SubSeq: expected Seq, found {other:?}")),
             },
             Expr::FlatMap(expr, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)?.expand_var() {
                     VarType::Seq(t) => {
                         let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(name.clone(), *t);
-                        match expr.infer_type(&child_scope)? {
-                            VarType::Seq(t2) => Ok(VarType::Seq(t2)),
+                        child_scope.push(name.clone(), (&**t).clone());
+                        match expr.infer_type(&child_scope)?.expand_var() {
+                            VarType::Seq(t2) => Ok(VarType::Seq(t2.clone())),
                             other => Err(format!("FlatMap: expected Seq, found {other:?}")),
                         }
                     }
@@ -962,7 +1046,7 @@ impl FormatModule {
             Format::EndOfInput => Ok(VarType::Tuple(vec![])),
             Format::Align(_n) => Ok(VarType::Tuple(vec![])),
             Format::Byte(_bs) => Ok(VarType::U8),
-            Format::Variant(label, f) => Ok(VarType::Union(vec![(
+            Format::Variant(label, f) => Ok(VarType::union(vec![(
                 label.clone(),
                 self.infer_format_type(scope, f)?,
             )])),
@@ -971,7 +1055,7 @@ impl FormatModule {
                 for (label, f) in branches {
                     ts.push((label.clone(), self.infer_format_type(scope, f)?));
                 }
-                Ok(VarType::Union(ts))
+                Ok(VarType::union(ts))
             }
             Format::Union(branches) => {
                 let mut t = VarType::var();
@@ -1046,8 +1130,8 @@ impl FormatModule {
             Format::Dynamic(name, dynformat, format) => {
                 match dynformat {
                     DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
-                        match lengths_expr.infer_type(scope)? {
-                            VarType::Seq(t) => match &*t {
+                        match lengths_expr.infer_type(scope)?.expand_var() {
+                            VarType::Seq(t) => match t.expand_var() {
                                 VarType::U8 | VarType::U16 => {}
                                 other => {
                                     return Err(format!(
