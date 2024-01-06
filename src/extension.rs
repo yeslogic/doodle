@@ -18,8 +18,8 @@ pub struct HOKind;
 mod sealed {
     pub trait ExtKind {}
 
-    impl ExtKind for NLKind {}
-    impl ExtKind for HOKind {}
+    impl ExtKind for super::NLKind {}
+    impl ExtKind for super::HOKind {}
     // impl ExtKind for MCKind {}
 }
 
@@ -29,40 +29,40 @@ pub trait Extension<K: sealed::ExtKind> {
     fn info() -> Self::Info;
 }
 
-pub trait Follows<X: Extension<K>> where K: sealed::ExtKind, Self: Extension<K> {
+pub trait Follows<X: Extension<K>, K> where K: sealed::ExtKind, Self: Extension<K> {
     fn downcast(info: Self::Info) -> X::Info;
 }
 
-impl Follows<UD> for TC {
-    fn downcast(info: Self::Info) -> <UD as Extension>::Info {
-        ()
+impl<K> Follows<UD, K> for TC where UD: Extension<K>, K: sealed::ExtKind, TC: Extension<K> {
+    fn downcast(_info: Self::Info) -> <UD as Extension<K>>::Info {
+        UD::info()
     }
 }
 
-impl<X: Extension<K>, K: ExtKind> Follows<X> for X {
-    fn downcast(info: Self::Info) -> <X as Extension>::Info {
+impl<X: Extension<K>, K: sealed::ExtKind> Follows<X, K> for X {
+    fn downcast(info: Self::Info) -> <X as Extension<K>>::Info {
         info
     }
 }
 
-pub trait Magic<X: Extension<K>> where K: sealed::ExtKind, Self: Extension<K> {
+pub trait MaybeCast<X: Extension<K>, K> where K: sealed::ExtKind, Self: Extension<K> {
     fn cast(info: Self::Info) -> Option<X::Info> {
         None
     }
 }
 
-impl<X, Y> Magic<X> for Y
-where Y: Follows<X>,
+impl<X, Y, K> MaybeCast<X, K> for Y
+where Y: Follows<X, K>, X: Extension<K>, K: sealed::ExtKind
 {
-    fn cast(info: Y::Info) -> Option<X::Info> {
+    fn cast(info: Y::Info) -> Option<<X as Extension<K>>::Info> {
         Some(Y::downcast(info))
     }
 }
 
-impl Magic<TC> for UD {}
+impl MaybeCast<TC, HOKind> for UD {}
+impl MaybeCast<TC, NLKind> for UD {}
 
-
-
+/// Extension Index for Undecorated trees
 pub struct UD;
 
 impl<K: sealed::ExtKind> Extension<K> for UD {
@@ -77,13 +77,14 @@ trait TotalExtension: Extension<NLKind> + Extension<HOKind> /* + Extension<MCKin
 
 impl<X> TotalExtension for X where X: Extension<NLKind> + Extension<HOKind> /* + Extension<MCKind> */ {}
 
+/// Extension index for Typechecked trees
 pub struct TC;
 
 impl Extension<NLKind> for TC {
     type Info = ValueType;
 
     fn info() -> Self::Info {
-        ValueType::Hole
+        ValueType::Any
     }
 }
 
@@ -91,6 +92,6 @@ impl Extension<HOKind> for TC {
     type Info = (ValueType, ValueType);
 
     fn info() -> Self::Info {
-        (ValueType::Hole, ValueType::Hole)
+        (ValueType::Any, ValueType::Any)
     }
 }
