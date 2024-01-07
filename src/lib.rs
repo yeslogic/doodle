@@ -12,12 +12,14 @@ use serde::Serialize;
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::read::ReadCtxt;
+use crate::typed::TExpr;
 
 pub mod bounds;
 pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
 pub mod error;
+pub mod typed;
 
 pub mod output;
 pub mod prelude;
@@ -91,17 +93,6 @@ impl Pattern {
             }
             _ => panic!("pattern build_scope failed"),
         }
-    }
-
-    fn infer_expr_branch_type(
-        &self,
-        scope: &TypeScope<'_>,
-        head_type: &VarType,
-        expr: &Expr,
-    ) -> Result<VarType, String> {
-        let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope(&mut pattern_scope, head_type);
-        expr.infer_type(&pattern_scope)
     }
 
     fn infer_format_branch_type(
@@ -457,219 +448,8 @@ impl Expr {
 
 impl Expr {
     fn infer_type(&self, scope: &TypeScope<'_>) -> Result<VarType, String> {
-        match self {
-            Expr::Var(name) => match scope.get_type_by_name(name) {
-                ValueKind::Value(t) => Ok(t.clone()),
-                ValueKind::Format(_t) => Err("expected value type".to_string()),
-            },
-            Expr::Bool(_b) => Ok(VarType::Bool),
-            Expr::U8(_i) => Ok(VarType::U8),
-            Expr::U16(_i) => Ok(VarType::U16),
-            Expr::U32(_i) => Ok(VarType::U32),
-            Expr::Tuple(exprs) => {
-                let mut ts = Vec::new();
-                for expr in exprs {
-                    ts.push(expr.infer_type(scope)?);
-                }
-                Ok(VarType::Tuple(ts))
-            }
-            Expr::TupleProj(head, index) => match head.infer_type(scope)? {
-                VarType::Tuple(vs) => Ok(vs[*index].clone()),
-                _ => Err("expected tuple type".to_string()),
-            },
-            Expr::Record(fields) => {
-                let mut fs = Vec::new();
-                for (label, expr) in fields {
-                    fs.push((label.clone(), expr.infer_type(scope)?));
-                }
-                Ok(VarType::Record(fs))
-            }
-            Expr::RecordProj(head, label) => Ok(head.infer_type(scope)?.record_proj(label)),
-            Expr::Variant(label, expr) => Ok(VarType::union(vec![(
-                label.clone(),
-                expr.infer_type(scope)?,
-            )])),
-            Expr::Seq(exprs) => {
-                let mut t = VarType::var();
-                for e in exprs {
-                    t = t.unify(&e.infer_type(scope)?)?;
-                }
-                Ok(VarType::Seq(Box::new(t)))
-            }
-            Expr::Match(head, branches) => {
-                if branches.is_empty() {
-                    return Err("infer_type: empty Match".to_string());
-                }
-                let head_type = head.infer_type(scope)?;
-                let mut t = VarType::var();
-                for (pattern, branch) in branches {
-                    t = t.unify(&pattern.infer_expr_branch_type(scope, &head_type, branch)?)?;
-                }
-                Ok(t)
-            }
-            Expr::Lambda(_, _) => Err("cannot infer_type lambda".to_string()),
-
-            Expr::BitAnd(x, y) | Expr::BitOr(x, y) => {
-                match (
-                    x.infer_type(scope)?.expand_var(),
-                    y.infer_type(scope)?.expand_var(),
-                ) {
-                    (VarType::U8, VarType::U8) => Ok(VarType::U8),
-                    (VarType::U16, VarType::U16) => Ok(VarType::U16),
-                    (VarType::U32, VarType::U32) => Ok(VarType::U32),
-                    (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
-                }
-            }
-            Expr::Eq(x, y)
-            | Expr::Ne(x, y)
-            | Expr::Lt(x, y)
-            | Expr::Gt(x, y)
-            | Expr::Lte(x, y)
-            | Expr::Gte(x, y) => match (
-                x.infer_type(scope)?.expand_var(),
-                y.infer_type(scope)?.expand_var(),
-            ) {
-                (VarType::U8, VarType::U8) => Ok(VarType::Bool),
-                (VarType::U16, VarType::U16) => Ok(VarType::Bool),
-                (VarType::U32, VarType::U32) => Ok(VarType::Bool),
-                (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
-            },
-            Expr::Add(x, y)
-            | Expr::Sub(x, y)
-            | Expr::Mul(x, y)
-            | Expr::Div(x, y)
-            | Expr::Rem(x, y)
-            | Expr::Shl(x, y)
-            | Expr::Shr(x, y) => match (
-                x.infer_type(scope)?.expand_var(),
-                y.infer_type(scope)?.expand_var(),
-            ) {
-                (VarType::U8, VarType::U8) => Ok(VarType::U8),
-                (VarType::U16, VarType::U16) => Ok(VarType::U16),
-                (VarType::U32, VarType::U32) => Ok(VarType::U32),
-                (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
-            },
-
-            Expr::AsU8(x) => match x.infer_type(scope)?.expand_var() {
-                VarType::U8 => Ok(VarType::U8),
-                VarType::U16 => Ok(VarType::U8),
-                VarType::U32 => Ok(VarType::U8),
-                x => Err(format!("cannot convert {x:?} to U8")),
-            },
-            Expr::AsU16(x) => match x.infer_type(scope)?.expand_var() {
-                VarType::U8 => Ok(VarType::U16),
-                VarType::U16 => Ok(VarType::U16),
-                VarType::U32 => Ok(VarType::U16),
-                x => Err(format!("cannot convert {x:?} to U16")),
-            },
-            Expr::AsU32(x) => match x.infer_type(scope)?.expand_var() {
-                VarType::U8 => Ok(VarType::U32),
-                VarType::U16 => Ok(VarType::U32),
-                VarType::U32 => Ok(VarType::U32),
-                x => Err(format!("cannot convert {x:?} to U32")),
-            },
-            Expr::AsChar(x) => match x.infer_type(scope)?.expand_var() {
-                VarType::U8 => Ok(VarType::Char),
-                VarType::U16 => Ok(VarType::Char),
-                VarType::U32 => Ok(VarType::Char),
-                x => Err(format!("cannot convert {x:?} to Char")),
-            },
-
-            Expr::U16Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                [VarType::U8, VarType::U8] => Ok(VarType::U16),
-                other => Err(format!("U16Be: expected (U8, U8), found {other:#?}")),
-            },
-            Expr::U16Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                [VarType::U8, VarType::U8] => Ok(VarType::U16),
-                other => Err(format!("U16Le: expected (U8, U8), found {other:#?}")),
-            },
-            Expr::U32Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                [VarType::U8, VarType::U8, VarType::U8, VarType::U8] => Ok(VarType::U32),
-                other => Err(format!(
-                    "U32Be: expected (U8, U8, U8, U8), found {other:#?}"
-                )),
-            },
-            Expr::U32Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                [VarType::U8, VarType::U8, VarType::U8, VarType::U8] => Ok(VarType::U32),
-                other => Err(format!(
-                    "U32Le: expected (U8, U8, U8, U8), found {other:#?}"
-                )),
-            },
-            Expr::SeqLength(seq) => match seq.infer_type(scope)?.expand_var() {
-                VarType::Seq(_t) => Ok(VarType::U32),
-                other => Err(format!("SeqLength: expected Seq, found {other:?}")),
-            },
-            Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)?.expand_var() {
-                VarType::Seq(t) => {
-                    let start_type = start.infer_type(scope)?;
-                    let length_type = length.infer_type(scope)?;
-                    if !start_type.is_numeric_type() {
-                        return Err(format!(
-                            "SubSeq start must be numeric, found {start_type:?}"
-                        ));
-                    }
-                    if !length_type.is_numeric_type() {
-                        return Err(format!(
-                            "SubSeq length must be numeric, found {length_type:?}"
-                        ));
-                    }
-                    Ok(VarType::Seq(t.clone()))
-                }
-                other => Err(format!("SubSeq: expected Seq, found {other:?}")),
-            },
-            Expr::FlatMap(expr, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.infer_type(scope)?.expand_var() {
-                    VarType::Seq(t) => {
-                        let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(name.clone(), (**t).clone());
-                        match expr.infer_type(&child_scope)?.expand_var() {
-                            VarType::Seq(t2) => Ok(VarType::Seq(t2.clone())),
-                            other => Err(format!("FlatMap: expected Seq, found {other:?}")),
-                        }
-                    }
-                    other => Err(format!("FlatMap: expected Seq, found {other:?}")),
-                },
-                other => Err(format!("FlatMap: expected Lambda, found {other:?}")),
-            },
-            Expr::FlatMapAccum(expr, accum, accum_type, seq) => match expr.as_ref() {
-                Expr::Lambda(name, expr) => match seq.infer_type(scope)?.expand_var() {
-                    VarType::Seq(t) => {
-                        let accum_type =
-                            accum.infer_type(scope)?.unify(&accum_type.to_var_type())?;
-                        let mut child_scope = TypeScope::child(scope);
-                        child_scope.push(
-                            name.clone(),
-                            VarType::Tuple(vec![accum_type.clone(), *t.clone()]),
-                        );
-                        match expr
-                            .infer_type(&child_scope)?
-                            .unwrap_tuple_type()
-                            .as_mut_slice()
-                        {
-                            [accum_result, VarType::Seq(t2)] => {
-                                accum_result.unify(&accum_type)?;
-                                Ok(VarType::Seq(t2.clone()))
-                            }
-                            _ => panic!("FlatMapAccum: expected two values"),
-                        }
-                    }
-                    other => Err(format!("FlatMapAccum: expected Seq, found {other:?}")),
-                },
-                other => Err(format!("FlatMapAccum: expected Lambda, found {other:?}")),
-            },
-            Expr::Dup(count, expr) => {
-                if !count.infer_type(scope)?.is_numeric_type() {
-                    return Err(format!("Dup: count is not numeric: {count:?}"));
-                }
-                let t = expr.infer_type(scope)?;
-                Ok(VarType::Seq(Box::new(t)))
-            }
-            Expr::Inflate(seq) => match seq.infer_type(scope)?.expand_var() {
-                // FIXME should check values are appropriate variants
-                VarType::Seq(_values) => Ok(VarType::Seq(Box::new(VarType::U8))),
-                other => Err(format!("Inflate: expected Seq, found {other:?}")),
-            },
-        }
+        let texpr = TExpr::infer_type(scope, self)?;
+        Ok(texpr.t)
     }
 
     /// Conservative bounds for unsigned numeric expressions
