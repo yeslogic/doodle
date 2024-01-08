@@ -17,10 +17,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ("length", base.u16be()),
             (
                 "data",
-                Format::Slice(
-                    Expr::Sub(Box::new(var("length")), Box::new(Expr::U16(2))),
-                    Box::new(data),
-                ),
+                Format::Slice(sub(var("length"), Expr::U16(2)), Box::new(data)),
             ),
         ])
     };
@@ -199,7 +196,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 match_variant(
-                    Expr::RecordProj(Box::new(var("identifier")), "string".into()),
+                    record_proj(var("identifier"), "string"),
                     vec![
                         (Pattern::from_bytes(b"JFIF"), "jfif", app0_jfif.call()),
                         // FIXME: there are other APP0 formats
@@ -229,7 +226,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "data",
                 match_variant(
-                    Expr::RecordProj(Box::new(var("identifier")), "string".into()),
+                    record_proj(var("identifier"), "string"),
                     vec![
                         (Pattern::from_bytes(b"Exif"), "exif", app1_exif.call()),
                         (
@@ -349,7 +346,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             not_byte(0xFF),
             Format::Map(
                 Box::new(tuple([is_byte(0xFF), is_byte(0x00)])),
-                Expr::Lambda("_".into(), Box::new(Expr::U8(0xFF))),
+                lambda("_", Expr::U8(0xFF)),
             ),
         ]),
     );
@@ -376,11 +373,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ),
             (
                 "scan-data-stream",
-                Format::Compute(Expr::FlatMap(
-                    Box::new(Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Match(
-                            Box::new(var("x")),
+                Format::Compute(flat_map(
+                    lambda(
+                        "x",
+                        expr_match(
+                            var("x"),
                             vec![
                                 (
                                     Pattern::variant("mcu", Pattern::Binding("v".into())),
@@ -419,9 +416,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                                     Expr::Seq(vec![]),
                                 ),
                             ],
-                        )),
-                    )),
-                    Box::new(var("scan-data")),
+                        ),
+                    ),
+                    var("scan-data"),
                 )),
             ),
         ]),

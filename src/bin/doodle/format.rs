@@ -52,7 +52,7 @@ mod test {
     use std::borrow::Cow;
 
     use super::*;
-    use doodle::{byte_set::ByteSet, decoder::Value, error::ParseError, read::ReadCtxt, Expr};
+    use doodle::{byte_set::ByteSet, decoder::Value, error::ParseError, read::ReadCtxt};
 
     #[test]
     fn with_relative_offset_format() -> Result<(), ParseError> {
@@ -77,10 +77,7 @@ mod test {
                     var("len"),
                     Format::Map(
                         Box::new(base.u8()),
-                        Expr::Lambda(
-                            "byte".into(),
-                            Box::new(Expr::BitAnd(Box::new(var("mask")), Box::new(var("byte")))),
-                        ),
+                        lambda("byte", bit_and(var("mask"), var("byte"))),
                     ),
                 ),
             ),

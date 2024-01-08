@@ -17,13 +17,7 @@ const DROPMASKS: [u8; 6] = [
 fn drop_n_msb(n: usize, format: Format) -> Format {
     Format::Map(
         Box::new(format),
-        Expr::Lambda(
-            "raw".into(),
-            Box::new(Expr::BitAnd(
-                Box::new(var("raw")),
-                Box::new(Expr::U8(DROPMASKS[n])),
-            )),
-        ),
+        lambda("raw", bit_and(var("raw"), Expr::U8(DROPMASKS[n]))),
     )
 }
 
@@ -32,7 +26,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let utf8_1 = Format::Map(
         Box::new(Format::Byte(VALID_ASCII)),
-        Expr::Lambda("byte".into(), Box::new(Expr::AsU32(Box::new(var("byte"))))),
+        lambda("byte", as_u32(var("byte"))),
     );
 
     let utf8_2 = Format::Map(
@@ -40,15 +34,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             drop_n_msb(3, byte_in(0xC2..=0xDF)),
             utf8_tail.call(),
         ])),
-        Expr::Lambda(
-            "bytes".into(),
-            Box::new(Expr::Match(
-                Box::new(var("bytes")),
+        lambda(
+            "bytes",
+            expr_match(
+                var("bytes"),
                 vec![(
                     Pattern::Tuple(vec![bind("x1"), bind("x0")]),
                     shift6_2(var("x1"), var("x0")),
                 )],
-            )),
+            ),
         ),
     );
 
@@ -75,15 +69,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 utf8_tail.call(),
             ]),
         ])),
-        Expr::Lambda(
-            "bytes".into(),
-            Box::new(Expr::Match(
-                Box::new(var("bytes")),
+        lambda(
+            "bytes",
+            expr_match(
+                var("bytes"),
                 vec![(
                     Pattern::Tuple(vec![bind("x2"), bind("x1"), bind("x0")]),
                     shift6_3(var("x2"), var("x1"), var("x0")),
                 )],
-            )),
+            ),
         ),
     );
 
@@ -108,15 +102,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 utf8_tail.call(),
             ]),
         ])),
-        Expr::Lambda(
-            "bytes".into(),
-            Box::new(Expr::Match(
-                Box::new(var("bytes")),
+        lambda(
+            "bytes",
+            expr_match(
+                var("bytes"),
                 vec![(
                     Pattern::Tuple(vec![bind("x3"), bind("x2"), bind("x1"), bind("x0")]),
                     shift6_4(var("x3"), var("x2"), var("x1"), var("x0")),
                 )],
-            )),
+            ),
         ),
     );
 
@@ -125,10 +119,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "text.utf8.char",
         Format::Map(
             Box::new(union([utf8_1, utf8_2, utf8_3, utf8_4])),
-            Expr::Lambda(
-                "codepoint".into(),
-                Box::new(Expr::AsChar(Box::new(var("codepoint")))),
-            ),
+            lambda("codepoint", as_char(var("codepoint"))),
         ),
     );
 
@@ -145,22 +136,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 }
 
 fn shift6_2(hi: Expr, lo: Expr) -> Expr {
-    bitor(
-        shl(Expr::AsU32(Box::new(hi)), Expr::U32(6)),
-        Expr::AsU32(Box::new(lo)),
-    )
+    bit_or(shl(as_u32(hi), Expr::U32(6)), as_u32(lo))
 }
 
 fn shift6_3(hi: Expr, mid: Expr, lo: Expr) -> Expr {
-    bitor(
-        shl(Expr::AsU32(Box::new(hi)), Expr::U32(12)),
-        shift6_2(mid, lo),
-    )
+    bit_or(shl(as_u32(hi), Expr::U32(12)), shift6_2(mid, lo))
 }
 
 fn shift6_4(hh: Expr, hl: Expr, lh: Expr, ll: Expr) -> Expr {
-    bitor(
-        shl(Expr::AsU32(Box::new(hh)), Expr::U32(18)),
-        shift6_3(hl, lh, ll),
-    )
+    bit_or(shl(as_u32(hh), Expr::U32(18)), shift6_3(hl, lh, ll))
 }

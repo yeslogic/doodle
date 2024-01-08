@@ -6,16 +6,16 @@ const BLOCK_SIZE: u32 = 512;
 
 // octal pair to u32 numeric evalue
 fn o2u32(hi: Expr, lo: Expr) -> Expr {
-    let hi32 = shl(Expr::AsU32(Box::new(hi)), Expr::U32(3));
-    let lo32 = Expr::AsU32(Box::new(lo));
-    bitor(hi32, lo32)
+    let hi32 = shl(as_u32(hi), Expr::U32(3));
+    let lo32 = as_u32(lo);
+    bit_or(hi32, lo32)
 }
 
 // octal quartet to u32 numeric value
 fn o4u32(hh: Expr, hl: Expr, lh: Expr, ll: Expr) -> Expr {
     let hi32 = shl(o2u32(hh, hl), Expr::U32(6));
     let lo32 = o2u32(lh, ll);
-    bitor(hi32, lo32)
+    bit_or(hi32, lo32)
 }
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
@@ -56,13 +56,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let size_field = {
         let octal_digit = Format::Map(
             Box::new(base.ascii_octal_digit()),
-            Expr::Lambda(
-                "bit".into(),
-                Box::new(Expr::Sub(
-                    Box::new(Expr::AsU8(Box::new(var("bit")))),
-                    Box::new(Expr::U8(b'0')),
-                )),
-            ),
+            lambda("bit", sub(as_u8(var("bit")), Expr::U8(b'0'))),
         );
 
         Format::Map(
@@ -81,12 +75,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("__nil", nul_or_wsp.call()),
                 (
                     "value",
-                    Format::Compute(bitor(
+                    Format::Compute(bit_or(
                         shl(
                             o4u32(Expr::U8(0), var("oA"), var("o9"), var("o8")),
                             Expr::U32(24),
                         ),
-                        bitor(
+                        bit_or(
                             shl(
                                 o4u32(var("o7"), var("o6"), var("o5"), var("o4")),
                                 Expr::U32(12),
@@ -96,10 +90,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     )),
                 ),
             ])),
-            Expr::Lambda(
-                "rec".into(),
-                Box::new(Expr::record_proj(var("rec"), "value")),
-            ),
+            lambda("rec", Expr::record_proj(var("rec"), "value")),
         )
     };
 
@@ -164,10 +155,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("header", header.call()),
             (
                 "file",
-                repeat_count(
-                    Expr::RecordProj(Box::new(var("header")), "size".into()),
-                    base.u8(),
-                ),
+                repeat_count(record_proj(var("header"), "size"), base.u8()),
             ),
             ("__padding", Format::Align(512)),
         ]),

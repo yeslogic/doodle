@@ -6,20 +6,12 @@ fn tuple_proj(x: Expr, i: usize) -> Expr {
     Expr::TupleProj(Box::new(x), i)
 }
 
-fn add(x: Expr, y: Expr) -> Expr {
-    Expr::Add(Box::new(x), Box::new(y))
-}
-
 fn shl_u8(x: Expr, r: u8) -> Expr {
-    Expr::Shl(Box::new(x), Box::new(Expr::U8(r)))
+    shl(x, Expr::U8(r))
 }
 
 fn shl_u16(x: Expr, r: u16) -> Expr {
-    Expr::Shl(Box::new(Expr::AsU16(Box::new(x))), Box::new(Expr::U16(r)))
-}
-
-fn bit_or(x: Expr, y: Expr) -> Expr {
-    Expr::BitOr(Box::new(x), Box::new(y))
+    shl(as_u16(x), Expr::U16(r))
 }
 
 fn bits_value_u8(name: &'static str, n: usize) -> Expr {
@@ -40,7 +32,7 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
             bits_value_u16(name, n - 1),
         )
     } else {
-        Expr::AsU16(Box::new(tuple_proj(var(name), 0)))
+        as_u16(tuple_proj(var(name), 0))
     }
 }
 
@@ -52,7 +44,7 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
     if n > 0 {
         Format::Map(
             Box::new(tuple(fs)),
-            Expr::Lambda("bits".into(), Box::new(bits_value_u8("bits", n))),
+            lambda("bits", bits_value_u8("bits", n)),
         )
     } else {
         /* if n == 0 */
@@ -68,7 +60,7 @@ fn bits16(n: usize, base: &BaseModule) -> Format {
     if n > 0 {
         Format::Map(
             Box::new(tuple(fs)),
-            Expr::Lambda("bits".into(), Box::new(bits_value_u16("bits", n))),
+            lambda("bits", bits_value_u16("bits", n)),
         )
     } else {
         /* if n == 0 */
@@ -88,7 +80,7 @@ fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Forma
 
 fn distance_record(base: &BaseModule) -> Format {
     Format::Match(
-        Expr::AsU8(Box::new(var("distance-code"))),
+        as_u8(var("distance-code")),
         vec![
             (Pattern::U8(0), distance_record0(1, base, 0)),
             (Pattern::U8(1), distance_record0(2, base, 0)),
@@ -131,7 +123,7 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
             "length",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(var("length-extra-bits"))),
+                as_u16(var("length-extra-bits")),
             )),
         ),
         (
@@ -149,7 +141,7 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
             "length",
             Format::Compute(add(
                 Expr::U16(start as u16),
-                Expr::AsU16(Box::new(var("length-extra-bits"))),
+                as_u16(var("length-extra-bits")),
             )),
         ),
         ("distance-code", bits8(5, base)),
@@ -158,28 +150,19 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
 }
 
 fn reference_record() -> Expr {
-    Expr::Match(
-        Box::new(Expr::RecordProj(Box::new(var("x")), "extra".into())),
+    expr_match(
+        record_proj(var("x"), "extra"),
         vec![(
             Pattern::Variant("some".into(), Box::new(Pattern::Binding("rec".into()))),
-            Expr::Seq(vec![Expr::Variant(
-                "reference".into(),
-                Box::new(Expr::Record(vec![
-                    (
-                        "length".into(),
-                        Expr::RecordProj(Box::new(var("rec")), "length".into()),
-                    ),
+            Expr::Seq(vec![variant(
+                "reference",
+                Expr::Record(vec![
+                    ("length".into(), record_proj(var("rec"), "length")),
                     (
                         "distance".into(),
-                        Expr::RecordProj(
-                            Box::new(Expr::RecordProj(
-                                Box::new(var("rec")),
-                                "distance-record".into(),
-                            )),
-                            "distance".into(),
-                        ),
+                        record_proj(record_proj(var("rec"), "distance-record"), "distance"),
                     ),
-                ])),
+                ]),
             )]),
         )],
     )
@@ -221,15 +204,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("bytes", repeat_count(var("len"), bits8(8, base))),
             (
                 "codes-values",
-                Format::Compute(Expr::FlatMap(
-                    Box::new(Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Seq(vec![Expr::Variant(
-                            "literal".into(),
-                            Box::new(var("x")),
-                        )])),
-                    )),
-                    Box::new(var("bytes")),
+                Format::Compute(flat_map(
+                    lambda("x", Expr::Seq(vec![variant("literal", var("x"))])),
+                    var("bytes"),
                 )),
             ),
         ]),
@@ -244,15 +221,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "format".into(),
                     DynFormat::Huffman(fixed_code_lengths(), None),
                     Box::new(repeat_until_last(
-                        Expr::Lambda(
-                            "x".into(),
-                            Box::new(Expr::Eq(
-                                Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
-                                    Box::new(var("x")),
-                                    "code".into(),
-                                )))),
-                                Box::new(Expr::U16(256)),
-                            )),
+                        lambda(
+                            "x",
+                            expr_eq(as_u16(record_proj(var("x"), "code")), Expr::U16(256)),
                         ),
                         record([
                             ("code", Format::Apply("format".into())),
@@ -416,11 +387,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "codes-values",
-                Format::Compute(Expr::FlatMap(
-                    Box::new(Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".into())),
+                Format::Compute(flat_map(
+                    lambda(
+                        "x",
+                        expr_match(
+                            record_proj(var("x"), "code"),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
@@ -454,18 +425,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U16(285), reference_record()),
                                 (
                                     Pattern::Wildcard,
-                                    Expr::Seq(vec![Expr::Variant(
-                                        "literal".into(),
-                                        Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
-                                            Box::new(var("x")),
-                                            "code".into(),
-                                        )))),
+                                    Expr::Seq(vec![variant(
+                                        "literal",
+                                        as_u8(record_proj(var("x"), "code")),
                                     )]),
                                 ),
                             ],
-                        )),
-                    )),
-                    Box::new(var("codes")),
+                        ),
+                    ),
+                    var("codes"),
                 )),
             ),
         ]),
@@ -510,38 +478,29 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ])),
                     ),
                     Box::new(repeat_until_seq(
-                        Expr::Lambda(
-                            "y".into(),
-                            Box::new(Expr::Gte(
-                                Box::new(Expr::SeqLength(Box::new(Expr::FlatMapAccum(
-                                    Box::new(Expr::Lambda(
-                                        "x".into(),
-                                        Box::new(Expr::Match(
-                                            Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
-                                                Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
-                                                "code".into(),
-                                            )))),
+                        lambda(
+                            "y",
+                            expr_gte(
+                                seq_length(flat_map_accum(
+                                    lambda(
+                                        "x",
+                                        expr_match(
+                                            as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
                                             vec![
                                                 (
                                                     Pattern::U8(16),
                                                     Expr::Tuple(vec![
-                                                        Expr::TupleProj(Box::new(var("x")), 0),
-                                                        Expr::Dup(
-                                                            Box::new(add(
-                                                                Expr::RecordProj(
-                                                                    Box::new(Expr::TupleProj(
-                                                                        Box::new(var("x")),
-                                                                        1,
-                                                                    )),
-                                                                    "extra".into(),
+                                                        tuple_proj(var("x"), 0),
+                                                        dup(
+                                                            add(
+                                                                record_proj(
+                                                                    tuple_proj(var("x"), 1),
+                                                                    "extra",
                                                                 ),
                                                                 Expr::U8(3),
-                                                            )),
-                                                            Box::new(Expr::Match(
-                                                                Box::new(Expr::TupleProj(
-                                                                    Box::new(var("x")),
-                                                                    0,
-                                                                )),
+                                                            ),
+                                                            expr_match(
+                                                                tuple_proj(var("x"), 0),
                                                                 vec![(
                                                                     Pattern::Variant(
                                                                         "some".into(),
@@ -549,82 +508,70 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                                             "y".into(),
                                                                         )),
                                                                     ),
-                                                                    Expr::Var("y".into()),
+                                                                    var("y"),
                                                                 )],
-                                                            )),
+                                                            ),
                                                         ),
                                                     ]),
                                                 ),
                                                 (
                                                     Pattern::U8(17),
                                                     Expr::Tuple(vec![
-                                                        Expr::TupleProj(Box::new(var("x")), 0),
-                                                        Expr::Dup(
-                                                            Box::new(add(
-                                                                Expr::RecordProj(
-                                                                    Box::new(Expr::TupleProj(
-                                                                        Box::new(var("x")),
-                                                                        1,
-                                                                    )),
-                                                                    "extra".into(),
+                                                        tuple_proj(var("x"), 0),
+                                                        dup(
+                                                            add(
+                                                                record_proj(
+                                                                    tuple_proj(var("x"), 1),
+                                                                    "extra",
                                                                 ),
                                                                 Expr::U8(3),
-                                                            )),
-                                                            Box::new(Expr::U8(0)),
+                                                            ),
+                                                            Expr::U8(0),
                                                         ),
                                                     ]),
                                                 ),
                                                 (
                                                     Pattern::U8(18),
                                                     Expr::Tuple(vec![
-                                                        Expr::TupleProj(Box::new(var("x")), 0),
-                                                        Expr::Dup(
-                                                            Box::new(add(
-                                                                Expr::RecordProj(
-                                                                    Box::new(Expr::TupleProj(
-                                                                        Box::new(var("x")),
-                                                                        1,
-                                                                    )),
-                                                                    "extra".into(),
+                                                        tuple_proj(var("x"), 0),
+                                                        dup(
+                                                            add(
+                                                                record_proj(
+                                                                    tuple_proj(var("x"), 1),
+                                                                    "extra",
                                                                 ),
                                                                 Expr::U8(11),
-                                                            )),
-                                                            Box::new(Expr::U8(0)),
+                                                            ),
+                                                            Expr::U8(0),
                                                         ),
                                                     ]),
                                                 ),
                                                 (
                                                     Pattern::Binding("v".into()),
                                                     Expr::Tuple(vec![
-                                                        Expr::Variant(
-                                                            "some".into(),
-                                                            Box::new(var("v")),
-                                                        ),
+                                                        variant("some", var("v")),
                                                         Expr::Seq(vec![var("v")]),
                                                     ]),
                                                 ),
                                             ],
-                                        )),
-                                    )),
-                                    Box::new(Expr::Variant("none".into(), Box::new(Expr::UNIT))),
+                                        ),
+                                    ),
+                                    variant("none", Expr::UNIT),
                                     ValueType::Union(vec![
                                         ("none".into(), ValueType::Tuple(vec![])),
                                         ("some".into(), ValueType::U8),
                                     ]),
-                                    Box::new(var("y")),
-                                )))),
-                                Box::new(add(
-                                    Expr::AsU32(Box::new(add(var("hlit"), var("hdist")))),
-                                    Expr::U32(258),
+                                    var("y"),
                                 )),
-                            )),
+                                add(as_u32(add(var("hlit"), var("hdist"))), Expr::U32(258)),
+                            ),
                         ),
                         record([
                             ("code", Format::Apply("code-length-alphabet-format".into())),
                             (
                                 "extra",
                                 Format::Match(
-                                    Expr::AsU8(Box::new(var("code"))),
+                                    as_u8(var("code")),
                                     vec![
                                         (Pattern::U8(16), bits2.clone()),
                                         (Pattern::U8(17), bits3.clone()),
@@ -639,113 +586,92 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "literal-length-distance-alphabet-code-lengths-value",
-                Format::Compute(Expr::FlatMapAccum(
-                    Box::new(Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Match(
-                            Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
-                                Box::new(Expr::TupleProj(Box::new(var("x")), 1)),
-                                "code".into(),
-                            )))),
+                Format::Compute(flat_map_accum(
+                    lambda(
+                        "x",
+                        expr_match(
+                            as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
                             vec![
                                 (
                                     Pattern::U8(16),
                                     Expr::Tuple(vec![
-                                        Expr::TupleProj(Box::new(var("x")), 0),
-                                        Expr::Dup(
-                                            Box::new(add(
-                                                Expr::RecordProj(
-                                                    Box::new(Expr::TupleProj(
-                                                        Box::new(var("x")),
-                                                        1,
-                                                    )),
-                                                    "extra".into(),
-                                                ),
+                                        tuple_proj(var("x"), 0),
+                                        dup(
+                                            add(
+                                                record_proj(tuple_proj(var("x"), 1), "extra"),
                                                 Expr::U8(3),
-                                            )),
-                                            Box::new(Expr::Match(
-                                                Box::new(Expr::TupleProj(Box::new(var("x")), 0)),
+                                            ),
+                                            expr_match(
+                                                tuple_proj(var("x"), 0),
                                                 vec![(
                                                     Pattern::Variant(
                                                         "some".into(),
                                                         Box::new(Pattern::Binding("y".into())),
                                                     ),
-                                                    Expr::Var("y".into()),
+                                                    var("y"),
                                                 )],
-                                            )),
+                                            ),
                                         ),
                                     ]),
                                 ),
                                 (
                                     Pattern::U8(17),
                                     Expr::Tuple(vec![
-                                        Expr::TupleProj(Box::new(var("x")), 0),
-                                        Expr::Dup(
-                                            Box::new(add(
-                                                Expr::RecordProj(
-                                                    Box::new(Expr::TupleProj(
-                                                        Box::new(var("x")),
-                                                        1,
-                                                    )),
-                                                    "extra".into(),
-                                                ),
+                                        tuple_proj(var("x"), 0),
+                                        dup(
+                                            add(
+                                                record_proj(tuple_proj(var("x"), 1), "extra"),
                                                 Expr::U8(3),
-                                            )),
-                                            Box::new(Expr::U8(0)),
+                                            ),
+                                            Expr::U8(0),
                                         ),
                                     ]),
                                 ),
                                 (
                                     Pattern::U8(18),
                                     Expr::Tuple(vec![
-                                        Expr::TupleProj(Box::new(var("x")), 0),
-                                        Expr::Dup(
-                                            Box::new(add(
-                                                Expr::RecordProj(
-                                                    Box::new(Expr::TupleProj(
-                                                        Box::new(var("x")),
-                                                        1,
-                                                    )),
-                                                    "extra".into(),
-                                                ),
+                                        tuple_proj(var("x"), 0),
+                                        dup(
+                                            add(
+                                                record_proj(tuple_proj(var("x"), 1), "extra"),
                                                 Expr::U8(11),
-                                            )),
-                                            Box::new(Expr::U8(0)),
+                                            ),
+                                            Expr::U8(0),
                                         ),
                                     ]),
                                 ),
                                 (
                                     Pattern::Binding("v".into()),
                                     Expr::Tuple(vec![
-                                        Expr::Variant("some".into(), Box::new(var("v"))),
+                                        variant("some", var("v")),
                                         Expr::Seq(vec![var("v")]),
                                     ]),
                                 ),
                             ],
-                        )),
-                    )),
-                    Box::new(Expr::Variant("none".into(), Box::new(Expr::UNIT))),
+                        ),
+                    ),
+                    variant("none", Expr::UNIT),
                     ValueType::Union(vec![
                         ("none".into(), ValueType::Tuple(vec![])),
                         ("some".into(), ValueType::U8),
                     ]),
-                    Box::new(var("literal-length-distance-alphabet-code-lengths")),
+                    var("literal-length-distance-alphabet-code-lengths"),
                 )),
             ),
             (
                 "literal-length-alphabet-code-lengths-value",
-                Format::Compute(Expr::SubSeq(
-                    Box::new(var("literal-length-distance-alphabet-code-lengths-value")),
-                    Box::new(Expr::U8(0)),
-                    Box::new(add(Expr::AsU16(Box::new(var("hlit"))), Expr::U16(257))),
+                Format::Compute(sub_seq(
+                    var("literal-length-distance-alphabet-code-lengths-value"),
+                    Expr::U8(0),
+                    add(as_u16(var("hlit")), Expr::U16(257)),
                 )),
             ),
             (
                 "distance-alphabet-code-lengths-value",
-                Format::Compute(Expr::SubSeq(
-                    Box::new(var("literal-length-distance-alphabet-code-lengths-value")),
-                    Box::new(add(Expr::AsU16(Box::new(var("hlit"))), Expr::U16(257))),
-                    Box::new(add(Expr::AsU16(Box::new(var("hdist"))), Expr::U16(1))),
+                Format::Compute(sub_seq(
+                    var("literal-length-distance-alphabet-code-lengths-value"),
+                    add(as_u16(var("hlit")), Expr::U16(257)),
+                    add(as_u16(var("hdist")), Expr::U16(1)),
                 )),
             ),
             (
@@ -757,15 +683,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "literal-length-alphabet-format".into(),
                         DynFormat::Huffman(var("literal-length-alphabet-code-lengths-value"), None),
                         Box::new(repeat_until_last(
-                            Expr::Lambda(
-                                "x".into(),
-                                Box::new(Expr::Eq(
-                                    Box::new(Expr::AsU16(Box::new(Expr::RecordProj(
-                                        Box::new(var("x")),
-                                        "code".into(),
-                                    )))),
-                                    Box::new(Expr::U16(256)),
-                                )),
+                            lambda(
+                                "x",
+                                expr_eq(as_u16(record_proj(var("x"), "code")), Expr::U16(256)),
                             ),
                             record([
                                 (
@@ -841,11 +761,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "codes-values",
-                Format::Compute(Expr::FlatMap(
-                    Box::new(Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "code".into())),
+                Format::Compute(flat_map(
+                    lambda(
+                        "x",
+                        expr_match(
+                            record_proj(var("x"), "code"),
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
@@ -879,18 +799,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U16(285), reference_record()),
                                 (
                                     Pattern::Wildcard,
-                                    Expr::Seq(vec![Expr::Variant(
-                                        "literal".into(),
-                                        Box::new(Expr::AsU8(Box::new(Expr::RecordProj(
-                                            Box::new(var("x")),
-                                            "code".into(),
-                                        )))),
+                                    Expr::Seq(vec![variant(
+                                        "literal",
+                                        as_u8(record_proj(var("x"), "code")),
                                     )]),
                                 ),
                             ],
-                        )),
-                    )),
-                    Box::new(var("codes")),
+                        ),
+                    ),
+                    var("codes"),
                 )),
             ),
         ]),
@@ -921,49 +838,43 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "blocks",
                 repeat_until_last(
-                    Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Eq(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "final".into())),
-                            Box::new(Expr::U8(1)),
-                        )),
-                    ),
+                    lambda("x", expr_eq(record_proj(var("x"), "final"), Expr::U8(1))),
                     block.call(),
                 ),
             ),
             (
                 "codes",
-                Format::Compute(Expr::FlatMap(
-                    Box::new(Expr::Lambda(
-                        "x".into(),
-                        Box::new(Expr::Match(
-                            Box::new(Expr::RecordProj(Box::new(var("x")), "data".into())),
+                Format::Compute(flat_map(
+                    lambda(
+                        "x",
+                        expr_match(
+                            record_proj(var("x"), "data"),
                             vec![
                                 (
                                     Pattern::Variant(
                                         "uncompressed".into(),
                                         Box::new(Pattern::Binding("y".into())),
                                     ),
-                                    Expr::RecordProj(Box::new(var("y")), "codes-values".into()),
+                                    record_proj(var("y"), "codes-values"),
                                 ),
                                 (
                                     Pattern::Variant(
                                         "fixed_huffman".into(),
                                         Box::new(Pattern::Binding("y".into())),
                                     ),
-                                    Expr::RecordProj(Box::new(var("y")), "codes-values".into()),
+                                    record_proj(var("y"), "codes-values"),
                                 ),
                                 (
                                     Pattern::Variant(
                                         "dynamic_huffman".into(),
                                         Box::new(Pattern::Binding("y".into())),
                                     ),
-                                    Expr::RecordProj(Box::new(var("y")), "codes-values".into()),
+                                    record_proj(var("y"), "codes-values"),
                                 ),
                             ],
-                        )),
-                    )),
-                    Box::new(var("blocks")),
+                        ),
+                    ),
+                    var("blocks"),
                 )),
             ),
             (
