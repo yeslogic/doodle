@@ -9,21 +9,12 @@ use crate::format::base::*;
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags & 0b10000000) != 0
-        Expr::Ne(
-            Box::new(Expr::BitAnd(
-                Box::new(flags),
-                Box::new(Expr::U8(0b10000000)),
-            )),
-            Box::new(Expr::U8(0)),
-        )
+        expr_ne(bit_and(flags, Expr::U8(0b10000000)), Expr::U8(0))
     }
 
     fn color_table_len(flags: Expr) -> Expr {
         // 2 << (flags & 7)
-        Expr::Shl(
-            Box::new(Expr::U8(2)),
-            Box::new(Expr::BitAnd(Box::new(flags), Box::new(Expr::U8(7)))),
-        )
+        shl(Expr::U8(2), bit_and(flags, Expr::U8(7)))
     }
 
     let color_table_entry = module.define_format(

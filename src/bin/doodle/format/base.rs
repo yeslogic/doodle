@@ -1,9 +1,17 @@
 use doodle::byte_set::ByteSet;
 use doodle::IntoLabel;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 pub fn var<Name: IntoLabel>(name: Name) -> Expr {
     Expr::Var(name.into())
+}
+
+pub fn lambda<Name: IntoLabel>(name: Name, body: Expr) -> Expr {
+    Expr::Lambda(name.into(), Box::new(body))
+}
+
+pub fn variant<Name: IntoLabel>(name: Name, value: Expr) -> Expr {
+    Expr::Variant(name.into(), Box::new(value))
 }
 
 pub fn bind<Name: IntoLabel>(name: Name) -> Pattern {
@@ -20,6 +28,10 @@ pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -
             .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
             .collect(),
     )
+}
+
+pub fn expr_match(head: Expr, branches: impl Into<Vec<(Pattern, Expr)>>) -> Expr {
+    Expr::Match(Box::new(head), branches.into())
 }
 
 pub fn match_variant<Name: IntoLabel>(
@@ -113,12 +125,80 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
     tuple(bytes.iter().copied().map(is_byte))
 }
 
+pub fn record_proj(head: impl Into<Expr>, label: impl IntoLabel) -> Expr {
+    Expr::RecordProj(Box::new(head.into()), label.into())
+}
+
+pub fn expr_eq(x: Expr, y: Expr) -> Expr {
+    Expr::Eq(Box::new(x), Box::new(y))
+}
+
+pub fn expr_ne(x: Expr, y: Expr) -> Expr {
+    Expr::Ne(Box::new(x), Box::new(y))
+}
+
+pub fn expr_gte(x: Expr, y: Expr) -> Expr {
+    Expr::Gte(Box::new(x), Box::new(y))
+}
+
+pub fn as_u8(x: Expr) -> Expr {
+    Expr::AsU8(Box::new(x))
+}
+
+pub fn as_u16(x: Expr) -> Expr {
+    Expr::AsU16(Box::new(x))
+}
+
+pub fn as_u32(x: Expr) -> Expr {
+    Expr::AsU32(Box::new(x))
+}
+
+pub fn as_char(x: Expr) -> Expr {
+    Expr::AsChar(Box::new(x))
+}
+
+pub fn add(x: Expr, y: Expr) -> Expr {
+    Expr::Add(Box::new(x), Box::new(y))
+}
+
+pub fn sub(x: Expr, y: Expr) -> Expr {
+    Expr::Sub(Box::new(x), Box::new(y))
+}
+
+pub fn rem(x: Expr, y: Expr) -> Expr {
+    Expr::Rem(Box::new(x), Box::new(y))
+}
+
 pub fn shl(value: Expr, places: Expr) -> Expr {
     Expr::Shl(Box::new(value), Box::new(places))
 }
 
-pub fn bitor(x: Expr, y: Expr) -> Expr {
+pub fn bit_or(x: Expr, y: Expr) -> Expr {
     Expr::BitOr(Box::new(x), Box::new(y))
+}
+
+pub fn bit_and(x: Expr, y: Expr) -> Expr {
+    Expr::BitAnd(Box::new(x), Box::new(y))
+}
+
+pub fn seq_length(seq: Expr) -> Expr {
+    Expr::SeqLength(Box::new(seq))
+}
+
+pub fn sub_seq(seq: Expr, start: Expr, length: Expr) -> Expr {
+    Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length))
+}
+
+pub fn flat_map(f: Expr, seq: Expr) -> Expr {
+    Expr::FlatMap(Box::new(f), Box::new(seq))
+}
+
+pub fn flat_map_accum(f: Expr, accum: Expr, accum_type: ValueType, seq: Expr) -> Expr {
+    Expr::FlatMapAccum(Box::new(f), Box::new(accum), accum_type, Box::new(seq))
+}
+
+pub fn dup(count: Expr, expr: Expr) -> Expr {
+    Expr::Dup(Box::new(count), Box::new(expr))
 }
 
 /// ByteSet consisting of 0..=127, or the valid ASCII range (including control characters)
@@ -201,7 +281,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         "base.u16be",
         Format::Map(
             Box::new(tuple([u8.call(), u8.call()])),
-            Expr::Lambda("x".into(), Box::new(Expr::U16Be(Box::new(var("x"))))),
+            lambda("x", Expr::U16Be(Box::new(var("x")))),
         ),
     );
 
@@ -209,7 +289,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         "base.u16le",
         Format::Map(
             Box::new(tuple([u8.call(), u8.call()])),
-            Expr::Lambda("x".into(), Box::new(Expr::U16Le(Box::new(var("x"))))),
+            lambda("x", Expr::U16Le(Box::new(var("x")))),
         ),
     );
 
@@ -217,7 +297,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         "base.u32be",
         Format::Map(
             Box::new(tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
-            Expr::Lambda("x".into(), Box::new(Expr::U32Be(Box::new(var("x"))))),
+            lambda("x", Expr::U32Be(Box::new(var("x")))),
         ),
     );
 
@@ -225,7 +305,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         "base.u32le",
         Format::Map(
             Box::new(tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
-            Expr::Lambda("x".into(), Box::new(Expr::U32Le(Box::new(var("x"))))),
+            lambda("x", Expr::U32Le(Box::new(var("x")))),
         ),
     );
 

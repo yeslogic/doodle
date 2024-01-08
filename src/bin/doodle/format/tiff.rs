@@ -70,7 +70,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "ifd",
                 Format::WithRelativeOffset(
                     // TODO: Offset from start of the TIFF header
-                    Expr::Sub(Box::new(var("offset")), Box::new(Expr::U32(8))),
+                    sub(var("offset"), Expr::U32(8)),
                     Box::new(Format::Match(
                         var("byte-order"),
                         vec![

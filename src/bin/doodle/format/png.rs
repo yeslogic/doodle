@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{Format, FormatModule, FormatRef, Pattern};
 
 use crate::format::base::*;
 
@@ -42,10 +42,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let iend = module.define_format("png.iend", chunk(iend_tag.call(), iend_data.call()));
 
     let bkgd_data = match_variant(
-        Expr::RecordProj(
-            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".into())),
-            "color-type".into(),
-        ),
+        record_proj(record_proj(var("ihdr"), "data"), "color-type"),
         vec![
             (
                 Pattern::U8(0),
@@ -110,10 +107,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let time = module.define_format("png.time", chunk(is_bytes(b"tIME"), time_data));
 
     let trns_data = match_variant(
-        Expr::RecordProj(
-            Box::new(Expr::RecordProj(Box::new(var("ihdr")), "data".into())),
-            "color-type".into(),
-        ),
+        record_proj(record_proj(var("ihdr"), "data"), "color-type"),
         vec![
             (
                 Pattern::U8(0),
