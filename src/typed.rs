@@ -5,57 +5,7 @@ use std::ops::Deref;
 #[derive(Clone, Debug)]
 pub struct TExpr {
     pub t: VarType,
-    e: TExpr0,
-}
-
-#[derive(Clone, Debug)]
-pub enum TExpr0 {
-    Var(Label),
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    Tuple(Vec<TExpr>),
-    TupleProj(Box<TExpr>, usize),
-    Record(Vec<(Label, TExpr)>),
-    RecordProj(Box<TExpr>, Label),
-    Variant(Label, Box<TExpr>),
-    Seq(Vec<TExpr>),
-    Match(Box<TExpr>, Vec<(Pattern, TExpr)>),
-    Lambda(Label, Box<TExpr>),
-
-    BitAnd(Box<TExpr>, Box<TExpr>),
-    BitOr(Box<TExpr>, Box<TExpr>),
-    Eq(Box<TExpr>, Box<TExpr>),
-    Ne(Box<TExpr>, Box<TExpr>),
-    Lt(Box<TExpr>, Box<TExpr>),
-    Gt(Box<TExpr>, Box<TExpr>),
-    Lte(Box<TExpr>, Box<TExpr>),
-    Gte(Box<TExpr>, Box<TExpr>),
-    Mul(Box<TExpr>, Box<TExpr>),
-    Div(Box<TExpr>, Box<TExpr>),
-    Rem(Box<TExpr>, Box<TExpr>),
-    Shl(Box<TExpr>, Box<TExpr>),
-    Shr(Box<TExpr>, Box<TExpr>),
-    Add(Box<TExpr>, Box<TExpr>),
-    Sub(Box<TExpr>, Box<TExpr>),
-
-    AsU8(Box<TExpr>),
-    AsU16(Box<TExpr>),
-    AsU32(Box<TExpr>),
-
-    U16Be(Box<TExpr>),
-    U16Le(Box<TExpr>),
-    U32Be(Box<TExpr>),
-    U32Le(Box<TExpr>),
-    AsChar(Box<TExpr>),
-
-    SeqLength(Box<TExpr>),
-    SubSeq(Box<TExpr>, Box<TExpr>, Box<TExpr>),
-    FlatMap(Box<TExpr>, Box<TExpr>),
-    FlatMapAccum(Box<TExpr>, Box<TExpr>, VarType, Box<TExpr>),
-    Dup(Box<TExpr>, Box<TExpr>),
-    Inflate(Box<TExpr>),
+    e: Expr<TExpr>,
 }
 
 #[derive(Clone, Debug)]
@@ -116,20 +66,20 @@ pub enum TFormat {
 }
 
 impl TExpr {
-    fn new(t: VarType, e: TExpr0) -> TExpr {
+    fn new(t: VarType, e: Expr<TExpr>) -> TExpr {
         TExpr { t, e }
     }
 
     pub fn infer_type(scope: &TypeScope<'_>, expr: &Expr0) -> Result<TExpr, String> {
         match expr {
             Expr::Var(name) => match scope.get_type_by_name(name) {
-                ValueKind::Value(t) => Ok(TExpr::new(t.clone(), TExpr0::Var(name.clone()))),
+                ValueKind::Value(t) => Ok(TExpr::new(t.clone(), Expr::Var(name.clone()))),
                 ValueKind::Format(_t) => Err("expected value type".to_string()),
             },
-            Expr::Bool(b) => Ok(TExpr::new(VarType::Bool, TExpr0::Bool(*b))),
-            Expr::U8(i) => Ok(TExpr::new(VarType::U8, TExpr0::U8(*i))),
-            Expr::U16(i) => Ok(TExpr::new(VarType::U16, TExpr0::U16(*i))),
-            Expr::U32(i) => Ok(TExpr::new(VarType::U32, TExpr0::U32(*i))),
+            Expr::Bool(b) => Ok(TExpr::new(VarType::Bool, Expr::Bool(*b))),
+            Expr::U8(i) => Ok(TExpr::new(VarType::U8, Expr::U8(*i))),
+            Expr::U16(i) => Ok(TExpr::new(VarType::U16, Expr::U16(*i))),
+            Expr::U32(i) => Ok(TExpr::new(VarType::U32, Expr::U32(*i))),
             Expr::Tuple(exprs) => {
                 let mut es = Vec::with_capacity(exprs.len());
                 let mut ts = Vec::with_capacity(exprs.len());
@@ -139,14 +89,14 @@ impl TExpr {
                     es.push(e);
                     ts.push(t);
                 }
-                Ok(TExpr::new(VarType::Tuple(ts), TExpr0::Tuple(es)))
+                Ok(TExpr::new(VarType::Tuple(ts), Expr::Tuple(es)))
             }
             Expr::TupleProj(head, index) => {
                 let head = TExpr::infer_type(scope, head)?;
                 match head.t.expand_var() {
                     VarType::Tuple(vs) => Ok(TExpr::new(
                         vs[*index].clone(),
-                        TExpr0::TupleProj(Box::new(head), *index),
+                        Expr::TupleProj(Box::new(head), *index),
                     )),
                     _ => Err("expected tuple type".to_string()),
                 }
@@ -159,21 +109,21 @@ impl TExpr {
                     ts.push((label.clone(), expr.t.clone()));
                     fs.push((label.clone(), expr));
                 }
-                Ok(TExpr::new(VarType::Record(ts), TExpr0::Record(fs)))
+                Ok(TExpr::new(VarType::Record(ts), Expr::Record(fs)))
             }
             Expr::RecordProj(head, label) => {
                 let head = TExpr::infer_type(scope, head)?;
                 let t = head.t.record_proj(label);
                 Ok(TExpr::new(
                     t,
-                    TExpr0::RecordProj(Box::new(head), label.clone()),
+                    Expr::RecordProj(Box::new(head), label.clone()),
                 ))
             }
             Expr::Variant(label, expr) => {
                 let expr = TExpr::infer_type(scope, expr)?;
                 Ok(TExpr::new(
                     VarType::union(vec![(label.clone(), expr.t.clone())]),
-                    TExpr0::Variant(label.clone(), Box::new(expr)),
+                    Expr::Variant(label.clone(), Box::new(expr)),
                 ))
             }
             Expr::Seq(exprs) => {
@@ -184,7 +134,7 @@ impl TExpr {
                     t = t.unify(&e.t)?;
                     es.push(e);
                 }
-                Ok(TExpr::new(VarType::Seq(Box::new(t)), TExpr0::Seq(es)))
+                Ok(TExpr::new(VarType::Seq(Box::new(t)), Expr::Seq(es)))
             }
             Expr::Match(head, branches) => {
                 if branches.is_empty() {
@@ -199,7 +149,7 @@ impl TExpr {
                     t = t.unify(&branch.t)?;
                     bs.push((pattern.clone(), branch));
                 }
-                Ok(TExpr::new(t, TExpr0::Match(Box::new(head), bs)))
+                Ok(TExpr::new(t, Expr::Match(Box::new(head), bs)))
             }
             Expr::Lambda(_, _) => Err("cannot infer_type lambda".to_string()),
 
@@ -209,15 +159,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::U8,
-                        TExpr0::BitAnd(Box::new(x), Box::new(y)),
+                        Expr::BitAnd(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::BitAnd(Box::new(x), Box::new(y)),
+                        Expr::BitAnd(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::BitAnd(Box::new(x), Box::new(y)),
+                        Expr::BitAnd(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -228,15 +178,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::U8,
-                        TExpr0::BitOr(Box::new(x), Box::new(y)),
+                        Expr::BitOr(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::BitOr(Box::new(x), Box::new(y)),
+                        Expr::BitOr(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::BitOr(Box::new(x), Box::new(y)),
+                        Expr::BitOr(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -247,15 +197,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Eq(Box::new(x), Box::new(y)),
+                        Expr::Eq(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Eq(Box::new(x), Box::new(y)),
+                        Expr::Eq(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Eq(Box::new(x), Box::new(y)),
+                        Expr::Eq(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -266,15 +216,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Ne(Box::new(x), Box::new(y)),
+                        Expr::Ne(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Ne(Box::new(x), Box::new(y)),
+                        Expr::Ne(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Ne(Box::new(x), Box::new(y)),
+                        Expr::Ne(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -285,15 +235,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Lt(Box::new(x), Box::new(y)),
+                        Expr::Lt(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Lt(Box::new(x), Box::new(y)),
+                        Expr::Lt(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Lt(Box::new(x), Box::new(y)),
+                        Expr::Lt(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -304,15 +254,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Gt(Box::new(x), Box::new(y)),
+                        Expr::Gt(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Gt(Box::new(x), Box::new(y)),
+                        Expr::Gt(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Gt(Box::new(x), Box::new(y)),
+                        Expr::Gt(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -323,15 +273,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Lte(Box::new(x), Box::new(y)),
+                        Expr::Lte(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Lte(Box::new(x), Box::new(y)),
+                        Expr::Lte(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Lte(Box::new(x), Box::new(y)),
+                        Expr::Lte(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -342,15 +292,15 @@ impl TExpr {
                 match (x.t.expand_var(), y.t.expand_var()) {
                     (VarType::U8, VarType::U8) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Gte(Box::new(x), Box::new(y)),
+                        Expr::Gte(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Gte(Box::new(x), Box::new(y)),
+                        Expr::Gte(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::Bool,
-                        TExpr0::Gte(Box::new(x), Box::new(y)),
+                        Expr::Gte(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -359,17 +309,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Add(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Add(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Add(Box::new(x), Box::new(y)),
+                        Expr::Add(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Add(Box::new(x), Box::new(y)),
+                        Expr::Add(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -378,17 +327,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Sub(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Sub(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Sub(Box::new(x), Box::new(y)),
+                        Expr::Sub(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Sub(Box::new(x), Box::new(y)),
+                        Expr::Sub(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -397,17 +345,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Mul(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Mul(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Mul(Box::new(x), Box::new(y)),
+                        Expr::Mul(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Mul(Box::new(x), Box::new(y)),
+                        Expr::Mul(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -416,17 +363,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Div(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Div(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Div(Box::new(x), Box::new(y)),
+                        Expr::Div(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Div(Box::new(x), Box::new(y)),
+                        Expr::Div(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -435,17 +381,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Rem(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Rem(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Rem(Box::new(x), Box::new(y)),
+                        Expr::Rem(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Rem(Box::new(x), Box::new(y)),
+                        Expr::Rem(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -454,17 +399,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Shl(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Shl(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Shl(Box::new(x), Box::new(y)),
+                        Expr::Shl(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Shl(Box::new(x), Box::new(y)),
+                        Expr::Shl(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -473,17 +417,16 @@ impl TExpr {
                 let x = TExpr::infer_type(scope, x)?;
                 let y = TExpr::infer_type(scope, y)?;
                 match (x.t.expand_var(), y.t.expand_var()) {
-                    (VarType::U8, VarType::U8) => Ok(TExpr::new(
-                        VarType::U8,
-                        TExpr0::Shr(Box::new(x), Box::new(y)),
-                    )),
+                    (VarType::U8, VarType::U8) => {
+                        Ok(TExpr::new(VarType::U8, Expr::Shr(Box::new(x), Box::new(y))))
+                    }
                     (VarType::U16, VarType::U16) => Ok(TExpr::new(
                         VarType::U16,
-                        TExpr0::Shr(Box::new(x), Box::new(y)),
+                        Expr::Shr(Box::new(x), Box::new(y)),
                     )),
                     (VarType::U32, VarType::U32) => Ok(TExpr::new(
                         VarType::U32,
-                        TExpr0::Shr(Box::new(x), Box::new(y)),
+                        Expr::Shr(Box::new(x), Box::new(y)),
                     )),
                     (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
                 }
@@ -492,36 +435,36 @@ impl TExpr {
             Expr::AsU8(x) => {
                 let x = TExpr::infer_type(scope, x)?;
                 match x.t.expand_var() {
-                    VarType::U8 => Ok(TExpr::new(VarType::U8, TExpr0::AsU8(Box::new(x)))),
-                    VarType::U16 => Ok(TExpr::new(VarType::U8, TExpr0::AsU8(Box::new(x)))),
-                    VarType::U32 => Ok(TExpr::new(VarType::U8, TExpr0::AsU8(Box::new(x)))),
+                    VarType::U8 => Ok(TExpr::new(VarType::U8, Expr::AsU8(Box::new(x)))),
+                    VarType::U16 => Ok(TExpr::new(VarType::U8, Expr::AsU8(Box::new(x)))),
+                    VarType::U32 => Ok(TExpr::new(VarType::U8, Expr::AsU8(Box::new(x)))),
                     x => Err(format!("cannot convert {x:?} to U8")),
                 }
             }
             Expr::AsU16(x) => {
                 let x = TExpr::infer_type(scope, x)?;
                 match x.t.expand_var() {
-                    VarType::U8 => Ok(TExpr::new(VarType::U16, TExpr0::AsU16(Box::new(x)))),
-                    VarType::U16 => Ok(TExpr::new(VarType::U16, TExpr0::AsU16(Box::new(x)))),
-                    VarType::U32 => Ok(TExpr::new(VarType::U16, TExpr0::AsU16(Box::new(x)))),
+                    VarType::U8 => Ok(TExpr::new(VarType::U16, Expr::AsU16(Box::new(x)))),
+                    VarType::U16 => Ok(TExpr::new(VarType::U16, Expr::AsU16(Box::new(x)))),
+                    VarType::U32 => Ok(TExpr::new(VarType::U16, Expr::AsU16(Box::new(x)))),
                     x => Err(format!("cannot convert {x:?} to U16")),
                 }
             }
             Expr::AsU32(x) => {
                 let x = TExpr::infer_type(scope, x)?;
                 match x.t.expand_var() {
-                    VarType::U8 => Ok(TExpr::new(VarType::U32, TExpr0::AsU32(Box::new(x)))),
-                    VarType::U16 => Ok(TExpr::new(VarType::U32, TExpr0::AsU32(Box::new(x)))),
-                    VarType::U32 => Ok(TExpr::new(VarType::U32, TExpr0::AsU32(Box::new(x)))),
+                    VarType::U8 => Ok(TExpr::new(VarType::U32, Expr::AsU32(Box::new(x)))),
+                    VarType::U16 => Ok(TExpr::new(VarType::U32, Expr::AsU32(Box::new(x)))),
+                    VarType::U32 => Ok(TExpr::new(VarType::U32, Expr::AsU32(Box::new(x)))),
                     x => Err(format!("cannot convert {x:?} to U32")),
                 }
             }
             Expr::AsChar(x) => {
                 let x = TExpr::infer_type(scope, x)?;
                 match x.t.expand_var() {
-                    VarType::U8 => Ok(TExpr::new(VarType::Char, TExpr0::AsChar(Box::new(x)))),
-                    VarType::U16 => Ok(TExpr::new(VarType::Char, TExpr0::AsChar(Box::new(x)))),
-                    VarType::U32 => Ok(TExpr::new(VarType::Char, TExpr0::AsChar(Box::new(x)))),
+                    VarType::U8 => Ok(TExpr::new(VarType::Char, Expr::AsChar(Box::new(x)))),
+                    VarType::U16 => Ok(TExpr::new(VarType::Char, Expr::AsChar(Box::new(x)))),
+                    VarType::U32 => Ok(TExpr::new(VarType::Char, Expr::AsChar(Box::new(x)))),
                     x => Err(format!("cannot convert {x:?} to Char")),
                 }
             }
@@ -530,7 +473,7 @@ impl TExpr {
                 let bytes = TExpr::infer_type(scope, bytes)?;
                 match bytes.t.clone().unwrap_tuple_type().as_slice() {
                     [VarType::U8, VarType::U8] => {
-                        Ok(TExpr::new(VarType::U16, TExpr0::U16Le(Box::new(bytes))))
+                        Ok(TExpr::new(VarType::U16, Expr::U16Le(Box::new(bytes))))
                     }
                     other => Err(format!("U16Be: expected (U8, U8), found {other:#?}")),
                 }
@@ -539,7 +482,7 @@ impl TExpr {
                 let bytes = TExpr::infer_type(scope, bytes)?;
                 match bytes.t.clone().unwrap_tuple_type().as_slice() {
                     [VarType::U8, VarType::U8] => {
-                        Ok(TExpr::new(VarType::U16, TExpr0::U16Le(Box::new(bytes))))
+                        Ok(TExpr::new(VarType::U16, Expr::U16Le(Box::new(bytes))))
                     }
                     other => Err(format!("U16Le: expected (U8, U8), found {other:#?}")),
                 }
@@ -548,7 +491,7 @@ impl TExpr {
                 let bytes = TExpr::infer_type(scope, bytes)?;
                 match bytes.t.clone().unwrap_tuple_type().as_slice() {
                     [VarType::U8, VarType::U8, VarType::U8, VarType::U8] => {
-                        Ok(TExpr::new(VarType::U32, TExpr0::U32Be(Box::new(bytes))))
+                        Ok(TExpr::new(VarType::U32, Expr::U32Be(Box::new(bytes))))
                     }
                     other => Err(format!(
                         "U32Be: expected (U8, U8, U8, U8), found {other:#?}"
@@ -559,7 +502,7 @@ impl TExpr {
                 let bytes = TExpr::infer_type(scope, bytes)?;
                 match bytes.t.clone().unwrap_tuple_type().as_slice() {
                     [VarType::U8, VarType::U8, VarType::U8, VarType::U8] => {
-                        Ok(TExpr::new(VarType::U32, TExpr0::U32Le(Box::new(bytes))))
+                        Ok(TExpr::new(VarType::U32, Expr::U32Le(Box::new(bytes))))
                     }
                     other => Err(format!(
                         "U32Le: expected (U8, U8, U8, U8), found {other:#?}"
@@ -570,7 +513,7 @@ impl TExpr {
                 let seq = TExpr::infer_type(scope, seq)?;
                 match seq.t.expand_var() {
                     VarType::Seq(_t) => {
-                        Ok(TExpr::new(VarType::U32, TExpr0::SeqLength(Box::new(seq))))
+                        Ok(TExpr::new(VarType::U32, Expr::SeqLength(Box::new(seq))))
                     }
                     other => Err(format!("SeqLength: expected Seq, found {other:?}")),
                 }
@@ -595,7 +538,7 @@ impl TExpr {
                         }
                         Ok(TExpr::new(
                             VarType::Seq(t.clone()),
-                            TExpr0::SubSeq(Box::new(seq), Box::new(start), Box::new(length)),
+                            Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length)),
                         ))
                     }
                     other => Err(format!("SubSeq: expected Seq, found {other:?}")),
@@ -615,11 +558,11 @@ impl TExpr {
                                         // FIXME no lambda types yet
                                         let expr = TExpr::new(
                                             body.t.clone(),
-                                            TExpr0::Lambda(name.clone(), Box::new(body)),
+                                            Expr::Lambda(name.clone(), Box::new(body)),
                                         );
                                         Ok(TExpr::new(
                                             VarType::Seq(t2),
-                                            TExpr0::FlatMap(Box::new(expr), Box::new(seq)),
+                                            Expr::FlatMap(Box::new(expr), Box::new(seq)),
                                         ))
                                     }
                                     other => Err(format!("FlatMap: expected Seq, found {other:?}")),
@@ -651,14 +594,14 @@ impl TExpr {
                                         // FIXME no lambda types yet
                                         let expr = TExpr::new(
                                             body.t.clone(),
-                                            TExpr0::Lambda(name.clone(), Box::new(body)),
+                                            Expr::Lambda(name.clone(), Box::new(body)),
                                         );
                                         Ok(TExpr::new(
                                             VarType::Seq(t2.clone()),
-                                            TExpr0::FlatMapAccum(
+                                            Expr::FlatMapAccum(
                                                 Box::new(expr),
                                                 Box::new(accum),
-                                                accum_type,
+                                                accum_type.to_value_type(),
                                                 Box::new(seq),
                                             ),
                                         ))
@@ -680,7 +623,7 @@ impl TExpr {
                 }
                 Ok(TExpr::new(
                     VarType::Seq(Box::new(expr.t.clone())),
-                    TExpr0::Dup(Box::new(count), Box::new(expr)),
+                    Expr::Dup(Box::new(count), Box::new(expr)),
                 ))
             }
             Expr::Inflate(seq) => {
@@ -689,7 +632,7 @@ impl TExpr {
                     // FIXME should check values are appropriate variants
                     VarType::Seq(_values) => Ok(TExpr::new(
                         VarType::Seq(Box::new(VarType::U8)),
-                        TExpr0::Inflate(Box::new(seq)),
+                        Expr::Inflate(Box::new(seq)),
                     )),
                     other => Err(format!("Inflate: expected Seq, found {other:?}")),
                 }
