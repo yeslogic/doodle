@@ -5,10 +5,7 @@ use crate::format::base::*;
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn is_even(num: Expr) -> Expr {
         // (num % 2) == 0
-        Expr::Eq(
-            Box::new(Expr::Rem(Box::new(num), Box::new(Expr::U32(2)))),
-            Box::new(Expr::U32(0)),
-        )
+        expr_eq(rem(num, Expr::U32(2)), Expr::U32(0))
     }
 
     let chunk = |tag: Format, data: Format| {

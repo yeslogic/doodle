@@ -21,15 +21,9 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         record([("crc", base.u32le()), ("length", base.u32le())]),
     );
 
-    let fname_flag = Expr::Ne(
-        Box::new(Expr::BitAnd(
-            Box::new(Expr::RecordProj(
-                Box::new(var("header")),
-                "file-flags".into(),
-            )),
-            Box::new(Expr::U8(0x08)),
-        )),
-        Box::new(Expr::U8(0x00)),
+    let fname_flag = expr_ne(
+        bit_and(record_proj(var("header"), "file-flags"), Expr::U8(0x08)),
+        Expr::U8(0x00),
     );
 
     let fname = module.define_format("gzip.fname", base.asciiz_string());
