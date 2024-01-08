@@ -1,5 +1,5 @@
 use crate::format::BaseModule;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
+use doodle::{Expr, Expr0, Format, FormatModule, FormatRef, Pattern};
 
 use super::base::*;
 
@@ -35,7 +35,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             "bytes",
             expr_match(
                 var("bytes"),
-                vec![(
+                &[(
                     Pattern::Tuple(vec![bind("x1"), bind("x0")]),
                     shift6_2(var("x1"), var("x0")),
                 )],
@@ -70,7 +70,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             "bytes",
             expr_match(
                 var("bytes"),
-                vec![(
+                &[(
                     Pattern::Tuple(vec![bind("x2"), bind("x1"), bind("x0")]),
                     shift6_3(var("x2"), var("x1"), var("x0")),
                 )],
@@ -103,7 +103,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             "bytes",
             expr_match(
                 var("bytes"),
-                vec![(
+                &[(
                     Pattern::Tuple(vec![bind("x3"), bind("x2"), bind("x1"), bind("x0")]),
                     shift6_4(var("x3"), var("x2"), var("x1"), var("x0")),
                 )],
@@ -132,14 +132,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     )
 }
 
-fn shift6_2(hi: Expr, lo: Expr) -> Expr {
+fn shift6_2(hi: Expr0, lo: Expr0) -> Expr0 {
     bit_or(shl(as_u32(hi), Expr::U32(6)), as_u32(lo))
 }
 
-fn shift6_3(hi: Expr, mid: Expr, lo: Expr) -> Expr {
+fn shift6_3(hi: Expr0, mid: Expr0, lo: Expr0) -> Expr0 {
     bit_or(shl(as_u32(hi), Expr::U32(12)), shift6_2(mid, lo))
 }
 
-fn shift6_4(hh: Expr, hl: Expr, lh: Expr, ll: Expr) -> Expr {
+fn shift6_4(hh: Expr0, hl: Expr0, lh: Expr0, ll: Expr0) -> Expr0 {
     bit_or(shl(as_u32(hh), Expr::U32(18)), shift6_3(hl, lh, ll))
 }

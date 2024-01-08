@@ -1,4 +1,4 @@
-use doodle::{Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, Expr0, Format, FormatModule, FormatRef};
 
 use crate::format::base::*;
 
@@ -7,12 +7,12 @@ use crate::format::base::*;
 /// - [Graphics Interchange Format Version 89a](https://www.w3.org/Graphics/GIF/spec-gif89a.txt)
 #[allow(clippy::redundant_clone)]
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
-    fn has_color_table(flags: Expr) -> Expr {
+    fn has_color_table(flags: Expr0) -> Expr0 {
         // (flags & 0b10000000) != 0
         expr_ne(bit_and(flags, Expr::U8(0b10000000)), Expr::U8(0))
     }
 
-    fn color_table_len(flags: Expr) -> Expr {
+    fn color_table_len(flags: Expr0) -> Expr0 {
         // 2 << (flags & 7)
         shl(Expr::U8(2), bit_and(flags, Expr::U8(7)))
     }
@@ -22,7 +22,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]),
     );
 
-    let color_table = |flags: Expr| {
+    let color_table = |flags: Expr0| {
         if_then_else(
             has_color_table(flags.clone()),
             repeat_count(color_table_len(flags), color_table_entry.call()),

@@ -2,7 +2,8 @@ use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
 use crate::{
-    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType,
+    DynFormat, Expr, Expr0, Expr1, Format, FormatModule, MatchTree, Next, Pattern, TypeScope,
+    ValueType,
 };
 use crate::{IntoLabel, Label};
 use serde::Serialize;
@@ -137,7 +138,7 @@ impl Value {
     }
 }
 
-impl Expr {
+impl Expr0 {
     pub fn eval<'a>(&'a self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
         match self {
             Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
@@ -417,7 +418,7 @@ impl Expr {
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
 pub enum Decoder {
-    Call(usize, Vec<(Label, Expr)>),
+    Call(usize, Vec<(Label, Expr0)>),
     Fail,
     EndOfInput,
     Align(usize),
@@ -429,18 +430,18 @@ pub enum Decoder {
     Record(Vec<(Label, Decoder)>),
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
-    RepeatCount(Expr, Box<Decoder>),
-    RepeatUntilLast(Expr, Box<Decoder>),
-    RepeatUntilSeq(Expr, Box<Decoder>),
+    RepeatCount(Expr0, Box<Decoder>),
+    RepeatUntilLast(Expr0, Box<Decoder>),
+    RepeatUntilSeq(Expr0, Box<Decoder>),
     Peek(Box<Decoder>),
     PeekNot(Box<Decoder>),
-    Slice(Expr, Box<Decoder>),
+    Slice(Expr0, Box<Decoder>),
     Bits(Box<Decoder>),
-    WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Box<Decoder>, Expr),
-    Compute(Expr),
-    Let(Label, Expr, Box<Decoder>),
-    Match(Expr, Vec<(Pattern, Decoder)>),
+    WithRelativeOffset(Expr0, Box<Decoder>),
+    Map(Box<Decoder>, Expr0),
+    Compute(Expr0),
+    Let(Label, Expr0, Box<Decoder>),
+    Match(Expr0, Vec<(Pattern, Decoder)>),
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
 }
@@ -1117,7 +1118,10 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         if len != 0 {
             codes.push(Format::Map(
                 Box::new(bit_range(len, next_code[len])),
-                Expr::Lambda("_".into(), Box::new(Expr::U16(n.try_into().unwrap()))),
+                Expr::Lambda(
+                    "_".into(),
+                    Box::new(Expr1(Expr::U16(n.try_into().unwrap()))),
+                ),
             ));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;

@@ -5,7 +5,7 @@ use crate::codegen::rust_ast::{
     LocalType, Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem, RustProgram,
 };
 use crate::decoder::{Decoder, Program};
-use crate::{Expr, Label, MatchTree, ValueType};
+use crate::{Expr0, Label, MatchTree, ValueType};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -452,7 +452,7 @@ pub enum ParallelLogic {
 pub enum SimpleLogic {
     Fail,
     ExpectEnd,
-    Invoke(usize, Vec<(Label, Expr)>),
+    Invoke(usize, Vec<(Label, Expr0)>),
     SkipToNextMultiple(usize),
     ByteIn(ByteSet),
 }

@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::decoder::{MultiScope, Scope, SingleScope, Value};
 use crate::Label;
-use crate::{DynFormat, Expr, Format, FormatModule};
+use crate::{DynFormat, Expr, Expr0, Format, FormatModule};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
@@ -786,8 +786,8 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_binop(
         &mut self,
         op: &'static str,
-        lhs: &Expr,
-        rhs: &Expr,
+        lhs: &Expr0,
+        rhs: &Expr0,
         lhs_prec: Precedence,
         rhs_prec: Precedence,
     ) -> Fragment {
@@ -803,8 +803,8 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_prefix(
         &mut self,
         op: &'static str,
-        args: Option<&[&Expr]>,
-        operand: &Expr,
+        args: Option<&[&Expr0]>,
+        operand: &Expr0,
     ) -> Fragment {
         let mut frags = FragmentBuilder::new();
 
@@ -827,7 +827,7 @@ impl<'module> MonoidalPrinter<'module> {
         frags.finalize_with_sep(Fragment::Char(' '))
     }
 
-    fn compile_expr(&mut self, expr: &Expr, prec: Precedence) -> Fragment {
+    fn compile_expr(&mut self, expr: &Expr0, prec: Precedence) -> Fragment {
         match expr {
             Expr::Match(head, _) => cond_paren(
                 Fragment::String("match ".into())

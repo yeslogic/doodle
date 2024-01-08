@@ -387,66 +387,91 @@ impl VarType {
     }
 }
 
+pub type Expr0 = Expr<Expr1>;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub struct Expr1(Expr0);
+
+impl From<Expr0> for Expr1 {
+    fn from(value: Expr0) -> Self {
+        Expr1(value)
+    }
+}
+/*
+impl From<Expr0> for Box<Expr1> {
+    fn from(value: Expr0) -> Self {
+        Box::new(Expr1(value))
+    }
+}
+*/
+impl Deref for Expr1 {
+    type Target = Expr0;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
-pub enum Expr {
+pub enum Expr<E> {
     Var(Label),
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
-    Tuple(Vec<Expr>),
-    TupleProj(Box<Expr>, usize),
-    Record(Vec<(Label, Expr)>),
-    RecordProj(Box<Expr>, Label),
-    Variant(Label, Box<Expr>),
-    Seq(Vec<Expr>),
-    Match(Box<Expr>, Vec<(Pattern, Expr)>),
-    Lambda(Label, Box<Expr>),
+    Tuple(Vec<E>),
+    TupleProj(Box<E>, usize),
+    Record(Vec<(Label, E)>),
+    RecordProj(Box<E>, Label),
+    Variant(Label, Box<E>),
+    Seq(Vec<E>),
+    Match(Box<E>, Vec<(Pattern, E)>),
+    Lambda(Label, Box<E>),
 
-    BitAnd(Box<Expr>, Box<Expr>),
-    BitOr(Box<Expr>, Box<Expr>),
-    Eq(Box<Expr>, Box<Expr>),
-    Ne(Box<Expr>, Box<Expr>),
-    Lt(Box<Expr>, Box<Expr>),
-    Gt(Box<Expr>, Box<Expr>),
-    Lte(Box<Expr>, Box<Expr>),
-    Gte(Box<Expr>, Box<Expr>),
-    Mul(Box<Expr>, Box<Expr>),
-    Div(Box<Expr>, Box<Expr>),
-    Rem(Box<Expr>, Box<Expr>),
-    Shl(Box<Expr>, Box<Expr>),
-    Shr(Box<Expr>, Box<Expr>),
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
+    BitAnd(Box<E>, Box<E>),
+    BitOr(Box<E>, Box<E>),
+    Eq(Box<E>, Box<E>),
+    Ne(Box<E>, Box<E>),
+    Lt(Box<E>, Box<E>),
+    Gt(Box<E>, Box<E>),
+    Lte(Box<E>, Box<E>),
+    Gte(Box<E>, Box<E>),
+    Mul(Box<E>, Box<E>),
+    Div(Box<E>, Box<E>),
+    Rem(Box<E>, Box<E>),
+    Shl(Box<E>, Box<E>),
+    Shr(Box<E>, Box<E>),
+    Add(Box<E>, Box<E>),
+    Sub(Box<E>, Box<E>),
 
-    AsU8(Box<Expr>),
-    AsU16(Box<Expr>),
-    AsU32(Box<Expr>),
+    AsU8(Box<E>),
+    AsU16(Box<E>),
+    AsU32(Box<E>),
 
-    U16Be(Box<Expr>),
-    U16Le(Box<Expr>),
-    U32Be(Box<Expr>),
-    U32Le(Box<Expr>),
-    AsChar(Box<Expr>),
+    U16Be(Box<E>),
+    U16Le(Box<E>),
+    U32Be(Box<E>),
+    U32Le(Box<E>),
+    AsChar(Box<E>),
 
-    SeqLength(Box<Expr>),
-    SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
-    FlatMap(Box<Expr>, Box<Expr>),
-    FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
-    Dup(Box<Expr>, Box<Expr>),
-    Inflate(Box<Expr>),
+    SeqLength(Box<E>),
+    SubSeq(Box<E>, Box<E>, Box<E>),
+    FlatMap(Box<E>, Box<E>),
+    FlatMapAccum(Box<E>, Box<E>, ValueType, Box<E>),
+    Dup(Box<E>, Box<E>),
+    Inflate(Box<E>),
 }
 
-impl Expr {
-    pub const UNIT: Expr = Expr::Tuple(Vec::new());
+impl Expr0 {
+    pub const UNIT: Expr0 = Expr::Tuple(Vec::new());
 
-    pub fn record_proj(head: impl Into<Box<Expr>>, label: impl IntoLabel) -> Expr {
-        Expr::RecordProj(head.into(), label.into())
+    pub fn record_proj(head: impl Into<Expr0>, label: impl IntoLabel) -> Expr0 {
+        Expr::RecordProj(Box::new(Expr1(head.into())), label.into())
     }
 }
 
-impl Expr {
+impl Expr0 {
     fn infer_type(&self, scope: &TypeScope<'_>) -> Result<VarType, String> {
         let texpr = TExpr::infer_type(scope, self)?;
         Ok(texpr.t)
@@ -467,7 +492,7 @@ impl Expr {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum DynFormat {
-    Huffman(Expr, Option<Expr>),
+    Huffman(Expr0, Option<Expr0>),
 }
 
 /// Binary format descriptions
@@ -514,7 +539,7 @@ pub enum DynFormat {
 #[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
-    ItemVar(usize, Vec<Expr>),
+    ItemVar(usize, Vec<Expr0>),
     /// A format that never matches
     Fail,
     /// Matches if the end of the input has been reached
@@ -539,29 +564,29 @@ pub enum Format {
     /// Repeat a format one-or-more times
     Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
-    RepeatCount(Expr, Box<Format>),
+    RepeatCount(Expr0, Box<Format>),
     /// Repeat a format until a condition is satisfied by its last item
-    RepeatUntilLast(Expr, Box<Format>),
+    RepeatUntilLast(Expr0, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
-    RepeatUntilSeq(Expr, Box<Format>),
+    RepeatUntilSeq(Expr0, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
     /// Attempt to parse a format and fail if it succeeds
     PeekNot(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
-    Slice(Expr, Box<Format>),
+    Slice(Expr0, Box<Format>),
     /// Parse bitstream
     Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
-    WithRelativeOffset(Expr, Box<Format>),
+    WithRelativeOffset(Expr0, Box<Format>),
     /// Map a value with a lambda expression
-    Map(Box<Format>, Expr),
+    Map(Box<Format>, Expr0),
     /// Compute a value
-    Compute(Expr),
+    Compute(Expr0),
     /// Let binding
-    Let(Label, Expr, Box<Format>),
+    Let(Label, Expr0, Box<Format>),
     /// Pattern match on an expression
-    Match(Expr, Vec<(Pattern, Format)>),
+    Match(Expr0, Vec<(Pattern, Format)>),
     /// Format generated dynamically
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
@@ -749,7 +774,7 @@ impl FormatRef {
         Format::ItemVar(self.0, vec![])
     }
 
-    pub fn call_args(&self, args: Vec<Expr>) -> Format {
+    pub fn call_args(&self, args: Vec<Expr0>) -> Format {
         Format::ItemVar(self.0, args)
     }
 }

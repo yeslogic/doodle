@@ -1,18 +1,18 @@
-use doodle::{byte_set::ByteSet, Expr, Format, FormatModule, FormatRef};
+use doodle::{byte_set::ByteSet, Expr, Expr0, Format, FormatModule, FormatRef};
 
 use crate::format::base::*;
 
 const BLOCK_SIZE: u32 = 512;
 
 // octal pair to u32 numeric evalue
-fn o2u32(hi: Expr, lo: Expr) -> Expr {
+fn o2u32(hi: Expr0, lo: Expr0) -> Expr0 {
     let hi32 = shl(as_u32(hi), Expr::U32(3));
     let lo32 = as_u32(lo);
     bit_or(hi32, lo32)
 }
 
 // octal quartet to u32 numeric value
-fn o4u32(hh: Expr, hl: Expr, lh: Expr, ll: Expr) -> Expr {
+fn o4u32(hh: Expr0, hl: Expr0, lh: Expr0, ll: Expr0) -> Expr0 {
     let hi32 = shl(o2u32(hh, hl), Expr::U32(6));
     let lo32 = o2u32(lh, ll);
     bit_or(hi32, lo32)

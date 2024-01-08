@@ -1,5 +1,6 @@
 use crate::byte_set::ByteSet;
-use crate::{DynFormat, Expr, Label, Pattern, TypeScope, ValueKind, VarType};
+use crate::{DynFormat, Expr, Expr0, Label, Pattern, TypeScope, ValueKind, VarType};
+use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 pub struct TExpr {
@@ -119,7 +120,7 @@ impl TExpr {
         TExpr { t, e }
     }
 
-    pub fn infer_type(scope: &TypeScope<'_>, expr: &Expr) -> Result<TExpr, String> {
+    pub fn infer_type(scope: &TypeScope<'_>, expr: &Expr0) -> Result<TExpr, String> {
         match expr {
             Expr::Var(name) => match scope.get_type_by_name(name) {
                 ValueKind::Value(t) => Ok(TExpr::new(t.clone(), TExpr0::Var(name.clone()))),
@@ -604,8 +605,8 @@ impl TExpr {
                 let seq = TExpr::infer_type(scope, seq)?;
                 match seq.t.expand_var() {
                     VarType::Seq(t) => {
-                        match expr.as_ref() {
-                            Expr::Lambda(name, body) => {
+                        match expr.as_ref().deref() {
+                            Expr0::Lambda(name, body) => {
                                 let mut child_scope = TypeScope::child(scope);
                                 child_scope.push(name.clone(), (**t).clone());
                                 let body = TExpr::infer_type(&child_scope, body)?;
@@ -635,8 +636,8 @@ impl TExpr {
                 let seq = TExpr::infer_type(scope, seq)?;
                 match seq.t.expand_var() {
                     VarType::Seq(t) => {
-                        match expr.as_ref() {
-                            Expr::Lambda(name, body) => {
+                        match expr.as_ref().deref() {
+                            Expr0::Lambda(name, body) => {
                                 let accum_type = accum.t.unify(&accum_type.to_var_type())?;
                                 let mut child_scope = TypeScope::child(scope);
                                 child_scope.push(
@@ -700,7 +701,7 @@ impl TExpr {
         scope: &TypeScope<'_>,
         head_type: &VarType,
         pattern: &Pattern,
-        expr: &Expr,
+        expr: &Expr0,
     ) -> Result<TExpr, String> {
         let mut pattern_scope = TypeScope::child(scope);
         pattern.build_scope(&mut pattern_scope, head_type);
