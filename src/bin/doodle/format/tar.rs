@@ -54,13 +54,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         |len: u16| -> Format { Format::Slice(Expr::U16(len), Box::new(tar_asciiz.call())) };
     let magic = is_bytes(MAGIC);
     let size_field = {
-        let octal_digit = Format::Map(
-            Box::new(base.ascii_octal_digit()),
+        let octal_digit = map(
+            base.ascii_octal_digit(),
             lambda("bit", sub(as_u8(var("bit")), Expr::U8(b'0'))),
         );
 
-        Format::Map(
-            Box::new(record([
+        map(
+            record([
                 ("oA", octal_digit.clone()),
                 ("o9", octal_digit.clone()),
                 ("o8", octal_digit.clone()),
@@ -89,7 +89,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     )),
                 ),
-            ])),
+            ]),
             lambda("rec", Expr::record_proj(var("rec"), "value")),
         )
     };

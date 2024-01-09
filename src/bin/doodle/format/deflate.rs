@@ -42,10 +42,7 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
         fs.push(base.bit());
     }
     if n > 0 {
-        Format::Map(
-            Box::new(tuple(fs)),
-            lambda("bits", bits_value_u8("bits", n)),
-        )
+        map(tuple(fs), lambda("bits", bits_value_u8("bits", n)))
     } else {
         /* if n == 0 */
         Format::Compute(Expr::U8(0))
@@ -58,10 +55,7 @@ fn bits16(n: usize, base: &BaseModule) -> Format {
         fs.push(base.bit());
     }
     if n > 0 {
-        Format::Map(
-            Box::new(tuple(fs)),
-            lambda("bits", bits_value_u16("bits", n)),
-        )
+        map(tuple(fs), lambda("bits", bits_value_u16("bits", n)))
     } else {
         /* if n == 0 */
         Format::Compute(Expr::U16(0))

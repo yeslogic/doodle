@@ -344,8 +344,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         "jpeg.mcu",
         Format::Union(vec![
             not_byte(0xFF),
-            Format::Map(
-                Box::new(tuple([is_byte(0xFF), is_byte(0x00)])),
+            map(
+                tuple([is_byte(0xFF), is_byte(0x00)]),
                 lambda("_", Expr::U8(0xFF)),
             ),
         ]),
