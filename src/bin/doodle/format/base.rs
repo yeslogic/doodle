@@ -15,7 +15,7 @@ pub fn variant<Name: IntoLabel>(name: Name, value: Expr) -> Expr {
 }
 
 pub fn bind<Name: IntoLabel>(name: Name) -> Pattern {
-    Pattern::Binding(name.into())
+    Pattern::binding(name)
 }
 
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
