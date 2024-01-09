@@ -102,6 +102,10 @@ pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
     )
 }
 
+pub fn map(f: Format, expr: Expr) -> Format {
+    Format::Map(Box::new(f), expr)
+}
+
 pub fn is_byte(b: u8) -> Format {
     Format::Byte(ByteSet::from([b]))
 }
@@ -279,32 +283,32 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
 
     let u16be = module.define_format(
         "base.u16be",
-        Format::Map(
-            Box::new(tuple([u8.call(), u8.call()])),
+        map(
+            tuple([u8.call(), u8.call()]),
             lambda("x", Expr::U16Be(Box::new(var("x")))),
         ),
     );
 
     let u16le = module.define_format(
         "base.u16le",
-        Format::Map(
-            Box::new(tuple([u8.call(), u8.call()])),
+        map(
+            tuple([u8.call(), u8.call()]),
             lambda("x", Expr::U16Le(Box::new(var("x")))),
         ),
     );
 
     let u32be = module.define_format(
         "base.u32be",
-        Format::Map(
-            Box::new(tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
+        map(
+            tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
             lambda("x", Expr::U32Be(Box::new(var("x")))),
         ),
     );
 
     let u32le = module.define_format(
         "base.u32le",
-        Format::Map(
-            Box::new(tuple([u8.call(), u8.call(), u8.call(), u8.call()])),
+        map(
+            tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
             lambda("x", Expr::U32Le(Box::new(var("x")))),
         ),
     );
