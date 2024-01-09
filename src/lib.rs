@@ -53,6 +53,10 @@ impl Pattern {
         Pattern::Variant(label.into(), value.into())
     }
 
+    pub fn binding(name: impl IntoLabel) -> Pattern {
+        Pattern::Binding(name.into())
+    }
+
     fn build_scope(&self, scope: &mut TypeScope<'_>, t: &ValueType) {
         match (self, t) {
             (Pattern::Binding(name), t) => {
