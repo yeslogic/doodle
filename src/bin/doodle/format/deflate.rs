@@ -153,7 +153,7 @@ fn reference_record() -> Expr {
     expr_match(
         record_proj(var("x"), "extra"),
         vec![(
-            Pattern::Variant("some".into(), Box::new(Pattern::Binding("rec".into()))),
+            Pattern::variant("some", Pattern::binding("rec")),
             Expr::Seq(vec![variant(
                 "reference",
                 Expr::Record(vec![
@@ -502,11 +502,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                             expr_match(
                                                                 tuple_proj(var("x"), 0),
                                                                 vec![(
-                                                                    Pattern::Variant(
-                                                                        "some".into(),
-                                                                        Box::new(Pattern::Binding(
-                                                                            "y".into(),
-                                                                        )),
+                                                                    Pattern::variant(
+                                                                        "some",
+                                                                        Pattern::binding("y"),
                                                                     ),
                                                                     var("y"),
                                                                 )],
@@ -547,7 +545,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                     ]),
                                                 ),
                                                 (
-                                                    Pattern::Binding("v".into()),
+                                                    Pattern::binding("v"),
                                                     Expr::Tuple(vec![
                                                         variant("some", var("v")),
                                                         Expr::Seq(vec![var("v")]),
@@ -604,10 +602,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             expr_match(
                                                 tuple_proj(var("x"), 0),
                                                 vec![(
-                                                    Pattern::Variant(
-                                                        "some".into(),
-                                                        Box::new(Pattern::Binding("y".into())),
-                                                    ),
+                                                    Pattern::variant("some", Pattern::binding("y")),
                                                     var("y"),
                                                 )],
                                             ),
@@ -641,7 +636,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     ]),
                                 ),
                                 (
-                                    Pattern::Binding("v".into()),
+                                    Pattern::binding("v"),
                                     Expr::Tuple(vec![
                                         variant("some", var("v")),
                                         Expr::Seq(vec![var("v")]),
@@ -851,24 +846,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             record_proj(var("x"), "data"),
                             vec![
                                 (
-                                    Pattern::Variant(
-                                        "uncompressed".into(),
-                                        Box::new(Pattern::Binding("y".into())),
-                                    ),
+                                    Pattern::variant("uncompressed", Pattern::binding("y")),
                                     record_proj(var("y"), "codes-values"),
                                 ),
                                 (
-                                    Pattern::Variant(
-                                        "fixed_huffman".into(),
-                                        Box::new(Pattern::Binding("y".into())),
-                                    ),
+                                    Pattern::variant("fixed_huffman", Pattern::binding("y")),
                                     record_proj(var("y"), "codes-values"),
                                 ),
                                 (
-                                    Pattern::Variant(
-                                        "dynamic_huffman".into(),
-                                        Box::new(Pattern::Binding("y".into())),
-                                    ),
+                                    Pattern::variant("dynamic_huffman", Pattern::binding("y")),
                                     record_proj(var("y"), "codes-values"),
                                 ),
                             ],

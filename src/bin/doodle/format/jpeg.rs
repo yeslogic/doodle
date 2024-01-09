@@ -380,7 +380,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                             var("x"),
                             vec![
                                 (
-                                    Pattern::variant("mcu", Pattern::Binding("v".into())),
+                                    Pattern::variant("mcu", Pattern::binding("v")),
                                     Expr::Seq(vec![var("v")]),
                                 ),
                                 (
