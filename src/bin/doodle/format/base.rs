@@ -1,6 +1,6 @@
 use doodle::byte_set::ByteSet;
 use doodle::IntoLabel;
-use doodle::{Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{Arith, Expr, Format, FormatModule, FormatRef, IntRel, Pattern, ValueType};
 
 pub fn var<Name: IntoLabel>(name: Name) -> Expr {
     Expr::Var(name.into())
@@ -134,15 +134,15 @@ pub fn record_proj(head: impl Into<Expr>, label: impl IntoLabel) -> Expr {
 }
 
 pub fn expr_eq(x: Expr, y: Expr) -> Expr {
-    Expr::Eq(Box::new(x), Box::new(y))
+    Expr::IntRel(IntRel::Eq, Box::new(x), Box::new(y))
 }
 
 pub fn expr_ne(x: Expr, y: Expr) -> Expr {
-    Expr::Ne(Box::new(x), Box::new(y))
+    Expr::IntRel(IntRel::Ne, Box::new(x), Box::new(y))
 }
 
 pub fn expr_gte(x: Expr, y: Expr) -> Expr {
-    Expr::Gte(Box::new(x), Box::new(y))
+    Expr::IntRel(IntRel::Gte, Box::new(x), Box::new(y))
 }
 
 pub fn as_u8(x: Expr) -> Expr {
@@ -162,27 +162,27 @@ pub fn as_char(x: Expr) -> Expr {
 }
 
 pub fn add(x: Expr, y: Expr) -> Expr {
-    Expr::Add(Box::new(x), Box::new(y))
+    Expr::Arith(Arith::Add, Box::new(x), Box::new(y))
 }
 
 pub fn sub(x: Expr, y: Expr) -> Expr {
-    Expr::Sub(Box::new(x), Box::new(y))
+    Expr::Arith(Arith::Sub, Box::new(x), Box::new(y))
 }
 
 pub fn rem(x: Expr, y: Expr) -> Expr {
-    Expr::Rem(Box::new(x), Box::new(y))
-}
-
-pub fn shl(value: Expr, places: Expr) -> Expr {
-    Expr::Shl(Box::new(value), Box::new(places))
+    Expr::Arith(Arith::Rem, Box::new(x), Box::new(y))
 }
 
 pub fn bit_or(x: Expr, y: Expr) -> Expr {
-    Expr::BitOr(Box::new(x), Box::new(y))
+    Expr::Arith(Arith::BitOr, Box::new(x), Box::new(y))
 }
 
 pub fn bit_and(x: Expr, y: Expr) -> Expr {
-    Expr::BitAnd(Box::new(x), Box::new(y))
+    Expr::Arith(Arith::BitAnd, Box::new(x), Box::new(y))
+}
+
+pub fn shl(value: Expr, places: Expr) -> Expr {
+    Expr::Arith(Arith::Shl, Box::new(value), Box::new(places))
 }
 
 pub fn seq_length(seq: Expr) -> Expr {
