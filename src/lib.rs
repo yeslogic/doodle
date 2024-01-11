@@ -214,6 +214,29 @@ impl ValueType {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum IntRel {
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Lte,
+    Gte,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum Arith {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    BitAnd,
+    BitOr,
+    Shl,
+    Shr,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
     Var(Label),
@@ -230,31 +253,18 @@ pub enum Expr {
     Match(Box<Expr>, Vec<(Pattern, Expr)>),
     Lambda(Label, Box<Expr>),
 
-    BitAnd(Box<Expr>, Box<Expr>),
-    BitOr(Box<Expr>, Box<Expr>),
-    Eq(Box<Expr>, Box<Expr>),
-    Ne(Box<Expr>, Box<Expr>),
-    Lt(Box<Expr>, Box<Expr>),
-    Gt(Box<Expr>, Box<Expr>),
-    Lte(Box<Expr>, Box<Expr>),
-    Gte(Box<Expr>, Box<Expr>),
-    Mul(Box<Expr>, Box<Expr>),
-    Div(Box<Expr>, Box<Expr>),
-    Rem(Box<Expr>, Box<Expr>),
-    Shl(Box<Expr>, Box<Expr>),
-    Shr(Box<Expr>, Box<Expr>),
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
+    IntRel(IntRel, Box<Expr>, Box<Expr>),
+    Arith(Arith, Box<Expr>, Box<Expr>),
 
     AsU8(Box<Expr>),
     AsU16(Box<Expr>),
     AsU32(Box<Expr>),
+    AsChar(Box<Expr>),
 
     U16Be(Box<Expr>),
     U16Le(Box<Expr>),
     U32Be(Box<Expr>),
     U32Le(Box<Expr>),
-    AsChar(Box<Expr>),
 
     SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -326,32 +336,13 @@ impl Expr {
             }
             Expr::Lambda(_, _) => Err("cannot infer_type lambda".to_string()),
 
-            Expr::BitAnd(x, y) | Expr::BitOr(x, y) => {
-                match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                    (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
-                    (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
-                    (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
-                    (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
-                }
-            }
-            Expr::Eq(x, y)
-            | Expr::Ne(x, y)
-            | Expr::Lt(x, y)
-            | Expr::Gt(x, y)
-            | Expr::Lte(x, y)
-            | Expr::Gte(x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
+            Expr::IntRel(_rel, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::U8, ValueType::U8) => Ok(ValueType::Bool),
                 (ValueType::U16, ValueType::U16) => Ok(ValueType::Bool),
                 (ValueType::U32, ValueType::U32) => Ok(ValueType::Bool),
                 (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
             },
-            Expr::Add(x, y)
-            | Expr::Sub(x, y)
-            | Expr::Mul(x, y)
-            | Expr::Div(x, y)
-            | Expr::Rem(x, y)
-            | Expr::Shl(x, y)
-            | Expr::Shr(x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
+            Expr::Arith(_arith, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
                 (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
                 (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
@@ -483,8 +474,8 @@ impl Expr {
             Expr::U8(n) => Bounds::exact(usize::from(*n)),
             Expr::U16(n) => Bounds::exact(usize::from(*n)),
             Expr::U32(n) => Bounds::exact(*n as usize),
-            Expr::Add(a, b) => a.bounds() + b.bounds(),
-            Expr::Mul(a, b) => a.bounds() * b.bounds(),
+            Expr::Arith(Arith::Add, a, b) => a.bounds() + b.bounds(),
+            Expr::Arith(Arith::Mul, a, b) => a.bounds() * b.bounds(),
             _ => Bounds::new(0, None),
         }
     }
