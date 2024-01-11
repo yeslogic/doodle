@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::decoder::{MultiScope, Scope, SingleScope, Value};
 use crate::Label;
-use crate::{DynFormat, Expr, Format, FormatModule};
+use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
@@ -845,80 +845,80 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::ARROW,
             ),
-            Expr::BitAnd(lhs, rhs) => cond_paren(
-                self.compile_binop(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
-                prec,
-                Precedence::BITAND,
-            ),
-            Expr::BitOr(lhs, rhs) => cond_paren(
-                self.compile_binop(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
-                prec,
-                Precedence::BITOR,
-            ),
-            Expr::Eq(lhs, rhs) => cond_paren(
+            Expr::IntRel(IntRel::Eq, lhs, rhs) => cond_paren(
                 self.compile_binop(" == ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
                 prec,
                 Precedence::COMPARE,
             ),
-            Expr::Ne(lhs, rhs) => cond_paren(
+            Expr::IntRel(IntRel::Ne, lhs, rhs) => cond_paren(
                 self.compile_binop(" != ", lhs, rhs, Precedence::EQUALITY, Precedence::EQUALITY),
                 prec,
                 Precedence::COMPARE,
             ),
-            Expr::Lt(lhs, rhs) => cond_paren(
+            Expr::IntRel(IntRel::Lt, lhs, rhs) => cond_paren(
                 self.compile_binop(" < ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
-            Expr::Gt(lhs, rhs) => cond_paren(
+            Expr::IntRel(IntRel::Gt, lhs, rhs) => cond_paren(
                 self.compile_binop(" > ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
-            Expr::Lte(lhs, rhs) => cond_paren(
+            Expr::IntRel(IntRel::Lte, lhs, rhs) => cond_paren(
                 self.compile_binop(" <= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
-            Expr::Gte(lhs, rhs) => cond_paren(
+            Expr::IntRel(IntRel::Gte, lhs, rhs) => cond_paren(
                 self.compile_binop(" >= ", lhs, rhs, Precedence::COMPARE, Precedence::COMPARE),
                 prec,
                 Precedence::COMPARE,
             ),
-            Expr::Add(lhs, rhs) => cond_paren(
+            Expr::Arith(Arith::Add, lhs, rhs) => cond_paren(
                 self.compile_binop(" + ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
                 prec,
                 Precedence::ADDSUB,
             ),
-            Expr::Sub(lhs, rhs) => cond_paren(
+            Expr::Arith(Arith::Sub, lhs, rhs) => cond_paren(
                 self.compile_binop(" - ", lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
                 prec,
                 Precedence::ADDSUB,
             ),
-            Expr::Shl(lhs, rhs) => cond_paren(
-                self.compile_binop(" << ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
-                prec,
-                Precedence::BITSHIFT,
-            ),
-            Expr::Shr(lhs, rhs) => cond_paren(
-                self.compile_binop(" >> ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
-                prec,
-                Precedence::BITSHIFT,
-            ),
-            Expr::Mul(lhs, rhs) => cond_paren(
+            Expr::Arith(Arith::Mul, lhs, rhs) => cond_paren(
                 self.compile_binop(" * ", lhs, rhs, Precedence::MUL, Precedence::MUL),
                 prec,
                 Precedence::MUL,
             ),
-            Expr::Div(lhs, rhs) => cond_paren(
+            Expr::Arith(Arith::Div, lhs, rhs) => cond_paren(
                 self.compile_binop(" / ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
                 prec,
                 Precedence::DIVREM,
             ),
-            Expr::Rem(lhs, rhs) => cond_paren(
+            Expr::Arith(Arith::Rem, lhs, rhs) => cond_paren(
                 self.compile_binop(" % ", lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
                 prec,
                 Precedence::DIVREM,
+            ),
+            Expr::Arith(Arith::BitAnd, lhs, rhs) => cond_paren(
+                self.compile_binop(" & ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                prec,
+                Precedence::BITAND,
+            ),
+            Expr::Arith(Arith::BitOr, lhs, rhs) => cond_paren(
+                self.compile_binop(" | ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                prec,
+                Precedence::BITOR,
+            ),
+            Expr::Arith(Arith::Shl, lhs, rhs) => cond_paren(
+                self.compile_binop(" << ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
+                prec,
+                Precedence::BITSHIFT,
+            ),
+            Expr::Arith(Arith::Shr, lhs, rhs) => cond_paren(
+                self.compile_binop(" >> ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
+                prec,
+                Precedence::BITSHIFT,
             ),
             Expr::AsU8(expr) => cond_paren(
                 self.compile_prefix("as-u8", None, expr),
