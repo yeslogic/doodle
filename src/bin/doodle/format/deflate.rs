@@ -1,20 +1,20 @@
-use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
+use doodle::{DynFormat, Expr, Expr0, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 use crate::format::base::*;
 
-fn tuple_proj(x: Expr, i: usize) -> Expr {
-    Expr::TupleProj(Box::new(x), i)
+fn tuple_proj(x: Expr0, i: usize) -> Expr0 {
+    Expr::TupleProj(Box::new(x.into()), i)
 }
 
-fn shl_u8(x: Expr, r: u8) -> Expr {
+fn shl_u8(x: Expr0, r: u8) -> Expr0 {
     shl(x, Expr::U8(r))
 }
 
-fn shl_u16(x: Expr, r: u16) -> Expr {
+fn shl_u16(x: Expr0, r: u16) -> Expr0 {
     shl(as_u16(x), Expr::U16(r))
 }
 
-fn bits_value_u8(name: &'static str, n: usize) -> Expr {
+fn bits_value_u8(name: &'static str, n: usize) -> Expr0 {
     if n > 1 {
         bit_or(
             shl_u8(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
@@ -25,7 +25,7 @@ fn bits_value_u8(name: &'static str, n: usize) -> Expr {
     }
 }
 
-fn bits_value_u16(name: &'static str, n: usize) -> Expr {
+fn bits_value_u16(name: &'static str, n: usize) -> Expr0 {
     if n > 1 {
         bit_or(
             shl_u16(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
@@ -143,17 +143,17 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
     ])
 }
 
-fn reference_record() -> Expr {
+fn reference_record() -> Expr0 {
     expr_match(
         record_proj(var("x"), "extra"),
-        vec![(
+        &[(
             Pattern::variant("some", Pattern::binding("rec")),
-            Expr::Seq(vec![variant(
+            expr_seq(&[variant(
                 "reference",
-                Expr::Record(vec![
-                    ("length".into(), record_proj(var("rec"), "length")),
+                expr_record(&[
+                    ("length", record_proj(var("rec"), "length")),
                     (
-                        "distance".into(),
+                        "distance",
                         record_proj(record_proj(var("rec"), "distance-record"), "distance"),
                     ),
                 ]),
@@ -162,7 +162,7 @@ fn reference_record() -> Expr {
     )
 }
 
-fn fixed_code_lengths() -> Expr {
+fn fixed_code_lengths() -> Expr0 {
     let mut ls = Vec::new();
     for _ in 0..=143 {
         ls.push(Expr::U8(8));
@@ -176,7 +176,7 @@ fn fixed_code_lengths() -> Expr {
     for _ in 280..=287 {
         ls.push(Expr::U8(8));
     }
-    Expr::Seq(ls)
+    expr_seq(&ls)
 }
 
 /// Deflate
@@ -199,7 +199,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "codes-values",
                 Format::Compute(flat_map(
-                    lambda("x", Expr::Seq(vec![variant("literal", var("x"))])),
+                    lambda("x", expr_seq(&[variant("literal", var("x"))])),
                     var("bytes"),
                 )),
             ),
@@ -386,7 +386,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x",
                         expr_match(
                             record_proj(var("x"), "code"),
-                            vec![
+                            &[
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
                                 (Pattern::U16(258), reference_record()),
@@ -419,7 +419,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U16(285), reference_record()),
                                 (
                                     Pattern::Wildcard,
-                                    Expr::Seq(vec![variant(
+                                    expr_seq(&[variant(
                                         "literal",
                                         as_u8(record_proj(var("x"), "code")),
                                     )]),
@@ -449,7 +449,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "code-length-alphabet-format".into(),
                     DynFormat::Huffman(
                         var("code-length-alphabet-code-lengths"),
-                        Some(Expr::Seq(vec![
+                        Some(expr_seq(&[
                             Expr::U8(16),
                             Expr::U8(17),
                             Expr::U8(18),
@@ -480,10 +480,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         "x",
                                         expr_match(
                                             as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
-                                            vec![
+                                            &[
                                                 (
                                                     Pattern::U8(16),
-                                                    Expr::Tuple(vec![
+                                                    expr_tuple(&[
                                                         tuple_proj(var("x"), 0),
                                                         dup(
                                                             add(
@@ -495,7 +495,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                             ),
                                                             expr_match(
                                                                 tuple_proj(var("x"), 0),
-                                                                vec![(
+                                                                &[(
                                                                     Pattern::variant(
                                                                         "some",
                                                                         Pattern::binding("y"),
@@ -508,7 +508,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 ),
                                                 (
                                                     Pattern::U8(17),
-                                                    Expr::Tuple(vec![
+                                                    expr_tuple(&[
                                                         tuple_proj(var("x"), 0),
                                                         dup(
                                                             add(
@@ -524,7 +524,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 ),
                                                 (
                                                     Pattern::U8(18),
-                                                    Expr::Tuple(vec![
+                                                    expr_tuple(&[
                                                         tuple_proj(var("x"), 0),
                                                         dup(
                                                             add(
@@ -540,9 +540,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 ),
                                                 (
                                                     Pattern::binding("v"),
-                                                    Expr::Tuple(vec![
+                                                    expr_tuple(&[
                                                         variant("some", var("v")),
-                                                        Expr::Seq(vec![var("v")]),
+                                                        expr_seq(&[var("v").into()]),
                                                     ]),
                                                 ),
                                             ],
@@ -583,10 +583,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x",
                         expr_match(
                             as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
-                            vec![
+                            &[
                                 (
                                     Pattern::U8(16),
-                                    Expr::Tuple(vec![
+                                    expr_tuple(&[
                                         tuple_proj(var("x"), 0),
                                         dup(
                                             add(
@@ -595,7 +595,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                             ),
                                             expr_match(
                                                 tuple_proj(var("x"), 0),
-                                                vec![(
+                                                &[(
                                                     Pattern::variant("some", Pattern::binding("y")),
                                                     var("y"),
                                                 )],
@@ -605,7 +605,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ),
                                 (
                                     Pattern::U8(17),
-                                    Expr::Tuple(vec![
+                                    expr_tuple(&[
                                         tuple_proj(var("x"), 0),
                                         dup(
                                             add(
@@ -618,7 +618,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ),
                                 (
                                     Pattern::U8(18),
-                                    Expr::Tuple(vec![
+                                    expr_tuple(&[
                                         tuple_proj(var("x"), 0),
                                         dup(
                                             add(
@@ -631,10 +631,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ),
                                 (
                                     Pattern::binding("v"),
-                                    Expr::Tuple(vec![
-                                        variant("some", var("v")),
-                                        Expr::Seq(vec![var("v")]),
-                                    ]),
+                                    expr_tuple(&[variant("some", var("v")), expr_seq(&[var("v")])]),
                                 ),
                             ],
                         ),
@@ -755,7 +752,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x",
                         expr_match(
                             record_proj(var("x"), "code"),
-                            vec![
+                            &[
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
                                 (Pattern::U16(258), reference_record()),
@@ -788,7 +785,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U16(285), reference_record()),
                                 (
                                     Pattern::Wildcard,
-                                    Expr::Seq(vec![variant(
+                                    expr_seq(&[variant(
                                         "literal",
                                         as_u8(record_proj(var("x"), "code")),
                                     )]),
@@ -838,7 +835,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "x",
                         expr_match(
                             record_proj(var("x"), "data"),
-                            vec![
+                            &[
                                 (
                                     Pattern::variant("uncompressed", Pattern::binding("y")),
                                     record_proj(var("y"), "codes-values"),
@@ -859,7 +856,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "inflate",
-                Format::Compute(Expr::Inflate(Box::new(var("codes")))),
+                Format::Compute(Expr::Inflate(Box::new(var("codes").into()))),
             ),
         ]),
     )

@@ -5,7 +5,7 @@ use crate::codegen::rust_ast::{
     LocalType, Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem, RustProgram,
 };
 use crate::decoder::{Decoder, Program};
-use crate::{Expr, Label, MatchTree, ValueType};
+use crate::{Expr0, Label, MatchTree, ValueType};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -128,7 +128,6 @@ impl Codegen {
                 let inner = self.lift_type(t.as_ref());
                 CompType::Vec(Box::new(inner)).into()
             }
-            ValueType::Any => panic!("ValueType::Any"),
             ValueType::Record(fields) => {
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
@@ -453,7 +452,7 @@ pub enum ParallelLogic {
 pub enum SimpleLogic {
     Fail,
     ExpectEnd,
-    Invoke(usize, Vec<(Label, Expr)>),
+    Invoke(usize, Vec<(Label, Expr0)>),
     SkipToNextMultiple(usize),
     ByteIn(ByteSet),
 }

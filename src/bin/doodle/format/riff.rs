@@ -1,9 +1,9 @@
-use doodle::{Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, Expr0, Format, FormatModule, FormatRef};
 
 use crate::format::base::*;
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
-    fn is_even(num: Expr) -> Expr {
+    fn is_even(num: Expr0) -> Expr0 {
         // (num % 2) == 0
         expr_eq(rem(num, Expr::U32(2)), Expr::U32(0))
     }

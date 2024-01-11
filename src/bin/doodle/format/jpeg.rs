@@ -378,10 +378,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                         "x",
                         expr_match(
                             var("x"),
-                            vec![
+                            &[
                                 (
                                     Pattern::variant("mcu", Pattern::binding("v")),
-                                    Expr::Seq(vec![var("v")]),
+                                    Expr::Seq(vec![var("v").into()]),
                                 ),
                                 (
                                     Pattern::variant("rst0", Pattern::Wildcard),
