@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::ops::{Add, BitOr, Div, Mul, Shl, Shr, Sub};
+use std::ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
@@ -160,14 +160,6 @@ impl BitOr<Bounds> for Bounds {
     type Output = Self;
 
     fn bitor(self, rhs: Bounds) -> Bounds {
-        fn mask(x: usize) -> usize {
-            if x != 0 {
-                1_usize.checked_shl(x.ilog2() + 1).unwrap() - 1
-            } else {
-                0
-            }
-        }
-
         Bounds {
             min: usize::max(self.min, rhs.min),
             max: match (self.max, rhs.max) {
@@ -181,5 +173,33 @@ impl BitOr<Bounds> for Bounds {
                 _ => None,
             },
         }
+    }
+}
+
+impl BitAnd<Bounds> for Bounds {
+    type Output = Self;
+
+    fn bitand(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: 0,
+            max: match (self.max, rhs.max) {
+                (Some(m1), Some(m2)) => {
+                    if self.min == m1 || rhs.min == m2 {
+                        Some(m1 & m2)
+                    } else {
+                        Some(mask(m1) & mask(m2))
+                    }
+                }
+                _ => None,
+            },
+        }
+    }
+}
+
+fn mask(x: usize) -> usize {
+    if x != 0 {
+        1_usize.checked_shl(x.ilog2() + 1).unwrap() - 1
+    } else {
+        0
     }
 }
