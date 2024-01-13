@@ -1,6 +1,7 @@
+use serde::Serialize;
 use std::ops::{Add, Mul};
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
     pub min: usize,
     pub max: Option<usize>,
@@ -23,6 +24,14 @@ impl Bounds {
             Some(n) if n == self.min => Some(n),
             _ => None,
         }
+    }
+
+    pub fn contains(&self, n: usize) -> bool {
+        n >= self.min
+            && match self.max {
+                Some(m) => n <= m,
+                _ => true,
+            }
     }
 
     pub fn union(lhs: Bounds, rhs: Bounds) -> Bounds {

@@ -36,6 +36,7 @@ pub enum Pattern {
     U8(u8),
     U16(u16),
     U32(u32),
+    Int(Bounds),
     Char(char),
     Tuple(Vec<Pattern>),
     Variant(Label, Box<Pattern>),
@@ -67,6 +68,9 @@ impl Pattern {
             (Pattern::U8(_i0), ValueType::U8) => {}
             (Pattern::U16(_i0), ValueType::U16) => {}
             (Pattern::U32(_i0), ValueType::U32) => {}
+            (Pattern::Int(_), ValueType::U8) => {}
+            (Pattern::Int(_), ValueType::U16) => {}
+            (Pattern::Int(_), ValueType::U32) => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, t);

@@ -1,3 +1,4 @@
+use doodle::bounds::Bounds;
 use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 use crate::format::base::*;
@@ -387,6 +388,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         expr_match(
                             record_proj(var("x"), "code"),
                             vec![
+                                (
+                                    Pattern::Int(Bounds::new(0, Some(255))),
+                                    Expr::Seq(vec![variant(
+                                        "literal",
+                                        as_u8(record_proj(var("x"), "code")),
+                                    )]),
+                                ),
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
                                 (Pattern::U16(258), reference_record()),
@@ -417,13 +425,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U16(283), reference_record()),
                                 (Pattern::U16(284), reference_record()),
                                 (Pattern::U16(285), reference_record()),
-                                (
-                                    Pattern::Wildcard,
-                                    Expr::Seq(vec![variant(
-                                        "literal",
-                                        as_u8(record_proj(var("x"), "code")),
-                                    )]),
-                                ),
                             ],
                         ),
                     ),
@@ -756,6 +757,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         expr_match(
                             record_proj(var("x"), "code"),
                             vec![
+                                (
+                                    Pattern::Int(Bounds::new(0, Some(255))),
+                                    Expr::Seq(vec![variant(
+                                        "literal",
+                                        as_u8(record_proj(var("x"), "code")),
+                                    )]),
+                                ),
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::U16(257), reference_record()),
                                 (Pattern::U16(258), reference_record()),
@@ -786,13 +794,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U16(283), reference_record()),
                                 (Pattern::U16(284), reference_record()),
                                 (Pattern::U16(285), reference_record()),
-                                (
-                                    Pattern::Wildcard,
-                                    Expr::Seq(vec![variant(
-                                        "literal",
-                                        as_u8(record_proj(var("x"), "code")),
-                                    )]),
-                                ),
                             ],
                         ),
                     ),
