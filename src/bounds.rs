@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::ops::{Add, Div, Mul, Shl, Sub};
+use std::ops::{Add, Div, Mul, Shl, Shr, Sub};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
@@ -133,6 +133,23 @@ impl Shl<Bounds> for Bounds {
                 .unwrap(),
             max: match (self.max, rhs.max) {
                 (Some(m1), Some(m2)) => Some(m1.checked_shl(u32::try_from(m2).unwrap()).unwrap()),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl Shr<Bounds> for Bounds {
+    type Output = Self;
+
+    fn shr(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: match rhs.max {
+                Some(m2) => self.min.checked_shr(u32::try_from(m2).unwrap()).unwrap(),
+                None => 0,
+            },
+            max: match self.max {
+                Some(m1) => Some(m1.checked_shr(u32::try_from(rhs.min).unwrap()).unwrap()),
                 _ => None,
             },
         }
