@@ -1,7 +1,7 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::{Scope, ScopeEntry};
 use crate::read::ReadCtxt;
-use crate::{Label, ValueType};
+use crate::Label;
 
 pub type ParseResult<T> = Result<T, ParseError>;
 

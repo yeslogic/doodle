@@ -1,7 +1,7 @@
 mod rust_ast;
 
 use crate::{
-    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label,
+    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label, GroundType,
 };
 use std::rc::Rc;
 use crate::byte_set::ByteSet;
@@ -112,11 +112,11 @@ impl Codegen {
     fn lift_type(&mut self, vt: &ValueType) -> RustType {
         match vt {
             ValueType::Empty => RustType::UNIT,
-            ValueType::Bool => PrimType::Bool.into(),
-            ValueType::U8 => PrimType::U8.into(),
-            ValueType::U16 => PrimType::U16.into(),
-            ValueType::U32 => PrimType::U32.into(),
-            ValueType::Char => PrimType::Char.into(),
+            ValueType::Ground(GroundType::Bool) => PrimType::Bool.into(),
+            ValueType::Ground(GroundType::U8) => PrimType::U8.into(),
+            ValueType::Ground(GroundType::U16) => PrimType::U16.into(),
+            ValueType::Ground(GroundType::U32) => PrimType::U32.into(),
+            ValueType::Ground(GroundType::Char) => PrimType::Char.into(),
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.iter() {
@@ -1562,3 +1562,5 @@ impl<'a> Generator<'a> {
 
 
 }
+
+type TypedFormat = Format;

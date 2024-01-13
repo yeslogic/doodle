@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use crate::output::{Fragment, FragmentBuilder};
 
-use crate::precedence::{cond_paren, CompareLevel, IntransitiveOrd, Precedence, Relation};
-use crate::{Label, ValueType};
+use crate::precedence::{cond_paren, IntransitiveOrd, Precedence, Relation};
+use crate::{Label, ValueType, GroundType};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub(crate) enum Visibility {
@@ -666,11 +666,11 @@ impl TryFrom<ValueType> for RustType {
     fn try_from(value: ValueType) -> Result<Self, Self::Error> {
         match value {
             ValueType::Empty => Ok(RustType::UNIT),
-            ValueType::Bool => Ok(PrimType::Bool.into()),
-            ValueType::U8 => Ok(PrimType::U8.into()),
-            ValueType::U16 => Ok(PrimType::U16.into()),
-            ValueType::U32 => Ok(PrimType::U32.into()),
-            ValueType::Char => Ok(PrimType::Char.into()),
+            ValueType::Ground(GroundType::Bool) => Ok(PrimType::Bool.into()),
+            ValueType::Ground(GroundType::U8) => Ok(PrimType::U8.into()),
+            ValueType::Ground(GroundType::U16) => Ok(PrimType::U16.into()),
+            ValueType::Ground(GroundType::U32) => Ok(PrimType::U32.into()),
+            ValueType::Ground(GroundType::Char) => Ok(PrimType::Char.into()),
             ValueType::Tuple(mut vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.drain(..) {
