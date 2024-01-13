@@ -116,7 +116,7 @@ impl TypedFormat<GenType> {
                 inner.lookahead_bounds()
             }
 
-            TypedFormat::Align(n) => Bounds::new(0, Some(n - 1)),
+            TypedFormat::Align(n) => Bounds::new(0, n - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.lookahead_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -141,12 +141,10 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
-                f.lookahead_bounds() * Bounds::new(1, None)
+                f.lookahead_bounds() * Bounds::at_least(1)
             }
 
-            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => {
-                Bounds::new(0, None)
-            }
+            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
 
@@ -167,7 +165,7 @@ impl TypedFormat<GenType> {
                 .reduce(Bounds::union)
                 .unwrap(),
 
-            TypedFormat::Apply(_, _, _) => Bounds::new(1, None),
+            TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
         }
     }
 
@@ -181,7 +179,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::EndOfInput
             | TypedFormat::Fail => Bounds::exact(0),
 
-            TypedFormat::Align(n) => Bounds::new(0, Some(n - 1)),
+            TypedFormat::Align(n) => Bounds::new(0, n - 1),
             TypedFormat::Byte(_) => Bounds::exact(1),
             TypedFormat::Variant(_, _, f) => f.match_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
@@ -206,12 +204,10 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
-                f.match_bounds() * Bounds::new(1, None)
+                f.match_bounds() * Bounds::at_least(1)
             }
 
-            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => {
-                Bounds::new(0, None)
-            }
+            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
 
@@ -230,7 +226,7 @@ impl TypedFormat<GenType> {
                 .reduce(Bounds::union)
                 .unwrap(),
 
-            TypedFormat::Apply(_, _, _) => Bounds::new(1, None),
+            TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
         }
     }
 
@@ -378,7 +374,7 @@ impl<TypeRep> TypedExpr<TypeRep> {
             TypedExpr::U64(n) => Bounds::exact(*n as usize),
             TypedExpr::Arith(_t, Arith::Add, a, b) => a.bounds() + b.bounds(),
             TypedExpr::Arith(_t, Arith::Mul, a, b) => a.bounds() * b.bounds(),
-            _ => Bounds::new(0, None),
+            _ => Bounds::any(),
         }
     }
 }
