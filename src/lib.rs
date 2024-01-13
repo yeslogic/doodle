@@ -486,7 +486,7 @@ impl Expr {
             Expr::Arith(Arith::BitAnd, a, b) => a.bounds() & b.bounds(),
             Expr::Arith(Arith::Shl, a, b) => a.bounds() << b.bounds(),
             Expr::Arith(Arith::Shr, a, b) => a.bounds() >> b.bounds(),
-            _ => Bounds::new(0, None),
+            _ => Bounds::unknown(),
         }
     }
 }
@@ -621,7 +621,7 @@ impl Format {
             Format::ItemVar(level, _args) => module.get_format(*level).match_bounds(module),
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
-            Format::Align(n) => Bounds::new(0, Some(n - 1)),
+            Format::Align(n) => Bounds::new(0, n - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
             Format::UnionNondet(branches) => branches
@@ -644,11 +644,11 @@ impl Format {
                 .map(|(_, f)| f.match_bounds(module))
                 .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
-            Format::Repeat(_) => Bounds::new(0, None),
-            Format::Repeat1(f) => f.match_bounds(module) * Bounds::new(1, None),
+            Format::Repeat(_) => Bounds::unknown(),
+            Format::Repeat1(f) => f.match_bounds(module) * Bounds::unbounded(1),
             Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
-            Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
-            Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
+            Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::unbounded(1),
+            Format::RepeatUntilSeq(_, _f) => Bounds::unknown(),
             Format::Peek(_) => Bounds::exact(0),
             Format::PeekNot(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
@@ -663,7 +663,7 @@ impl Format {
                 .reduce(Bounds::union)
                 .unwrap(),
             Format::Dynamic(_name, _dynformat, f) => f.match_bounds(module),
-            Format::Apply(_) => Bounds::new(1, None),
+            Format::Apply(_) => Bounds::unbounded(1),
         }
     }
 

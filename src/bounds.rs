@@ -8,8 +8,26 @@ pub struct Bounds {
 }
 
 impl Bounds {
-    pub fn new(min: usize, max: Option<usize>) -> Bounds {
-        Bounds { min, max }
+    pub const fn new(min: usize, max: usize) -> Bounds {
+        Bounds {
+            min,
+            max: Some(max),
+        }
+    }
+
+    pub const fn exact(n: usize) -> Bounds {
+        Bounds {
+            min: n,
+            max: Some(n),
+        }
+    }
+
+    pub const fn unbounded(min: usize) -> Bounds {
+        Bounds { min, max: None }
+    }
+
+    pub const fn unknown() -> Bounds {
+        Bounds::unbounded(0)
     }
 
     pub fn min(&self) -> usize {
@@ -18,13 +36,6 @@ impl Bounds {
 
     pub fn max(&self) -> Option<usize> {
         self.max
-    }
-
-    pub fn exact(n: usize) -> Bounds {
-        Bounds {
-            min: n,
-            max: Some(n),
-        }
     }
 
     pub fn is_exact(&self) -> Option<usize> {

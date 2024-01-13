@@ -389,7 +389,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             record_proj(var("x"), "code"),
                             vec![
                                 (
-                                    Pattern::Int(Bounds::new(0, Some(255))),
+                                    Pattern::Int(Bounds::new(0, 255)),
                                     Expr::Seq(vec![variant(
                                         "literal",
                                         as_u8(record_proj(var("x"), "code")),
@@ -758,7 +758,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             record_proj(var("x"), "code"),
                             vec![
                                 (
-                                    Pattern::Int(Bounds::new(0, Some(255))),
+                                    Pattern::Int(Bounds::new(0, 255)),
                                     Expr::Seq(vec![variant(
                                         "literal",
                                         as_u8(record_proj(var("x"), "code")),
