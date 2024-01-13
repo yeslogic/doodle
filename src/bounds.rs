@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
@@ -99,6 +99,23 @@ impl Mul<Bounds> for Bounds {
             min: self.min.checked_mul(rhs.min).unwrap(),
             max: match (self.max, rhs.max) {
                 (Some(m1), Some(m2)) => Some(m1.checked_mul(m2).unwrap()),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl Div<Bounds> for Bounds {
+    type Output = Self;
+
+    fn div(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: match rhs.max {
+                Some(m2) => self.min.checked_div(m2).unwrap(),
+                None => 0,
+            },
+            max: match self.max {
+                Some(m1) => Some(m1 / usize::max(rhs.min, 1)),
                 _ => None,
             },
         }
