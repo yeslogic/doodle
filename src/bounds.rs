@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
@@ -69,6 +69,23 @@ impl Add for Bounds {
             max: match (self.max, rhs.max) {
                 (Some(m1), Some(m2)) => Some(m1.checked_add(m2).unwrap()),
                 _ => None,
+            },
+        }
+    }
+}
+
+impl Sub for Bounds {
+    type Output = Self;
+
+    fn sub(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: match rhs.max {
+                Some(m2) => self.min.saturating_sub(m2),
+                None => 0,
+            },
+            max: match self.max {
+                Some(m1) => Some(m1.saturating_sub(rhs.min)),
+                None => None,
             },
         }
     }
