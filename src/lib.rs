@@ -555,7 +555,13 @@ impl Expr {
             Expr::U32(n) => Bounds::exact(*n as usize),
             Expr::U64(n) => Bounds::exact(*n as usize),
             Expr::Arith(Arith::Add, a, b) => a.bounds() + b.bounds(),
+            Expr::Arith(Arith::Sub, a, b) => a.bounds() - b.bounds(),
             Expr::Arith(Arith::Mul, a, b) => a.bounds() * b.bounds(),
+            Expr::Arith(Arith::Div, a, b) => a.bounds() / b.bounds(),
+            Expr::Arith(Arith::BitOr, a, b) => a.bounds() | b.bounds(),
+            Expr::Arith(Arith::BitAnd, a, b) => a.bounds() & b.bounds(),
+            Expr::Arith(Arith::Shl, a, b) => a.bounds() << b.bounds(),
+            Expr::Arith(Arith::Shr, a, b) => a.bounds() >> b.bounds(),
             _ => Bounds::new(0, None),
         }
     }

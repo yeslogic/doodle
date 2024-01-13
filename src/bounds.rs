@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Bounds {
@@ -61,10 +61,27 @@ impl Add for Bounds {
 
     fn add(self, rhs: Bounds) -> Bounds {
         Bounds {
-            min: self.min + rhs.min,
+            min: self.min.checked_add(rhs.min).unwrap(),
             max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1 + m2),
+                (Some(m1), Some(m2)) => Some(m1.checked_add(m2).unwrap()),
                 _ => None,
+            },
+        }
+    }
+}
+
+impl Sub for Bounds {
+    type Output = Self;
+
+    fn sub(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: match rhs.max {
+                Some(m2) => self.min.saturating_sub(m2),
+                None => 0,
+            },
+            max: match self.max {
+                Some(m1) => Some(m1.saturating_sub(rhs.min)),
+                None => None,
             },
         }
     }
@@ -75,11 +92,110 @@ impl Mul<Bounds> for Bounds {
 
     fn mul(self, rhs: Bounds) -> Bounds {
         Bounds {
-            min: self.min * rhs.min,
+            min: self.min.checked_mul(rhs.min).unwrap(),
             max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1 * m2),
+                (Some(m1), Some(m2)) => Some(m1.checked_mul(m2).unwrap()),
                 _ => None,
             },
         }
+    }
+}
+
+impl Div<Bounds> for Bounds {
+    type Output = Self;
+
+    fn div(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: match rhs.max {
+                Some(m2) => self.min.checked_div(m2).unwrap(),
+                None => 0,
+            },
+            max: match self.max {
+                Some(m1) => Some(m1 / usize::max(rhs.min, 1)),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl Shl<Bounds> for Bounds {
+    type Output = Self;
+
+    fn shl(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: self
+                .min
+                .checked_shl(u32::try_from(rhs.min).unwrap())
+                .unwrap(),
+            max: match (self.max, rhs.max) {
+                (Some(m1), Some(m2)) => Some(m1.checked_shl(u32::try_from(m2).unwrap()).unwrap()),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl Shr<Bounds> for Bounds {
+    type Output = Self;
+
+    fn shr(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: match rhs.max {
+                Some(m2) => self.min.checked_shr(u32::try_from(m2).unwrap()).unwrap(),
+                None => 0,
+            },
+            max: match self.max {
+                Some(m1) => Some(m1.checked_shr(u32::try_from(rhs.min).unwrap()).unwrap()),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl BitOr<Bounds> for Bounds {
+    type Output = Self;
+
+    fn bitor(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: usize::max(self.min, rhs.min),
+            max: match (self.max, rhs.max) {
+                (Some(m1), Some(m2)) => {
+                    if self.min == m1 || rhs.min == m2 {
+                        Some(m1 | m2)
+                    } else {
+                        Some(mask(m1) | mask(m2))
+                    }
+                }
+                _ => None,
+            },
+        }
+    }
+}
+
+impl BitAnd<Bounds> for Bounds {
+    type Output = Self;
+
+    fn bitand(self, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: 0,
+            max: match (self.max, rhs.max) {
+                (Some(m1), Some(m2)) => {
+                    if self.min == m1 || rhs.min == m2 {
+                        Some(m1 & m2)
+                    } else {
+                        Some(mask(m1) & mask(m2))
+                    }
+                }
+                _ => None,
+            },
+        }
+    }
+}
+
+fn mask(x: usize) -> usize {
+    if x != 0 {
+        1_usize.checked_shl(x.ilog2() + 1).unwrap() - 1
+    } else {
+        0
     }
 }
