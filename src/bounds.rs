@@ -65,9 +65,9 @@ impl Add for Bounds {
 
     fn add(self, rhs: Bounds) -> Bounds {
         Bounds {
-            min: self.min + rhs.min,
+            min: self.min.checked_add(rhs.min).unwrap(),
             max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1 + m2),
+                (Some(m1), Some(m2)) => Some(m1.checked_add(m2).unwrap()),
                 _ => None,
             },
         }
@@ -79,9 +79,9 @@ impl Mul<Bounds> for Bounds {
 
     fn mul(self, rhs: Bounds) -> Bounds {
         Bounds {
-            min: self.min * rhs.min,
+            min: self.min.checked_mul(rhs.min).unwrap(),
             max: match (self.max, rhs.max) {
-                (Some(m1), Some(m2)) => Some(m1 * m2),
+                (Some(m1), Some(m2)) => Some(m1.checked_mul(m2).unwrap()),
                 _ => None,
             },
         }
