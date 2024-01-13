@@ -1,6 +1,6 @@
 use std::ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub};
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Bounds {
     pub min: usize,
     pub max: Option<usize>,
@@ -34,6 +34,14 @@ impl Bounds {
             Some(n) if n == self.min => Some(n),
             _ => None,
         }
+    }
+
+    pub fn contains(&self, n: usize) -> bool {
+        n >= self.min
+            && match self.max {
+                Some(m) => n <= m,
+                _ => true,
+            }
     }
 
     pub fn union(lhs: Bounds, rhs: Bounds) -> Bounds {
@@ -209,4 +217,177 @@ fn mask(x: usize) -> usize {
     } else {
         0
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn any_bounds() -> impl Strategy<Value = Bounds> {
+        Strategy::prop_union(
+            any::<u8>().prop_map(|n| Bounds::exact(n as usize)).boxed(),
+            any::<(u8, u8)>()
+                .prop_map(|(min, length)| {
+                    Bounds::new(min as usize, (min as usize) + (length as usize))
+                })
+                .boxed(),
+        )
+        .or(any::<u8>()
+            .prop_map(|n| Bounds::at_least(n as usize))
+            .boxed())
+    }
+
+    proptest! {
+        #[test]
+        fn test_add(a in any::<u8>(), b in any::<u8>(), x in any_bounds(), y in any_bounds()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                !x.contains(a) ||
+                !y.contains(b) ||
+                (x + y).contains(a + b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_sub(a in any::<u8>(), b in any::<u8>(), x in any_bounds(), y in any_bounds()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                !x.contains(a) ||
+                !y.contains(b) ||
+                (x - y).contains(a.saturating_sub(b)));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_mul(a in any::<u8>(), b in any::<u8>(), x in any_bounds(), y in any_bounds()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                !x.contains(a) ||
+                !y.contains(b) ||
+                (x * y).contains(a * b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_div(a in any::<u8>(), b in any::<u8>(), x in any_bounds(), y in any_bounds()) {
+            let a = a as usize;
+            let b = b as usize + 1;
+            prop_assert!(
+                !x.contains(a) ||
+                !y.contains(b) ||
+                (x / y).contains(a / b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_bitor(a in any::<u8>(), b in any::<u8>(), x in any_bounds(), y in any_bounds()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                !x.contains(a) ||
+                !y.contains(b) ||
+                (x | y).contains(a | b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_bitand(a in any::<u8>(), b in any::<u8>(), x in any_bounds(), y in any_bounds()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                !x.contains(a) ||
+                !y.contains(b) ||
+                (x & y).contains(a & b));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_add_exact(a in any::<u8>(), b in any::<u8>()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                (Bounds::exact(a) + Bounds::exact(b)).is_exact().unwrap() == a + b)
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_sub_exact(a in any::<u8>(), b in any::<u8>()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                (Bounds::exact(a) - Bounds::exact(b)).is_exact().unwrap() == a.saturating_sub(b))
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_mul_exact(a in any::<u8>(), b in any::<u8>()) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                (Bounds::exact(a) * Bounds::exact(b)).is_exact().unwrap() == a * b)
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_div_exact(a in any::<u8>(), b in any::<u8>()) {
+            let a = a as usize;
+            let b = b as usize + 1;
+            prop_assert!(
+                (Bounds::exact(a) / Bounds::exact(b)).is_exact().unwrap() == a / b)
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_shl_exact(a in any::<u8>(), b in 0..8) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                (Bounds::exact(a) << Bounds::exact(b)).is_exact().unwrap() == a << b)
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_shr_exact(a in any::<u8>(), b in 0..8) {
+            let a = a as usize;
+            let b = b as usize;
+            prop_assert!(
+                (Bounds::exact(a) >> Bounds::exact(b)).is_exact().unwrap() == a >> b)
+        }
+    }
+    /*
+        proptest! {
+            #[test]
+            fn test_bitor_exact(a in any::<u8>(), b in any::<u8>()) {
+                let a = a as usize;
+                let b = b as usize;
+                prop_assert!(
+                    (Bounds::exact(a) | Bounds::exact(b)).is_exact().unwrap() == a | b)
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn test_bitand_exact(a in any::<u8>(), b in any::<u8>()) {
+                let a = a as usize;
+                let b = b as usize;
+                prop_assert!(
+                    (Bounds::exact(a) & Bounds::exact(b)).is_exact().unwrap() == a & b)
+            }
+        }
+    */
 }
