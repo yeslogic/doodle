@@ -3,13 +3,21 @@ use std::ops::{Add, Mul};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
-    pub min: usize,
-    pub max: Option<usize>,
+    min: usize,
+    max: Option<usize>,
 }
 
 impl Bounds {
     pub fn new(min: usize, max: Option<usize>) -> Bounds {
         Bounds { min, max }
+    }
+
+    pub fn min(&self) -> usize {
+        self.min
+    }
+
+    pub fn max(&self) -> Option<usize> {
+        self.max
     }
 
     pub fn exact(n: usize) -> Bounds {

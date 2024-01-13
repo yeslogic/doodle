@@ -663,7 +663,7 @@ impl Format {
 
     /// Returns `true` if the format could match the empty byte string
     fn is_nullable(&self, module: &FormatModule) -> bool {
-        self.match_bounds(module).min == 0
+        self.match_bounds(module).min() == 0
     }
 
     /// True if the compilation of this format depends on the format that follows it
@@ -1261,7 +1261,7 @@ impl<'a> MatchTreeStep<'a> {
                 if let Some(n) = bounds.is_exact() {
                     Self::from_repeat_count(module, n, a, next.clone())
                 } else {
-                    Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
+                    Self::from_repeat_count(module, bounds.min(), a, Rc::new(Next::Empty))
                 }
             }
             Format::RepeatUntilLast(_expr, _a) => {
@@ -1286,7 +1286,7 @@ impl<'a> MatchTreeStep<'a> {
                 if let Some(n) = bounds.is_exact() {
                     Self::from_slice(module, n, inside, next)
                 } else {
-                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
+                    Self::from_slice(module, bounds.min(), inside, Rc::new(Next::Empty))
                 }
             }
             Format::Bits(_a) => {
