@@ -25,7 +25,7 @@ pub(crate) enum UInst {
 }
 
 impl UType {
-    pub fn iter_embedded(&self) -> Box<dyn Iterator<Item = Rc<UType>>> {
+    pub fn iter_embedded<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
         match self {
             UType::Var(..) | UType::Ground(..) => Box::new(std::iter::empty()),
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
@@ -138,7 +138,7 @@ pub(crate) struct TypeChecker {
 }
 
 #[derive(Clone, Debug, Default)]
-pub enum Constraints {
+pub(crate) enum Constraints {
     #[default]
     Indefinite, // default value before union-type distinction is made
     Variant(VarMap), // for type metavariables that are inferred to be an indefinite union type, minimal list of variants and their types we have found

@@ -175,6 +175,13 @@ impl ValueType {
         }
     }
 
+    fn as_tuple_type(&self) -> &[ValueType] {
+        match self {
+            ValueType::Tuple(ts) => ts.as_slice(),
+            other => panic!("type is not a tuple: {other:?}")
+        }
+    }
+
     fn is_numeric_type(&self) -> bool {
         match self {
             ValueType::Ground(g) => g.is_numeric(),
@@ -373,16 +380,16 @@ impl Expr {
             }
             Expr::Match(head, branches) => {
                 if branches.is_empty() {
-                    return Err(InferenceError::EmptyMatch);
+                    return Err(anyhow!("cannot infer type of empty match expression"));
                 }
                 let head_type = Rc::new(head.infer_type(scope)?);
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
-                    t = t.unify(&pattern.infer_expr_branch_type(scope, head_type, branch)?)?;
+                    t = t.unify(&pattern.infer_expr_branch_type(scope, head_type.clone(), branch)?)?;
                 }
                 Ok(t)
             }
-            Expr::Lambda(..) => Err(InferenceError::UnexpectedLambda),
+            Expr::Lambda(..) => Err(anyhow!("infer_type encountered unexpected lambda")),
 
             Expr::IntRel(_rel, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::Ground(g1), ValueType::Ground(g2)) if g1 == g2 && g1.is_numeric() => Ok(ValueType::Bool),
@@ -398,71 +405,71 @@ impl Expr {
             Expr::AsU8(x) =>
                 match x.infer_type(scope)? {
                     ValueType::Ground(g) if g.is_numeric() => Ok(ValueType::Ground(GroundType::U8)),
-                    x => Err(InferenceError::BadCast { method: "AsU8", from: x, to: GroundType::U8 }),
+                    x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
                 }
             Expr::AsU16(x) =>
                 match x.infer_type(scope)? {
                     ValueType::Ground(g) if g.is_numeric() =>
                         Ok(ValueType::Ground(GroundType::U16)),
-                    x => Err(InferenceError::BadCast { method: "AsU16", from: x, to: GroundType::U16 }),
+                    x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
                 }
             Expr::AsU32(x) =>
                 match x.infer_type(scope)? {
                     ValueType::Ground(g) if g.is_numeric() =>
                         Ok(ValueType::Ground(GroundType::U32)),
-                    x => Err(InferenceError::BadCast { method: "AsU32", from: x, to: GroundType::U32 }),
+                    x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
                 }
             Expr::AsChar(x) =>
                 match x.infer_type(scope)? {
                     ValueType::Ground(g) if g.is_numeric() =>
                         Ok(ValueType::Ground(GroundType::Char)),
-                    x => Err(InferenceError::BadCast { method: "AsChar", from: x, to: GroundType::Char }),
+                    x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
                 }
 
             Expr::U16Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.unwrap_tuple_type().as_slice() {
+                match _t.as_tuple_type() {
                     [ValueType::Ground(GroundType::U8), ValueType::Ground(GroundType::U8)] =>
                         Ok(ValueType::Ground(GroundType::U16)),
-                    _ => Err(InferenceError::BadCast { method: "U16Be", from: _t, to: GroundType::U16 }),
+                    _ => Err(anyhow!("unsound byte-level type cast U16Be(_ : {_t:?})")),
                 }
             }
             Expr::U16Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.unwrap_tuple_type().as_slice() {
+                match _t.as_tuple_type() {
                     [ValueType::Ground(GroundType::U8), ValueType::Ground(GroundType::U8)] =>
                         Ok(ValueType::Ground(GroundType::U16)),
-                    _ => Err(InferenceError::BadCast { method: "U16Le", from: _t, to: GroundType::U16 }),
+                    _ => Err(anyhow!("unsound byte-level type cast U16Le(_ : {_t:?})")),
                 }
             }
             Expr::U32Be(bytes)  => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.unwrap_tuple_type().as_slice() {
+                match _t.as_tuple_type() {
                     [
                         ValueType::Ground(GroundType::U8),
                         ValueType::Ground(GroundType::U8),
                         ValueType::Ground(GroundType::U8),
                         ValueType::Ground(GroundType::U8),
                     ] => Ok(ValueType::Ground(GroundType::U32)),
-                    _ => Err(InferenceError::BadCast { method: "U32Be", from: _t, to: GroundType::U32 }),
+                    _ => Err(anyhow!("unsound byte-level type cast U32Be(_ : {_t:?})")),
                 }
             }
             Expr::U32Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
-                match _t.unwrap_tuple_type().as_slice() {
+                match _t.as_tuple_type() {
                     [
                         ValueType::Ground(GroundType::U8),
                         ValueType::Ground(GroundType::U8),
                         ValueType::Ground(GroundType::U8),
                         ValueType::Ground(GroundType::U8),
                     ] => Ok(ValueType::Ground(GroundType::U32)),
-                    _ => Err(InferenceError::BadCast { method: "U32Le", from: _t, to: GroundType::U32 }),
+                    _ => Err(anyhow!("unsound byte-level type cast U32Le(_ : {_t:?})")),
                 }
             }
             Expr::SeqLength(seq) =>
                 match seq.infer_type(scope)? {
                     ValueType::Seq(_t) => Ok(ValueType::Ground(GroundType::U32)),
-                    other => Err(InferenceError::ExpectedSequence { method: "SeqLength", input: other }),
+                    other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
                 }
             Expr::SubSeq(seq, start, length) =>
                 match seq.infer_type(scope)? {
@@ -471,17 +478,17 @@ impl Expr {
                         let length_type = length.infer_type(scope)?;
                         if !start_type.is_numeric_type() {
                             return Err(
-                                InferenceError::ExpectedNumeric { method: "SubSeq", input: start_type }
+                                anyhow!("subseq start value should have numeric type, found {start_type:?}")
                             );
                         }
                         if !length_type.is_numeric_type() {
                             return Err(
-                                InferenceError::ExpectedNumeric { method: "SubSeq", input: length_type }
+                                anyhow!("subseq length value should have numeric type, found {length_type:?}")
                             );
                         }
                         Ok(ValueType::Seq(t))
                     }
-                    other => Err(InferenceError::ExpectedSequence { method: "SubSeq", input: other }),
+                    other => Err(anyhow!("subseq called on non-sequence type: {other:?}")),
                 }
             Expr::FlatMap(expr, seq) =>
                 match expr.as_ref() {
@@ -492,12 +499,12 @@ impl Expr {
                                 child_scope.push(name.clone(), *t);
                                 match expr.infer_type(&child_scope)? {
                                     ValueType::Seq(t2) => Ok(ValueType::Seq(t2)),
-                                    other => Err(InferenceError::ExpectedSequence { method: "FlatMap", input: other }),
+                                    other => Err(anyhow!("flat-map lambda output is non-sequence type: {other:?}")),
                                 }
                             }
-                            other => Err(format!("FlatMap: expected Seq, found {other:?}")),
+                            other => Err(anyhow!("flat-map called on non-sequence type: {other:?}")),
                         }
-                    other => Err(format!("FlatMap: expected Lambda, found {other:?}")),
+                    other => Err(anyhow!("FlatMap: expected Lambda, found {other:?}")),
                 }
             Expr::FlatMapAccum(expr, accum, accum_type, seq) =>
                 match expr.as_ref() {
@@ -520,16 +527,16 @@ impl Expr {
                                         accum_result.unify(&accum_type)?;
                                         Ok(ValueType::Seq(t2.clone()))
                                     }
-                                    _ => panic!("FlatMapAccum: expected two values"),
+                                    _ => Err(anyhow!("FlatMapAccum: expected two values")),
                                 }
                             }
-                            other => Err(format!("FlatMapAccum: expected Seq, found {other:?}")),
+                            other => Err(anyhow!("FlatMapAccum: expected Seq, found {other:?}")),
                         }
-                    other => Err(format!("FlatMapAccum: expected Lambda, found {other:?}")),
+                    other => Err(anyhow!("FlatMapAccum: expected Lambda, found {other:?}")),
                 }
             Expr::Dup(count, expr) => {
                 if !count.infer_type(scope)?.is_numeric_type() {
-                    return Err(format!("Dup: count is not numeric: {count:?}"));
+                    return Err(anyhow!("Dup: count is not numeric: {count:?}"));
                 }
                 let t = expr.infer_type(scope)?;
                 Ok(ValueType::Seq(Box::new(t)))
@@ -539,7 +546,7 @@ impl Expr {
                     // FIXME should check values are appropriate variants
                     ValueType::Seq(_values) =>
                         Ok(ValueType::Seq(Box::new(ValueType::Ground(GroundType::U8)))),
-                    other => Err(format!("Inflate: expected Seq, found {other:?}")),
+                    other => Err(anyhow!("Inflate: expected Seq, found {other:?}")),
                 }
         }
     }
@@ -603,8 +610,8 @@ pub enum DynFormat {
 ///
 /// [regular expressions]: https://en.wikipedia.org/wiki/Regular_expression#Formal_definition
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-// #[derive(Serialize)]
-// #[serde(tag = "tag", content = "data")]
+#[derive(Serialize)]
+#[serde(tag = "tag", content = "data")]
 pub enum Format {
     /// Reference to a top-level item
     ItemVar(usize, Vec<Expr>), // FIXME - do the exprs here need type(+) info?
@@ -895,7 +902,7 @@ impl FormatModule {
         &self.format_types[level]
     }
 
-    fn infer_format_type(&self, scope: &TypeScope<'_>, f: &Format) -> Result<ValueType, String> {
+    fn infer_format_type(&self, scope: &TypeScope<'_>, f: &Format) -> AResult<ValueType> {
         match f {
             Format::ItemVar(level, arg_exprs) => {
                 let arg_names = self.get_args(*level);
@@ -958,7 +965,7 @@ impl FormatModule {
                         child_scope.push(name.clone(), arg_type);
                         body.infer_type(&child_scope)
                     }
-                    other => Err(format!("Map: expected lambda, found {other:?}")),
+                    other => Err(anyhow!("Map: expected lambda, found {other:?}")),
                 }
             }
             Format::Compute(expr) => expr.infer_type(scope),
@@ -970,13 +977,13 @@ impl FormatModule {
             }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
-                    return Err("infer_format_type: empty Match".to_string());
+                    return Err(anyhow!("infer_format_type: empty Match"));
                 }
                 let head_type = Rc::new(head.infer_type(scope)?);
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
                     t = t.unify(
-                        &pattern.infer_format_branch_type(scope, &head_type, self, branch)?
+                        &pattern.infer_format_branch_type(scope, head_type.clone(), self, branch)?
                     )?;
                 }
                 Ok(t)
@@ -991,12 +998,12 @@ impl FormatModule {
                                     | ValueType::Ground(GroundType::U16) => {}
                                     other => {
                                         return Err(
-                                            format!("Huffman: expected U8 or U16, found {other:?}")
+                                            anyhow!("Huffman: expected U8 or U16, found {other:?}")
                                         );
                                     }
                                 }
                             other => {
-                                return Err(format!("Huffman: expected Seq, found {other:?}"));
+                                return Err(anyhow!("Huffman: expected Seq, found {other:?}"));
                             }
                         }
                         // FIXME check opt_values_expr type
@@ -1009,7 +1016,7 @@ impl FormatModule {
             Format::Apply(name) =>
                 match scope.get_type_by_name(name) {
                     ValueKind::Format(t) => Ok(t.clone()),
-                    ValueKind::Value(t) => Err(format!("Apply: expected format, found {t:?}")),
+                    ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
                 }
         }
     }

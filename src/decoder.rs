@@ -7,6 +7,7 @@ use crate::{
 };
 use crate::{IntoLabel, Label};
 use serde::Serialize;
+use anyhow::{anyhow, Result as AResult};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -512,7 +513,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile_program(module: &FormatModule, format: &Format) -> Result<Program, String> {
+    pub fn compile_program(module: &FormatModule, format: &Format) -> AResult<Program> {
         let mut compiler = Compiler::new(module);
         // type
         let scope = TypeScope::new();
@@ -533,7 +534,7 @@ impl<'a> Compiler<'a> {
         n
     }
 
-    pub fn compile_one(format: &Format) -> Result<Decoder, String> {
+    pub fn compile_one(format: &Format) -> AResult<Decoder> {
         let module = FormatModule::new();
         let mut compiler = Compiler::new(&module);
         compiler.compile_format(format, Rc::new(Next::Empty))
@@ -543,7 +544,7 @@ impl<'a> Compiler<'a> {
         &mut self,
         format: &'a Format,
         next: Rc<Next<'a>>,
-    ) -> Result<Decoder, String> {
+    ) -> AResult<Decoder> {
         match format {
             Format::ItemVar(level, arg_exprs) => {
                 let f = self.module.get_format(*level);
@@ -585,7 +586,7 @@ impl<'a> Compiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &fs, next) {
                     Ok(Decoder::Branch(tree, ds))
                 } else {
-                    Err(format!("cannot build match tree for {:?}", format))
+                    Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
             Format::UnionNondet(branches) => {
@@ -618,7 +619,7 @@ impl<'a> Compiler<'a> {
             }
             Format::Repeat(a) => {
                 if a.is_nullable(self.module) {
-                    return Err(format!("cannot repeat nullable format: {a:?}"));
+                    return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
                 let da = self.compile_format(a, Rc::new(Next::Repeat(a, next.clone())))?;
                 let astar = Format::Repeat(a.clone());
@@ -627,12 +628,12 @@ impl<'a> Compiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next) {
                     Ok(Decoder::While(tree, Box::new(da)))
                 } else {
-                    Err(format!("cannot build match tree for {:?}", format))
+                    Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
             Format::Repeat1(a) => {
                 if a.is_nullable(self.module) {
-                    return Err(format!("cannot repeat nullable format: {a:?}"));
+                    return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
                 let da = self.compile_format(a, Rc::new(Next::Repeat(a, next.clone())))?;
                 let astar = Format::Repeat(a.clone());
@@ -641,7 +642,7 @@ impl<'a> Compiler<'a> {
                 if let Some(tree) = MatchTree::build(self.module, &[fa, fb], next) {
                     Ok(Decoder::Until(tree, Box::new(da)))
                 } else {
-                    Err(format!("cannot build match tree for {:?}", format))
+                    Err(anyhow!("cannot build match tree for {:?}", format))
                 }
             }
             Format::RepeatCount(expr, a) => {
@@ -666,9 +667,9 @@ impl<'a> Compiler<'a> {
             Format::PeekNot(a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
                 match a.match_bounds(self.module).max {
-                    None => return Err("PeekNot cannot require unbounded lookahead".to_string()),
+                    None => return Err(anyhow!("PeekNot cannot require unbounded lookahead")),
                     Some(n) if n > MAX_LOOKAHEAD => {
-                        return Err(format!(
+                        return Err(anyhow!(
                             "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
                         ))
                     }
@@ -704,7 +705,7 @@ impl<'a> Compiler<'a> {
                     .map(|(pattern, f)| {
                         Ok((pattern.clone(), self.compile_format(f, next.clone())?))
                     })
-                    .collect::<Result<_, String>>()?;
+                    .collect::<AResult<_>>()?;
                 Ok(Decoder::Match(head.clone(), branches))
             }
             Format::Dynamic(name, dynformat, a) => {

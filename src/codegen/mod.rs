@@ -496,7 +496,7 @@ fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
         Pattern::Seq(pats) => {
             RustPattern::ArrayLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
         }
-        Pattern::Variant(tc, vname, pat) => {
+        Pattern::Variant(vname, pat) => {
             let constr = match type_hint {
                 Some(ty) => {
                     let tname = get_enum_name(ty).clone();
@@ -1552,15 +1552,14 @@ impl<'a> Generator<'a> {
     fn infer_type_format(&self, module: &FormatModule, format: &Format) -> TypedFormat {
         let scope = TypeScope::new();
         let ty = module.infer_format_type(&scope, format).expect("Could not infer Format type");
-        (format, ty).into()
+        // FIXME - we currently don't have a fully-implemented TypedFormat, so this is incorrect for now
+        // (format, ty).into()
+        format.clone()
     }
 
     fn generate_toplevel_format(&mut self, module: &FormatModule, t_format: &TypedFormat) {
         todo!();
     }
-
-
-
 }
 
 type TypedFormat = Format;

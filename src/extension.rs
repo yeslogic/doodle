@@ -1,7 +1,7 @@
 use crate::ValueType;
 
-pub(crate) type NLInfo<X: Extension<NLKind>> = <X as Extension<NLKind>>::Info;
-pub(crate) type HOInfo<X: Extension<HOKind>> = <X as Extension<HOKind>>::Info;
+pub(crate) type NLInfo<X> = <X as Extension<NLKind>>::Info;
+pub(crate) type HOInfo<X> = <X as Extension<HOKind>>::Info;
 // pub(crate) type MCInfo<X: Extension<HOKind>> = <X as Extension<MCKind>>::Info;
 
 
