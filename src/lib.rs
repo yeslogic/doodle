@@ -36,96 +36,8 @@ pub trait IntoLabel: Into<Label> {}
 
 impl<T> IntoLabel for T where T: Into<Label> {}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize)]
-#[serde(tag = "tag", content = "data")]
-pub enum Pattern {
-    Binding(Label),
-    Wildcard,
-    Bool(bool),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    Char(char),
-    Tuple(Vec<Pattern>),
-    Variant(Label, Box<Pattern>),
-    Seq(Vec<Pattern>),
-}
-
-impl Pattern {
-    pub const UNIT: Pattern = Pattern::Tuple(Vec::new());
-
-    pub fn from_bytes(bs: &[u8]) -> Pattern {
-        Pattern::Seq(bs.iter().copied().map(Pattern::U8).collect())
-    }
-
-    pub fn variant(label: impl IntoLabel, value: impl Into<Box<Self>>) -> Self {
-        Pattern::Variant(label.into(), value.into())
-    }
-
-    pub fn binding(name: impl IntoLabel) -> Pattern {
-        Pattern::Binding(name.into())
-    }
-
-    fn build_scope(&self, scope: &mut TypeScope<'_>, t: Rc<ValueType>) {
-        match (self, t.as_ref()) {
-            (Pattern::Binding(name), t) => {
-                // FIXME - do we want to store an Rc<ValueType> in the scope instead, perhaps...?
-                scope.push(name.clone(), t.clone());
-            }
-            (Pattern::Wildcard, _) => {}
-            (Pattern::Bool(..), ValueType::Ground(GroundType::Bool)) => {}
-            (Pattern::U8(..), ValueType::Ground(GroundType::U8)) => {}
-            (Pattern::U16(..), ValueType::Ground(GroundType::U16)) => {}
-            (Pattern::U32(..), ValueType::Ground(GroundType::U32)) => {}
-            (Pattern::U64(..), ValueType::Ground(GroundType::U64)) => {}
-            (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
-                for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
-                    p.build_scope(scope, Rc::new(t.clone()));
-                }
-            }
-            (Pattern::Seq(ps), ValueType::Seq(t)) => {
-                for p in ps {
-                    p.build_scope(scope, Rc::new((**t).clone()));
-                }
-            }
-            (Pattern::Variant(label, p), ValueType::Union(branches)) => {
-                if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
-                    // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
-                    let tmp = Rc::new(t.clone());
-                    p.build_scope(scope, tmp);
-                } else {
-                    panic!("no {label} in {branches:?}");
-                }
-            }
-            _ => panic!("pattern build_scope failed"),
-        }
-    }
-
-    fn infer_expr_branch_type(
-        &self,
-        scope: &TypeScope<'_>,
-        head_type: Rc<ValueType>,
-        expr: &Expr
-    ) -> AResult<ValueType> {
-        let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope(&mut pattern_scope, head_type);
-        expr.infer_type(&pattern_scope)
-    }
-
-    fn infer_format_branch_type(
-        &self,
-        scope: &TypeScope<'_>,
-        head_type: Rc<ValueType>,
-        module: &FormatModule,
-        format: &Format
-    ) -> AResult<ValueType> {
-        let mut pattern_scope = TypeScope::child(scope);
-        self.build_scope(&mut pattern_scope, head_type);
-        module.infer_format_type(&pattern_scope, format)
-    }
-}
+pub(crate) mod pattern;
+pub use pattern::Pattern;
 
 pub enum ValueKind {
     Value(ValueType),
@@ -133,7 +45,7 @@ pub enum ValueKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Hash)]
-pub enum GroundType {
+pub enum BaseType {
     Bool,
     U8,
     U16,
@@ -141,7 +53,8 @@ pub enum GroundType {
     U64,
     Char,
 }
-impl GroundType {
+
+impl BaseType {
     fn is_numeric(&self) -> bool {
         matches!(self, Self::U8 | Self::U16 | Self::U32 | Self::U64)
     }
@@ -151,7 +64,7 @@ impl GroundType {
 pub enum ValueType {
     Any,
     Empty,
-    Ground(GroundType),
+    Base(BaseType),
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
     Union(Vec<(Label, ValueType)>),
@@ -179,14 +92,21 @@ impl ValueType {
         }
     }
 
+    fn as_tuple_type(&self) -> &[ValueType] {
+        match self {
+            ValueType::Tuple(ts) => ts.as_slice(),
+            other => panic!("type is not a tuple: {other:?}"),
+        }
+    }
+
     fn unify(&self, other: &ValueType) -> Result<ValueType, UnificationError<ValueType>> {
         match (self, other) {
             (ValueType::Any, rhs) => Ok(rhs.clone()),
             (lhs, ValueType::Any) => Ok(lhs.clone()),
             (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
-            (ValueType::Ground(g1), ValueType::Ground(g2)) => {
-                if g1 == g2 {
-                    Ok(ValueType::Ground(*g1))
+            (ValueType::Base(b1), ValueType::Base(b2)) => {
+                if b1 == b2 {
+                    Ok(ValueType::Base(*b1))
                 } else {
                     Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
                 }
@@ -298,7 +218,6 @@ pub enum Expr {
     U64Be(Box<Expr>),
     U64Le(Box<Expr>),
 
-
     SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
     FlatMap(Box<Expr>, Box<Expr>),
@@ -344,11 +263,11 @@ impl Expr {
                             )
                         ),
                 }
-            Expr::Bool(_b) => Ok(ValueType::Ground(GroundType::Bool)),
-            Expr::U8(_n) => Ok(ValueType::Ground(GroundType::U8)),
-            Expr::U16(_n) => Ok(ValueType::Ground(GroundType::U16)),
-            Expr::U32(_n) => Ok(ValueType::Ground(GroundType::U32)),
-            Expr::U64(_n) => Ok(ValueType::Ground(GroundType::U64)),
+            Expr::Bool(_b) => Ok(ValueType::Base(BaseType::Bool)),
+            Expr::U8(_n) => Ok(ValueType::Base(BaseType::U8)),
+            Expr::U16(_n) => Ok(ValueType::Base(BaseType::U16)),
+            Expr::U32(_n) => Ok(ValueType::Base(BaseType::U32)),
+            Expr::U64(_n) => Ok(ValueType::Base(BaseType::U64)),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
@@ -381,113 +300,144 @@ impl Expr {
             }
             Expr::Match(head, branches) => {
                 if branches.is_empty() {
-                    return Err(anyhow!("empty match"));
+                    return Err(anyhow!("cannot infer type of empty match expression"));
                 }
                 let head_type = Rc::new(head.infer_type(scope)?);
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
-                    t = t.unify(&pattern.infer_expr_branch_type(scope, head_type, branch)?)?;
+                    t = t.unify(
+                        &pattern.infer_expr_branch_type(scope, head_type.clone(), branch)?
+                    )?;
                 }
                 Ok(t)
             }
-            Expr::Lambda(..) => Err(anyhow!("unexpected lambda")),
+            Expr::Lambda(..) => Err(anyhow!("infer_type encountered unexpected lambda")),
 
             Expr::IntRel(_rel, x, y) =>
                 match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                    (ValueType::Ground(g1), ValueType::Ground(g2)) if g1 == g2 && g1.is_numeric() =>
-                        Ok(ValueType::Ground(GroundType::Bool)),
-                    (x, y) => Err(anyhow!("mismatched operands {x:?}, {y:?}")),
+                    (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() =>
+                        Ok(ValueType::Base(BaseType::Bool)),
+                    (x, y) => Err(anyhow!("mismatched operand types for {_rel:?}: {x:?}, {y:?}")),
                 }
             Expr::Arith(_arith, x, y) =>
                 match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                    (ValueType::Ground(g1), ValueType::Ground(g2)) if g1 == g2 && g1.is_numeric() =>
-                        Ok(ValueType::Ground(g1)),
-                    (x, y) => Err(anyhow!("mismatched operands {x:?}, {y:?}")),
+                    (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() =>
+                        Ok(ValueType::Base(b1)),
+                    (x, y) => Err(anyhow!("mismatched operand types for {_arith:?}: {x:?}, {y:?}")),
                 }
 
             Expr::AsU8(x) =>
                 match x.infer_type(scope)? {
-                    ValueType::Ground(g) if g.is_numeric() => Ok(ValueType::Ground(GroundType::U8)),
-                    x => Err(anyhow!("bad cast: AsU8 @ {x:?}")),
+                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
+                    x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
                 }
             Expr::AsU16(x) =>
                 match x.infer_type(scope)? {
-                    ValueType::Ground(g) if g.is_numeric() =>
-                        Ok(ValueType::Ground(GroundType::U16)),
-                    x => Err(anyhow!("bad cast: AsU16 @ {x:?}")),
+                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
+                    x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
                 }
             Expr::AsU32(x) =>
                 match x.infer_type(scope)? {
-                    ValueType::Ground(g) if g.is_numeric() =>
-                        Ok(ValueType::Ground(GroundType::U32)),
-                    x => Err(anyhow!("bad cast: AsU32 @ {x:?}")),
+                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
+                    x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
                 }
             Expr::AsU64(x) =>
                 match x.infer_type(scope)? {
-                    ValueType::Ground(g) if g.is_numeric() =>
-                        Ok(ValueType::Ground(GroundType::U64)),
+                    ValueType::Base(b) if b.is_numeric() =>
+                        Ok(ValueType::Base(BaseType::U64)),
                     x => Err(anyhow!("cannot convert {x:?} to U64")),
                 }
             Expr::AsChar(x) =>
                 match x.infer_type(scope)? {
-                    ValueType::Ground(g) if g.is_numeric() =>
-                        Ok(ValueType::Ground(GroundType::Char)),
-                    x => Err(anyhow!("bad cast: AsChar @ {x:?}")),
+                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
+                    x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
                 }
-
-            Expr::U16Be(bytes) =>
-                match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                    [ValueType::U8, ValueType::U8] => Ok(ValueType::U16),
-                    other => Err(format!("U16Be: expected (U8, U8), found {other:#?}")),
+            Expr::U16Be(bytes) => {
+                let _t = bytes.infer_type(scope)?;
+                match _t.as_tuple_type() {
+                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] =>
+                        Ok(ValueType::Base(BaseType::U16)),
+                    _ => Err(anyhow!("unsound byte-level type cast U16Be(_ : {_t:?})")),
                 }
-            Expr::U16Le(bytes) =>
-                match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                    [ValueType::U8, ValueType::U8] => Ok(ValueType::U16),
-                    other => Err(format!("U16Le: expected (U8, U8), found {other:#?}")),
+            }
+            Expr::U16Le(bytes) => {
+                let _t = bytes.infer_type(scope)?;
+                match _t.as_tuple_type() {
+                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] =>
+                        Ok(ValueType::Base(BaseType::U16)),
+                    _ => Err(anyhow!("unsound byte-level type cast U16Le(_ : {_t:?})")),
                 }
-            Expr::U32Be(bytes) =>
-                match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                    [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] =>
-                        Ok(ValueType::U32),
-                    other => Err(format!("U32Be: expected (U8, U8, U8, U8), found {other:#?}")),
+            }
+            Expr::U32Be(bytes) => {
+                let _t = bytes.infer_type(scope)?;
+                match _t.as_tuple_type() {
+                    [
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                    ] => Ok(ValueType::Base(BaseType::U32)),
+                    _ => Err(anyhow!("unsound byte-level type cast U32Be(_ : {_t:?})")),
                 }
-            Expr::U32Le(bytes) =>
-                match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
-                    [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] =>
-                        Ok(ValueType::U32),
-                    other => Err(format!("U32Le: expected (U8, U8, U8, U8), found {other:#?}")),
+            }
+            Expr::U32Le(bytes) => {
+                let _t = bytes.infer_type(scope)?;
+                match _t.as_tuple_type() {
+                    [
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                    ] => Ok(ValueType::Base(BaseType::U32)),
+                    _ => Err(anyhow!("unsound byte-level type cast U32Le(_ : {_t:?})")),
                 }
+            }
             Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
-                match bytes.infer_type(scope)?.unwrap_tuple_type()?.as_slice() {
-                    [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => {
-                        Ok(ValueType::U64)
+                let _t = bytes.infer_type(scope)?;
+                match _t.as_tuple_type() {
+                    [
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                        ValueType::Base(BaseType::U8),
+                    ] => {
+                        Ok(ValueType::Base(BaseType::U64))
                     }
-                    other => Err(anyhow!(
-                        "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
-                    )),
+                    other =>
+                        Err(
+                            anyhow!(
+                                "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
+                            )
+                        ),
                 }
             }
             Expr::SeqLength(seq) =>
                 match seq.infer_type(scope)? {
-                    ValueType::Seq(_t) => Ok(ValueType::U32),
-                    other => Err(format!("SeqLength: expected Seq, found {other:?}")),
+                    ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
+                    other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
                 }
             Expr::SubSeq(seq, start, length) =>
                 match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
                         let start_type = start.infer_type(scope)?;
                         let length_type = length.infer_type(scope)?;
-                        if start_type != ValueType::U32 {
-                            return Err(format!("SubSeq start must be U32, found {start_type:?}"));
-                        }
-                        if length_type != ValueType::U32 {
+                        if start_type != ValueType::Base(BaseType::U32) {
                             return Err(
-                                format!("SubSeq length must be numeric, found {length_type:?}")
+                                anyhow!("SubSeq `start` param: expected U32, found {start_type:?}")
+                            );
+                        }
+                        if length_type != ValueType::Base(BaseType::U32) {
+                            return Err(
+                                anyhow!("SubSeq length must be numeric, found {length_type:?}")
                             );
                         }
                         Ok(ValueType::Seq(t))
                     }
-                    other => Err(format!("SubSeq: expected Seq, found {other:?}")),
+                    other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
                 }
             Expr::FlatMap(expr, seq) =>
                 match expr.as_ref() {
@@ -498,12 +448,12 @@ impl Expr {
                                 child_scope.push(name.clone(), *t);
                                 match expr.infer_type(&child_scope)? {
                                     ValueType::Seq(t2) => Ok(ValueType::Seq(t2)),
-                                    other => Err(format!("FlatMap: expected Seq, found {other:?}")),
+                                    other => Err(anyhow!("FlatMap: expected Seq, found {other:?}")),
                                 }
                             }
-                            other => Err(format!("FlatMap: expected Seq, found {other:?}")),
+                            other => Err(anyhow!("FlatMap: expected Seq, found {other:?}")),
                         }
-                    other => Err(format!("FlatMap: expected Lambda, found {other:?}")),
+                    other => Err(anyhow!("FlatMap: expected Lambda, found {other:?}")),
                 }
             Expr::FlatMapAccum(expr, accum, accum_type, seq) =>
                 match expr.as_ref() {
@@ -516,25 +466,22 @@ impl Expr {
                                     name.clone(),
                                     ValueType::Tuple(vec![accum_type.clone(), *t])
                                 );
-                                match
-                                    expr
-                                        .infer_type(&child_scope)?
-                                        .unwrap_tuple_type()
-                                        .as_mut_slice()
+                                let ValueType::Tuple(tup) = expr.infer_type(&child_scope)? else { return Err(anyhow!("non-tuple return value of lambda in FlatMapAccum")) };
+                                match tup.as_mut_slice()
                                 {
                                     [accum_result, ValueType::Seq(t2)] => {
                                         accum_result.unify(&accum_type)?;
                                         Ok(ValueType::Seq(t2.clone()))
                                     }
-                                    _ => panic!("FlatMapAccum: expected two values"),
+                                    _ => Err(anyhow!("FlatMapAccum: expected two values")),
                                 }
                             }
-                            other => Err(format!("FlatMapAccum: expected Seq, found {other:?}")),
+                            other => Err(anyhow!("FlatMapAccum: expected Seq, found {other:?}")),
                         }
-                    other => Err(format!("FlatMapAccum: expected Lambda, found {other:?}")),
+                    other => Err(anyhow!("FlatMapAccum: expected Lambda, found {other:?}")),
                 }
             Expr::Dup(count, expr) => {
-                if count.infer_type(scope)? != ValueType::Ground(GroundType::U32) {
+                if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
                 }
                 let t = expr.infer_type(scope)?;
@@ -544,7 +491,7 @@ impl Expr {
                 match seq.infer_type(scope)? {
                     // FIXME should check values are appropriate variants
                     ValueType::Seq(_values) =>
-                        Ok(ValueType::Seq(Box::new(ValueType::Ground(GroundType::U8)))),
+                        Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::U8)))),
                     other => Err(anyhow!("Inflate: expected Seq, found {other:?}")),
                 }
         }
@@ -661,7 +608,7 @@ pub enum Format {
     /// Let binding
     Let(Label, Expr, Box<Format>),
     /// Pattern match on an expression
-    Match(Expr, Vec<(Pattern, Format)>),
+    Match(Expr, Vec<(pattern::Pattern, Format)>),
     /// Format generated dynamically
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
@@ -918,7 +865,7 @@ impl FormatModule {
             Format::Fail => Ok(ValueType::Empty),
             Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
-            Format::Byte(_bs) => Ok(ValueType::Ground(GroundType::U8)),
+            Format::Byte(_bs) => Ok(ValueType::Base(BaseType::U8)),
             Format::Variant(label, f) =>
                 Ok(ValueType::Union(vec![(label.clone(), self.infer_format_type(scope, f)?)])),
             Format::Union(branches) | Format::UnionNondet(branches) => {
@@ -986,7 +933,7 @@ impl FormatModule {
                 let mut t = ValueType::Any;
                 for (pattern, branch) in branches {
                     t = t.unify(
-                        &pattern.infer_format_branch_type(scope, head_type, self, branch)?
+                        &pattern.infer_format_branch_type(scope, head_type.clone(), self, branch)?
                     )?;
                 }
                 Ok(t)
@@ -997,8 +944,8 @@ impl FormatModule {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) =>
                                 match &*t {
-                                    | ValueType::Ground(GroundType::U8)
-                                    | ValueType::Ground(GroundType::U16) => {}
+                                    | ValueType::Base(BaseType::U8)
+                                    | ValueType::Base(BaseType::U16) => {}
                                     other => {
                                         return Err(
                                             anyhow!("Huffman: expected U8 or U16, found {other:?}")
@@ -1013,7 +960,7 @@ impl FormatModule {
                     }
                 }
                 let mut child_scope = TypeScope::child(scope);
-                child_scope.push_format(name.clone(), ValueType::Ground(GroundType::U16));
+                child_scope.push_format(name.clone(), ValueType::Base(BaseType::U16));
                 self.infer_format_type(&child_scope, format)
             }
             Format::Apply(name) =>
