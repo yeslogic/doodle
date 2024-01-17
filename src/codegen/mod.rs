@@ -1,7 +1,7 @@
 mod rust_ast;
 
 use crate::{
-    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label, GroundType,
+    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label, BaseType, Arith, IntRel,
 };
 use std::rc::Rc;
 use crate::byte_set::ByteSet;
@@ -112,12 +112,12 @@ impl Codegen {
     fn lift_type(&mut self, vt: &ValueType) -> RustType {
         match vt {
             ValueType::Empty => RustType::UNIT,
-            ValueType::Ground(GroundType::Bool) => PrimType::Bool.into(),
-            ValueType::Ground(GroundType::U8) => PrimType::U8.into(),
-            ValueType::Ground(GroundType::U16) => PrimType::U16.into(),
-            ValueType::Ground(GroundType::U32) => PrimType::U32.into(),
-            ValueType::Ground(GroundType::U64) => PrimType::U64.into(),
-            ValueType::Ground(GroundType::Char) => PrimType::Char.into(),
+            ValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
+            ValueType::Base(BaseType::U8) => PrimType::U8.into(),
+            ValueType::Base(BaseType::U16) => PrimType::U16.into(),
+            ValueType::Base(BaseType::U32) => PrimType::U32.into(),
+            ValueType::Base(BaseType::U64) => PrimType::U64.into(),
+            ValueType::Base(BaseType::Char) => PrimType::Char.into(),
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.iter() {
@@ -523,6 +523,7 @@ fn embed_expr(expr: &Expr) -> RustExpr {
         Expr::U8(n) => RustExpr::num_lit(*n as usize),
         Expr::U16(n) => RustExpr::num_lit(*n as usize),
         Expr::U32(n) => RustExpr::num_lit(*n as usize),
+        Expr::U64(n) => RustExpr::num_lit(*n as usize),
         Expr::Tuple(tup) => RustExpr::Tuple(tup.iter().map(embed_expr).collect()),
         Expr::TupleProj(expr_tup, ix) => embed_expr(expr_tup).nth(*ix),
         Expr::Record(_fields) => unreachable!("Record not bound in Variant"),
@@ -554,23 +555,22 @@ fn embed_expr(expr: &Expr) -> RustExpr {
                 .collect(),
         ))),
         // FIXME - we probably need to apply precedence rules similar to tree-output, which will require a lot of refactoring in AST
-        Expr::BitAnd(lhs, rhs) => {
-            RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs))
-        }
-        Expr::BitOr(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::BitOr, embed_expr(rhs)),
-        Expr::Eq(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Eq, embed_expr(rhs)),
-        Expr::Ne(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Neq, embed_expr(rhs)),
-        Expr::Lt(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lt, embed_expr(rhs)),
-        Expr::Gt(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gt, embed_expr(rhs)),
-        Expr::Lte(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lte, embed_expr(rhs)),
-        Expr::Gte(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gte, embed_expr(rhs)),
-        Expr::Mul(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Mul, embed_expr(rhs)),
-        Expr::Div(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Div, embed_expr(rhs)),
-        Expr::Rem(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Rem, embed_expr(rhs)),
-        Expr::Shl(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shl, embed_expr(rhs)),
-        Expr::Shr(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shr, embed_expr(rhs)),
-        Expr::Add(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Add, embed_expr(rhs)),
-        Expr::Sub(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Sub, embed_expr(rhs)),
+        Expr::Arith(Arith::BitAnd, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs)),
+        Expr::Arith(Arith::BitOr, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::BitOr, embed_expr(rhs)),
+        Expr::Arith(Arith::Mul, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Mul, embed_expr(rhs)),
+        Expr::Arith(Arith::Div, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Div, embed_expr(rhs)),
+        Expr::Arith(Arith::Rem, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Rem, embed_expr(rhs)),
+        Expr::Arith(Arith::Shl, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shl, embed_expr(rhs)),
+        Expr::Arith(Arith::Shr, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shr, embed_expr(rhs)),
+        Expr::Arith(Arith::Add, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Add, embed_expr(rhs)),
+        Expr::Arith(Arith::Sub, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Sub, embed_expr(rhs)),
+
+        Expr::IntRel(IntRel::Eq, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Eq, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Ne, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Neq, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Lt, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lt, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Gt, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gt, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Lte, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lte, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Gte, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gte, embed_expr(rhs)),
         Expr::AsU8(x) => {
             RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr(x)), PrimType::U8.into()))
         }
@@ -582,10 +582,16 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             Box::new(embed_expr(x)),
             PrimType::U32.into(),
         )),
+        Expr::AsU64(x) => RustExpr::Operation(RustOp::AsCast(
+            Box::new(embed_expr(x)),
+            PrimType::U64.into(),
+        )),
         Expr::U16Be(be_bytes) => RustExpr::local("u16be").call_with([embed_expr(be_bytes)]),
         Expr::U16Le(le_bytes) => RustExpr::local("u16le").call_with([embed_expr(le_bytes)]),
         Expr::U32Be(be_bytes) => RustExpr::local("u32be").call_with([embed_expr(be_bytes)]),
         Expr::U32Le(le_bytes) => RustExpr::local("u32le").call_with([embed_expr(le_bytes)]),
+        Expr::U64Be(be_bytes) => RustExpr::local("u64be").call_with([embed_expr(be_bytes)]),
+        Expr::U64Le(le_bytes) => RustExpr::local("u64le").call_with([embed_expr(le_bytes)]),
         Expr::AsChar(codepoint) => RustExpr::scoped(["char"], "from_u32")
             .call_with([embed_expr(codepoint)])
             .call_method("unwrap"),
@@ -1554,15 +1560,14 @@ impl<'a> Generator<'a> {
     fn infer_type_format(&self, module: &FormatModule, format: &Format) -> TypedFormat {
         let scope = TypeScope::new();
         let ty = module.infer_format_type(&scope, format).expect("Could not infer Format type");
-        (format, ty).into()
+        // FIXME - we currently don't have a fully-implemented TypedFormat, so this is incorrect for now
+        // (format, ty).into()
+        format.clone()
     }
 
     fn generate_toplevel_format(&mut self, module: &FormatModule, t_format: &TypedFormat) {
         todo!();
     }
-
-
-
 }
 
 type TypedFormat = Format;
