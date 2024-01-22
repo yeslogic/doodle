@@ -2,7 +2,7 @@ use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
 use crate::{
-    Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, Pattern, TypeScope,
+    Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, pattern::Pattern, TypeScope,
     ValueType,
 };
 use crate::{IntoLabel, Label};

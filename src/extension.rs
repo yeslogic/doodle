@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::ValueType;
 
 pub(crate) type NLInfo<X> = <X as Extension<NLKind>>::Info;
@@ -46,6 +47,7 @@ impl<X: Extension<K>, K: sealed::ExtKind> Follows<X, K> for X {
 }
 
 pub trait MaybeCast<X: Extension<K>, K> where K: sealed::ExtKind, Self: Extension<K> {
+    #[allow(unused_variables)]
     fn cast(info: Self::Info) -> Option<X::Info> {
         None
     }

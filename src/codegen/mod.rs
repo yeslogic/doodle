@@ -1,7 +1,7 @@
 mod rust_ast;
 
 use crate::{
-    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label, GroundType,
+    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label, BaseType, Arith, IntRel,
 };
 use std::rc::Rc;
 use crate::byte_set::ByteSet;
@@ -112,11 +112,11 @@ impl Codegen {
     fn lift_type(&mut self, vt: &ValueType) -> RustType {
         match vt {
             ValueType::Empty => RustType::UNIT,
-            ValueType::Ground(GroundType::Bool) => PrimType::Bool.into(),
-            ValueType::Ground(GroundType::U8) => PrimType::U8.into(),
-            ValueType::Ground(GroundType::U16) => PrimType::U16.into(),
-            ValueType::Ground(GroundType::U32) => PrimType::U32.into(),
-            ValueType::Ground(GroundType::Char) => PrimType::Char.into(),
+            ValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
+            ValueType::Base(BaseType::U8) => PrimType::U8.into(),
+            ValueType::Base(BaseType::U16) => PrimType::U16.into(),
+            ValueType::Base(BaseType::U32) => PrimType::U32.into(),
+            ValueType::Base(BaseType::Char) => PrimType::Char.into(),
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.iter() {
@@ -552,23 +552,22 @@ fn embed_expr(expr: &Expr) -> RustExpr {
                 .collect(),
         ))),
         // FIXME - we probably need to apply precedence rules similar to tree-output, which will require a lot of refactoring in AST
-        Expr::BitAnd(lhs, rhs) => {
-            RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs))
-        }
-        Expr::BitOr(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::BitOr, embed_expr(rhs)),
-        Expr::Eq(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Eq, embed_expr(rhs)),
-        Expr::Ne(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Neq, embed_expr(rhs)),
-        Expr::Lt(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lt, embed_expr(rhs)),
-        Expr::Gt(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gt, embed_expr(rhs)),
-        Expr::Lte(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lte, embed_expr(rhs)),
-        Expr::Gte(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gte, embed_expr(rhs)),
-        Expr::Mul(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Mul, embed_expr(rhs)),
-        Expr::Div(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Div, embed_expr(rhs)),
-        Expr::Rem(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Rem, embed_expr(rhs)),
-        Expr::Shl(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shl, embed_expr(rhs)),
-        Expr::Shr(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shr, embed_expr(rhs)),
-        Expr::Add(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Add, embed_expr(rhs)),
-        Expr::Sub(lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Sub, embed_expr(rhs)),
+        Expr::Arith(Arith::BitAnd, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs)),
+        Expr::Arith(Arith::BitOr, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::BitOr, embed_expr(rhs)),
+        Expr::Arith(Arith::Mul, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Mul, embed_expr(rhs)),
+        Expr::Arith(Arith::Div, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Div, embed_expr(rhs)),
+        Expr::Arith(Arith::Rem, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Rem, embed_expr(rhs)),
+        Expr::Arith(Arith::Shl, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shl, embed_expr(rhs)),
+        Expr::Arith(Arith::Shr, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Shr, embed_expr(rhs)),
+        Expr::Arith(Arith::Add, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Add, embed_expr(rhs)),
+        Expr::Arith(Arith::Sub, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Sub, embed_expr(rhs)),
+
+        Expr::IntRel(IntRel::Eq, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Eq, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Ne, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Neq, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Lt, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lt, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Gt, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gt, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Lte, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Lte, embed_expr(rhs)),
+        Expr::IntRel(IntRel::Gte, lhs, rhs) => RustExpr::infix(embed_expr(lhs), Operator::Gte, embed_expr(rhs)),
         Expr::AsU8(x) => {
             RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr(x)), PrimType::U8.into()))
         }
