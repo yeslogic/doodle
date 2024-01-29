@@ -1,6 +1,6 @@
 use crate::format::BaseModule;
 use doodle::helper::*;
-use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType, PrimType};
+use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, PrimType, ValueType};
 
 fn tuple_proj(x: Expr, i: usize) -> Expr {
     Expr::TupleProj(Box::new(x), i)
