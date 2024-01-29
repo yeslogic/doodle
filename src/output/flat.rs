@@ -130,14 +130,7 @@ fn check_covered(
             check_covered(module, path, format)?;
             path.pop();
         }
-        Format::UnionNondet(branches) => {
-            for (label, format) in branches {
-                path.push(label.clone());
-                check_covered(module, path, format)?;
-                path.pop();
-            }
-        }
-        Format::Union(branches) => {
+        Format::Union(branches) | Format::UnionNondet(branches) => {
             for format in branches {
                 check_covered(module, path, format)?;
             }
@@ -219,20 +212,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected variant, found {value:?}"),
             },
-            Format::UnionNondet(branches) => match value {
-                Value::Branch(index, value) => {
-                    let (label, format) = &branches[*index];
-                    match value.as_ref() {
-                        Value::Variant(label2, value) => {
-                            assert_eq!(label, label2);
-                            self.write_flat(scope, value, format)
-                        }
-                        _ => panic!("expected variant, found {value:?}"),
-                    }
-                }
-                _ => panic!("expected branch, found {value:?}"),
-            },
-            Format::Union(branches) => match value {
+            Format::Union(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
                     let format = &branches[*index];
                     self.write_flat(scope, value, format)
