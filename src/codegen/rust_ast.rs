@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{cond_paren, IntransitiveOrd, Precedence, Relation};
-use crate::{Label, ValueType, BaseType};
+use crate::{BaseType, Label, ValueType};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub(crate) enum Visibility {
