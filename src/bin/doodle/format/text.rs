@@ -125,10 +125,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     module.define_format(
         "text.string",
-        Format::UnionNondet(vec![
-            ("ascii".into(), ascii_str.call()),
-            ("utf8".into(), utf8_str.call()),
-        ]),
+        union_nondet(vec![("ascii", ascii_str.call()), ("utf8", utf8_str.call())]),
     )
 }
 

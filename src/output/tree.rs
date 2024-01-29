@@ -147,19 +147,9 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Value::Branch(n, value) => match format.map(|f| self.unwrap_itemvars(f)) {
-                Some(Format::Union(branches)) => {
+                Some(Format::Union(branches)) | Some(Format::UnionNondet(branches)) => {
                     let format = &branches[*n];
                     self.is_atomic_value(value, Some(format))
-                }
-                Some(Format::UnionNondet(branches)) => {
-                    let (label, format) = &branches[*n];
-                    match value.as_ref() {
-                        Value::Variant(label2, value) => {
-                            assert_eq!(label, label2);
-                            self.is_atomic_value(value, Some(format))
-                        }
-                        _ => panic!("expected variant value"),
-                    }
                 }
                 Some(Format::Match(_head, branches)) => {
                     let (_pattern, format) = &branches[*n];
@@ -238,20 +228,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected variant, found {value:?}"),
             },
-            Format::UnionNondet(branches) => match value {
-                Value::Branch(index, value) => {
-                    let (label, format) = &branches[*index];
-                    match value.as_ref() {
-                        Value::Variant(label2, value) => {
-                            assert_eq!(label, label2);
-                            self.compile_variant(scope, label, value, Some(format))
-                        }
-                        _ => panic!("expected variant, found {value:?}"),
-                    }
-                }
-                _ => panic!("expected branch, found {value:?}"),
-            },
-            Format::Union(branches) => match value {
+            Format::Union(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(n, value) => {
                     let format = &branches[*n];
                     self.compile_decoded_value(scope, value, format)

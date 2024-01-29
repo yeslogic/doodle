@@ -543,8 +543,8 @@ pub enum Format {
     Variant(Label, Box<Format>),
     /// Matches the union of all the formats, which must have the same type
     Union(Vec<Format>),
-    /// Temporary hack for nondeterministic variant unions
-    UnionNondet(Vec<(Label, Format)>),
+    /// Nondeterministic unions, where the formats are not mutually exclusive
+    UnionNondet(Vec<Format>),
     /// Matches a sequence of concatenated formats
     Tuple(Vec<Format>),
     /// Matches a sequence of named formats where later formats can depend on
@@ -614,12 +614,7 @@ impl Format {
             Format::Align(n) => Bounds::new(0, Some(n - 1)),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
-            Format::UnionNondet(branches) => branches
-                .iter()
-                .map(|(_, f)| f.match_bounds(module))
-                .reduce(Bounds::union)
-                .unwrap(),
-            Format::Union(branches) => branches
+            Format::Union(branches) | Format::UnionNondet(branches) => branches
                 .iter()
                 .map(|f| f.match_bounds(module))
                 .reduce(Bounds::union)
@@ -671,8 +666,9 @@ impl Format {
             Format::Align(_) => false,
             Format::Byte(_) => false,
             Format::Variant(_label, f) => f.depends_on_next(module),
-            Format::UnionNondet(branches) => Format::union_depends_on_next(branches, module),
-            Format::Union(branches) => Format::iso_union_depends_on_next(branches, module),
+            Format::Union(branches) | Format::UnionNondet(branches) => {
+                Format::union_depends_on_next(branches, module)
+            }
             Format::Tuple(fields) => fields.iter().any(|f| f.depends_on_next(module)),
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Repeat(_) => true,
@@ -694,18 +690,7 @@ impl Format {
         }
     }
 
-    fn union_depends_on_next(branches: &[(Label, Format)], module: &FormatModule) -> bool {
-        let mut fs = Vec::with_capacity(branches.len());
-        for (_label, f) in branches {
-            if f.depends_on_next(module) {
-                return true;
-            }
-            fs.push(f.clone());
-        }
-        MatchTree::build(module, &fs, Rc::new(Next::Empty)).is_none()
-    }
-
-    fn iso_union_depends_on_next(branches: &[Format], module: &FormatModule) -> bool {
+    fn union_depends_on_next(branches: &[Format], module: &FormatModule) -> bool {
         let mut fs = Vec::with_capacity(branches.len());
         for f in branches {
             if f.depends_on_next(module) {
@@ -848,14 +833,7 @@ impl FormatModule {
                 label.clone(),
                 self.infer_format_type(scope, f)?,
             )])),
-            Format::UnionNondet(branches) => {
-                let mut ts = Vec::with_capacity(branches.len());
-                for (label, f) in branches {
-                    ts.push((label.clone(), self.infer_format_type(scope, f)?));
-                }
-                Ok(ValueType::Union(ts))
-            }
-            Format::Union(branches) => {
+            Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut t = ValueType::Any;
                 for f in branches {
                     t = t.unify(&self.infer_format_type(scope, f)?)?;
@@ -1225,14 +1203,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
-            Format::UnionNondet(branches) => {
-                let mut tree = Self::reject();
-                for (_, f) in branches {
-                    tree = tree.union(Self::from_format(module, f, next.clone()));
-                }
-                tree
-            }
-            Format::Union(branches) => {
+            Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut tree = Self::reject();
                 for f in branches {
                     tree = tree.union(Self::from_format(module, f, next.clone()));

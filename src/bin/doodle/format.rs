@@ -32,14 +32,14 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
         record([
             (
                 "data",
-                Format::UnionNondet(vec![
-                    ("gif".into(), gif.call()),
-                    ("gzip".into(), gzip.call()),
-                    ("jpeg".into(), jpeg.call()),
-                    ("png".into(), png.call()),
-                    ("riff".into(), riff.call()),
-                    ("tar".into(), tar.call()),
-                    ("text".into(), text.call()),
+                union_nondet(vec![
+                    ("gif", gif.call()),
+                    ("gzip", gzip.call()),
+                    ("jpeg", jpeg.call()),
+                    ("png", png.call()),
+                    ("riff", riff.call()),
+                    ("tar", tar.call()),
+                    ("text", text.call()),
                 ]),
             ),
             ("end", Format::EndOfInput),

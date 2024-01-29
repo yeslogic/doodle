@@ -52,6 +52,14 @@ pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
     Format::Union(branches.into_iter().collect())
 }
 
+pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
+    Format::UnionNondet(
+        (branches.into_iter())
+            .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
+            .collect(),
+    )
+}
+
 pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::Record(
         (fields.into_iter())
