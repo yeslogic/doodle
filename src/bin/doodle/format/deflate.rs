@@ -1,4 +1,4 @@
-use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType, PrimType};
+use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, PrimType, ValueType};
 
 use crate::format::base::*;
 

@@ -1,18 +1,21 @@
 mod rust_ast;
 
+use crate::byte_set::ByteSet;
 use crate::{
-    DynFormat, Expr, Format, FormatModule, MatchTree, Next, Pattern, TypeScope, ValueType, Label, BaseType, Arith, IntRel,
+    BaseType, DynFormat, Expr, Format, FormatModule, Label, MatchTree, Next, Pattern, TypeScope,
+    ValueType, Arith, IntRel,
 };
 use std::rc::Rc;
-use crate::byte_set::ByteSet;
 
 use crate::decoder::{Decoder, Program};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
 use rust_ast::{
-    LocalType, MatchCaseLHS, Mut, RustControl, RustDecl, RustImport, RustImportItems, RustItem,
-    RustOp, RustProgram, AtomType, CompType, Constructor, DefParams, FnSig, Operator, PrimType, RustEntity, RustExpr, RustFn, RustLt, RustParams, RustPattern, RustPrimLit, RustStmt, RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
+    AtomType, CompType, Constructor, DefParams, FnSig, LocalType, MatchCaseLHS, Mut, Operator,
+    PrimType, RustControl, RustDecl, RustEntity, RustExpr, RustFn, RustImport, RustImportItems,
+    RustItem, RustLt, RustOp, RustParams, RustPattern, RustPrimLit, RustProgram, RustStmt,
+    RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
 };
 use serde::de;
 
@@ -1445,11 +1448,9 @@ fn test_decoder_27() {
     print!("{}{}", content.to_fragment(), extra)
 }
 
-
 /// COPYPASTA
 
 /// Decoders with a fixed amount of lookahead
-
 
 pub struct DecoderFn(CaseLogic, RustType);
 
@@ -1550,7 +1551,9 @@ impl<'a> Generator<'a> {
 
     fn infer_type_format(&self, module: &FormatModule, format: &Format) -> TypedFormat {
         let scope = TypeScope::new();
-        let ty = module.infer_format_type(&scope, format).expect("Could not infer Format type");
+        let ty = module
+            .infer_format_type(&scope, format)
+            .expect("Could not infer Format type");
         // FIXME - we currently don't have a fully-implemented TypedFormat, so this is incorrect for now
         // (format, ty).into()
         format.clone()

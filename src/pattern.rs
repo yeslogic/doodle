@@ -1,10 +1,9 @@
+use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use anyhow::Result as AResult;
 use serde::Serialize;
 use std::rc::Rc;
-use crate::{Format, FormatModule, Expr, BaseType, ValueType, TypeScope, IntoLabel, Label};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[derive(Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Pattern {
     Binding(Label),
@@ -72,7 +71,7 @@ impl Pattern {
         &self,
         scope: &TypeScope<'_>,
         head_type: Rc<ValueType>,
-        expr: &Expr
+        expr: &Expr,
     ) -> AResult<ValueType> {
         let mut pattern_scope = TypeScope::child(scope);
         self.build_scope(&mut pattern_scope, head_type);
@@ -84,7 +83,7 @@ impl Pattern {
         scope: &TypeScope<'_>,
         head_type: Rc<ValueType>,
         module: &FormatModule,
-        format: &Format
+        format: &Format,
     ) -> AResult<ValueType> {
         let mut pattern_scope = TypeScope::child(scope);
         self.build_scope(&mut pattern_scope, head_type);

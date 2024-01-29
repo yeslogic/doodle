@@ -2,12 +2,12 @@ use crate::byte_set::ByteSet;
 use crate::error::{ParseError, ParseResult};
 use crate::read::ReadCtxt;
 use crate::{
-    Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, pattern::Pattern, TypeScope,
+    pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next, TypeScope,
     ValueType,
 };
 use crate::{IntoLabel, Label};
-use serde::Serialize;
 use anyhow::{anyhow, Result as AResult};
+use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -540,11 +540,7 @@ impl<'a> Compiler<'a> {
         compiler.compile_format(format, Rc::new(Next::Empty))
     }
 
-    fn compile_format(
-        &mut self,
-        format: &'a Format,
-        next: Rc<Next<'a>>,
-    ) -> AResult<Decoder> {
+    fn compile_format(&mut self, format: &'a Format, next: Rc<Next<'a>>) -> AResult<Decoder> {
         match format {
             Format::ItemVar(level, arg_exprs) => {
                 let f = self.module.get_format(*level);
