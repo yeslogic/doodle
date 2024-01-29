@@ -590,9 +590,9 @@ impl<'a> Compiler<'a> {
             }
             Format::UnionNondet(branches) => {
                 let mut ds = Vec::with_capacity(branches.len());
-                for (label, f) in branches {
+                for f in branches {
                     let d = self.compile_format(f, next.clone())?;
-                    ds.push(Decoder::Variant(label.clone(), Box::new(d)));
+                    ds.push(d);
                 }
                 Ok(Decoder::Parallel(ds))
             }
