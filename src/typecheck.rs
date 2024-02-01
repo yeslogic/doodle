@@ -1,12 +1,10 @@
-use std::{ collections::{HashMap, HashSet}, rc::Rc, borrow::Cow };
+use std::{ collections::{HashMap, HashSet}, rc::Rc, borrow::{Cow, BorrowMut}, ops::DerefMut };
 use crate::{precedence::IntransitiveOrd, Arith, IntRel, BaseType, Expr, Format, FormatModule, Label, ValueType, Pattern};
 
 /// Unification variable for use in typechecking
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub(crate) struct UVar(usize);
-
-
 
 /// Unification type, equivalent to ValueType up to abstraction
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -268,6 +266,13 @@ impl Alias {
         matches!(self, Alias::Canonical(_) | Alias::NoAlias)
     }
 
+    pub fn is_canonical_nonempty(&self) -> bool {
+        match self {
+            Alias::Canonical(x) => !x.is_empty(),
+            _ => false
+        }
+    }
+
     pub fn as_backref(&self) -> Option<usize> {
         match self {
             Alias::NoAlias | Alias::Canonical(_) => None,
@@ -395,7 +400,7 @@ impl std::fmt::Display for Constraint {
 /// abstraction over explicit collections of BaseType values that could be in any order
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub(crate) enum BaseSet {
-    Single(BaseType),
+    Single(BaseType), // singleton set of any basetype, even non-integral ones
     UAny, // U8, U16, U32
 }
 
@@ -486,8 +491,7 @@ impl TypeChecker {
     /// with other constraints on that variable, or any other it is aliased or equated to.
     fn unify_var_constraint(&mut self, uvar: UVar, constraint: Constraint) -> TCResult<Constraint> {
         let uix = uvar.0;
-        let constraints = &self.constraints[uix];
-        match constraints {
+        match &self.constraints[uix] {
             Constraints::Indefinite => {
                 let ret = constraint.clone();
                 self.constraints[uix] = Constraints::Invariant(constraint);
@@ -495,7 +499,8 @@ impl TypeChecker {
             }
             Constraints::Variant(vmid) => Err(TCError::VarianceMismatch(uvar, *vmid, constraint)),
             Constraints::Invariant(prior) => {
-                let ret = self.unify_constraints(prior, &constraint)?;
+                let c1 = prior.clone();
+                let ret = self.unify_constraint_pair(c1, constraint)?;
                 self.constraints[uix] = Constraints::Invariant(ret.clone());
                 Ok(ret)
             }
@@ -531,14 +536,15 @@ impl TypeChecker {
                 Ok(())
             }
             Constraints::Variant(vmid) => {
-                let vm = self.varmaps.get_varmap(vmid);
+                let id = *vmid;
+                let vm = self.varmaps.get_varmap(id);
                 if let Some(prior) = vm.get(&cname) {
                     let updated = self.unify_utype(prior.clone(), inner)?;
-                    if updated.as_ref() != prior.as_ref() {
-                        self.varmaps.get_varmap_mut(vmid).insert(cname, updated);
+                    if updated.as_ref() != self.varmaps.get_varmap(id).get(&cname).unwrap().as_ref() {
+                        self.varmaps.get_varmap_mut(id).insert(cname, updated);
                     }
                 } else {
-                    self.varmaps.get_varmap_mut(vmid).insert(cname, inner);
+                    self.varmaps.get_varmap_mut(*vmid).insert(cname, inner);
                 }
                 Ok(())
             }
@@ -739,7 +745,7 @@ impl TypeChecker {
                 Ok(Rc::new(UType::Record(fs0)))
             }
             (&UType::Var(v1), &UType::Var(v2)) => {
-                self.equate_uvars(v1, v2)?;
+                self.unify_vars_constraints(v1, v2)?;
                 Ok(Rc::new(UType::Var(Ord::min(v1, v2))))
             }
             (&UType::Var(v), _) => {
@@ -788,293 +794,74 @@ impl TypeChecker {
         }
     }
 
-    /// Assigns a 'solution' (UType substitution and equivalence-constraint) to a UVar
-    ///
-    /// Does not perform transitive inference or checking, due to quadratic cost as linkages grow.
+    /// Assigns a 'solution' (destructively-updated invariant constraint) to a UVar
     fn unify_var_utype(&mut self, uvar: UVar, solution: Rc<UType>) -> TCResult<()> {
-        let ref mut constraints = self.constraints[uvar.0];
-        match constraints {
-            Constraints::Indefinite => {
-                *constraints = Constraints::Invariant(Constraint::Equiv(solution));
-                Ok(())
-            }
-            &mut Constraints::Variant(vmid) => Err(TCError::VarianceMismatch(
-                uvar,
-                vmid,
-                Constraint::Equiv(solution),
-            )),
-            Constraints::Invariant(ref mut constraint) => match constraint {
-                Constraint::Equiv(ut) => {
-                    let unified = self.unify_utype(ut.clone(), solution)?;
-                    *constraint = Constraint::Equiv(unified);
-                    Ok(())
-                }
-                Constraint::Elem(bs) => {
-                    let new_constraint = self.unify_utype_baseset(solution, *bs)?;
-                    *constraint = new_constraint;
-                    Ok(())
-                }
-            },
-        }
+        self.unify_var_constraint(uvar, Constraint::Equiv(solution))?;
+        Ok(())
     }
+
+    /// Overwrites the [`Constraints`] at the specified index `tgt_ix` with the immediate value at the specified index `src_ix`, returning
+    /// an up-to-date reference to the value at the rewritten index.
+    #[must_use]
+    fn replace_constraints_from_index(&mut self, tgt_ix: usize, src_ix: usize) -> &Constraints {
+        assert_ne!(tgt_ix, src_ix);
+        let val = self.constraints[src_ix].clone();
+        self.replace_constraints_with_value(tgt_ix, val)
+    }
+
+    /// Overwrites the constraints at the specified index with the provided value, returning
+    /// an up-to-date reference to the target-indexed [`Constraints`]` element.
+    #[must_use]
+    fn replace_constraints_with_value(&mut self, ix: usize, val: Constraints) -> &Constraints {
+        self.constraints[ix] = val;
+        &self.constraints[ix]
+    }
+
 
     fn unify_vars_constraints(&mut self, v1: UVar, v2: UVar) -> TCResult<&Constraints> {
         if v1 == v2 {
             return Ok(&self.constraints[v1.0]);
         }
 
-        let c1 = &mut self.constraints[v1.0];
-        let c2 = &mut self.constraints[v2.0];
-
-        match (c1, c2) {
+        match (&self.constraints[v1.0], &self.constraints[v2.0]) {
             (Constraints::Indefinite, Constraints::Indefinite) => {
-                Ok(c1)
+                Ok(&Constraints::Indefinite)
             }
             (Constraints::Indefinite, _) => {
-                *c1 = *c2;
-                Ok(c2)
+                Ok(self.replace_constraints_from_index(v1.0, v2.0))
             }
             (_, Constraints::Indefinite) => {
-                *c2 = *c1;
-                Ok(c1)
+                Ok(self.replace_constraints_from_index(v2.0, v1.0))
             }
             (Constraints::Variant(vmid1), Constraints::Variant(vmid2)) => {
-                let _ = self.unify_varmaps(v1, vmid1, v2, vmid2)?;
-                Ok(c1)
+                let _ = self.unify_varmaps(v1, *vmid1, v2, *vmid2)?;
+                Ok(&self.constraints[v1.0])
             }
             (Constraints::Variant(vmid), Constraints::Invariant(c))
             | (Constraints::Invariant(c), Constraints::Variant(vmid)) => return Err(
                 TCError::VarianceMismatch(Ord::min(v1, v2), *vmid, c.clone()),
             ),
             (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
-                let c0 = self.unify_constraints(c1, c2)?;
-                *c1 = c0.clone();
-                *c2 = c0.clone();
+                let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
+                self.replace_constraints_with_value(v1.0, Constraints::Invariant(c0.clone()));
+                self.replace_constraints_with_value(v2.0, Constraints::Invariant(c0));
                 Ok(&self.constraints[v1.0])
             }
         }
     }
 
-    fn equate_uvars(&self, v1: UVar, v2: UVar) -> TCResult<()> {
-        if v1 == v2 {
-            return Ok(());
-        }
-
-        let ref mut a1 = self.aliases[v1.0];
-        let ref mut a2 = self.aliases[v2.0];
-
-        // short-circuit if already equated
-        match (a1, a2) {
-            (Alias::NoAlias, Alias::NoAlias) => {
-                let c0 = self.unify_vars_constraints(v1, v2);
-                if v1 < v2 {
-                    a1.add_forward_ref(v2.0);
-                    let _ = a2.set_backref(v1.0);
-                } else {
-                    a2.add_forward_ref(v1.0);
-                    let _ = a1.set_backref(v2.0);
-                }
-                Ok(())
-            }
-            (Alias::NoAlias, Alias::BackRef(tgt)) => {
-                let tmp = *tgt;
-                if v1.0 > tmp {
-                    a1.set_backref(tmp);
-                } else if v1.0 < tmp {
-                    // find the old canonical pointee
-                    let mid = &mut self.aliases[tmp];
-                    // it must be Canonical or else we have a problem
-                    assert!(matches!(mid, Alias::Canonical(..)), "backref to non-canonical alias ?{tmp}: {mid:?}");
-                    // it must not contain v1.0 already, or else something is *very* wrong
-                    assert!(!mid.contains_fwd_ref(v1.0));
-                    // iteratively update all backreferences to v1
-                    for a in mid.iter_fwd_refs() {
-                        self.aliases[a].set_backref(v1.0);
-                    }
-                    *a1 = mid.set_backref(v1.0);
-                } else {
-                    panic!("BackRef ({v1}<-{v2}) conflicts with NoAlias ({v1}-|)");
-                }
-                Ok(())
-            }
-            (Alias::BackRef(tgt), Alias::NoAlias) => {
-                let tmp = *tgt;
-                if v2.0 > tmp {
-                    a1.set_backref(tmp);
-                } else if v2.0 < tmp {
-                    // find the old canonical pointee
-                    let mid = &mut self.aliases[tmp];
-                    // it must be Canonical or else we have a problem
-                    assert!(matches!(mid, Alias::Canonical(..)), "backref to non-canonical alias ?{tmp}: {mid:?}");
-                    // it must not contain v1.0 already, or else something is *very* wrong
-                    assert!(!mid.contains_fwd_ref(v2.0));
-                    // iteratively update all backreferences to v1
-                    for a in mid.iter_fwd_refs() {
-                        self.aliases[a].set_backref(v2.0);
-                    }
-                    *a1 = mid.set_backref(v2.0);
-                } else {
-                    panic!("BackRef ({v2}<-{v1}) conflicts with NoAlias ({v2}-|)");
-                }
-                Ok(())
-            }
-            (Alias::NoAlias, Alias::Canonical(fwds)) => {
-                if v1.0 < v2.0 {
-                    assert!(!a2.contains_fwd_ref(v1.0));
-                    // iteratively update all backreferences to v1
-                    let mid = a2;
-                    for a in mid.iter_fwd_refs() {
-                        self.aliases[a].set_backref(v1.0);
-                    }
-                    *a1 = a2.set_backref(v1.0);
-                    a1.add_forward_ref(v2.0);
-                } else {
-                    a1.set_backref(v2.0);
-                    a2.add_forward_ref(v1.0);
-                }
-                Ok(())
-            }
-            (Alias::Canonical(fwds), Alias::NoAlias) => {
-                if v1.0 < v2.0 {
-                     assert!(!a1.contains_fwd_ref(v2.0));
-                    // iteratively update all backreferences to v1
-                    let mid = a1;
-                    for a in mid.iter_fwd_refs() {
-                        self.aliases[a].set_backref(v2.0);
-                    }
-                    *a2 = a1.set_backref(v2.0);
-                    a2.add_forward_ref(v1.0);
-                } else {
-                    a2.set_backref(v1.0);
-                    a1.add_forward_ref(v2.0);
-                }
-                Ok(())
-            }
-            (Alias::BackRef(tgt1), Alias::BackRef(tgt2)) => {
-                let ix1 = *tgt1;
-                let ix2 = *tgt2;
-                let fwd1 = &mut self.aliases[ix1];
-                let fwd2 = &mut self.aliases[ix2];
-
-                if ix1 < ix2 {
-                    let mid = fwd2.set_backref(ix1);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!fwd1.contains_fwd_ref(a), "canonical alias of {v1} (?{ix1}) shares forward-reference ?{a} with canonical alias of {v2} (?{ix2})");
-                        self.aliases[a].set_backref(ix1);
-                        fwd1.add_forward_ref(a);
-                    }
-                    fwd1.add_forward_ref(ix2);
-                } else if ix1 > ix2 {
-                    let mid = fwd1.set_backref(ix2);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!fwd2.contains_fwd_ref(a), "canonical alias of {v2} (?{ix2}) shares forward-reference ?{a} with canonical alias of {v1} (?{ix1})");
-                        self.aliases[a].set_backref(ix2);
-                        fwd2.add_forward_ref(a);
-                    }
-                    fwd2.add_forward_ref(ix1);
-                }
-                Ok(())
-            }
-            (Alias::BackRef(tgt), Alias::Canonical(fwds)) => {
-                let left = fwds.contains(tgt);
-                let right = *tgt == v2.0;
-
-                match (left, right) {
-                    (true, true) => return Ok(()),
-                    (true, false) | (false, true) => unreachable!("mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"),
-                    (false, false) => ()
-                }
-
-                let ix1 = *tgt;
-                let ix2 = v2.0;
-                let fwd1 = &mut self.aliases[ix1];
-                let fwd2 = a2;
-
-                // check not the actual indices, but the canonical indices for tie-breaking
-                if ix1 < ix2 {
-                    let mid = fwd2.set_backref(ix1);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!fwd1.contains_fwd_ref(a), "canonical alias of {v1} (?{ix1}) shares forward-reference ?{a} with canonical alias {v2}");
-                        self.aliases[a].set_backref(ix1);
-                        fwd1.add_forward_ref(a);
-                    }
-                    fwd1.add_forward_ref(ix2);
-                } else {
-                    // ix1 > ix2 , because we already checked for equality
-                    let mid = fwd1.set_backref(ix2);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!fwd2.contains_fwd_ref(a), "canonical alias {v2} shares forward-reference ?{a} with canonical alias of {v1} (?{ix1})");
-                        self.aliases[a].set_backref(ix2);
-                        fwd2.add_forward_ref(a);
-                    }
-                    fwd2.add_forward_ref(ix1);
-                }
-                Ok(())
-            }
-            (Alias::Canonical(fwds), Alias::BackRef(tgt)) => {
-                let left = fwds.contains(tgt);
-                let right = *tgt == v1.0;
-
-                match (left, right) {
-                    (true, true) => return Ok(()),
-                    (true, false) | (false, true) => unreachable!("mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"),
-                    (false, false) => ()
-                }
-
-                let ix1 = v1.0;
-                let ix2 = *tgt;
-                let fwd1 = a1;
-                let fwd2 = &mut self.aliases[ix2];
-
-                // check not the actual indices, but the canonical indices for tie-breaking
-                if ix1 < ix2 {
-                    let mid = fwd2.set_backref(ix1);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!fwd1.contains_fwd_ref(a), "canonical alias {v1} (?{ix1}) shares forward-reference ?{a} with canonical alias of {v2} (?{ix2})");
-                        self.aliases[a].set_backref(ix1);
-                        fwd1.add_forward_ref(a);
-                    }
-                    fwd1.add_forward_ref(ix2);
-                } else {
-                    // ix1 > ix2 , because we already checked for equality
-                    let mid = fwd1.set_backref(ix2);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!fwd2.contains_fwd_ref(a), "canonical alias of {v2} (?{ix2}) shares forward-reference ?{a} with canonical alias {v1}");
-                        self.aliases[a].set_backref(ix2);
-                        fwd2.add_forward_ref(a);
-                    }
-                    fwd2.add_forward_ref(ix1);
-                }
-                Ok(())
-            }
-            (Alias::Canonical(_), Alias::Canonical(_)) => {
-                if v1 < v2 {
-                    let mid = a2.set_backref(v1.0);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!a1.contains_fwd_ref(a), "canonical alias {v1} shares forward-reference ?{a} with canonical alias {v2}");
-                        self.aliases[a].set_backref(v1.0);
-                        a1.add_forward_ref(a);
-                    }
-                    a1.add_forward_ref(v2.0);
-                } else {
-                    // v1 > v2, because we already checked for equality
-                    let mid = a1.set_backref(v2.0);
-                    for a in mid.iter_fwd_refs() {
-                        assert!(!a2.contains_fwd_ref(a), "canonical alias {v2} shares forward-reference ?{a} with canonical alias {v1}");
-                        self.aliases[a].set_backref(v2.0);
-                        a2.add_forward_ref(a);
-                    }
-                    a2.add_forward_ref(v1.0);
-                }
-                Ok(())
-            }
-        }
-    }
-
-    fn infer_utype_expr<'a>(&self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<Rc<UType>> {
+    fn infer_utype_expr<'a>(&mut self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<Rc<UType>> {
         match e {
             Expr::Var(lbl) => match scope.get_uvar_by_name(lbl) {
-                Some(uv) => Ok(Rc::new(UType::Var(uv))),
+                Some(uv) => {
+                    let occ_var = self.get_new_uvar();
+                    self.unify_vars_constraints(uv, occ_var);
+                    if let Some(ut) = self.substitute_uvar_utype(occ_var)? {
+                        Ok(ut)
+                    } else {
+                        Ok(Rc::new(UType::Var(uv)))
+                    }
+                }
                 None => {
                     unreachable!("encountered unset variable: {lbl}");
                 }
@@ -1111,12 +898,12 @@ impl TypeChecker {
             }
             Expr::Record(fs) => {
                 let newvar = self.get_new_uvar();
-                let mut child = UMultiScope::new(scope);
-                let mut ufs : Vec<(Label, Rc<UType>)> = Vec::with_capacity(fs.len());
+                let cell = std::cell::RefCell::new(UMultiScope::new(scope));
                 for (lbl, f) in fs {
-                    self.infer_utype_expr_field(lbl, f, &mut child)?;
+                    let mut scope = cell.borrow_mut();
+                    self.infer_utype_expr_field(lbl, f, scope.deref_mut())?;
                 }
-                let ret = child.into_record_utype();
+                let ret = cell.into_inner().into_record_utype();
                 self.unify_var_utype(newvar, ret.clone());
                 Ok(ret)
             }
@@ -1140,10 +927,50 @@ impl TypeChecker {
             Expr::Seq(_) => todo!(),
             Expr::Match(_, _) => todo!(),
             Expr::Lambda(_, _) => todo!(),
+
+            Expr::Arith(_arith, x, y) => {
+                let zvar = self.get_new_uvar();
+
+                let tx = self.infer_utype_expr(x.as_ref(), scope)?;
+                let cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+
+                let tx = self.infer_utype_expr(y.as_ref(), scope)?;
+                let cy = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+
+                let cz = self.unify_constraint_pair(cx, cy)?;
+
+                self.unify_var_constraint(zvar, cz)?;
+
+                if let Some(ret) = self.substitute_uvar_utype(zvar)? {
+                    Ok(ret)
+                } else {
+                    Ok(Rc::new(UType::Var(zvar)))
+                }
+            }
+            Expr::IntRel(_rel, x, y) => {
+                let zvar = self.get_new_uvar();
+
+                let tx = self.infer_utype_expr(x.as_ref(), scope)?;
+                let cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+
+                let tx = self.infer_utype_expr(y.as_ref(), scope)?;
+                let cy = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+
+                let cz = Constraint::Elem(BaseSet::Single(BaseType::Bool));
+                self.unify_var_constraint(zvar, cz)?;
+
+                if let Some(ret) = self.substitute_uvar_utype(zvar)? {
+                    Ok(ret)
+                } else {
+                    Ok(Rc::new(UType::Var(zvar)))
+                }
+            }
+
             Expr::AsU8(_) => todo!(),
             Expr::AsU16(_) => todo!(),
             Expr::AsU32(_) => todo!(),
             Expr::AsChar(_) => todo!(),
+
 
             Expr::U16Be(_) => todo!(),
             Expr::U16Le(_) => todo!(),
@@ -1158,7 +985,7 @@ impl TypeChecker {
         }
     }
 
-    fn unify_utype_baseset(&self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
+    fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => {
                 let constraint = bs.to_constraint();
@@ -1177,16 +1004,16 @@ impl TypeChecker {
         }
     }
 
-    fn unify_constraints(&self, cs1: &Constraint, cs2: &Constraint) -> TCResult<Constraint> {
-        match (cs1, cs2) {
+    fn unify_constraint_pair(&mut self, c1: Constraint, c2: Constraint) -> TCResult<Constraint> {
+        match (c1, c2) {
             (Constraint::Equiv(t1), Constraint::Equiv(t2)) => {
                 let t0 = self.unify_utype(t1.clone(), t2.clone())?;
                 Ok(Constraint::Equiv(t0))
             }
             (Constraint::Equiv(ut), Constraint::Elem(bs))
-            | (Constraint::Elem(bs), Constraint::Equiv(ut)) => Ok(self.unify_utype_baseset(ut.clone(), *bs)?),
+            | (Constraint::Elem(bs), Constraint::Equiv(ut)) => Ok(self.unify_utype_baseset(ut.clone(), bs)?),
             (Constraint::Elem(bs1), Constraint::Elem(bs2)) => {
-                let bs0 = bs1.union(bs2)?;
+                let bs0 = bs1.union(&bs2)?;
                 Ok(bs0.to_constraint())
             }
         }
@@ -1210,49 +1037,45 @@ impl TypeChecker {
         }
     }
 
-    fn unify_varmaps(&self, v1: UVar, vmid1: &mut VMId, v2: UVar, vmid2: &mut VMId) -> TCResult<VMId> {
-        if (*vmid1 == *vmid2) {
-            return Ok(*vmid1);
+    fn unify_varmaps(&mut self, v1: UVar, vmid1: VMId, v2: UVar, vmid2: VMId) -> TCResult<VMId> {
+        if (vmid1 == vmid2) {
+            return Ok(vmid1);
         }
 
-        let (lo, hi) = if (*vmid1 < *vmid2) {
+        let (lo, hi) = if (vmid1 < vmid2) {
             (vmid1, vmid2)
         } else {
             (vmid2, vmid1)
         };
 
-        let vm_lo = self
-            .varmaps
-            .as_inner_mut()
-            .get_mut(&lo.0)
-            .unwrap_or_else(|| unreachable!("missing {lo}"));
         let vm_hi = self
             .varmaps
             .as_inner_mut()
             .get_mut(&hi.0)
             .unwrap_or_else(|| unreachable!("missing {hi}"));
 
-        // keep the earlier one, prune the later one, after computing the union
-        for (vname, inner) in vm_hi.drain() {
-            if vm_lo.contains_key(&vname) {
-                let t_lo = vm_lo
-                    .get(&vname)
-                    .unwrap_or_else(|| unreachable!("cannot get key we already know is there"));
+        let hi_entries = vm_hi.drain().collect::<Vec<_>>();
+
+        for (vname, inner) in hi_entries.into_iter() {
+            if let Some(t_lo) = self.varmaps.as_inner().get(&lo.0).and_then(|x| x.get(&vname)) {
                 let t_hi = inner;
                 let unified = self.unify_utype(t_lo.clone(), t_hi.clone())?;
-                let _ = vm_lo.insert(vname, unified);
+                let _ = self.varmaps.as_inner_mut().get_mut(&lo.0).unwrap().insert(vname, unified);
             } else {
-                vm_lo.insert(vname, inner);
+                self.varmaps.as_inner_mut().get_mut(&lo.0).unwrap().insert(vname, inner);
             }
         }
 
-        // delete varmap at *hi to end up in a clean-ish state
+        // delete varmap at hi to end up in a clean-ish state
         self.varmaps.as_inner_mut().remove(&hi.0);
 
-        // overwrite the value pointed to by hi, to match that of lo
-        *hi = *lo;
+        // ensure both variables now point to lo
+        self.repoint_vmid(v1, lo);
+        self.repoint_vmid(v2, lo);
 
-        Ok(*lo)
+
+        // return the de-facto vmid for both variables
+        Ok(lo)
     }
 
     /// Performs an occurs-check for early detection of infinite types
@@ -1311,7 +1134,7 @@ impl TypeChecker {
         }
     }
 
-    fn infer_utype_expr_field<'a>(&mut self, lbl: &Label, expr: &Expr, scope: &'a mut UMultiScope<'a>) -> TCResult<Rc<UType>> {
+    fn infer_utype_expr_field<'a, 'b: 'a>(&mut self, lbl: &Label, expr: &Expr, scope: &'a mut UMultiScope<'b>) -> TCResult<Rc<UType>> {
         let newvar = self.get_new_uvar();
         let t = self.infer_utype_expr(expr, &UScope::Multi(scope))?;
         self.unify_var_utype(newvar, t.clone());
@@ -1359,7 +1182,191 @@ impl TypeChecker {
             Constraints::Invariant(_) => todo!(),
         }
     }
+
+    fn repoint_vmid(&mut self, v: UVar, id: VMId) {
+        match &mut self.constraints[v.0] {
+            Constraints::Variant(placeholder) => {
+                *placeholder = id;
+            }
+            other => unreachable!("repoint_vmid expects Constraints::Variant, found {other:?}"),
+        }
+    }
 }
+
+impl TypeChecker {
+    // FIXME - add constraint unification at appropriate sites
+    unsafe fn equate_uvars(&mut self, v1: UVar, v2: UVar) -> TCResult<()> {
+        if v1 == v2 {
+            return Ok(());
+        }
+
+        // short-circuit if already equated
+        match (&self.aliases[v1.0], &self.aliases[v2.0]) {
+            (Alias::NoAlias, Alias::NoAlias) => {
+                if v1 < v2 {
+                    self.repoint(v1.0, v2.0);
+                    self.transfer_constraints(v1.0, v2.0)
+                } else {
+                    self.repoint(v2.0, v1.0);
+                    self.transfer_constraints(v2.0, v1.0)
+                }
+            }
+            (Alias::NoAlias, Alias::BackRef(tgt)) => {
+                let can_ix = *tgt;
+
+                if v1.0 > can_ix {
+                    self.repoint(can_ix, v1.0);
+                    self.transfer_constraints(can_ix, v1.0)
+                } else if v1.0 < can_ix {
+                    debug_assert!(self.aliases[can_ix].is_canonical_nonempty(), "half-alias ?{can_ix}-|<-{v2}");
+                    debug_assert!(!self.aliases[can_ix].contains_fwd_ref(v1.0), "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v1}");
+                    self.recanonicalize(v1.0, can_ix)
+                } else {
+                    unreachable!("unexpected half-alias {v1}-|<-{v2}");
+                }
+            }
+            (Alias::BackRef(tgt), Alias::NoAlias) => {
+                let can_ix = *tgt;
+                if v2.0 > can_ix {
+                    self.repoint(can_ix, v2.0);
+                    self.transfer_constraints(can_ix, v2.0)
+                } else if v2.0 < can_ix {
+                    debug_assert!(self.aliases[can_ix].is_canonical_nonempty(), "half-alias ?{can_ix}-|<-{v1}");
+                    debug_assert!(!self.aliases[can_ix].contains_fwd_ref(v2.0), "retrograde half-aliased 'forward' ref ?{can_ix}->|-{v2}");
+                    self.recanonicalize(v2.0, can_ix)
+                } else {
+                    unreachable!("unexpected half-alias {v2}-|<-{v1}");
+                }
+            }
+            (Alias::NoAlias, Alias::Canonical(_)) => {
+                if v1.0 < v2.0 {
+                    debug_assert!(!self.aliases[v2.0].contains_fwd_ref(v1.0), "retrograde half-aliased 'forward' ref {v2}->|-{v1}");
+                    self.recanonicalize(v1.0, v2.0)
+                } else {
+                    self.repoint(v2.0, v1.0);
+                    self.transfer_constraints(v2.0, v1.0)
+                }
+            }
+            (Alias::Canonical(_), Alias::NoAlias) => {
+                if v2.0 < v1.0 {
+                    debug_assert!(!self.aliases[v1.0].contains_fwd_ref(v2.0), "retrograde half-aliased 'forward' ref {v1}->|-{v2}");
+                    self.recanonicalize(v2.0, v1.0)
+                } else {
+                    self.repoint(v1.0, v2.0);
+                    self.transfer_constraints(v1.0, v2.0)
+                }
+            }
+            (Alias::BackRef(tgt1), Alias::BackRef(tgt2)) => {
+                let ix1 = *tgt1;
+                let ix2 = *tgt2;
+
+                if ix1 < ix2 {
+                    self.recanonicalize(ix1, ix2)
+                } else if ix2 < ix1 {
+                    self.recanonicalize(ix2, ix1)
+                } else {
+                    // the two are equal so nothing needs to be changed; we will check both are forward-aliased, however
+                    let common = &self.aliases[ix1];
+                    debug_assert!(common.contains_fwd_ref(v1.0), "unexpected half-alias ?{ix1}<-{v1}");
+                    debug_assert!(common.contains_fwd_ref(v2.0), "unexpected half-alias ?{ix1}<-{v2}");
+                    Ok(())
+                }
+            }
+            (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwds)) => {
+                let left = fwds.contains(tgt);
+                let right = *tgt == v2.0;
+
+                match (left, right) {
+                    (true, true) => return Ok(()),
+                    (true, false) | (false, true) => unreachable!("mismatched back- and forward-references for {v1} ({a1:?}) and {v2} ({a2:?})"),
+                    (false, false) => ()
+                }
+
+                let ix1 = *tgt;
+                let ix2 = v2.0;
+
+                // check not the actual indices, but the canonical indices for tie-breaking
+                if ix1 < ix2 {
+                    self.recanonicalize(ix1, ix2)
+                } else {
+                    self.recanonicalize(ix2, ix1)
+                }
+            }
+            (a1 @ Alias::Canonical(fwds), a2 @ Alias::BackRef(tgt)) => {
+                let left = fwds.contains(tgt);
+                let right = *tgt == v1.0;
+
+                match (left, right) {
+                    (true, true) => return Ok(()),
+                    (true, false) | (false, true) => unreachable!("mismatched forward- and back-references for {v1} ({a1:?}) and {v2} ({a2:?})"),
+                    (false, false) => ()
+                }
+
+                let ix1 = v1.0;
+                let ix2 = *tgt;
+
+                // check not the actual indices, but the canonical indices for tie-breaking
+                if ix1 < ix2 {
+                    self.recanonicalize(ix1, ix2)
+                } else {
+                    self.recanonicalize(ix2, ix1)
+                }
+            }
+            (Alias::Canonical(_), Alias::Canonical(_)) => {
+                if v1 < v2 {
+                    self.recanonicalize(v1.0, v2.0)
+                } else {
+                    self.recanonicalize(v2.0, v1.0)
+                }
+            }
+        }
+    }
+
+    /// Modifies the aliasing table of `self` so that the alias stored at `a1` is canonical and takes over
+    /// the old status of canonical `a2`, modifying its back-references and unifying with its constraints
+    ///
+    /// # Safety
+    ///
+    /// As this method is designed ot be internal with a specific singular use-case, there are a number of preconditions that must either be
+    /// assumed or asserted, in order to ensure that the call is sound and valid. These preconditions are numerous enough to merit unsafe status for
+    /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
+    ///
+    /// - `a1 < a2`
+    /// - `a1` has no back-references but may have some forward-references
+    /// - `a2` has no back-references
+    unsafe fn recanonicalize(&mut self, a1: usize, a2: usize) -> TCResult<()> {
+        let tmp = self.aliases[a2].set_backref(a1);
+        let mut iter = tmp.iter_fwd_refs();
+        for a in iter {
+            assert!(!self.aliases[a1].contains_fwd_ref(a), "forward ref of ?{a2} is also a forward ref of ?{a1}, somehow");
+            self.repoint(a1, a);
+        }
+        self.aliases[a1].add_forward_ref(a2);
+        self.transfer_constraints(a1, a2)
+    }
+
+    /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
+    ///
+    /// Assumes that this aliasing does not exist already, and may cause unexpected but not undefined behavior
+    /// if called in a context that does not check certain preconditions.
+    ///
+    /// # Safety
+    ///
+    /// Like [`Self::recanonicalize`], this method is niche enough to not be suitable for calls in a neutral context,
+    /// and may be marked safe after code stablizes. Otherwise it is not known to lead to any UB.
+    /// guards are enforced in advance.
+    unsafe fn repoint(&mut self, lo: usize, hi: usize) {
+        self.aliases[hi].set_backref(lo);
+        self.aliases[lo].add_forward_ref(hi);
+    }
+
+    /// Ensure that all constraints on `a2` are inherited by `a1`, with the reverse occuring as a side-effect.
+    fn transfer_constraints(&mut self, a1: usize, a2: usize) -> TCResult<()> {
+        self.unify_vars_constraints(UVar(a1), UVar(a2))?;
+        Ok(())
+    }
+}
+
 
 pub(crate) type TypeError = UnificationError<Rc<UType>>;
 pub(crate) type ConstraintError = UnificationError<Constraint>;
@@ -1383,13 +1390,13 @@ impl From<TypeError> for ConstraintError {
 
 #[derive(Clone, Debug)]
 // Generic error in unification between two type-constraints, which are represented generically
-pub enum UnificationError<T: std::fmt::Debug> {
+pub(crate) enum UnificationError<T: std::fmt::Debug> {
     Incompatible(UVar, T, T), // two independent assertions about a UVar are incompatible
     Unsatisfiable(T, T),      // a single non-variable assertion is directly unsatisfiable
 }
 
 #[derive(Clone, Debug)]
-pub enum TCError {
+pub(crate) enum TCError {
     VarianceMismatch(UVar, VMId, Constraint), // attempted unification of a variant and non-variant constraint
     Unification(ConstraintError),
     InfiniteType(UVar, Constraints),
@@ -1457,14 +1464,28 @@ pub(crate) fn typecheck(
 
 pub(crate) type TCResult<T> = Result<T, TCError>;
 
-// #[cfg(test)]
+#[cfg(test)]
 mod tests {
+    use crate::byte_set::ByteSet;
+
     use super::*;
 
-    // #[test]
-    fn test_aliasing() {
+    fn adhoc_union(iter: impl IntoIterator<Item = (&'static str, Format)>) -> Format  {
+        let tmp = iter.into_iter().map(|(str, fmt)| Format::Variant(Label::from(str), Box::new(fmt))).collect();
+        Format::Union(tmp)
+    }
+
+    #[test]
+    fn test_union() -> TCResult<()> {
         let mut tc = TypeChecker::new();
-        return;
+        let format = adhoc_union([("A", Format::Byte(ByteSet::full())), ("B", Format::EndOfInput)]);
+        let mut module = FormatModule::new();
+        module.define_format("foo", format.clone());
+        let ut = tc.infer_utype_format(&format, &module)?;
+        let oput = tc.reify(ut).unwrap();
+        let expected = ValueType::Union(vec![("A".into(), ValueType::Base(BaseType::U8)), ("B".into(), ValueType::Empty)]);
+        assert_eq!(oput, expected);
+        return Ok(());
     }
 }
 
