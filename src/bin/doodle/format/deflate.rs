@@ -1,4 +1,4 @@
-use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, PrimType, ValueType};
+use doodle::{BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 use crate::format::base::*;
 
@@ -551,7 +551,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     variant("none", Expr::UNIT),
                                     ValueType::Union(vec![
                                         ("none".into(), ValueType::Tuple(vec![])),
-                                        ("some".into(), ValueType::Base(PrimType::U8)),
+                                        ("some".into(), ValueType::Base(BaseType::U8)),
                                     ]),
                                     var("y"),
                                 )),
@@ -642,7 +642,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     variant("none", Expr::UNIT),
                     ValueType::Union(vec![
                         ("none".into(), ValueType::Tuple(vec![])),
-                        ("some".into(), ValueType::Base(PrimType::U8)),
+                        ("some".into(), ValueType::Base(BaseType::U8)),
                     ]),
                     var("literal-length-distance-alphabet-code-lengths"),
                 )),
