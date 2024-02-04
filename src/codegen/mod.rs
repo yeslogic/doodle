@@ -116,6 +116,7 @@ impl Codegen {
             ValueType::U8 => PrimType::U8.into(),
             ValueType::U16 => PrimType::U16.into(),
             ValueType::U32 => PrimType::U32.into(),
+            ValueType::U64 => PrimType::U64.into(),
             ValueType::Char => PrimType::Char.into(),
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());

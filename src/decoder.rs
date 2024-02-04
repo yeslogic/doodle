@@ -18,6 +18,7 @@ pub enum Value {
     U8(u8),
     U16(u16),
     U32(u32),
+    U64(u64),
     Char(char),
     Tuple(Vec<Value>),
     Record(Vec<(Label, Value)>),
@@ -73,6 +74,7 @@ impl Value {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
             Value::U32(n) => usize::try_from(n).unwrap(),
+            Value::U64(n) => usize::try_from(n).unwrap(),
             _ => panic!("value is not a number"),
         }
     }
@@ -119,6 +121,7 @@ impl Value {
             (Pattern::U8(i0), Value::U8(i1)) => i0 == i1,
             (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
             (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
+            (Pattern::U64(i0), Value::U64(i1)) => i0 == i1,
             (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
@@ -146,6 +149,7 @@ impl Expr {
             Expr::U8(i) => Cow::Owned(Value::U8(*i)),
             Expr::U16(i) => Cow::Owned(Value::U16(*i)),
             Expr::U32(i) => Cow::Owned(Value::U32(*i)),
+            Expr::U64(i) => Cow::Owned(Value::U64(*i)),
             Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
@@ -185,6 +189,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
+                    (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -193,6 +198,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
+                    (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -201,6 +207,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
+                    (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -209,6 +216,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
+                    (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -217,6 +225,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
+                    (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -225,6 +234,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
+                    (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -233,6 +243,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -241,6 +252,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -249,6 +261,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -257,6 +270,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -265,6 +279,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -273,6 +288,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
                     (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
                     (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -281,6 +297,7 @@ impl Expr {
                     (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
                     (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
                     (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
+                    (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -293,6 +310,9 @@ impl Expr {
                         Value::U16(u16::checked_shl(x, u32::from(y)).unwrap())
                     }
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shl(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => {
+                        Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
@@ -305,27 +325,40 @@ impl Expr {
                         Value::U16(u16::checked_shr(x, u32::from(y)).unwrap())
                     }
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_shr(x, y).unwrap()),
+                    (Value::U64(x), Value::U64(y)) => {
+                        Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
+                    }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
 
             Expr::AsU8(x) => Cow::Owned(match x.eval_value(scope) {
                 Value::U8(x) => Value::U8(x),
-                Value::U16(x) if x < 256 => Value::U8(x as u8),
-                Value::U32(x) if x < 256 => Value::U8(x as u8),
+                Value::U16(x) => Value::U8(u8::try_from(x).unwrap()),
+                Value::U32(x) => Value::U8(u8::try_from(x).unwrap()),
+                Value::U64(x) => Value::U8(u8::try_from(x).unwrap()),
                 x => panic!("cannot convert {x:?} to U8"),
             }),
             Expr::AsU16(x) => Cow::Owned(match x.eval_value(scope) {
                 Value::U8(x) => Value::U16(u16::from(x)),
                 Value::U16(x) => Value::U16(x),
-                Value::U32(x) if x < 65536 => Value::U16(x as u16),
+                Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
+                Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
                 x => panic!("cannot convert {x:?} to U16"),
             }),
             Expr::AsU32(x) => Cow::Owned(match x.eval_value(scope) {
                 Value::U8(x) => Value::U32(u32::from(x)),
                 Value::U16(x) => Value::U32(u32::from(x)),
                 Value::U32(x) => Value::U32(x),
+                Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
                 x => panic!("cannot convert {x:?} to U32"),
+            }),
+            Expr::AsU64(x) => Cow::Owned(match x.eval_value(scope) {
+                Value::U8(x) => Value::U64(u64::from(x)),
+                Value::U16(x) => Value::U64(u64::from(x)),
+                Value::U32(x) => Value::U64(u64::from(x)),
+                Value::U64(x) => Value::U64(x),
+                x => panic!("cannot convert {x:?} to U64"),
             }),
 
             Expr::U16Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
@@ -352,6 +385,22 @@ impl Expr {
                 }
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
+            Expr::U64Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
+                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
+                    Cow::Owned(Value::U64(u64::from_be_bytes([
+                        *a, *b, *c, *d, *e, *f, *g, *h,
+                    ])))
+                }
+                _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
+            },
+            Expr::U64Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
+                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
+                    Cow::Owned(Value::U64(u64::from_le_bytes([
+                        *a, *b, *c, *d, *e, *f, *g, *h,
+                    ])))
+                }
+                _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
+            },
             Expr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
                 Value::U8(x) => Value::Char(char::from(x)),
                 Value::U16(x) => {
@@ -360,7 +409,11 @@ impl Expr {
                 Value::U32(x) => {
                     Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
                 }
-                _ => panic!("AsChar: expected U8, U16, or U32"),
+                Value::U64(x) => Value::Char(
+                    char::from_u32(u32::try_from(x).unwrap())
+                        .unwrap_or(char::REPLACEMENT_CHARACTER),
+                ),
+                _ => panic!("AsChar: expected U8, U16, U32, or U64"),
             }),
             Expr::SeqLength(seq) => match seq.eval(scope).coerce_mapped_value() {
                 Value::Seq(values) => {

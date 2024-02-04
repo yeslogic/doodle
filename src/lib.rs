@@ -36,6 +36,7 @@ pub enum Pattern {
     U8(u8),
     U16(u16),
     U32(u32),
+    U64(u64),
     Char(char),
     Tuple(Vec<Pattern>),
     Variant(Label, Box<Pattern>),
@@ -67,6 +68,7 @@ impl Pattern {
             (Pattern::U8(_i0), ValueType::U8) => {}
             (Pattern::U16(_i0), ValueType::U16) => {}
             (Pattern::U32(_i0), ValueType::U32) => {}
+            (Pattern::U64(_i0), ValueType::U64) => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, t);
@@ -125,6 +127,7 @@ pub enum ValueType {
     U8,
     U16,
     U32,
+    U64,
     Char,
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
@@ -159,6 +162,7 @@ impl ValueType {
             (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
             (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
             (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+            (ValueType::U64, ValueType::U64) => Ok(ValueType::U64),
             (ValueType::Char, ValueType::Char) => Ok(ValueType::Char),
             (ValueType::Tuple(ts1), ValueType::Tuple(ts2)) => {
                 if ts1.len() != ts2.len() {
@@ -240,6 +244,7 @@ pub enum Expr {
     U8(u8),
     U16(u16),
     U32(u32),
+    U64(u64),
     Tuple(Vec<Expr>),
     TupleProj(Box<Expr>, usize),
     Record(Vec<(Label, Expr)>),
@@ -255,12 +260,15 @@ pub enum Expr {
     AsU8(Box<Expr>),
     AsU16(Box<Expr>),
     AsU32(Box<Expr>),
+    AsU64(Box<Expr>),
     AsChar(Box<Expr>),
 
     U16Be(Box<Expr>),
     U16Le(Box<Expr>),
     U32Be(Box<Expr>),
     U32Le(Box<Expr>),
+    U64Be(Box<Expr>),
+    U64Le(Box<Expr>),
 
     SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -289,6 +297,7 @@ impl Expr {
             Expr::U8(_i) => Ok(ValueType::U8),
             Expr::U16(_i) => Ok(ValueType::U16),
             Expr::U32(_i) => Ok(ValueType::U32),
+            Expr::U64(_i) => Ok(ValueType::U64),
             Expr::Tuple(exprs) => {
                 let mut ts = Vec::new();
                 for expr in exprs {
@@ -336,12 +345,14 @@ impl Expr {
                 (ValueType::U8, ValueType::U8) => Ok(ValueType::Bool),
                 (ValueType::U16, ValueType::U16) => Ok(ValueType::Bool),
                 (ValueType::U32, ValueType::U32) => Ok(ValueType::Bool),
+                (ValueType::U64, ValueType::U64) => Ok(ValueType::Bool),
                 (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
             },
             Expr::Arith(_arith, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::U8, ValueType::U8) => Ok(ValueType::U8),
                 (ValueType::U16, ValueType::U16) => Ok(ValueType::U16),
                 (ValueType::U32, ValueType::U32) => Ok(ValueType::U32),
+                (ValueType::U64, ValueType::U64) => Ok(ValueType::U64),
                 (x, y) => Err(format!("mismatched operands {x:?}, {y:?}")),
             },
 
@@ -349,24 +360,35 @@ impl Expr {
                 ValueType::U8 => Ok(ValueType::U8),
                 ValueType::U16 => Ok(ValueType::U8),
                 ValueType::U32 => Ok(ValueType::U8),
+                ValueType::U64 => Ok(ValueType::U8),
                 x => Err(format!("cannot convert {x:?} to U8")),
             },
             Expr::AsU16(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::U16),
                 ValueType::U16 => Ok(ValueType::U16),
                 ValueType::U32 => Ok(ValueType::U16),
+                ValueType::U64 => Ok(ValueType::U16),
                 x => Err(format!("cannot convert {x:?} to U16")),
             },
             Expr::AsU32(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::U32),
                 ValueType::U16 => Ok(ValueType::U32),
                 ValueType::U32 => Ok(ValueType::U32),
+                ValueType::U64 => Ok(ValueType::U32),
                 x => Err(format!("cannot convert {x:?} to U32")),
+            },
+            Expr::AsU64(x) => match x.infer_type(scope)? {
+                ValueType::U8 => Ok(ValueType::U64),
+                ValueType::U16 => Ok(ValueType::U64),
+                ValueType::U32 => Ok(ValueType::U64),
+                ValueType::U64 => Ok(ValueType::U64),
+                x => Err(format!("cannot convert {x:?} to U64")),
             },
             Expr::AsChar(x) => match x.infer_type(scope)? {
                 ValueType::U8 => Ok(ValueType::Char),
                 ValueType::U16 => Ok(ValueType::Char),
                 ValueType::U32 => Ok(ValueType::Char),
+                ValueType::U64 => Ok(ValueType::Char),
                 x => Err(format!("cannot convert {x:?} to Char")),
             },
 
@@ -390,6 +412,16 @@ impl Expr {
                     "U32Le: expected (U8, U8, U8, U8), found {other:#?}"
                 )),
             },
+            Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
+                match bytes.infer_type(scope)?.unwrap_tuple_type()?.as_slice() {
+                    [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => {
+                        Ok(ValueType::U64)
+                    }
+                    other => Err(format!(
+                        "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
+                    )),
+                }
+            }
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
                 ValueType::Seq(_t) => Ok(ValueType::U32),
                 other => Err(format!("SeqLength: expected Seq, found {other:?}")),
@@ -468,6 +500,7 @@ impl Expr {
             Expr::U8(n) => Bounds::exact(usize::from(*n)),
             Expr::U16(n) => Bounds::exact(usize::from(*n)),
             Expr::U32(n) => Bounds::exact(*n as usize),
+            Expr::U64(n) => Bounds::exact(*n as usize),
             Expr::Arith(Arith::Add, a, b) => a.bounds() + b.bounds(),
             Expr::Arith(Arith::Mul, a, b) => a.bounds() * b.bounds(),
             _ => Bounds::new(0, None),

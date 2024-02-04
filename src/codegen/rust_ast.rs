@@ -506,6 +506,7 @@ pub(crate) enum PrimType {
     U8,
     U16,
     U32,
+    U64,
     Bool,
     Char,
     Usize,
@@ -518,6 +519,7 @@ impl ToFragment for PrimType {
             PrimType::U8 => "u8",
             PrimType::U16 => "u16",
             PrimType::U32 => "u32",
+            PrimType::U64 => "u64",
             PrimType::Bool => "bool",
             PrimType::Char => "char",
             PrimType::Usize => "usize",
@@ -655,6 +657,7 @@ impl TryFrom<ValueType> for RustType {
             ValueType::U8 => Ok(PrimType::U8.into()),
             ValueType::U16 => Ok(PrimType::U16.into()),
             ValueType::U32 => Ok(PrimType::U32.into()),
+            ValueType::U64 => Ok(PrimType::U64.into()),
             ValueType::Char => Ok(PrimType::Char.into()),
             ValueType::Tuple(mut vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
