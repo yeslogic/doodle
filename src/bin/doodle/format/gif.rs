@@ -23,7 +23,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
 
     let color_table = |flags: Expr| {
-        if_then_else(
+        if_then_else_variant(
             has_color_table(flags.clone()),
             repeat_count(color_table_len(flags), color_table_entry.call()),
             Format::EMPTY,

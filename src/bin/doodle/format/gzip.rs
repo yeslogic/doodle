@@ -34,7 +34,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
             ("header", header.call()),
             (
                 "fname",
-                if_then_else(fname_flag, fname.call(), Format::EMPTY),
+                if_then_else_variant(fname_flag, fname.call(), Format::EMPTY),
             ),
             // FIXME fextra
             // FIXME fcomment
