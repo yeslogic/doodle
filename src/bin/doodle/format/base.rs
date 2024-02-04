@@ -165,6 +165,10 @@ pub fn as_u32(x: Expr) -> Expr {
     Expr::AsU32(Box::new(x))
 }
 
+pub fn as_u64(x: Expr) -> Expr {
+    Expr::AsU64(Box::new(x))
+}
+
 pub fn as_char(x: Expr) -> Expr {
     Expr::AsChar(Box::new(x))
 }
@@ -223,6 +227,8 @@ pub struct BaseModule {
     u16le: FormatRef,
     u32be: FormatRef,
     u32le: FormatRef,
+    u64be: FormatRef,
+    u64le: FormatRef,
     ascii_char: FormatRef,
     ascii_char_strict: FormatRef,
     asciiz_string: FormatRef,
@@ -244,6 +250,9 @@ impl BaseModule {
     pub fn u16le(&self) -> Format { self.u16le.call() }
     pub fn u32be(&self) -> Format { self.u32be.call() }
     pub fn u32le(&self) -> Format { self.u32le.call() }
+    pub fn u64be(&self) -> Format { self.u64be.call() }
+    #[allow(dead_code)]
+    pub fn u64le(&self) -> Format { self.u64le.call() }
     pub fn ascii_char(&self) -> Format { self.ascii_char.call() }
     pub fn ascii_char_strict(&self) -> Format { self.ascii_char_strict.call() }
     pub fn asciiz_string(&self) -> Format { self.asciiz_string.call() }
@@ -321,6 +330,40 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         ),
     );
 
+    let u64be = module.define_format(
+        "base.u64be",
+        map(
+            tuple([
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+            ]),
+            lambda("x", Expr::U64Be(Box::new(var("x")))),
+        ),
+    );
+
+    let u64le = module.define_format(
+        "base.u64le",
+        map(
+            tuple([
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+                u8.call(),
+            ]),
+            lambda("x", Expr::U64Le(Box::new(var("x")))),
+        ),
+    );
+
     let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
 
     let mut bs = ByteSet::from(32..=127);
@@ -364,6 +407,8 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
         u16le,
         u32be,
         u32le,
+        u64be,
+        u64le,
         ascii_char,
         ascii_char_strict,
         asciiz_string,
