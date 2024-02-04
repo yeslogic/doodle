@@ -15,7 +15,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("data", Format::Slice(var("length"), Box::new(data))),
             (
                 "pad",
-                if_then_else(is_even(var("length")), Format::EMPTY, is_byte(0x00)),
+                if_then_else_variant(is_even(var("length")), Format::EMPTY, is_byte(0x00)),
             ),
         ])
     };

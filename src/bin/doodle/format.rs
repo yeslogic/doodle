@@ -8,6 +8,7 @@ mod deflate;
 mod gif;
 mod gzip;
 mod jpeg;
+mod mpeg4;
 mod png;
 mod riff;
 mod tar;
@@ -22,6 +23,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let gif = gif::main(module, &base);
     let gzip = gzip::main(module, deflate, &base);
     let jpeg = jpeg::main(module, &base, &tiff);
+    let mpeg4 = mpeg4::main(module, &base);
     let png = png::main(module, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
@@ -36,6 +38,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("gif", gif.call()),
                     ("gzip", gzip.call()),
                     ("jpeg", jpeg.call()),
+                    ("mpeg4", mpeg4.call()),
                     ("png", png.call()),
                     ("riff", riff.call()),
                     ("tar", tar.call()),

@@ -98,15 +98,17 @@ pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
     Format::Match(
         cond,
         vec![
-            (
-                Pattern::Bool(true),
-                Format::Variant("yes".into(), Box::new(format0)),
-            ),
-            (
-                Pattern::Bool(false),
-                Format::Variant("no".into(), Box::new(format1)),
-            ),
+            (Pattern::Bool(true), format0),
+            (Pattern::Bool(false), format1),
         ],
+    )
+}
+
+pub fn if_then_else_variant(cond: Expr, format0: Format, format1: Format) -> Format {
+    if_then_else(
+        cond,
+        Format::Variant("yes".into(), Box::new(format0)),
+        Format::Variant("no".into(), Box::new(format1)),
     )
 }
 
