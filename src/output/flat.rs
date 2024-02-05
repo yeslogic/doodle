@@ -92,6 +92,9 @@ fn is_show_format(name: &str) -> Option<&'static str> {
         "jpeg.sos" => Some("Start of Scan"),
         "jpeg.scan-data" => Some("Entropy-Coded Segment"),
 
+        // mpeg4
+        "mpeg4.atom" => Some("MPEG4 atom"),
+
         // Tar
         "tar.main" => Some("tar.main"),
         "tar.header" => Some("Tar Header"),
