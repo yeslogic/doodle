@@ -402,12 +402,10 @@ impl Expr {
                 ValueType::Seq(t) => {
                     let start_type = start.infer_type(scope)?;
                     let length_type = length.infer_type(scope)?;
-                    if !start_type.is_numeric_type() {
-                        return Err(format!(
-                            "SubSeq start must be numeric, found {start_type:?}"
-                        ));
+                    if start_type != ValueType::U32 {
+                        return Err(format!("SubSeq start must be U32, found {start_type:?}"));
                     }
-                    if !length_type.is_numeric_type() {
+                    if length_type != ValueType::U32 {
                         return Err(format!(
                             "SubSeq length must be numeric, found {length_type:?}"
                         ));

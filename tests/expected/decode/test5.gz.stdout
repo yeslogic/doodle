@@ -80,7 +80,7 @@
 │           │   │   │           │   ├── 9 := 0
 │           │   │   │           │   ~
 │           │   │   │           │   └── 307 := 6
-│           │   │   │           ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │   │           ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u32 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
 │           │   │   │           │   ├── 0 := 0
 │           │   │   │           │   ├── 1 := 0
 │           │   │   │           │   ├── 2 := 0
@@ -93,7 +93,7 @@
 │           │   │   │           │   ├── 9 := 0
 │           │   │   │           │   ~
 │           │   │   │           │   └── 279 := 12
-│           │   │   │           ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │   │           ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u32 hlit + 257, as-u32 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
 │           │   │   │           │   ├── 0 := 0
 │           │   │   │           │   ├── 1 := 0
 │           │   │   │           │   ├── 2 := 9
@@ -223,7 +223,7 @@
 │           │   │               │   ├── 9 := 0
 │           │   │               │   ~
 │           │   │               │   └── 308 := 5
-│           │   │               ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u16 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │               ├── literal-length-alphabet-code-lengths-value <- compute sub-seq (0, as-u32 hlit + 257) literal-length-distance-alphabet-code-lengths-value :=
 │           │   │               │   ├── 0 := 0
 │           │   │               │   ├── 1 := 0
 │           │   │               │   ├── 2 := 0
@@ -236,7 +236,7 @@
 │           │   │               │   ├── 9 := 0
 │           │   │               │   ~
 │           │   │               │   └── 279 := 8
-│           │   │               ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u16 hlit + 257, as-u16 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
+│           │   │               ├── distance-alphabet-code-lengths-value <- compute sub-seq (as-u32 hlit + 257, as-u32 hdist + 1) literal-length-distance-alphabet-code-lengths-value :=
 │           │   │               │   ├── 0 := 0
 │           │   │               │   ├── 1 := 0
 │           │   │               │   ├── 2 := 0
