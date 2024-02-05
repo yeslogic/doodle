@@ -651,16 +651,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "literal-length-alphabet-code-lengths-value",
                 Format::Compute(sub_seq(
                     var("literal-length-distance-alphabet-code-lengths-value"),
-                    Expr::U8(0),
-                    add(as_u16(var("hlit")), Expr::U16(257)),
+                    Expr::U32(0),
+                    add(as_u32(var("hlit")), Expr::U32(257)),
                 )),
             ),
             (
                 "distance-alphabet-code-lengths-value",
                 Format::Compute(sub_seq(
                     var("literal-length-distance-alphabet-code-lengths-value"),
-                    add(as_u16(var("hlit")), Expr::U16(257)),
-                    add(as_u16(var("hdist")), Expr::U16(1)),
+                    add(as_u32(var("hlit")), Expr::U32(257)),
+                    add(as_u32(var("hdist")), Expr::U32(1)),
                 )),
             ),
             (
