@@ -2325,7 +2325,7 @@ mod tests {
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = ValueType::Union(vec![
             ("A".into(), ValueType::Base(BaseType::U8)),
-            ("B".into(), ValueType::Empty),
+            ("B".into(), ValueType::Tuple(vec![])),
         ]);
         assert_eq!(oput, expected);
         return Ok(());
