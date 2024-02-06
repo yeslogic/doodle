@@ -151,6 +151,14 @@ pub fn expr_ne(x: Expr, y: Expr) -> Expr {
     Expr::IntRel(IntRel::Ne, Box::new(x), Box::new(y))
 }
 
+pub fn expr_lt(x: Expr, y: Expr) -> Expr {
+    Expr::IntRel(IntRel::Lt, Box::new(x), Box::new(y))
+}
+
+pub fn expr_gt(x: Expr, y: Expr) -> Expr {
+    Expr::IntRel(IntRel::Gt, Box::new(x), Box::new(y))
+}
+
 pub fn expr_gte(x: Expr, y: Expr) -> Expr {
     Expr::IntRel(IntRel::Gte, Box::new(x), Box::new(y))
 }
@@ -197,6 +205,10 @@ pub fn bit_and(x: Expr, y: Expr) -> Expr {
 
 pub fn shl(value: Expr, places: Expr) -> Expr {
     Expr::Arith(Arith::Shl, Box::new(value), Box::new(places))
+}
+
+pub fn shr(value: Expr, places: Expr) -> Expr {
+    Expr::Arith(Arith::Shr, Box::new(value), Box::new(places))
 }
 
 pub fn seq_length(seq: Expr) -> Expr {
