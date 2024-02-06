@@ -36,7 +36,21 @@ impl From<BaseType> for Rc<UType> {
     }
 }
 
+impl From<UVar> for UType {
+    fn from(value: UVar) -> Self {
+        Self::Var(value)
+    }
+}
+
+impl From<UVar> for Rc<UType> {
+    fn from(value: UVar) -> Self {
+        Rc::new(UType::Var(value))
+    }
+}
+
 impl UType {
+    pub const UNIT : Self = UType::Tuple(Vec::new());
+
     pub fn tuple<T>(elems: impl IntoIterator<Item = T>) -> Self
     where
         T: Into<Rc<UType>>,
@@ -1294,6 +1308,11 @@ impl TypeChecker {
         Ok(Rc::new(UType::Var(var)))
     }
 
+    /// Unifies a UType against a BaseSet, updating any variable constraints in the process.
+    ///
+    /// Fails (with `Err`) for any shapeful UType other than `Base` or `Var`.
+    ///
+    /// Otherwise returns a copy of the novel constraint implied by the unification.
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => {
@@ -1803,7 +1822,7 @@ impl TypeChecker {
 
 // SECTION - interface between the typechecker and the rest of the crate
 impl TypeChecker {
-    pub fn infer_utype_format_union(
+    pub fn infer_var_format_union(
         &mut self,
         branches: &[Format],
         module: &FormatModule,
@@ -1840,65 +1859,143 @@ impl TypeChecker {
                         let _ = self.infer_var_expr(arg, &scope)?;
                     }
                 }
-                let ret = self.infer_utype_format(module.get_format(*level), module)?;
-                self.unify_var_constraint(newvar, Constraint::Equiv(ret.clone()))?;
-                Ok(ret)
+                let ut = self.infer_utype_format(module.get_format(*level), module)?;
+                self.unify_var_utype(newvar, ut)?;
+                Ok(newvar.into())
             }
-            Format::Fail | Format::EndOfInput | Format::Align(_) => {
-                Ok(self.init_var_simple(UType::Empty)?.1)
+            Format::Fail => {
+                Ok(self.init_var_simple(UType::Empty)?.0.into())
+
             }
-            Format::Byte(_n) => Ok(self.init_var_simple(UType::Base(BaseType::U8))?.1),
+            Format::EndOfInput | Format::Align(_) => {
+                Ok(self.init_var_simple(UType::UNIT)?.0.into())
+            }
+            Format::Byte(_set) => {
+                // FIXME - this may be a bit overly pedantic
+                if _set.is_empty() {
+                    Ok(self.init_var_simple(UType::Empty)?.0.into())
+                } else {
+                    Ok(self.init_var_simple(UType::Base(BaseType::U8))?.0.into())
+                }
+            }
             Format::Variant(cname, inner) => {
                 let newvar = self.get_new_uvar();
                 let t_inner = self.infer_utype_format(inner.as_ref(), module)?;
                 self.add_uvar_variant(newvar, cname.clone(), t_inner)?;
-                Ok(Rc::new(UType::Var(newvar)))
+                Ok(newvar.into())
             }
             Format::Union(branches) | Format::UnionNondet(branches) => {
-                let var = self.infer_utype_format_union(branches, module)?;
-                Ok(Rc::new(UType::Var(var)))
+                let newvar = self.infer_var_format_union(branches, module)?;
+                Ok(newvar.into())
             }
             Format::Tuple(ts) => {
+                let newvar = self.get_new_uvar();
                 let mut uts = Vec::with_capacity(ts.len());
                 for t in ts {
                     uts.push(self.infer_utype_format(t, module)?);
                 }
-                Ok(Rc::new(UType::Tuple(uts)))
+                self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
+                Ok(newvar.into())
             }
             Format::Record(fs) => {
+                let newvar = self.get_new_uvar();
                 let mut ufs = Vec::with_capacity(fs.len());
                 for (lbl, f) in fs {
                     ufs.push((lbl.clone(), self.infer_utype_format(f, module)?));
                 }
-                Ok(Rc::new(UType::Record(ufs)))
+                self.unify_var_utype(newvar, Rc::new(UType::Record(ufs)))?;
+                Ok(newvar.into())
             }
             // FIXME - logically these should be grouped together, but anything containing an expression has to be typed as a special-case
             Format::Repeat(inner) | Format::Repeat1(inner) => {
+                let newvar = self.get_new_uvar();
                 let t = self.infer_utype_format(inner, module)?;
-                Ok(Rc::new(UType::Seq(t)))
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(t)))?;
+                Ok(newvar.into())
             }
             Format::RepeatCount(n, inner) => {
+                let newvar = self.get_new_uvar();
                 let scope = UScope::new();
                 let n_type = self.infer_utype_expr(n, &scope)?;
                 // NOTE : we don't care about the constraint, only whether it was successfully computed
                 let _constraint = self.unify_utype_baseset(n_type, BaseSet::UAny)?;
                 let inner_type = self.infer_utype_format(inner, module)?;
-                Ok(Rc::new(UType::Seq(inner_type)))
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_type)))?;
+                Ok(newvar.into())
             }
             Format::RepeatUntilLast(f, inner) => {
+                let newvar = self.get_new_uvar();
                 let scope = UScope::new();
-                let (in_t, out_t) = self.infer_utype_expr_lambda(f, &scope)?;
-                todo!("finish lambda");
+                let (in_var, out_t) = self.infer_utype_expr_lambda(f, &scope)?;
+                let inner_t = self.infer_utype_format(inner, module)?;
+                self.unify_var_utype(in_var, inner_t.clone())?;
+                self.unify_utype(out_t, BaseType::Bool.into())?;
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                Ok(newvar.into())
             }
-            Format::RepeatUntilSeq(cond_seq, inner) => todo!(),
-            Format::Peek(_) => todo!(),
-            Format::PeekNot(_) => todo!(),
-            Format::Slice(_, _) => todo!(),
-            Format::Bits(_) => todo!(),
-            Format::WithRelativeOffset(_, _) => todo!(),
-            Format::Map(_, _) => todo!(),
-            Format::Compute(_) => todo!(),
-            Format::Let(_, _, _) => todo!(),
+            Format::RepeatUntilSeq(f, inner) => {
+                let newvar = self.get_new_uvar();
+                let scope = UScope::new();
+                let (in_var, out_t) = self.infer_utype_expr_lambda(f, &scope)?;
+                let inner_t = self.infer_utype_format(inner, module)?;
+                self.unify_var_utype(in_var, Rc::new(UType::Seq(inner_t.clone())))?;
+                self.unify_utype(out_t, BaseType::Bool.into())?;
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                Ok(newvar.into())
+            }
+            Format::Peek(peek) => {
+                let newvar = self.get_new_uvar();
+                let peek_t = self.infer_utype_format(&peek, module)?;
+                self.unify_var_utype(newvar, peek_t);
+                Ok(newvar.into())
+            }
+             Format::PeekNot(peek) => {
+                let newvar = self.init_var_simple(UType::UNIT)?.0;
+                let _peek_t = self.infer_utype_format(&peek, module)?;
+                Ok(newvar.into())
+            }
+            Format::Slice(sz, inner) => {
+                let newvar = self.get_new_uvar();
+                let scope = UScope::new();
+                let sz_t = self.infer_utype_expr(sz, &scope)?;
+                self.unify_utype_baseset(sz_t, BaseSet::USome)?;
+                let inner_t = self.infer_utype_format(&inner, module)?;
+                self.unify_var_utype(newvar, inner_t)?;
+                Ok(newvar.into())
+            }
+            Format::Bits(inner) => {
+                let newvar = self.get_new_uvar();
+                let inner_t = self.infer_utype_format(&inner, module)?;
+                self.unify_var_utype(newvar, inner_t);
+                Ok(newvar.into())
+            }
+            Format::WithRelativeOffset(ofs, inner) => {
+                let newvar = self.get_new_uvar();
+                let scope = UScope::new();
+                let sz_t = self.infer_utype_expr(ofs, &scope)?;
+                self.unify_utype_baseset(sz_t, BaseSet::USome)?;
+                let inner_t = self.infer_utype_format(&inner, module)?;
+                self.unify_var_utype(newvar, inner_t)?;
+                Ok(newvar.into())
+            }
+            Format::Map(inner, f) => {
+                let newvar = self.get_new_uvar();
+                let inner_t = self.infer_utype_format(&inner, module)?;
+
+                let scope = UScope::new();
+                let (in_v, out_t) = self.infer_utype_expr_lambda(f, &scope)?;
+                self.unify_var_utype(in_v, inner_t)?;
+                self.unify_var_utype(newvar, out_t)?;
+                Ok(newvar.into())
+            }
+            Format::Compute(x) => {
+                let newvar = self.get_new_uvar();
+                let scope = UScope::new();
+                let xt = self.infer_utype_expr(&x, &scope)?;
+                self.unify_var_utype(newvar, xt);
+                Ok(newvar.into())
+            }
+            Format::Let(lab, x, inner) => todo!()
             Format::Match(_, _) => todo!(),
             Format::Dynamic(_, _, _) => todo!(),
             Format::Apply(_) => todo!(),
