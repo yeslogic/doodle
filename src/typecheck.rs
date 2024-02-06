@@ -1,9 +1,6 @@
 use crate::{BaseType, Expr, Format, FormatModule, Label, Pattern, ValueType};
 use std::{
-    borrow::{Borrow, Cow},
-    cell::RefCell,
     collections::{HashMap, HashSet},
-    ops::DerefMut,
     rc::Rc,
 };
 
@@ -15,7 +12,7 @@ pub(crate) struct UVar(usize);
 /// Unification type, equivalent to ValueType up to abstraction
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum UType {
-    Empty,     // Reserved for value-free Formats
+    Empty,     // Reserved for value-free Formats (Format::Fail only)
     Hole,      // ground type-hole for shape-only unifications
     Var(UVar), // type-hole
     Base(BaseType),
@@ -58,7 +55,7 @@ impl UType {
         Self::Tuple(elems.into_iter().map(Into::into).collect())
     }
 
-    fn from_vtype(vt: &ValueType) -> Option<UType> {
+    pub(crate) fn from_vtype(vt: &ValueType) -> Option<UType> {
         match vt {
             ValueType::Any => Some(Self::Hole),
             ValueType::Empty => Some(Self::Empty),
@@ -73,7 +70,7 @@ impl UType {
             ValueType::Record(vfs) => {
                 let mut ufs = Vec::with_capacity(vfs.len());
                 for (lab, vf) in vfs.iter() {
-                    ufs.push((lab.clone(), Rc::new(Self::from_vtype(vt)?)));
+                    ufs.push((lab.clone(), Rc::new(Self::from_vtype(vf)?)));
                 }
                 Some(Self::Record(ufs))
             }
@@ -380,7 +377,7 @@ impl Alias {
     fn add_forward_ref(&mut self, tgt: usize) {
         match self {
             Alias::NoAlias => {
-                std::mem::replace(self, Alias::Canonical(HashSet::from([tgt])));
+                let _ = std::mem::replace(self, Alias::Canonical(HashSet::from([tgt])));
             }
             Alias::BackRef(_) => panic!("cannot add forward-ref to Alias::BackRef"),
             Alias::Canonical(fwds) => {
@@ -531,8 +528,9 @@ impl BaseSet {
                 }
             }
             (BaseSet::UAny, BaseSet::UAny) => Ok(*self),
-            (BaseSet::UAny | BaseSet::USome, BaseSet::USome)
-            | (BaseSet::USome, BaseSet::UAny | BaseSet::USome) => Ok(BaseSet::USome),
+            (BaseSet::UAny | BaseSet::USome, BaseSet::USome) | (BaseSet::USome, BaseSet::UAny) => {
+                Ok(BaseSet::USome)
+            }
         }
     }
 
@@ -612,6 +610,8 @@ impl TypeChecker {
         for (label, ut) in vm.iter() {
             branches.push((label.clone(), self.reify(ut.clone())?));
         }
+        // ensure branches are sorted lexically by label
+        branches.sort_by_key(|x| x.0.to_owned());
         Some(ValueType::Union(branches))
     }
 
@@ -676,7 +676,7 @@ impl TypeChecker {
                 self.unify_var_utype(
                     seq_uvar,
                     Rc::new(UType::Seq(Rc::new(UType::Var(elem_uvar)))),
-                );
+                )?;
                 Ok(seq_uvar)
             }
         }
@@ -696,7 +696,7 @@ impl TypeChecker {
         let newscope = UScope::Multi(&tmp);
         let newctxt = ctxt.with_scope(&newscope);
         let rhs_type = self.infer_utype_format(rhs_format, newctxt)?;
-        self.unify_var_utype(pvar, head_t);
+        self.unify_var_utype(pvar, head_t)?;
         self.unify_var_utype(rhs_var, rhs_type)?;
         Ok(())
     }
@@ -1069,7 +1069,7 @@ impl TypeChecker {
                 for t in ts {
                     uts.push(self.infer_utype_expr(t, scope)?);
                 }
-                self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)));
+                self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
                 newvar
             }
             &Expr::TupleProj(ref e_tup, ix) => {
@@ -1099,7 +1099,7 @@ impl TypeChecker {
                     })?;
                     child.push(lbl.clone(), newvar);
                 }
-                self.unify_var_utype(newvar, child.into_record_utype());
+                self.unify_var_utype(newvar, child.into_record_utype())?;
                 newvar
             }
             Expr::RecordProj(e_rec, fname) => {
@@ -1308,6 +1308,7 @@ impl TypeChecker {
                     unreachable!("substitute_hole failure")
                 };
                 // FIXME - not sure what checks to apply to elem_t
+                debug_assert!(matches!(elem_t, _));
 
                 self.unify_var_utype(
                     newvar,
@@ -1504,40 +1505,21 @@ impl TypeChecker {
             (vmid2, vmid1)
         };
 
-        let vm_hi = self
-            .varmaps
-            .as_inner_mut()
-            .get_mut(&hi.0)
-            .unwrap_or_else(|| unreachable!("missing {hi}"));
-
+        let vm_hi = self.varmaps.get_varmap_mut(hi);
         let hi_entries = vm_hi.drain().collect::<Vec<_>>();
 
         for (vname, inner) in hi_entries.into_iter() {
-            if let Some(t_lo) = self
-                .varmaps
-                .as_inner()
-                .get(&lo.0)
-                .and_then(|x| x.get(&vname))
-            {
+            if let Some(t_lo) = self.varmaps.get_varmap(lo).get(&vname) {
                 let t_hi = inner;
                 let unified = self.unify_utype(t_lo.clone(), t_hi.clone())?;
-                let _ = self
-                    .varmaps
-                    .as_inner_mut()
-                    .get_mut(&lo.0)
-                    .unwrap()
-                    .insert(vname, unified);
+                let _ = self.varmaps.get_varmap_mut(lo).insert(vname, unified);
             } else {
-                self.varmaps
-                    .as_inner_mut()
-                    .get_mut(&lo.0)
-                    .unwrap()
-                    .insert(vname, inner);
+                self.varmaps.get_varmap_mut(lo).insert(vname, inner);
             }
         }
 
         // delete varmap at hi to end up in a clean-ish state
-        self.varmaps.as_inner_mut().remove(&hi.0);
+        let Some(_hi) = self.varmaps.as_inner_mut().remove(&hi.0) else { unreachable!("missing varmap {hi} could not be removed") };
 
         // ensure both variables now point to lo
         self.repoint_vmid(v1, lo);
@@ -1849,8 +1831,9 @@ impl TypeChecker {
             }
             (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
                 let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
-                self.replace_constraints_with_value(v1.0, Constraints::Invariant(c0.clone()));
-                self.replace_constraints_with_value(v2.0, Constraints::Invariant(c0));
+                let _ =
+                    self.replace_constraints_with_value(v1.0, Constraints::Invariant(c0.clone()));
+                let _ = self.replace_constraints_with_value(v2.0, Constraints::Invariant(c0));
                 Ok(&self.constraints[v1.0])
             }
         }
@@ -2002,7 +1985,7 @@ impl TypeChecker {
             Format::Peek(peek) => {
                 let newvar = self.get_new_uvar();
                 let peek_t = self.infer_utype_format(&peek, ctxt)?;
-                self.unify_var_utype(newvar, peek_t);
+                self.unify_var_utype(newvar, peek_t)?;
                 Ok(newvar.into())
             }
             Format::PeekNot(peek) => {
@@ -2022,7 +2005,7 @@ impl TypeChecker {
             Format::Bits(inner) => {
                 let newvar = self.get_new_uvar();
                 let inner_t = self.infer_utype_format(&inner, ctxt)?;
-                self.unify_var_utype(newvar, inner_t);
+                self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar.into())
             }
             Format::WithRelativeOffset(ofs, inner) => {
@@ -2131,11 +2114,11 @@ pub(crate) type ConstraintError = UnificationError<Constraint>;
 impl From<TypeError> for ConstraintError {
     fn from(value: TypeError) -> Self {
         match value {
-            UnificationError::Incompatible(ix, lt, rt) => {
-                let lc = Constraint::Equiv(lt);
-                let rc = Constraint::Equiv(rt);
-                UnificationError::Incompatible(ix, lc, rc)
-            }
+            // UnificationError::Incompatible(ix, lt, rt) => {
+            //     let lc = Constraint::Equiv(lt);
+            //     let rc = Constraint::Equiv(rt);
+            //     UnificationError::Incompatible(ix, lc, rc)
+            // }
             UnificationError::Unsatisfiable(lt, rt) => {
                 let lc = Constraint::Equiv(lt);
                 let rc = Constraint::Equiv(rt);
@@ -2148,8 +2131,8 @@ impl From<TypeError> for ConstraintError {
 #[derive(Clone, Debug)]
 // Generic error in unification between two type-constraints, which are represented generically
 pub(crate) enum UnificationError<T: std::fmt::Debug> {
-    Incompatible(UVar, T, T), // two independent assertions about a UVar are incompatible
-    Unsatisfiable(T, T),      // a single non-variable assertion is directly unsatisfiable
+    // Incompatible(UVar, T, T), // two independent assertions about a UVar are incompatible
+    Unsatisfiable(T, T), // a single non-variable assertion is directly unsatisfiable
 }
 
 #[derive(Clone, Debug)]
@@ -2210,12 +2193,7 @@ impl std::fmt::Display for TCError {
 impl<T: std::fmt::Debug> std::fmt::Display for UnificationError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UnificationError::Incompatible(var, lhs, rhs) => {
-                write!(
-                    f,
-                    "incompatible equivalences `{var} = {lhs:?}` && `{var} = {rhs:?}`"
-                )
-            }
+            // UnificationError::Incompatible(var, lhs, rhs) => { write!( f, "incompatible equivalences `{var} = {lhs:?}` && `{var} = {rhs:?}`") }
             UnificationError::Unsatisfiable(lhs, rhs) => {
                 write!(f, "unsatisfiable equivalence  `{lhs:?} = {rhs:?}`")
             }
@@ -2225,13 +2203,11 @@ impl<T: std::fmt::Debug> std::fmt::Display for UnificationError<T> {
 
 impl<T: std::fmt::Debug> std::error::Error for UnificationError<T> {}
 
-pub(crate) fn typecheck(
-    module: &FormatModule,
-    f: &Format,
-) -> Result<TypeChecker, UnificationError<UType>> {
+pub(crate) fn typecheck(module: &FormatModule, f: &Format) -> TCResult<TypeChecker> {
     let mut tc = TypeChecker::new();
     let scope = UScope::new();
-    let ut = tc.infer_var_format(f, Ctxt::new(module, &scope));
+    let ctxt = Ctxt::new(module, &scope);
+    let _ut = tc.infer_utype_format(f, ctxt)?;
     // FIXME - there should be a lot more that goes on under the covers here, especially since we want to detect errors
     Ok(tc)
 }

@@ -5,7 +5,6 @@ use crate::{
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Next,
     Pattern, TypeScope, ValueType,
 };
-use std::rc::Rc;
 
 use crate::decoder::{Decoder, Program};
 use std::borrow::Cow;
@@ -17,7 +16,6 @@ use rust_ast::{
     RustItem, RustLt, RustOp, RustParams, RustPattern, RustPrimLit, RustProgram, RustStmt,
     RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
 };
-use serde::de;
 
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
