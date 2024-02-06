@@ -1995,7 +1995,7 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, xt);
                 Ok(newvar.into())
             }
-            Format::Let(lab, x, inner) => todo!()
+            // Format::Let(lab, x, inner) => todo!()
             Format::Match(_, _) => todo!(),
             Format::Dynamic(_, _, _) => todo!(),
             Format::Apply(_) => todo!(),
