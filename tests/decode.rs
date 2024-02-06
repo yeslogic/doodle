@@ -37,6 +37,17 @@ mod gif {
     }
 }
 
+mod heic {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_heic() {
+        let output = doodle().args(["file", "test.heic"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.heic.stdout");
+        check_output(output, expected)
+    }
+}
+
 mod jpeg {
     use super::*;
 
@@ -51,6 +62,17 @@ mod jpeg {
     fn test_decode_test2_jpg() {
         let output = doodle().args(["file", "test2.jpg"]).output().unwrap();
         let expected = expect_test::expect_file!("expected/decode/test2.jpg.stdout");
+        check_output(output, expected)
+    }
+}
+
+mod mpeg4 {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_mpeg4() {
+        let output = doodle().args(["file", "test.mp4"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.mp4.stdout");
         check_output(output, expected)
     }
 }
