@@ -486,13 +486,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                     Expr::Tuple(vec![
                                                         tuple_proj(var("x"), 0),
                                                         dup(
-                                                            add(
+                                                            as_u32(add(
                                                                 record_proj(
                                                                     tuple_proj(var("x"), 1),
                                                                     "extra",
                                                                 ),
                                                                 Expr::U8(3),
-                                                            ),
+                                                            )),
                                                             expr_match(
                                                                 tuple_proj(var("x"), 0),
                                                                 vec![(
@@ -511,13 +511,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                     Expr::Tuple(vec![
                                                         tuple_proj(var("x"), 0),
                                                         dup(
-                                                            add(
+                                                            as_u32(add(
                                                                 record_proj(
                                                                     tuple_proj(var("x"), 1),
                                                                     "extra",
                                                                 ),
                                                                 Expr::U8(3),
-                                                            ),
+                                                            )),
                                                             Expr::U8(0),
                                                         ),
                                                     ]),
@@ -527,13 +527,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                     Expr::Tuple(vec![
                                                         tuple_proj(var("x"), 0),
                                                         dup(
-                                                            add(
+                                                            as_u32(add(
                                                                 record_proj(
                                                                     tuple_proj(var("x"), 1),
                                                                     "extra",
                                                                 ),
                                                                 Expr::U8(11),
-                                                            ),
+                                                            )),
                                                             Expr::U8(0),
                                                         ),
                                                     ]),
@@ -589,10 +589,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Expr::Tuple(vec![
                                         tuple_proj(var("x"), 0),
                                         dup(
-                                            add(
+                                            as_u32(add(
                                                 record_proj(tuple_proj(var("x"), 1), "extra"),
                                                 Expr::U8(3),
-                                            ),
+                                            )),
                                             expr_match(
                                                 tuple_proj(var("x"), 0),
                                                 vec![(
@@ -608,10 +608,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Expr::Tuple(vec![
                                         tuple_proj(var("x"), 0),
                                         dup(
-                                            add(
+                                            as_u32(add(
                                                 record_proj(tuple_proj(var("x"), 1), "extra"),
                                                 Expr::U8(3),
-                                            ),
+                                            )),
                                             Expr::U8(0),
                                         ),
                                     ]),
@@ -621,10 +621,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Expr::Tuple(vec![
                                         tuple_proj(var("x"), 0),
                                         dup(
-                                            add(
+                                            as_u32(add(
                                                 record_proj(tuple_proj(var("x"), 1), "extra"),
                                                 Expr::U8(11),
-                                            ),
+                                            )),
                                             Expr::U8(0),
                                         ),
                                     ]),

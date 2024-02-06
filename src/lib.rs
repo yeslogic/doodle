@@ -150,10 +150,6 @@ impl ValueType {
         }
     }
 
-    fn is_numeric_type(&self) -> bool {
-        matches!(self, ValueType::U8 | ValueType::U16 | ValueType::U32)
-    }
-
     fn unify(&self, other: &ValueType) -> Result<ValueType, String> {
         match (self, other) {
             (ValueType::Any, rhs) => Ok(rhs.clone()),
@@ -452,8 +448,8 @@ impl Expr {
                 other => Err(format!("FlatMapAccum: expected Lambda, found {other:?}")),
             },
             Expr::Dup(count, expr) => {
-                if !count.infer_type(scope)?.is_numeric_type() {
-                    return Err(format!("Dup: count is not numeric: {count:?}"));
+                if count.infer_type(scope)? != ValueType::U32 {
+                    return Err(format!("Dup: count is not U32: {count:?}"));
                 }
                 let t = expr.infer_type(scope)?;
                 Ok(ValueType::Seq(Box::new(t)))
