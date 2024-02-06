@@ -28,7 +28,7 @@ mod extension;
 // use extension::{UD, TC, Extension, TotalExtension, HOInfo, MCInfo, NLInfo, MaybeCast};
 
 mod typecheck;
-use typecheck::{TCError, UnificationError};
+use typecheck::UnificationError;
 
 pub type Label = std::borrow::Cow<'static, str>;
 
@@ -107,7 +107,7 @@ impl ValueType {
                 if b1 == b2 {
                     Ok(ValueType::Base(*b1))
                 } else {
-                    Err((UnificationError::Unsatisfiable(self.clone(), other.clone())))
+                    Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
                 }
             }
             (ValueType::Tuple(ts1), ValueType::Tuple(ts2)) => {
