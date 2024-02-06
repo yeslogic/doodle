@@ -691,10 +691,10 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Map(da, expr.clone()))
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
-            // Format::Let(name, expr, a) => {
-            //     let da = Box::new(self.compile_format(a, next.clone())?);
-            //     Ok(Decoder::Let(name.clone(), expr.clone(), da))
-            // }
+            Format::Let(name, expr, a) => {
+                let da = Box::new(self.compile_format(a, next.clone())?);
+                Ok(Decoder::Let(name.clone(), expr.clone(), da))
+            }
             Format::Match(head, branches) => {
                 let branches = branches
                     .iter()

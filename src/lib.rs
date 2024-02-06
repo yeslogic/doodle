@@ -560,8 +560,8 @@ pub enum Format {
     Map(Box<Format>, Expr),
     /// Compute a value
     Compute(Expr),
-    // /// Let binding
-    // Let(Label, Expr, Box<Format>),
+    /// Let binding
+    Let(Label, Expr, Box<Format>),
     /// Pattern match on an expression
     Match(Expr, Vec<(pattern::Pattern, Format)>),
     /// Format generated dynamically
@@ -629,7 +629,7 @@ impl Format {
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
             Format::Map(f, _expr) => f.match_bounds(module),
             Format::Compute(_) => Bounds::exact(0),
-            // Format::Let(_name, _expr, f) => f.match_bounds(module),
+            Format::Let(_name, _expr, f) => f.match_bounds(module),
             Format::Match(_, branches) => branches
                 .iter()
                 .map(|(_, f)| f.match_bounds(module))
@@ -671,7 +671,7 @@ impl Format {
             Format::WithRelativeOffset(..) => false,
             Format::Map(f, _expr) => f.depends_on_next(module),
             Format::Compute(..) => false,
-            // Format::Let(_name, _expr, f) => f.depends_on_next(module),
+            Format::Let(_name, _expr, f) => f.depends_on_next(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(..) => false,
@@ -872,12 +872,12 @@ impl FormatModule {
                 }
             }
             Format::Compute(expr) => expr.infer_type(scope),
-            // Format::Let(name, expr, format) => {
-            //     let t = expr.infer_type(scope)?;
-            //     let mut child_scope = TypeScope::child(scope);
-            //     child_scope.push(name.clone(), t);
-            //     self.infer_format_type(&child_scope, format)
-            // }
+            Format::Let(name, expr, format) => {
+                let t = expr.infer_type(scope)?;
+                let mut child_scope = TypeScope::child(scope);
+                child_scope.push(name.clone(), t);
+                self.infer_format_type(&child_scope, format)
+            }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
                     return Err(anyhow!("infer_format_type: empty Match"));
@@ -1274,7 +1274,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Map(f, _expr) => Self::from_format(module, f, next),
             Format::Compute(_expr) => Self::from_next(module, next),
-            // Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
+            Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Match(_, branches) => {
                 let mut tree = Self::reject();
                 for (_, f) in branches {
