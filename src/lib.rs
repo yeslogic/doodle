@@ -296,10 +296,10 @@ impl Expr {
                 }
                 Ok(ValueType::Tuple(ts))
             }
-            Expr::TupleProj(head, index) => match head.infer_type(scope)? {
-                ValueType::Tuple(vs) => Ok(vs[*index].clone()),
-                _ => Err("expected tuple type".to_string()),
-            },
+            Expr::TupleProj(head, index) => {
+                let vs = head.infer_type(scope)?.unwrap_tuple_type()?;
+                Ok(vs[*index].clone())
+            }
             Expr::Record(fields) => {
                 let mut fs = Vec::new();
                 for (label, expr) in fields {
