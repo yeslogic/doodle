@@ -1,5 +1,5 @@
 use crate::{ BaseType, Expr, Format, FormatModule, Label, Pattern, ValueType };
-use std::{ collections::{ HashMap, HashSet }, rc::Rc };
+use std::{ collections::{ BTreeMap, HashMap, HashSet }, rc::Rc };
 
 /// Unification variable for use in typechecking
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -310,6 +310,8 @@ pub(crate) enum VType {
     Base(BaseSet),
     Concrete(Rc<ValueType>),
     Abstract(Rc<UType>),
+    ImplicitTuple(Vec<Rc<UType>>),
+    ImplicitRecord(Vec<(Label, Rc<UType>)>),
     IndefiniteUnion(VMId),
 }
 
@@ -453,6 +455,42 @@ impl Constraints {
 pub(crate) enum Constraint {
     Equiv(Rc<UType>), // direct equivalence with a UType, which should not be a bare `UType::Var` (that is what TypeChecker.equivalences is for)
     Elem(BaseSet), // implicit restriction to a narrowed set of ground-types (e.g. from `Expr::AsU32`)
+    Proj(ProjShape), // constraints implied by projections
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ProjShape {
+    TupleWith(BTreeMap<usize, UVar>), // required associations of metavars at given indices of an uncertain tuple
+    RecordWith(BTreeMap<Label, UVar>), // required associations of metavars at given fields of an uncertain record
+    SeqOf(UVar), // simple sequence element-type projection
+}
+
+impl ProjShape {
+    pub fn new_tuple() -> Self {
+        Self::TupleWith(BTreeMap::new())
+    }
+
+    pub fn new_record() -> Self {
+        Self::RecordWith(BTreeMap::new())
+    }
+
+    pub fn seq_of(elem: UVar) -> Self {
+        Self::SeqOf(elem)
+    }
+
+    fn as_tuple_mut(&mut self) -> &mut BTreeMap<usize, UVar> {
+        match self {
+            ProjShape::TupleWith(map) => map,
+            other => panic!("called as_tuple_mut on non-tuple {other:?}"),
+        }
+    }
+
+    fn as_record_mut(&mut self) -> &mut BTreeMap<Label, UVar> {
+        match self {
+            ProjShape::RecordWith(map) => map,
+            other => panic!("called as_record_mut on non-record {other:?}"),
+        }
+    }
 }
 
 /// Abstraction over explicit collections of BaseType values that could be in any order
@@ -701,6 +739,8 @@ impl TypeChecker {
 
     /// Converts a `UType` to Weak Head-Normal Form `VType` by unchaining as many metavariables as required, after performing
     /// a sanity check to eliminate potential infinite types from consideration.
+    ///
+    /// Will avoid panicking at all costs, even if it requires returning a non-WHNF variable.
     fn to_whnf_vtype(&self, t: Rc<UType>) -> VType {
         assert!(!self.is_infinite_type(t.clone()));
         match t.as_ref() {
@@ -709,8 +749,9 @@ impl TypeChecker {
                 match &self.constraints[v0.0] {
                     Constraints::Invariant(Constraint::Equiv(ut)) => self.to_whnf_vtype(ut.clone()),
                     Constraints::Invariant(Constraint::Elem(bs)) => VType::Base(*bs),
+                    Constraints::Invariant(Constraint::Proj(ps)) => self.proj_shape_to_vtype(ps),
                     Constraints::Variant(vmid) => VType::IndefiniteUnion(*vmid),
-                    Constraints::Indefinite => panic!("cannot evaluate indefinite {v0} to WHNF"),
+                    Constraints::Indefinite => VType::Abstract(v0.into()),
                 }
             }
             _ => VType::Abstract(t),
@@ -762,6 +803,23 @@ impl TypeChecker {
                 match c {
                     Constraint::Elem(_) => Ok(()),
                     Constraint::Equiv(t) => self.occurs_in(v, t),
+                    Constraint::Proj(p) =>
+                        match p {
+                            ProjShape::TupleWith(ixvars) => {
+                                for (_ix, var) in ixvars.iter() {
+                                    self.occurs_in(v, Rc::<UType>::from(*var))?;
+                                }
+                                Ok(())
+                            }
+                            ProjShape::RecordWith(fldvars) => {
+                                for (_lbl, var) in fldvars.iter() {
+                                    self.occurs_in(v, Rc::<UType>::from(*var))?;
+                                }
+                                Ok(())
+                            }
+                            ProjShape::SeqOf(elem_v) =>
+                                self.occurs_in(v, Rc::<UType>::from(*elem_v)),
+                        }
                 }
         }
     }
@@ -914,6 +972,136 @@ impl TypeChecker {
         }
     }
 
+    /// Unifies according to `?i ~ Tuple(..., ?j, ...?)`, with `tuple_var` on the lhs and `ix_var` on the rhs
+    /// of the metavariable equation, with `ix_var` occuring at index `ix` of the tuple being projected.
+    fn unify_var_proj_index(&mut self, tuple_var: UVar, ix: usize, ix_var: UVar) -> TCResult<()> {
+        let can_v = self.get_canonical_uvar(tuple_var);
+        match &mut self.constraints[can_v.0] {
+            Constraints::Indefinite => {
+                let mut proj = ProjShape::new_tuple();
+                proj.as_tuple_mut().insert(ix, ix_var);
+                self.unify_var_constraint(tuple_var, Constraint::Proj(proj))?;
+                Ok(())
+            }
+            Constraints::Variant(_) => unreachable!("cannot solve tuple projection on union"),
+            Constraints::Invariant(c) =>
+                match c {
+                    Constraint::Elem(_) =>
+                        unreachable!("cannot solve tuple projection on base-set"),
+                    Constraint::Equiv(ut) => {
+                        match ut.as_ref() {
+                            UType::Tuple(ts) => {
+                                assert!(ts.len() > ix);
+                                let type_at_ix = ts[ix].clone();
+                                self.unify_var_utype(ix_var, type_at_ix)?;
+                                Ok(())
+                            }
+                            other => unreachable!("expected UType::Tuple, found {other:?}"),
+                        }
+                    }
+                    Constraint::Proj(ps) =>
+                        match ps {
+                            ProjShape::TupleWith(map) => {
+                                if let Some(&other_var) = map.get(&ix) {
+                                    self.unify_var_pair(ix_var, other_var)?;
+                                    Ok(())
+                                } else {
+                                    map.insert(ix, ix_var);
+                                    Ok(())
+                                }
+                            }
+                            _ => unreachable!("cannot unify on index of non-tuple projection"),
+                        }
+                }
+        }
+    }
+
+    /// Unifies according to `?i ~ Record(name: ?j, ...?)`, with `rec_var` on the lhs and `fld_var` on the rhs
+    /// of the metavariable equation, with `fld_var` being the field with label `fname`.
+    fn unify_var_proj_field(&mut self, rec_var: UVar, fname: Label, fld_var: UVar) -> TCResult<()> {
+        let can_v = self.get_canonical_uvar(rec_var);
+        match &mut self.constraints[can_v.0] {
+            Constraints::Indefinite => {
+                let mut proj = ProjShape::new_record();
+                proj.as_record_mut().insert(fname, fld_var);
+                self.unify_var_constraint(rec_var, Constraint::Proj(proj))?;
+                Ok(())
+            }
+            Constraints::Variant(_) => unreachable!("cannot solve record projection on union"),
+            Constraints::Invariant(c) =>
+                match c {
+                    Constraint::Elem(_) =>
+                        unreachable!("cannot solve record projection on base-set"),
+                    Constraint::Equiv(ut) => {
+                        match ut.as_ref() {
+                            UType::Record(fs) => {
+                                let fld_type = fs
+                                    .iter()
+                                    .find(|(name, _)| name == &fname)
+                                    .unwrap()
+                                    .1.clone();
+                                self.unify_var_utype(fld_var, fld_type)?;
+                                Ok(())
+                            }
+                            other => unreachable!("expected UType::Record, found {other:?}"),
+                        }
+                    }
+                    Constraint::Proj(ps) =>
+                        match ps {
+                            ProjShape::RecordWith(map) => {
+                                if let Some(&other_var) = map.get(&fname) {
+                                    self.unify_var_pair(fld_var, other_var)?;
+                                    Ok(())
+                                } else {
+                                    map.insert(fname, fld_var);
+                                    Ok(())
+                                }
+                            }
+                            _ => unreachable!("cannot unify on field of non-record projection"),
+                        }
+                }
+        }
+    }
+
+    /// Establishes `?i ~ Seq(?j)` through projective unification, where `seq_v` is the lhs
+    /// and `elem_v` is the rhs metavariable.
+    fn unify_var_proj_elem(&mut self, seq_v: UVar, elem_v: UVar) -> TCResult<()> {
+        let can_v = self.get_canonical_uvar(seq_v);
+        match &mut self.constraints[can_v.0] {
+            Constraints::Indefinite => {
+                let mut proj = ProjShape::seq_of(elem_v);
+                self.unify_var_constraint(seq_v, Constraint::Proj(proj))?;
+                Ok(())
+            }
+            Constraints::Variant(_) => unreachable!("cannot solve record projection on union"),
+            Constraints::Invariant(c) =>
+                match c {
+                    Constraint::Elem(_) =>
+                        unreachable!("cannot solve record projection on base-set"),
+                    Constraint::Equiv(ut) => {
+                        match ut.as_ref() {
+                            UType::Seq(inner) => {
+                                let elem_t = inner.clone();
+                                self.unify_var_utype(elem_v, elem_t)?;
+                                Ok(())
+                            }
+                            other => unreachable!("expected UType::Seq, found {other:?}"),
+                        }
+                    }
+                    Constraint::Proj(ps) =>
+                        match ps {
+                            ProjShape::SeqOf(other_var) => {
+                                let tmp = *other_var;
+                                self.unify_var_pair(elem_v, tmp)?;
+                                Ok(())
+                            }
+                            _ =>
+                                unreachable!("cannot unify on element typen of non-seq projection"),
+                        }
+                }
+        }
+    }
+
     fn unify_utype(&mut self, left: Rc<UType>, right: Rc<UType>) -> TCResult<Rc<UType>> {
         match (left.as_ref(), right.as_ref()) {
             (UType::Hole, UType::Hole) => {
@@ -976,7 +1164,8 @@ impl TypeChecker {
                 self.occurs(v)?;
                 match after {
                     Constraint::Equiv(t) => Ok(t.clone()),
-                    Constraint::Elem(_) => Ok(left),
+                    Constraint::Elem(_) | Constraint::Proj(_) =>
+                        unreachable!("equiv should erase proj and elem"),
                 }
             }
             (_, &UType::Var(v)) => {
@@ -985,7 +1174,8 @@ impl TypeChecker {
                 self.occurs(v)?;
                 match after {
                     Constraint::Equiv(t) => Ok(t.clone()),
-                    Constraint::Elem(_) => Ok(right),
+                    Constraint::Elem(_) | Constraint::Proj(_) =>
+                        unreachable!("equiv should erase proj and elem"),
                 }
             }
             (UType::Empty, UType::Empty) => Ok(left),
@@ -1017,15 +1207,15 @@ impl TypeChecker {
         &self.constraints[ix]
     }
 
-    fn infer_utype_expr_acc(
+    fn infer_var_expr_acc(
         &mut self,
         e: &Expr,
         vt: &ValueType,
         scope: &UScope<'_>
-    ) -> TCResult<Rc<UType>> {
+    ) -> TCResult<UVar> {
         let uv = self.infer_var_expr(e, scope)?;
         self.unify_var_valuetype(uv, vt)?;
-        Ok(Rc::new(UType::Var(uv)))
+        Ok(uv)
     }
 
     fn infer_var_expr<'a>(&mut self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<UVar> {
@@ -1056,24 +1246,8 @@ impl TypeChecker {
             }
             &Expr::TupleProj(ref e_tup, ix) => {
                 let newvar = self.get_new_uvar();
-                let raw = self.infer_utype_expr(e_tup, scope)?;
-                let solution = match self.to_whnf_vtype(raw) {
-                    VType::Abstract(ut) =>
-                        match ut.as_ref() {
-                            UType::Tuple(elts) => {
-                                if ix < elts.len() {
-                                    elts[ix].clone()
-                                } else {
-                                    panic!(
-                                        "tuple projection `*.{ix}` out-of-bounds on tuple {elts:#?}"
-                                    );
-                                }
-                            }
-                            other => unreachable!("expected tuple, found {other:?}"),
-                        }
-                    other => unreachable!("expected VType::Abstract, found {other:?}"),
-                };
-                self.unify_var_utype(newvar, solution)?;
+                let v_tup = self.infer_var_expr(e_tup, scope)?;
+                self.unify_var_proj_index(v_tup, ix, newvar)?;
                 newvar
             }
             Expr::Record(fs) => {
@@ -1089,24 +1263,8 @@ impl TypeChecker {
             }
             Expr::RecordProj(e_rec, fname) => {
                 let newvar = self.get_new_uvar();
-                let raw = self.infer_utype_expr(e_rec, scope)?;
-                let solution = match self.to_whnf_vtype(raw) {
-                    VType::Abstract(ut) =>
-                        match ut.as_ref() {
-                            UType::Record(flds) => {
-                                if let Some((_, ft)) = flds.iter().find(|(lbl, _)| lbl == fname) {
-                                    ft.clone()
-                                } else {
-                                    panic!(
-                                        "record projection `*.{fname}` is a non-existent field for record {flds:#?}"
-                                    );
-                                }
-                            }
-                            other => unreachable!("expected record, found {other:?}"),
-                        }
-                    other => unreachable!("expected VType::Abstract, found {other:?}"),
-                };
-                self.unify_var_utype(newvar, solution)?;
+                let rec_var = self.infer_var_expr(e_rec, scope)?;
+                self.unify_var_proj_field(rec_var, fname.clone(), newvar)?;
                 newvar
             }
             Expr::Seq(elems) => {
@@ -1239,40 +1397,34 @@ impl TypeChecker {
             Expr::FlatMap(f_expr, seq_expr) => {
                 let newvar = self.get_new_uvar();
 
-                let (in_var, out_t) = self.infer_utype_expr_lambda(f_expr.as_ref(), scope)?;
+                let (in_var, out_var) = self.infer_vars_expr_lambda(f_expr.as_ref(), scope)?;
                 let seq_t = self.infer_utype_expr(seq_expr.as_ref(), scope)?;
 
                 self.unify_utype(seq_t, Rc::new(UType::Seq(Rc::new(UType::Var(in_var)))))?;
-                self.unify_utype(out_t.clone(), Rc::new(UType::Seq(Rc::new(UType::Hole))))?;
+                self.unify_var_utype(out_var, Rc::new(UType::Seq(Rc::new(UType::Hole))))?;
 
-                self.unify_var_utype(newvar, out_t)?;
+                self.unify_var_pair(newvar, out_var)?;
 
                 newvar
             }
             Expr::FlatMapAccum(f_expr, acc_expr, acc_vt, seq_expr) => {
-                let newvar = self.get_new_uvar();
-                let (in_var, out_t) = self.infer_utype_expr_lambda(f_expr, scope)?;
+                // NOTE - ((acc, x) -> (acc, y)) -> acc -> Vt(acc) -> [x] -> [y]
+                let ys_var = self.get_new_uvar();
 
-                // unify the accumulator type against the provided ValueType
-                let raw_acc_t = self.infer_utype_expr_acc(&acc_expr, acc_vt, scope)?;
+                let (acc_x_var, acc_y_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
+                let acc_var = self.infer_var_expr_acc(&acc_expr, acc_vt, scope)?;
+                let xs_var = self.infer_var_expr(&seq_expr, scope)?;
+                let x_var = self.get_new_uvar();
+                let y_var = self.get_new_uvar();
 
-                // unify it against the return type of the lambda
-                let acc_t = self.unify_utype(raw_acc_t, out_t)?;
+                self.unify_var_proj_elem(ys_var, y_var)?;
+                self.unify_var_proj_elem(xs_var, x_var)?;
+                self.unify_var_proj_index(acc_x_var, 0, acc_var)?;
+                self.unify_var_proj_index(acc_y_var, 0, acc_var)?;
+                self.unify_var_proj_index(acc_x_var, 1, x_var)?;
+                self.unify_var_proj_index(acc_y_var, 1, y_var)?;
 
-                let seq_t = self.infer_utype_expr(&seq_expr, scope)?;
-                let elem_t = match
-                    self.substitute_hole(Rc::new(UType::Seq(Rc::new(UType::Hole))), seq_t)?
-                {
-                    Some(ut) => ut,
-                    None => unreachable!("guaranteed hole-substitution did not succeed"),
-                };
-
-                // f_expr ~ (acc_t, elem_t) -> acc_t
-                self.unify_var_utype(in_var, Rc::new(UType::tuple([acc_t.clone(), elem_t])))?;
-
-                self.unify_var_utype(newvar, acc_t)?;
-
-                newvar
+                ys_var
             }
             Expr::Dup(count, x) => {
                 let newvar = self.get_new_uvar();
@@ -1486,6 +1638,120 @@ impl TypeChecker {
                 let bs0 = bs1.union(&bs2)?;
                 Ok(bs0.to_constraint())
             }
+            (
+                Constraint::Proj(ProjShape::TupleWith(t1)),
+                Constraint::Proj(ProjShape::TupleWith(t2)),
+            ) => {
+                if t1 == t2 {
+                    return Ok(Constraint::Proj(ProjShape::TupleWith(t1)));
+                }
+
+                let mut t0 = BTreeMap::new();
+
+                let keys_t1 = t1.keys().copied().collect::<HashSet<_>>();
+                let keys_t2 = t2.keys().copied().collect::<HashSet<_>>();
+
+                let keys_t0 = HashSet::union(&keys_t1, &keys_t2);
+
+                for key in keys_t0.into_iter() {
+                    match (t1.get(&key), t2.get(&key)) {
+                        (Some(var1), Some(var2)) => {
+                            self.unify_var_pair(*var1, *var2)?;
+                            t0.insert(*key, Ord::min(*var1, *var2));
+                        }
+                        (Some(var), None) | (None, Some(var)) => {
+                            t0.insert(*key, *var);
+                        }
+                        _ => unreachable!("key must be in at least one of t1, t2"),
+                    }
+                }
+
+                Ok(Constraint::Proj(ProjShape::TupleWith(t0)))
+            }
+            (
+                Constraint::Proj(ProjShape::RecordWith(r1)),
+                Constraint::Proj(ProjShape::RecordWith(r2)),
+            ) => {
+                if r1 == r2 {
+                    return Ok(Constraint::Proj(ProjShape::RecordWith(r1)));
+                }
+
+                let mut r0 = BTreeMap::new();
+
+                let keys_r1 = r1.keys().cloned().collect::<HashSet<_>>();
+                let keys_r2 = r2.keys().cloned().collect::<HashSet<_>>();
+
+                let keys_r0 = HashSet::union(&keys_r1, &keys_r2);
+
+                for key in keys_r0.into_iter() {
+                    match (r1.get(key), r2.get(key)) {
+                        (Some(var1), Some(var2)) => {
+                            self.unify_var_pair(*var1, *var2)?;
+                            r0.insert(key.clone(), Ord::min(*var1, *var2));
+                        }
+                        (Some(var), None) | (None, Some(var)) => {
+                            r0.insert(key.clone(), *var);
+                        }
+                        _ => unreachable!("key must be in at least one of r1, r2"),
+                    }
+                }
+
+                Ok(Constraint::Proj(ProjShape::RecordWith(r0)))
+            }
+            | (ref c1 @ Constraint::Proj(ref p), ref c2 @ Constraint::Equiv(ref ut))
+            | (ref c1 @ Constraint::Equiv(ref ut), ref c2 @ Constraint::Proj(ref p)) => {
+                match (p, ut.as_ref()) {
+                    (ProjShape::RecordWith(fld_p), UType::Record(fld_ut)) => {
+                        let keys_p = fld_p.keys().cloned().collect::<HashSet<_>>();
+                        let mut keys_ut = HashSet::new();
+
+                        for (fld, ut) in fld_ut.iter() {
+                            keys_ut.insert(fld.clone());
+                            if let Some(var) = fld_p.get(fld) {
+                                self.unify_var_utype(*var, ut.clone())?;
+                            }
+                        }
+
+                        if keys_ut.is_superset(&keys_p) {
+                            Ok(Constraint::Equiv(ut.clone()))
+                        } else {
+                            Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
+                        }
+                    }
+                    (ProjShape::RecordWith(flds), other) =>
+                        unreachable!("could not match Record-Shape {flds:?} against {other:?}"),
+                    (ProjShape::TupleWith(elt_p), UType::Tuple(elt_ut)) => {
+                        let keys_p = elt_p.keys().copied().collect::<HashSet<_>>();
+                        let mut keys_ut = HashSet::new();
+
+                        for (ix, ut) in elt_ut.iter().enumerate() {
+                            keys_ut.insert(ix);
+                            if let Some(var) = elt_p.get(&ix) {
+                                self.unify_var_utype(*var, ut.clone())?;
+                            }
+                        }
+
+                        if keys_ut.is_superset(&keys_p) {
+                            Ok(Constraint::Equiv(ut.clone()))
+                        } else {
+                            Err(
+                                TCError::Unification(
+                                    UnificationError::Unsatisfiable(c1.clone(), c2.clone())
+                                )
+                            )
+                        }
+                    }
+                    (ProjShape::TupleWith(elts), other) =>
+                        unreachable!("could not match Tuple-Shape {elts:?} against {other:?}"),
+                    (ProjShape::SeqOf(elem_v), UType::Seq(elem_t)) => {
+                        self.unify_var_utype(*elem_v, elem_t.clone())?;
+                        Ok(Constraint::Equiv(ut.clone()))
+                    }
+                    (ProjShape::SeqOf(elem_v), other) =>
+                        unreachable!("could not match Seq-Shape against {other:?}"),
+                }
+            }
+            (c1, c2) => Err(UnificationError::Unsatisfiable(c1, c2).into()),
         }
     }
 
@@ -1525,18 +1791,18 @@ impl TypeChecker {
         Ok(lo)
     }
 
-    fn infer_utype_expr_lambda<'a>(
+    fn infer_vars_expr_lambda<'a>(
         &mut self,
         expr: &Expr,
         scope: &'a UScope<'a>
-    ) -> TCResult<(UVar, Rc<UType>)> {
+    ) -> TCResult<(UVar, UVar)> {
         match expr {
             Expr::Lambda(head, body) => {
                 let head_var = self.get_new_uvar();
                 let body_scope = USingleScope::new(scope, &head, head_var);
-                let body_type = self.infer_utype_expr(body.as_ref(), &UScope::Single(body_scope))?;
+                let body_var = self.infer_var_expr(body.as_ref(), &UScope::Single(body_scope))?;
 
-                Ok((head_var, body_type))
+                Ok((head_var, body_var))
             }
             _ => unreachable!("infer_utype_expr_lambda: unexpected non-lambda expr {expr:?}"),
         }
@@ -1563,9 +1829,33 @@ impl TypeChecker {
                 match c {
                     Constraint::Equiv(ut) => Some(self.to_whnf_vtype(ut.clone())),
                     Constraint::Elem(bs) => Some(VType::Base(*bs)),
+                    Constraint::Proj(ps) => Some(self.proj_shape_to_vtype(ps)),
                 }
             }
         })
+    }
+
+    fn proj_shape_to_vtype(&self, shape: &ProjShape) -> VType {
+        match shape {
+            ProjShape::TupleWith(ix_vars) => {
+                let mut flat = Vec::new();
+                for (ix, var) in ix_vars.iter() {
+                    while *ix > flat.len() {
+                        flat.push(Rc::new(UType::Hole));
+                    }
+                    flat.push((*var).into());
+                }
+                VType::ImplicitTuple(flat)
+            }
+            ProjShape::RecordWith(fld_vars) => {
+                let mut flat = Vec::new();
+                for (lbl, var) in fld_vars.iter() {
+                    flat.push((lbl.clone(), (*var).into()));
+                }
+                VType::ImplicitRecord(flat)
+            }
+            ProjShape::SeqOf(v) => VType::Abstract((*v).into()),
+        }
     }
 
     fn repoint_vmid(&mut self, v: UVar, id: VMId) {
@@ -1593,13 +1883,13 @@ impl TypeChecker {
                 if v1 < v2 {
                     unsafe {
                         self.repoint(v1.0, v2.0);
+                        self.transfer_constraints(v1.0, v2.0)
                     }
-                    self.transfer_constraints(v1.0, v2.0)
                 } else {
                     unsafe {
                         self.repoint(v2.0, v1.0);
+                        self.transfer_constraints(v2.0, v1.0)
                     }
-                    self.transfer_constraints(v2.0, v1.0)
                 }
             }
             (Alias::NoAlias, Alias::BackRef(tgt)) => {
@@ -1608,8 +1898,8 @@ impl TypeChecker {
                 if v1.0 > can_ix {
                     unsafe {
                         self.repoint(can_ix, v1.0);
+                        self.transfer_constraints(can_ix, v1.0)
                     }
-                    self.transfer_constraints(can_ix, v1.0)
                 } else if v1.0 < can_ix {
                     debug_assert!(
                         self.aliases[can_ix].is_canonical_nonempty(),
@@ -1629,8 +1919,8 @@ impl TypeChecker {
                 if v2.0 > can_ix {
                     unsafe {
                         self.repoint(can_ix, v2.0);
+                        self.transfer_constraints(can_ix, v2.0)
                     }
-                    self.transfer_constraints(can_ix, v2.0)
                 } else if v2.0 < can_ix {
                     debug_assert!(
                         self.aliases[can_ix].is_canonical_nonempty(),
@@ -1655,8 +1945,8 @@ impl TypeChecker {
                 } else {
                     unsafe {
                         self.repoint(v2.0, v1.0);
+                        self.transfer_constraints(v2.0, v1.0)
                     }
-                    self.transfer_constraints(v2.0, v1.0)
                 }
             }
             (Alias::Canonical(_), Alias::NoAlias) => {
@@ -1669,8 +1959,8 @@ impl TypeChecker {
                 } else {
                     unsafe {
                         self.repoint(v1.0, v2.0);
+                        self.transfer_constraints(v1.0, v2.0)
                     }
-                    self.transfer_constraints(v1.0, v2.0)
                 }
             }
             (Alias::BackRef(tgt1), Alias::BackRef(tgt2)) => {
@@ -1797,7 +2087,7 @@ impl TypeChecker {
     }
 
     /// Ensure that all constraints on `a2` are inherited by `a1`, with the reverse occuring as a side-effect.
-    fn transfer_constraints(&mut self, a1: usize, a2: usize) -> TCResult<&Constraints> {
+    unsafe fn transfer_constraints(&mut self, a1: usize, a2: usize) -> TCResult<&Constraints> {
         let v1 = UVar(a1);
         let v2 = UVar(a2);
         if v1 == v2 {
@@ -1959,19 +2249,19 @@ impl TypeChecker {
             }
             Format::RepeatUntilLast(f, inner) => {
                 let newvar = self.get_new_uvar();
-                let (in_var, out_t) = self.infer_utype_expr_lambda(f, ctxt.scope)?;
+                let (in_var, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(in_var, inner_t.clone())?;
-                self.unify_utype(out_t, BaseType::Bool.into())?;
+                self.unify_var_utype(out_var, BaseType::Bool.into())?;
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar.into())
             }
             Format::RepeatUntilSeq(f, inner) => {
                 let newvar = self.get_new_uvar();
-                let (in_var, out_t) = self.infer_utype_expr_lambda(f, ctxt.scope)?;
+                let (in_var, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(in_var, Rc::new(UType::Seq(inner_t.clone())))?;
-                self.unify_utype(out_t, BaseType::Bool.into())?;
+                self.unify_var_utype(out_var, BaseType::Bool.into())?;
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar.into())
             }
@@ -2013,9 +2303,9 @@ impl TypeChecker {
                 let newvar = self.get_new_uvar();
                 let inner_t = self.infer_utype_format(&inner, ctxt)?;
 
-                let (in_v, out_t) = self.infer_utype_expr_lambda(f, ctxt.scope)?;
+                let (in_v, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
                 self.unify_var_utype(in_v, inner_t)?;
-                self.unify_var_utype(newvar, out_t)?;
+                self.unify_var_pair(newvar, out_var)?;
                 Ok(newvar)
             }
             Format::Compute(x) => {
@@ -2080,6 +2370,10 @@ impl TypeChecker {
                             VType::Concrete(vt) => Some(vt.as_ref().clone()),
                             VType::Abstract(ut) => self.reify(ut),
                             VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
+                            _ =>
+                                unreachable!(
+                                    "Unsolved implicit Tuple or Record leftover from un-unified projection"
+                                ),
                         }
                     Err(_) => None,
                     Ok(None) => {
@@ -2187,6 +2481,9 @@ impl std::fmt::Display for TCError {
                                 ),
                             Constraint::Elem(_) =>
                                 unreachable!("`{v} {inv}` is not infinite, but we thought it was"),
+                            Constraint::Proj(ps) => {
+                                write!(f, "`{v} ~ {ps:?}` constitutes an infinite type")
+                            }
                         }
                 }
             TCError::MultipleSolutions(uv, bs) =>
@@ -2220,7 +2517,7 @@ pub(crate) fn typecheck(module: &FormatModule, f: &Format) -> TCResult<TypeCheck
 pub(crate) type TCResult<T> = Result<T, TCError>;
 
 mod __impls {
-    use super::{ Constraint, UVar, VMId };
+    use super::{ Constraint, ProjShape, UVar, VMId };
     use std::borrow::{ Borrow, BorrowMut };
 
     impl std::fmt::Display for Constraint {
@@ -2228,6 +2525,21 @@ mod __impls {
             match self {
                 Constraint::Equiv(ut) => write!(f, "= {ut:?}"),
                 Constraint::Elem(bs) => write!(f, "∈ {bs}"),
+                Constraint::Proj(ps) =>
+                    match ps {
+                        ProjShape::TupleWith(ts) =>
+                            write!(
+                                f,
+                                "~ TupleGT{}(..)",
+                                ts
+                                    .last_key_value()
+                                    .map(|x| *x.0)
+                                    .unwrap_or(0)
+                            ),
+                        ProjShape::RecordWith(fs) =>
+                            write!(f, "~ Record(..) (>={} fields)", fs.len()),
+                        ProjShape::SeqOf(elv) => write!(f, "~ Seq({elv})"),
+                    }
             }
         }
     }
@@ -2406,6 +2718,88 @@ mod tests {
                 )
             ]
         );
+        assert_eq!(oput, expected);
+        return Ok(());
+    }
+
+    fn mk_format_u32() -> Format {
+        Format::Map(
+            Box::new(Format::Tuple(vec![Format::Byte(ByteSet::full()); 4])),
+            Expr::Lambda("x".into(), Box::new(Expr::U32Be(Box::new(Expr::Var("x".into())))))
+        )
+    }
+
+    #[test]
+    fn test_lambda_accum() -> TCResult<()> {
+        let mut tc = TypeChecker::new();
+        let format = Format::Map(
+            Box::new(Format::Repeat(Box::new(mk_format_u32()))),
+            Expr::Lambda(
+                "xs".into(),
+                Box::new(
+                    Expr::FlatMapAccum(
+                        Box::new(
+                            Expr::Lambda(
+                                "acc_x".into(),
+                                Box::new(
+                                    Expr::Tuple(
+                                        vec![
+                                            Expr::Arith(
+                                                Arith::Mul,
+                                                Box::new(
+                                                    Expr::TupleProj(
+                                                        Box::new(Expr::Var("acc_x".into())),
+                                                        0
+                                                    )
+                                                ),
+                                                Box::new(
+                                                    Expr::TupleProj(
+                                                        Box::new(Expr::Var("acc_x".into())),
+                                                        1
+                                                    )
+                                                )
+                                            ),
+                                            Expr::Arith(
+                                                Arith::Add,
+                                                Box::new(Expr::U32(1)),
+                                                Box::new(
+                                                    Expr::Arith(
+                                                        Arith::Mul,
+                                                        Box::new(
+                                                            Expr::TupleProj(
+                                                                Box::new(Expr::Var("acc_x".into())),
+                                                                0
+                                                            )
+                                                        ),
+                                                        Box::new(
+                                                            Expr::TupleProj(
+                                                                Box::new(Expr::Var("acc_x".into())),
+                                                                1
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        ]
+                                    )
+                                )
+                            )
+                        ),
+                        Box::new(Expr::U32(1)),
+                        ValueType::Base(BaseType::U32),
+                        Box::new(Expr::Var("xs".into()))
+                    )
+                )
+            )
+        );
+        let module = FormatModule::new();
+        // module.define_format("prod32", format.clone());
+        let scope = UScope::new();
+        let ut = tc.infer_utype_format(&format, Ctxt::new(&module, &scope))?;
+        println!("ut: {ut:?}");
+        println!("tc: {tc:?}");
+        let oput = tc.reify(ut).unwrap_or_else(|| panic!("reify returned None"));
+        let expected = ValueType::Base(BaseType::U32);
         assert_eq!(oput, expected);
         return Ok(());
     }
