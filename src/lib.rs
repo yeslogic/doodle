@@ -143,10 +143,10 @@ impl ValueType {
         }
     }
 
-    fn unwrap_tuple_type(self) -> Vec<ValueType> {
+    fn unwrap_tuple_type(self) -> Result<Vec<ValueType>, String> {
         match self {
-            ValueType::Tuple(ts) => ts,
-            _ => panic!("type is not a tuple"),
+            ValueType::Tuple(ts) => Ok(ts),
+            t => Err(format!("type is not a tuple: {t:?}")),
         }
     }
 
@@ -370,21 +370,21 @@ impl Expr {
                 x => Err(format!("cannot convert {x:?} to Char")),
             },
 
-            Expr::U16Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+            Expr::U16Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type()?.as_slice() {
                 [ValueType::U8, ValueType::U8] => Ok(ValueType::U16),
                 other => Err(format!("U16Be: expected (U8, U8), found {other:#?}")),
             },
-            Expr::U16Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+            Expr::U16Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type()?.as_slice() {
                 [ValueType::U8, ValueType::U8] => Ok(ValueType::U16),
                 other => Err(format!("U16Le: expected (U8, U8), found {other:#?}")),
             },
-            Expr::U32Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+            Expr::U32Be(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type()?.as_slice() {
                 [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(ValueType::U32),
                 other => Err(format!(
                     "U32Be: expected (U8, U8, U8, U8), found {other:#?}"
                 )),
             },
-            Expr::U32Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type().as_slice() {
+            Expr::U32Le(bytes) => match bytes.infer_type(scope)?.unwrap_tuple_type()?.as_slice() {
                 [ValueType::U8, ValueType::U8, ValueType::U8, ValueType::U8] => Ok(ValueType::U32),
                 other => Err(format!(
                     "U32Le: expected (U8, U8, U8, U8), found {other:#?}"
@@ -433,7 +433,7 @@ impl Expr {
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
                         match expr
                             .infer_type(&child_scope)?
-                            .unwrap_tuple_type()
+                            .unwrap_tuple_type()?
                             .as_mut_slice()
                         {
                             [accum_result, ValueType::Seq(t2)] => {
