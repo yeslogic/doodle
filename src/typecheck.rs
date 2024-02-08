@@ -1718,8 +1718,6 @@ impl TypeChecker {
                             Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
                         }
                     }
-                    (ProjShape::RecordWith(flds), other) =>
-                        unreachable!("could not match Record-Shape {flds:?} against {other:?}"),
                     (ProjShape::TupleWith(elt_p), UType::Tuple(elt_ut)) => {
                         let keys_p = elt_p.keys().copied().collect::<HashSet<_>>();
                         let mut keys_ut = HashSet::new();
@@ -1741,14 +1739,16 @@ impl TypeChecker {
                             )
                         }
                     }
-                    (ProjShape::TupleWith(elts), other) =>
-                        unreachable!("could not match Tuple-Shape {elts:?} against {other:?}"),
                     (ProjShape::SeqOf(elem_v), UType::Seq(elem_t)) => {
                         self.unify_var_utype(*elem_v, elem_t.clone())?;
                         Ok(Constraint::Equiv(ut.clone()))
                     }
-                    (ProjShape::SeqOf(elem_v), other) =>
-                        unreachable!("could not match Seq-Shape against {other:?}"),
+                    (proj, UType::Var(var)) => {
+                        self.unify_var_constraint(*var, Constraint::Proj(proj.clone()))
+                    }
+                    (ProjShape::RecordWith(flds), other) => unreachable!("could not match Record-Shape {flds:?} against {other:?}"),
+                    (ProjShape::TupleWith(elts), other) => unreachable!("could not match Tuple-Shape {elts:?} against {other:?}"),
+                    (ProjShape::SeqOf(_), other) => unreachable!("could not match Seq-Shape against {other:?}"),
                 }
             }
             (c1, c2) => Err(UnificationError::Unsatisfiable(c1, c2).into()),
