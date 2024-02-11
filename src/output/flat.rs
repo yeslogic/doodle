@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::decoder::{MultiScope, Scope, SingleScope, Value};
+use crate::decoder::Value;
 use crate::Label;
 use crate::{Format, FormatModule};
 
@@ -8,7 +8,7 @@ pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format
     let mut path = Vec::new();
     check_covered(module, &mut path, format).unwrap();
     Context::new(io::stdout(), module)
-        .write_flat(&Scope::Empty, value, format)
+        .write_flat(value, format)
         .unwrap()
 }
 
@@ -183,19 +183,14 @@ impl<'module, W: io::Write> Context<'module, W> {
         Context { writer, module }
     }
 
-    pub fn write_flat(
-        &mut self,
-        scope: &Scope<'_>,
-        value: &Value,
-        format: &Format,
-    ) -> io::Result<()> {
+    pub fn write_flat(&mut self, value: &Value, format: &Format) -> io::Result<()> {
         match format {
             Format::ItemVar(level, _args) => {
                 let label = self.module.get_name(*level);
                 if let Some(title) = is_show_format(label) {
                     writeln!(&mut self.writer, "{label} - {title}")
                 } else {
-                    self.write_flat(scope, value, self.module.get_format(*level))
+                    self.write_flat(value, self.module.get_format(*level))
                 }
             }
             Format::Fail => Ok(()),
@@ -205,7 +200,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Variant(label, format) => match value {
                 Value::Variant(label2, value) => {
                     if label == label2 {
-                        self.write_flat(scope, value, format)
+                        self.write_flat(value, format)
                     } else {
                         panic!("expected variant label {label}, found {label2}");
                     }
@@ -215,7 +210,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Union(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(index, value) => {
                     let format = &branches[*index];
-                    self.write_flat(scope, value, format)
+                    self.write_flat(value, format)
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
@@ -223,7 +218,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Value::Tuple(values) => {
                     for (index, value) in values.iter().enumerate() {
                         let format = &formats[index];
-                        self.write_flat(scope, value, format)?;
+                        self.write_flat(value, format)?;
                     }
                     Ok(())
                 }
@@ -231,11 +226,9 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
-                    let mut record_scope = MultiScope::with_capacity(scope, value_fields.len());
-                    for (index, (label, value)) in value_fields.iter().enumerate() {
+                    for (index, (_label, value)) in value_fields.iter().enumerate() {
                         let format = &format_fields[index].1;
-                        self.write_flat(&Scope::Multi(&record_scope), value, format)?;
-                        record_scope.push(label.clone(), value.clone());
+                        self.write_flat(value, format)?;
                     }
                     Ok(())
                 }
@@ -248,41 +241,29 @@ impl<'module, W: io::Write> Context<'module, W> {
             | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => {
                     for v in values {
-                        self.write_flat(scope, v, format)?;
+                        self.write_flat(v, format)?;
                     }
                     Ok(())
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
-            Format::Peek(format) => self.write_flat(scope, value, format),
-            Format::PeekNot(format) => self.write_flat(scope, value, format),
-            Format::Slice(_, format) => self.write_flat(scope, value, format),
-            Format::Bits(format) => self.write_flat(scope, value, format),
-            Format::WithRelativeOffset(_, format) => self.write_flat(scope, value, format),
+            Format::Peek(format) => self.write_flat(value, format),
+            Format::PeekNot(format) => self.write_flat(value, format),
+            Format::Slice(_, format) => self.write_flat(value, format),
+            Format::Bits(format) => self.write_flat(value, format),
+            Format::WithRelativeOffset(_, format) => self.write_flat(value, format),
             Format::Map(_format, _expr) => Ok(()),
             Format::Compute(_expr) => Ok(()),
-            Format::Let(name, expr, format) => {
-                let v = expr.eval_value(scope);
-                let let_scope = SingleScope::new(scope, name, &v);
-                self.write_flat(&Scope::Single(let_scope), value, format)
-            }
-            Format::Match(head, branches) => match value {
+            Format::Let(_name, _expr, format) => self.write_flat(value, format),
+            Format::Match(_head, branches) => match value {
                 Value::Branch(index, value) => {
-                    let head = head.eval(scope);
-                    let (pattern, format) = &branches[*index];
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        self.write_flat(&Scope::Multi(&pattern_scope), value, format)?;
-                        return Ok(());
-                    }
-                    panic!("pattern match failure");
+                    let (_pattern, format) = &branches[*index];
+                    self.write_flat(value, format)?;
+                    return Ok(());
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(name, _dynformat, format) => {
-                let v = Value::Tuple(vec![]);
-                let child_scope = SingleScope::new(scope, name, &v);
-                self.write_flat(&Scope::Single(child_scope), value, format)
-            }
+            Format::Dynamic(_name, _dynformat, format) => self.write_flat(value, format),
             Format::Apply(_) => Ok(()), // FIXME
         }
     }

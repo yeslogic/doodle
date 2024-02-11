@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
-use crate::decoder::{MultiScope, Scope, SingleScope, Value};
+use crate::decoder::Value;
 use crate::Label;
 use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};
 
@@ -15,7 +15,7 @@ fn atomic_value_to_string(value: &Value) -> String {
 
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     use std::io::Write;
-    let frag = MonoidalPrinter::new(module).compile_decoded_value(&Scope::Empty, value, format);
+    let frag = MonoidalPrinter::new(module).compile_decoded_value(value, format);
     let mut lock = io::stdout().lock();
     match write!(&mut lock, "{}", frag) {
         Ok(_) => (),
@@ -188,12 +188,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    pub fn compile_decoded_value(
-        &mut self,
-        scope: &Scope<'_>,
-        value: &Value,
-        fmt: &Format,
-    ) -> Fragment {
+    pub fn compile_decoded_value(&mut self, value: &Value, fmt: &Format) -> Fragment {
         let mut frag = Fragment::Empty;
         match fmt {
             Format::ItemVar(level, _args) => {
@@ -211,17 +206,17 @@ impl<'module> MonoidalPrinter<'module> {
                     frag.encat(Fragment::Char('\''));
                     frag
                 } else {
-                    self.compile_decoded_value(scope, value, self.module.get_format(*level))
+                    self.compile_decoded_value(value, self.module.get_format(*level))
                 }
             }
             Format::Fail => panic!("uninhabited format (value={value:?}"),
-            Format::EndOfInput => self.compile_value(scope, value),
-            Format::Align(_) => self.compile_value(scope, value),
-            Format::Byte(_) => self.compile_value(scope, value),
+            Format::EndOfInput => self.compile_value(value),
+            Format::Align(_) => self.compile_value(value),
+            Format::Byte(_) => self.compile_value(value),
             Format::Variant(label, format) => match value {
                 Value::Variant(label2, value) => {
                     if label == label2 {
-                        self.compile_variant(scope, label, value, Some(format))
+                        self.compile_variant(label, value, Some(format))
                     } else {
                         panic!("expected variant label {label}, found {label2}");
                     }
@@ -231,7 +226,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Union(branches) | Format::UnionNondet(branches) => match value {
                 Value::Branch(n, value) => {
                     let format = &branches[*n];
-                    self.compile_decoded_value(scope, value, format)
+                    self.compile_decoded_value(value, format)
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
@@ -240,14 +235,14 @@ impl<'module> MonoidalPrinter<'module> {
                     if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
                         self.compile_ascii_seq(values)
                     } else {
-                        self.compile_tuple(scope, values, Some(formats))
+                        self.compile_tuple(values, Some(formats))
                     }
                 }
                 _ => panic!("expected tuple, found {value:?}"),
             },
             Format::Record(format_fields) => match value {
                 Value::Record(value_fields) => {
-                    self.compile_record(scope, value_fields, Some(format_fields))
+                    self.compile_record(value_fields, Some(format_fields))
                 }
                 _ => panic!("expected record, found {value:?}"),
             },
@@ -266,61 +261,38 @@ impl<'module> MonoidalPrinter<'module> {
                     {
                         self.compile_ascii_seq(values)
                     } else {
-                        self.compile_seq(scope, values, Some(format))
+                        self.compile_seq(values, Some(format))
                     }
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
-            Format::Peek(format) => self.compile_decoded_value(scope, value, format),
-            Format::PeekNot(_format) => self.compile_value(scope, value),
-            Format::Slice(_, format) => self.compile_decoded_value(scope, value, format),
-            Format::Bits(format) => self.compile_decoded_value(scope, value, format),
-            Format::WithRelativeOffset(_, format) => {
-                self.compile_decoded_value(scope, value, format)
-            }
+            Format::Peek(format) => self.compile_decoded_value(value, format),
+            Format::PeekNot(_format) => self.compile_value(value),
+            Format::Slice(_, format) => self.compile_decoded_value(value, format),
+            Format::Bits(format) => self.compile_decoded_value(value, format),
+            Format::WithRelativeOffset(_, format) => self.compile_decoded_value(value, format),
             Format::Map(format, _expr) => {
                 if self.flags.collapse_mapped_values {
-                    self.compile_value(scope, value)
+                    self.compile_value(value)
                 } else {
                     match value {
-                        Value::Mapped(orig, _value) => {
-                            self.compile_decoded_value(scope, orig, format)
-                        }
+                        Value::Mapped(orig, _value) => self.compile_decoded_value(orig, format),
                         _ => panic!("expected mapped value, found {value:?}"),
                     }
                 }
             }
-            Format::Compute(_expr) => self.compile_value(scope, value),
-            Format::Let(name, expr, format) => {
-                let v = expr.eval_value(scope);
-                let let_scope = SingleScope::new(scope, name, &v);
-                self.compile_decoded_value(&Scope::Single(let_scope), value, format)
-            }
-            Format::Match(head, branches) => match value {
+            Format::Compute(_expr) => self.compile_value(value),
+            Format::Let(_name, _expr, format) => self.compile_decoded_value(value, format),
+            Format::Match(_head, branches) => match value {
                 Value::Branch(index, value) => {
-                    let head = head.eval(scope);
-                    let (pattern, format) = &branches[*index];
-                    if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        frag.encat(self.compile_decoded_value(
-                            &Scope::Multi(&pattern_scope),
-                            value,
-                            format,
-                        ));
-                        return frag;
-                    }
-                    panic!("pattern match failure");
+                    let (_pattern, format) = &branches[*index];
+                    frag.encat(self.compile_decoded_value(value, format));
+                    return frag;
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(name, _dynformat, format) => {
-                // TODO this scope entry should never be accessed while printing.
-                // In future we could potentially save the generated dynamic format
-                // as a new type of value if we wanted to optionally display it.
-                let v = Value::Tuple(vec![]);
-                let child_scope = SingleScope::new(scope, name, &v);
-                self.compile_decoded_value(&Scope::Single(child_scope), value, format)
-            }
-            Format::Apply(_) => self.compile_value(scope, value),
+            Format::Dynamic(_name, _dynformat, format) => self.compile_decoded_value(value, format),
+            Format::Apply(_) => self.compile_value(value),
         }
     }
 
@@ -328,7 +300,7 @@ impl<'module> MonoidalPrinter<'module> {
         !formats.is_empty() && formats.iter().all(|f| f.is_ascii_char_format(self.module))
     }
 
-    pub fn compile_value(&mut self, scope: &Scope<'_>, value: &Value) -> Fragment {
+    pub fn compile_value(&mut self, value: &Value) -> Fragment {
         match value {
             Value::Bool(true) => Fragment::String("true".into()),
             Value::Bool(false) => Fragment::String("false".into()),
@@ -336,18 +308,18 @@ impl<'module> MonoidalPrinter<'module> {
             Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
-            Value::Tuple(vals) => self.compile_tuple(scope, vals, None),
-            Value::Seq(vals) => self.compile_seq(scope, vals, None),
-            Value::Record(fields) => self.compile_record(scope, fields, None),
-            Value::Variant(label, value) => self.compile_variant(scope, label, value, None),
+            Value::Tuple(vals) => self.compile_tuple(vals, None),
+            Value::Seq(vals) => self.compile_seq(vals, None),
+            Value::Record(fields) => self.compile_record(fields, None),
+            Value::Variant(label, value) => self.compile_variant(label, value, None),
             Value::Mapped(orig, value) => {
                 if self.flags.collapse_mapped_values {
-                    self.compile_value(scope, value)
+                    self.compile_value(value)
                 } else {
-                    self.compile_value(scope, orig)
+                    self.compile_value(orig)
                 }
             }
-            Value::Branch(_n, value) => self.compile_value(scope, value),
+            Value::Branch(_n, value) => self.compile_value(value),
         }
     }
 
@@ -438,12 +410,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn compile_tuple(
-        &mut self,
-        scope: &Scope<'_>,
-        vals: &[Value],
-        formats: Option<&[Format]>,
-    ) -> Fragment {
+    fn compile_tuple(&mut self, vals: &[Value], formats: Option<&[Format]>) -> Fragment {
         if vals.is_empty() {
             Fragment::String("()".into())
         } else {
@@ -451,7 +418,6 @@ impl<'module> MonoidalPrinter<'module> {
             let last_index = vals.len() - 1;
             for index in 0..last_index {
                 frag.encat(self.compile_field_value_continue(
-                    scope,
                     index,
                     &vals[index],
                     formats.map(|fs| &fs[index]),
@@ -459,7 +425,6 @@ impl<'module> MonoidalPrinter<'module> {
                 ));
             }
             frag.encat(self.compile_field_value_last(
-                scope,
                 last_index,
                 &vals[last_index],
                 formats.map(|fs| &fs[last_index]),
@@ -469,12 +434,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn compile_seq(
-        &mut self,
-        scope: &Scope<'_>,
-        vals: &[Value],
-        format: Option<&Format>,
-    ) -> Fragment {
+    fn compile_seq(&mut self, vals: &[Value], format: Option<&Format>) -> Fragment {
         if vals.is_empty() {
             Fragment::String("[]".into())
         } else {
@@ -487,18 +447,12 @@ impl<'module> MonoidalPrinter<'module> {
                 Some(_) | None => (last_index, false),
             };
             for (index, val) in vals[0..upper_bound].iter().enumerate() {
-                frag.encat(self.compile_field_value_continue(scope, index, val, format, false));
+                frag.encat(self.compile_field_value_continue(index, val, format, false));
             }
             if any_skipped {
                 frag.encat(self.compile_field_skipped());
             }
-            frag.encat(self.compile_field_value_last(
-                scope,
-                last_index,
-                &vals[last_index],
-                format,
-                false,
-            ));
+            frag.encat(self.compile_field_value_last(last_index, &vals[last_index], format, false));
             frag
         }
     }
@@ -562,7 +516,6 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_record(
         &mut self,
-        scope: &Scope<'_>,
         value_fields: &[FieldValue],
         format_fields: Option<&[FieldFormat]>,
     ) -> Fragment {
@@ -596,52 +549,32 @@ impl<'module> MonoidalPrinter<'module> {
             Fragment::String("{}".into())
         } else {
             let mut frag = Fragment::new();
-            let mut record_scope = MultiScope::with_capacity(scope, value_fields.len());
             let last_index = value_fields.len() - 1;
             for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
                 let format = format_fields.map(|fs| &fs[index].1);
-                frag.encat(self.compile_field_value_continue(
-                    &Scope::Multi(&record_scope),
-                    label,
-                    value,
-                    format,
-                    true,
-                ));
-                record_scope.push(label.clone(), value.clone());
+                frag.encat(self.compile_field_value_continue(label, value, format, true));
             }
             let (label, value) = &value_fields[last_index];
             let format = format_fields.map(|fs| &fs[last_index].1);
-            frag.encat(self.compile_field_value_last(
-                &Scope::Multi(&record_scope),
-                label,
-                value,
-                format,
-                true,
-            ));
+            frag.encat(self.compile_field_value_last(label, value, format, true));
             frag
         }
     }
 
-    fn compile_variant(
-        &mut self,
-        scope: &Scope<'_>,
-        label: &str,
-        value: &Value,
-        format: Option<&Format>,
-    ) -> Fragment {
+    fn compile_variant(&mut self, label: &str, value: &Value, format: Option<&Format>) -> Fragment {
         if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
             frag.encat(Fragment::String(format!("{{ {label} := ").into()));
             if let Some(format) = format {
-                frag.encat(self.compile_decoded_value(scope, value, format));
+                frag.encat(self.compile_decoded_value(value, format));
             } else {
-                frag.encat(self.compile_value(scope, value));
+                frag.encat(self.compile_value(value));
             }
             frag.encat(Fragment::String(" }".into()));
             frag.engroup();
             frag
         } else {
-            self.compile_field_value_last(scope, label, value, format, true)
+            self.compile_field_value_last(label, value, format, true)
         }
     }
 
@@ -665,7 +598,6 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_field_value_continue(
         &mut self,
-        scope: &Scope<'_>,
         label: impl fmt::Display,
         value: &Value,
         format: Option<&Format>,
@@ -679,7 +611,7 @@ impl<'module> MonoidalPrinter<'module> {
         ));
 
         self.gutter.push(Column::Branch);
-        let frag_value = self.compile_field_value(scope, value, format);
+        let frag_value = self.compile_field_value(value, format);
         self.gutter.pop();
 
         if let Some(format) = format {
@@ -697,7 +629,6 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_field_value_last(
         &mut self,
-        scope: &Scope<'_>,
         label: impl fmt::Display,
         value: &Value,
         format: Option<&Format>,
@@ -711,7 +642,7 @@ impl<'module> MonoidalPrinter<'module> {
         ));
 
         self.gutter.push(Column::Space);
-        let frag_value = self.compile_field_value(scope, value, format);
+        let frag_value = self.compile_field_value(value, format);
         self.gutter.pop();
 
         if let Some(format) = format {
@@ -727,12 +658,7 @@ impl<'module> MonoidalPrinter<'module> {
         frags.finalize().group()
     }
 
-    fn compile_field_value(
-        &mut self,
-        scope: &Scope<'_>,
-        value: &Value,
-        format: Option<&Format>,
-    ) -> Fragment {
+    fn compile_field_value(&mut self, value: &Value, format: Option<&Format>) -> Fragment {
         match format {
             Some(format) => {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
@@ -740,16 +666,15 @@ impl<'module> MonoidalPrinter<'module> {
                 } else {
                     Fragment::join_with_wsp(
                         Fragment::String(" :=".into()),
-                        self.compile_decoded_value(scope, value, format),
+                        self.compile_decoded_value(value, format),
                     )
                     .group()
                 }
             }
-            None => Fragment::join_with_wsp(
-                Fragment::String(" :=".into()),
-                self.compile_value(scope, value),
-            )
-            .group(),
+            None => {
+                Fragment::join_with_wsp(Fragment::String(" :=".into()), self.compile_value(value))
+                    .group()
+            }
         }
     }
 
