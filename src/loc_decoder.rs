@@ -1316,6 +1316,13 @@ impl Decoder {
                 let image = ParsedValue::inherit(&orig, v);
                 Ok((ParsedValue::Mapped(Box::new(orig), Box::new(image)), input))
             }
+            Decoder::Where(d, expr) => {
+                let (v, input) = d.parse_with_loc(program, scope, input)?;
+                match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
+                    true => Ok((v, input)),
+                    false => Err(ParseError::loc_fail(scope, input)),
+                }
+            }
             Decoder::Compute(expr) => {
                 let v = expr.eval_with_loc(scope);
                 Ok((v.as_ref().clone(), input))
