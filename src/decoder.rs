@@ -598,6 +598,7 @@ pub enum Decoder {
     Bits(Box<Decoder>),
     WithRelativeOffset(Expr, Box<Decoder>),
     Map(Box<Decoder>, Expr),
+    Where(Box<Decoder>, Expr),
     Compute(Expr),
     Let(Label, Expr, Box<Decoder>),
     Match(Expr, Vec<(Pattern, Decoder)>),
@@ -866,6 +867,10 @@ impl<'a> Compiler<'a> {
             Format::Map(a, expr) => {
                 let da = Box::new(self.compile_format(a, next.clone())?);
                 Ok(Decoder::Map(da, expr.clone()))
+            }
+            Format::Where(a, expr) => {
+                let da = Box::new(self.compile_format(a, next.clone())?);
+                Ok(Decoder::Where(da, expr.clone()))
             }
             Format::Compute(expr) => Ok(Decoder::Compute(expr.clone())),
             Format::Let(name, expr, a) => {
@@ -1270,6 +1275,13 @@ impl Decoder {
                 let (orig, input) = d.parse(program, scope, input)?;
                 let v = expr.eval_lambda(scope, &orig);
                 Ok((Value::Mapped(Box::new(orig), Box::new(v)), input))
+            }
+            Decoder::Where(d, expr) => {
+                let (v, input) = d.parse(program, scope, input)?;
+                match expr.eval_lambda(scope, &v).unwrap_bool() {
+                    true => Ok((v, input)),
+                    false => Err(ParseError::fail(scope, input)),
+                }
             }
             Decoder::Compute(expr) => {
                 let v = expr.eval_value(scope);
@@ -2118,5 +2130,42 @@ mod tests {
         let trailer = is_byte(1);
         let f = Format::Tuple(vec![repeat_between, trailer]);
         assert!(Compiler::compile_one(&f).is_ok());
+    }
+
+    #[test]
+    #[ignore] // TODO can we distinguish a Union based on disjoint Where clauses?
+    fn compile_where_u16be_eq() {
+        let u8 = Format::Byte(ByteSet::full());
+        let u16be = map(
+            tuple([u8.clone(), u8]),
+            lambda("x", Expr::U16Be(Box::new(var("x")))),
+        );
+        let a = Format::Where(
+            Box::new(u16be.clone()),
+            lambda("x", expr_eq(var("x"), Expr::U16(0x00FF))),
+        );
+        let b = Format::Where(
+            Box::new(u16be),
+            lambda("x", expr_eq(var("x"), Expr::U16(0xFF00))),
+        );
+        let f = Format::Union(vec![a, b]);
+        let d = Compiler::compile_one(&f).unwrap();
+        accepts(
+            &d,
+            &[0x00, 0xFF],
+            &[],
+            Value::Branch(0, Box::new(Value::U16(0x00FF))),
+        );
+        accepts(
+            &d,
+            &[0xFF, 0x00],
+            &[],
+            Value::Branch(0, Box::new(Value::U16(0xFF00))),
+        );
+        rejects(&d, &[]);
+        rejects(&d, &[0x00]);
+        rejects(&d, &[0xFF]);
+        rejects(&d, &[0x00, 0x00]);
+        rejects(&d, &[0xFF, 0xFF]);
     }
 }

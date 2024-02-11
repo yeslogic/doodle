@@ -2790,6 +2790,9 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Map(gt, Box::new(t_inner), t_lambda)
             }
+            Format::Where(_inner, _lambda) => {
+                unimplemented!();
+            }
             Format::Compute(expr) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
