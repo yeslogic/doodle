@@ -629,13 +629,11 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Variant(label.clone(), Box::new(d)))
             }
             Format::Union(branches) => {
-                let mut fs = Vec::with_capacity(branches.len());
                 let mut ds = Vec::with_capacity(branches.len());
                 for f in branches {
                     ds.push(self.compile_format(f, next.clone())?);
-                    fs.push(f.clone());
                 }
-                if let Some(tree) = MatchTree::build(self.module, &fs, next) {
+                if let Some(tree) = MatchTree::build(self.module, branches, next) {
                     Ok(Decoder::Branch(tree, ds))
                 } else {
                     Err(format!("cannot build match tree for {:?}", format))
