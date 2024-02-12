@@ -1,6 +1,5 @@
+use doodle::base::*;
 use doodle::{Format, FormatModule, FormatRef, Pattern};
-
-use crate::format::base::*;
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let chunk = |tag: Format, data: Format| {

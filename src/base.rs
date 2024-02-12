@@ -1,6 +1,6 @@
-use doodle::byte_set::ByteSet;
-use doodle::IntoLabel;
-use doodle::{Arith, Expr, Format, FormatModule, FormatRef, IntRel, Pattern, ValueType};
+use crate::byte_set::ByteSet;
+use crate::IntoLabel;
+use crate::{Arith, Expr, Format, FormatModule, FormatRef, IntRel, Pattern, ValueType};
 
 pub fn var<Name: IntoLabel>(name: Name) -> Expr {
     Expr::Var(name.into())

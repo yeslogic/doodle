@@ -1,6 +1,5 @@
+use doodle::base::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};
-
-use crate::format::base::*;
 
 /// gzip
 pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) -> FormatRef {

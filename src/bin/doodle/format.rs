@@ -1,8 +1,5 @@
+use doodle::base::*;
 use doodle::{Format, FormatModule, FormatRef};
-
-use crate::format::base::*;
-
-mod base;
 
 mod deflate;
 mod gif;
@@ -16,7 +13,7 @@ mod text;
 mod tiff;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
-    let base = base::main(module);
+    let base = doodle::base::main(module);
 
     let deflate = deflate::main(module, &base);
     let tiff = tiff::main(module, &base);
@@ -60,7 +57,7 @@ mod test {
     #[test]
     fn with_relative_offset_format() -> Result<(), ParseError> {
         let mut module = FormatModule::new();
-        let base = base::main(&mut module);
+        let base = doodle::base::main(&mut module);
 
         let mask_bytes = {
             let mut tmp = ByteSet::new();

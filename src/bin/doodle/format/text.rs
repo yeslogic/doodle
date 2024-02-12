@@ -1,7 +1,6 @@
 use crate::format::BaseModule;
+use doodle::base::*;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
-
-use super::base::*;
 
 // mask table for bitwise and in order to drop N bits, for N = 0 ..= 5
 // We technically don't need a mask to drop 0, but it keeps the other indices intuitively correct

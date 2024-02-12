@@ -1,6 +1,5 @@
+use doodle::base::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};
-
-use crate::format::base::*;
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn is_even(num: Expr) -> Expr {
