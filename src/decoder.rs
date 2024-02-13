@@ -1172,8 +1172,7 @@ fn value_to_vec_usize(v: &Value) -> Vec<usize> {
     vs.iter()
         .map(|v| match v.coerce_mapped_value() {
             Value::U8(n) => *n as usize,
-            Value::U16(n) => *n as usize,
-            _ => panic!("expected U8 or U16"),
+            _ => panic!("expected U8"),
         })
         .collect::<Vec<usize>>()
 }
