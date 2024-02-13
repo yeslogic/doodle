@@ -2,13 +2,14 @@ mod rust_ast;
 
 use crate::byte_set::ByteSet;
 use crate::{
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Next,
-    Pattern, TypeScope, ValueType,
+    Arith, BaseType, Expr, Format, FormatModule, IntRel, Label, MatchTree,
+    Pattern, ValueType,
 };
 
 use crate::decoder::{Decoder, Program};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use rust_ast::{
     AtomType, CompType, Constructor, DefParams, FnSig, LocalType, MatchCaseLHS, Mut, Operator,
@@ -1577,28 +1578,23 @@ impl<'a> Generator<'a> {
             sourcemap,
         }
     }
-
-    fn generate_sourcemap(module: &FormatModule, format: &Format) -> Result<SourceMap, String> {
-        let mut generator = Generator::new(module);
-
-        let t_format = generator.infer_type_format(module, format);
-        generator.generate_toplevel_format(module, &t_format);
-        Ok(generator.sourcemap)
-    }
-
-    fn infer_type_format(&self, module: &FormatModule, format: &Format) -> TypedFormat {
-        let scope = TypeScope::new();
-        let ty = module
-            .infer_format_type(&scope, format)
-            .expect("Could not infer Format type");
-        // FIXME - we currently don't have a fully-implemented TypedFormat, so this is incorrect for now
-        // (format, ty).into()
-        format.clone()
-    }
-
-    fn generate_toplevel_format(&mut self, module: &FormatModule, t_format: &TypedFormat) {
-        todo!();
-    }
 }
 
-type TypedFormat = Format;
+pub enum VTShadowTree {
+    Tip,
+    Leaf(Rc<ValueType>),
+    Node { node_type: Rc<ValueType>, children: Vec<VTShadowTree> },
+}
+
+impl VTShadowTree {
+    pub const fn new() -> Self {
+        Self::Tip
+    }
+
+    pub fn node_type(&self) -> Rc<ValueType> {
+        match self {
+            VTShadowTree::Tip => Rc::new(ValueType::Empty),
+            VTShadowTree::Leaf(node_type) | VTShadowTree::Node { node_type, .. } => node_type.clone(),
+        }
+    }
+}

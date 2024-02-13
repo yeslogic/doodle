@@ -24,11 +24,9 @@ mod precedence;
 pub mod prelude;
 pub mod read;
 
-mod extension;
-// use extension::{UD, TC, Extension, TotalExtension, HOInfo, MCInfo, NLInfo, MaybeCast};
-
 mod typecheck;
 use typecheck::UnificationError;
+pub use typecheck::{typecheck, TCError, TCResult};
 
 pub type Label = std::borrow::Cow<'static, str>;
 
@@ -69,6 +67,42 @@ pub enum ValueType {
     Record(Vec<(Label, ValueType)>),
     Union(Vec<(Label, ValueType)>),
     Seq(Box<ValueType>),
+}
+
+fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
+    match vt {
+        ValueType::Any | ValueType::Empty => None,
+        ValueType::Base(b) => {
+            Some(match b {
+                BaseType::Bool => Expr::Bool(false),
+                BaseType::U8 => Expr::U8(0),
+                BaseType::U16 => Expr::U16(0),
+                BaseType::U32 => Expr::U32(0),
+                BaseType::U64 => Expr::U64(0),
+                BaseType::Char => Expr::AsChar(Box::new(Expr::U32(0))),
+            })
+        }
+        ValueType::Tuple(ts) => {
+            let mut xs = Vec::with_capacity(ts.len());
+            for t in ts {
+                xs.push(mk_value_expr(t)?);
+            }
+            Some(Expr::Tuple(xs))
+        }
+        ValueType::Record(fs) => {
+            let mut xs = Vec::with_capacity(fs.len());
+            for (lbl, t) in fs {
+                xs.push((lbl.clone(), mk_value_expr(t)?));
+            }
+            Some(Expr::Record(xs))
+        }
+        ValueType::Union(branches) => {
+            mk_value_expr(&branches[0].1)
+        }
+        ValueType::Seq(t) => {
+            Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?]))
+        }
+    }
 }
 
 impl ValueType {
@@ -828,8 +862,18 @@ impl FormatModule {
         FormatRef(level)
     }
 
-    fn get_name(&self, level: usize) -> &str {
+    pub fn get_name(&self, level: usize) -> &str {
         &self.names[level]
+    }
+
+    pub fn iter_formats<'a>(&'a self) -> impl Iterator<Item = (usize, Format)> + 'a {
+        (0..self.formats.len()).filter_map(|ix| {
+            let mut x_args = Vec::with_capacity(self.args[ix].len());
+            for (_, vt) in self.args[ix].iter() {
+                x_args.push(mk_value_expr(vt)?);
+            }
+            Some((ix, Format::ItemVar(ix, x_args)))
+        })
     }
 
     fn get_args(&self, level: usize) -> &[(Label, ValueType)] {
