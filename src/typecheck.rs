@@ -1,14 +1,14 @@
-use crate::{ BaseType, Expr, Format, FormatModule, Label, Pattern, ValueType };
+use crate::{ BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, ValueType };
 use std::{ collections::{ BTreeMap, HashMap, HashSet }, rc::Rc };
 
 /// Unification variable for use in typechecking
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub(crate) struct UVar(usize);
+pub struct UVar(usize);
 
 /// Unification type, equivalent to ValueType up to abstraction
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub(crate) enum UType {
+pub enum UType {
     Empty, // Reserved for value-free Formats (Format::Fail only)
     Hole, // ground type-hole for shape-only unifications
     Var(UVar), // type-hole
@@ -74,14 +74,6 @@ impl UType {
     }
 }
 
-/// Analogue of Mercury-style instantiation states, but for metavariables
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum UInst {
-    Ground, // No free metavariables
-    Bound(HashSet<UVar>),
-    Free(UVar),
-}
-
 #[derive(Debug, Clone, Default)]
 pub(crate) enum UScope<'a> {
     #[default]
@@ -134,13 +126,6 @@ impl<'a> UMultiScope<'a> {
         self.entries.push((name, v));
     }
 
-    fn get_bindings(&self, bindings: &mut Vec<(Label, UVar)>) {
-        for (name, metavar) in self.entries.iter().rev() {
-            bindings.push((name.clone(), *metavar));
-        }
-        self.parent.get_bindings(bindings);
-    }
-
     fn get_uvar_by_name(&self, name: &str) -> Option<UVar> {
         for (n, v) in self.entries.iter().rev() {
             if n == name {
@@ -162,18 +147,70 @@ pub(crate) struct USingleScope<'a> {
 pub(crate) struct Ctxt<'a> {
     module: &'a FormatModule,
     scope: &'a UScope<'a>,
+    dyns: DynScope<'a>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DynScope<'a> {
+    Empty,
+    Single(DynSingleScope<'a>),
+}
+
+impl<'a> DynScope<'a> {
+    pub fn new() -> Self {
+        Self::Empty
+    }
+
+    fn get_dynformat_by_name(&self, label: &str) -> Option<&DynFormat> {
+        match self {
+            DynScope::Empty => None,
+            DynScope::Single(single) => single.get_dynformat_by_name(label),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DynSingleScope<'a> {
+    parent: &'a DynScope<'a>,
+    name: &'a str,
+    dynf: &'a DynFormat,
+}
+
+impl<'a> DynSingleScope<'a> {
+    pub fn new(parent: &'a DynScope<'a>, name: &'a str, dynf: &'a DynFormat) -> Self {
+        Self { parent, name, dynf }
+    }
+
+    fn get_dynformat_by_name(&self, label: &str) -> Option<&DynFormat> {
+        if label == self.name {
+            Some(self.dynf)
+        } else {
+            self.parent.get_dynformat_by_name(label)
+        }
+    }
+}
+
+
 impl<'a> Ctxt<'a> {
-    fn with_scope<'b>(self, newscope: &'b UScope<'b>) -> Ctxt<'b> where 'a: 'b, 'b: 'a {
+    fn with_scope(&'a self, newscope: &'a UScope<'a>) -> Ctxt<'a> {
         Self {
             module: self.module,
+            dyns: self.dyns,
             scope: newscope,
         }
     }
 
+    fn with_dyn_binding(&'a self, name: &'a str, dynf: &'a DynFormat) -> Ctxt<'a> {
+        Self {
+            module: self.module,
+            dyns: DynScope::Single(DynSingleScope::new(&self.dyns, name, dynf)),
+            scope: self.scope,
+        }
+    }
+
+
     fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
-        Self { module, scope }
+        Self { module, scope, dyns: DynScope::new() }
     }
 }
 
@@ -188,11 +225,6 @@ impl<'a> USingleScope<'a> {
         }
         self.parent.get_uvar_by_name(name)
     }
-
-    fn get_bindings(&self, bindings: &mut Vec<(Label, UVar)>) {
-        bindings.push((String::from(self.name).into(), self.uvar));
-        self.parent.get_bindings(bindings);
-    }
 }
 
 impl<'a> UScope<'a> {
@@ -201,14 +233,6 @@ impl<'a> UScope<'a> {
             UScope::Empty => None,
             UScope::Multi(multi) => multi.get_uvar_by_name(name),
             UScope::Single(single) => single.get_uvar_by_name(name),
-        }
-    }
-
-    pub fn get_bindings(&self, bindings: &mut Vec<(Label, UVar)>) {
-        match self {
-            UScope::Empty => {}
-            UScope::Multi(multi) => multi.get_bindings(bindings),
-            UScope::Single(single) => single.get_bindings(bindings),
         }
     }
 }
@@ -224,91 +248,12 @@ impl UType {
             UType::Seq(t) => Box::new(std::iter::once(t.clone())),
         }
     }
-
-    pub fn get_uinst(&self) -> UInst {
-        match self {
-            Self::Hole | Self::Empty | Self::Base(..) => UInst::Ground,
-            Self::Var(v) => UInst::Free(*v),
-            Self::Record(fs) => {
-                let mut vars = HashSet::new();
-                for (_l, t) in fs.iter() {
-                    match t.get_uinst() {
-                        UInst::Free(var) => {
-                            let _ = vars.insert(var);
-                        }
-                        UInst::Bound(vars0) => {
-                            vars.extend(vars0.iter());
-                        }
-                        UInst::Ground => {}
-                    }
-                }
-                if vars.is_empty() {
-                    UInst::Ground
-                } else {
-                    UInst::Bound(vars)
-                }
-            }
-            Self::Tuple(ts) => {
-                let mut vars = HashSet::new();
-                for t in ts.iter() {
-                    match t.get_uinst() {
-                        UInst::Free(var) => {
-                            let _ = vars.insert(var);
-                        }
-                        UInst::Bound(vars0) => {
-                            vars.extend(vars0.iter());
-                        }
-                        UInst::Ground => {}
-                    }
-                }
-                if vars.is_empty() {
-                    UInst::Ground
-                } else {
-                    UInst::Bound(vars)
-                }
-            }
-            Self::Seq(t) =>
-                match t.get_uinst() {
-                    UInst::Ground => UInst::Ground,
-                    UInst::Bound(vs) => UInst::Bound(vs),
-                    UInst::Free(v) => UInst::Bound(HashSet::from([v])),
-                }
-        }
-    }
-
-    /// Determines whether a particular UVar occurs within a UType, and at what nesting depth.
-    ///
-    /// Some(true) indicates direct equivalence to the UVar in question, which is a
-    /// tautology rather than an infinite type if self is equated to the UVar
-    /// being searched for.
-    ///
-    /// Some(false) indicates that the UVar in question occurs somewhere within the type,
-    /// but inside of an N-layer nested structure of intervening constructors. This would constitute
-    /// an infinite type if self is equated to the UVar being searched for.
-    ///
-    /// None indicates the variable does not directly occur in the type.
-    ///
-    /// Note that transitive inclusion is not checked, as this requires a typechecker context to evaluate
-    /// indirect equivalences, so a return value of `None` does not necessarily rule out infinite types
-    /// or tautologies.
-    pub fn find_var_depth(&self, var: &UVar) -> Option<bool> {
-        match self.get_uinst() {
-            UInst::Ground => None,
-            UInst::Bound(vs) => {
-                if vs.contains(var) { Some(false) } else { None }
-            }
-            UInst::Free(v0) => {
-                if v0 == *var { Some(true) } else { None }
-            }
-        }
-    }
 }
 
 /// Representation of an inferred type that is either fully-known or partly-known
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum VType {
     Base(BaseSet),
-    Concrete(Rc<ValueType>),
     Abstract(Rc<UType>),
     ImplicitTuple(Vec<Rc<UType>>),
     ImplicitRecord(Vec<(Label, Rc<UType>)>),
@@ -336,10 +281,7 @@ impl Alias {
         Self::NoAlias
     }
 
-    pub const fn is_canonical(&self) -> bool {
-        matches!(self, Alias::Canonical(_) | Alias::NoAlias)
-    }
-
+    /// Returns `true` if `self` is the canonical alias of at least one other metavariable (i.e. [`Alias::Canonical`] over a non-empty set).
     pub fn is_canonical_nonempty(&self) -> bool {
         match self {
             Alias::Canonical(x) => !x.is_empty(),
@@ -431,10 +373,10 @@ impl VarMapMap {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
-pub(crate) struct VMId(usize);
+pub struct VMId(usize);
 
 #[derive(Clone, Debug, Default)]
-pub(crate) enum Constraints {
+pub enum Constraints {
     #[default]
     Indefinite, // default value before union-type distinction is made
     Variant(VMId), // indirect index into typechecker metacontext 'varmap' hashmap
@@ -445,21 +387,17 @@ impl Constraints {
     pub fn new() -> Self {
         Self::Indefinite
     }
-
-    pub fn is_variant(&self) -> bool {
-        matches!(self, Self::Variant(_))
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Constraint {
+pub enum Constraint {
     Equiv(Rc<UType>), // direct equivalence with a UType, which should not be a bare `UType::Var` (that is what TypeChecker.equivalences is for)
     Elem(BaseSet), // implicit restriction to a narrowed set of ground-types (e.g. from `Expr::AsU32`)
     Proj(ProjShape), // constraints implied by projections
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum ProjShape {
+pub enum ProjShape {
     TupleWith(BTreeMap<usize, UVar>), // required associations of metavars at given indices of an uncertain tuple
     RecordWith(BTreeMap<Label, UVar>), // required associations of metavars at given fields of an uncertain record
     SeqOf(UVar), // simple sequence element-type projection
@@ -495,33 +433,56 @@ impl ProjShape {
 
 /// Abstraction over explicit collections of BaseType values that could be in any order
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub(crate) enum BaseSet {
+pub enum BaseSet {
     /// singleton set of any basetype, even non-integral ones
     Single(BaseType),
-    /// U8, U16, U32 (or any future types like U64)
-    UAny,
-    /// Unifies as if UAny, solves as if Single(BaseSet::U32)
-    USome,
+    /// Some subset of U8, U16, U32 (or any future types like U64)
+    U(UintSet),
 }
 
 impl BaseSet {
-    pub fn intersects(&self, other: &Self) -> bool {
-        match (self, other) {
-            (BaseSet::Single(b1), BaseSet::Single(b2)) => b1 == b2,
-            | (BaseSet::Single(b), BaseSet::UAny | BaseSet::USome)
-            | (BaseSet::UAny | BaseSet::USome, BaseSet::Single(b)) => b.is_numeric(),
-            (BaseSet::UAny | BaseSet::USome, BaseSet::UAny | BaseSet::USome) => true,
-        }
-    }
+    #[allow(non_upper_case_globals)]
+    pub const UAny: Self = Self::U(UintSet::Any);
 
-    pub fn contains(&self, item: BaseType) -> bool {
+    #[allow(non_upper_case_globals)]
+    pub const USome: Self = Self::U(UintSet::Any32);
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum UintSet {
+    Any, // unrestricted and non-defaulting if more than one solution
+    Any32,  // like Any,  but defaults to U32 if multiple solutions
+    Short8, // U8 or U16, default solution is U8
+}
+
+impl UintSet {
+    pub fn contains(&self, b: BaseType) -> bool {
         match self {
-            BaseSet::Single(elem) => *elem == item,
-            BaseSet::UAny | BaseSet::USome => item.is_numeric(),
+            UintSet::Any | UintSet::Any32 => b.is_numeric(),
+            UintSet::Short8 => b == BaseType::U8 || b == BaseType::U16,
         }
     }
 
-    pub fn union(&self, other: &Self) -> Result<Self, ConstraintError> {
+    pub fn intersection(self, other: Self) -> Self {
+        match (self, other) {
+            (x, y) if x == y => x,
+            (UintSet::Any, x) | (x, UintSet::Any) => x,
+            (UintSet::Short8, _) | (_, UintSet::Short8) => Self::Short8,
+            _ => unreachable!("exhaustive cases covered"),
+        }
+    }
+
+    pub fn get_unique_solution(self) -> Option<BaseType> {
+        match self {
+            UintSet::Any => None,
+            UintSet::Any32 => Some(BaseType::U32),
+            UintSet::Short8 => Some(BaseType::U8),
+        }
+    }
+}
+
+impl BaseSet {
+    pub fn unify(&self, other: &Self) -> Result<Self, ConstraintError> {
         match (self, other) {
             (BaseSet::Single(b1), BaseSet::Single(b2)) => {
                 if b1 == b2 {
@@ -535,9 +496,9 @@ impl BaseSet {
                     )
                 }
             }
-            | (BaseSet::UAny | BaseSet::USome, BaseSet::Single(b))
-            | (BaseSet::Single(b), BaseSet::UAny | BaseSet::USome) => {
-                if b.is_numeric() {
+            | (BaseSet::U(u), BaseSet::Single(b))
+            | (BaseSet::Single(b), BaseSet::U(u)) => {
+                if u.contains(*b) {
                     Ok(BaseSet::Single(*b))
                 } else {
                     Err(
@@ -545,10 +506,7 @@ impl BaseSet {
                     )
                 }
             }
-            (BaseSet::UAny, BaseSet::UAny) => Ok(*self),
-            (BaseSet::UAny | BaseSet::USome, BaseSet::USome) | (BaseSet::USome, BaseSet::UAny) => {
-                Ok(BaseSet::USome)
-            }
+            (BaseSet::U(u1), BaseSet::U(u2)) => Ok(BaseSet::U(u1.intersection(*u2))),
         }
     }
 
@@ -557,15 +515,19 @@ impl BaseSet {
     pub fn to_constraint(&self) -> Constraint {
         match self {
             BaseSet::Single(b) => Constraint::Equiv(Rc::new(UType::Base(*b))),
-            BaseSet::UAny | BaseSet::USome => Constraint::Elem(*self),
+            _ => Constraint::Elem(*self),
         }
     }
 
     fn get_unique_solution(&self, v: UVar) -> TCResult<Rc<UType>> {
         match self {
             BaseSet::Single(b) => Ok(Rc::new(UType::Base(*b))),
-            BaseSet::USome => Ok(Rc::new(UType::Base(BaseType::U32))),
-            BaseSet::UAny => Err(TCError::MultipleSolutions(v, *self)),
+            BaseSet::U(u) => {
+                match u.get_unique_solution() {
+                    Some(b) => Ok(Rc::new(UType::Base(b))),
+                    None => Err(TCError::MultipleSolutions(v, *self)),
+                }
+            }
         }
     }
 }
@@ -573,8 +535,10 @@ impl BaseSet {
 impl std::fmt::Display for BaseSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BaseSet::UAny => write!(f, "{{ U8, U16, U32 }}"),
-            BaseSet::USome => write!(f, "{{ U8, U16, [U32] }}"),
+            // FIXME - correct this if we add U64
+            BaseSet::U(UintSet::Any) => write!(f, "{{ U8, U16, U32 }}"),
+            BaseSet::U(UintSet::Any32) => write!(f, "{{ U8, U16, [U32] }}"),
+            BaseSet::U(UintSet::Short8) => write!(f, "{{ [U8], U16 }}"),
             BaseSet::Single(t) => write!(f, "{{ {t:?} }}"),
         }
     }
@@ -717,9 +681,9 @@ impl TypeChecker {
         let tmp = child.clone();
         let newscope = UScope::Multi(&tmp);
         let newctxt = ctxt.with_scope(&newscope);
-        let rhs_type = self.infer_utype_format(rhs_format, newctxt)?;
+        let local_rhs_var = self.infer_var_format(rhs_format, newctxt)?;
         self.unify_var_utype(pvar, head_t)?;
-        self.unify_var_utype(rhs_var, rhs_type)?;
+        self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
     }
 
@@ -735,9 +699,9 @@ impl TypeChecker {
         let pvar = self.infer_var_scope_pattern(pat, &mut child)?;
         let tmp = child.clone();
         let newscope = UScope::Multi(&tmp);
-        let rhs_type = self.infer_utype_expr(rhs_expr, &newscope)?;
+        let local_rhs_var = self.infer_var_expr(rhs_expr, &newscope)?;
         self.unify_var_utype(pvar, head_t)?;
-        self.unify_var_utype(rhs_var, rhs_type)?;
+        self.unify_var_pair(rhs_var, local_rhs_var)?;
         Ok(())
     }
 
@@ -760,6 +724,15 @@ impl TypeChecker {
             }
             _ => VType::Abstract(t),
         }
+    }
+
+    fn unify_var_valuetype_union(&mut self, var: UVar, branches: &[(Label, ValueType)]) -> TCResult<()> {
+        for (lbl, branch_vt) in branches.iter() {
+            let branch_var = self.get_new_uvar();
+            self.unify_var_valuetype(branch_var, branch_vt)?;
+            self.add_uvar_variant(var, lbl.clone(), branch_var.into())?;
+        }
+        Ok(())
     }
 }
 // !SECTION
@@ -937,7 +910,7 @@ impl TypeChecker {
                 Ok(())
             }
             Constraints::Invariant(orig) => {
-                Err(TCError::VarianceMismatch(uvar, vmid, orig.clone()))
+                Err(TCError::VarianceMismatch(uvar, vmid, self.varmaps.get_varmap(vmid).clone(), orig.clone()))
             }
             Constraints::Indefinite => {
                 *constrs = Constraints::Variant(vmid);
@@ -957,13 +930,14 @@ impl TypeChecker {
     /// with other constraints on that variable, or any other it is aliased or equated to.
     fn unify_var_constraint(&mut self, uvar: UVar, constraint: Constraint) -> TCResult<Constraint> {
         let can_ix = self.get_canonical_uvar(uvar).0;
+
         match &self.constraints[can_ix] {
             Constraints::Indefinite => {
                 let ret = constraint.clone();
                 self.constraints[can_ix] = Constraints::Invariant(constraint);
                 Ok(ret)
             }
-            Constraints::Variant(vmid) => Err(TCError::VarianceMismatch(uvar, *vmid, constraint)),
+            Constraints::Variant(vmid) => Err(TCError::VarianceMismatch(uvar, *vmid, self.varmaps.get_varmap(*vmid).clone(), constraint)),
             Constraints::Invariant(prior) => {
                 let c1 = prior.clone();
                 if c1 == constraint {
@@ -1047,6 +1021,10 @@ impl TypeChecker {
                                 self.unify_var_utype(fld_var, fld_type)?;
                                 Ok(())
                             }
+                            UType::Var(v_other) => {
+                                let v = *v_other;
+                                self.unify_var_proj_field(v, fname, fld_var)
+                            }
                             other => unreachable!("expected UType::Record, found {other:?}"),
                         }
                     }
@@ -1073,7 +1051,7 @@ impl TypeChecker {
         let can_v = self.get_canonical_uvar(seq_v);
         match &mut self.constraints[can_v.0] {
             Constraints::Indefinite => {
-                let mut proj = ProjShape::seq_of(elem_v);
+                let proj = ProjShape::seq_of(elem_v);
                 self.unify_var_constraint(seq_v, Constraint::Proj(proj))?;
                 Ok(())
             }
@@ -1100,7 +1078,7 @@ impl TypeChecker {
                                 Ok(())
                             }
                             _ =>
-                                unreachable!("cannot unify on element typen of non-seq projection"),
+                                unreachable!("cannot unify on element type of non-seq projection"),
                         }
                 }
         }
@@ -1182,16 +1160,23 @@ impl TypeChecker {
                         unreachable!("equiv should erase proj and elem"),
                 }
             }
-            (UType::Empty, UType::Empty) => Ok(left),
             // all the remaining cases are mismatched UType constructors
             _ => Err(UnificationError::Unsatisfiable(left, right).into()),
         }
     }
 
     /// Assigns a 'solution' (destructively-updated invariant constraint) to a UVar
-    fn unify_var_utype(&mut self, uvar: UVar, solution: Rc<UType>) -> TCResult<()> {
-        self.unify_var_constraint(uvar, Constraint::Equiv(solution))?;
-        Ok(())
+    fn unify_var_utype(&mut self, v1: UVar, solution: Rc<UType>) -> TCResult<()> {
+        match solution.as_ref() {
+            UType::Var(v2) => {
+                self.unify_var_pair(v1, *v2)?;
+                Ok(())
+            }
+            _ => {
+                self.unify_var_constraint(v1, Constraint::Equiv(solution))?;
+                Ok(())
+            }
+        }
     }
 
     /// Overwrites the [`Constraints`] at the specified index `tgt_ix` with the immediate value at the specified index `src_ix`, returning
@@ -1224,17 +1209,16 @@ impl TypeChecker {
 
     fn infer_var_expr<'a>(&mut self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<UVar> {
         let topvar = match e {
-            Expr::Var(lbl) =>
+            Expr::Var(lbl) => {
+                let occ_var = self.get_new_uvar();
                 match scope.get_uvar_by_name(lbl) {
                     Some(uv) => {
-                        let occ_var = self.get_new_uvar();
                         self.unify_var_pair(uv, occ_var)?;
-                        occ_var
                     }
-                    None => {
-                        unreachable!("encountered unset variable: {lbl}");
-                    }
+                    None => unreachable!("variable {lbl} not in scope"),
                 }
+                occ_var
+            }
             Expr::Bool(_) => self.init_var_simple(UType::Base(BaseType::Bool))?.0,
             Expr::U8(_) => self.init_var_simple(UType::Base(BaseType::U8))?.0,
             Expr::U16(_) => self.init_var_simple(UType::Base(BaseType::U16))?.0,
@@ -1257,7 +1241,7 @@ impl TypeChecker {
             }
             Expr::Record(fs) => {
                 let newvar = self.get_new_uvar();
-                let mut child = UMultiScope::new(scope);
+                let mut child = UMultiScope::with_capacity(scope, fs.len());
                 for (lbl, f) in fs {
                     let scope = UScope::Multi(&child);
                     let fvar = self.infer_var_expr(f, &scope)?;
@@ -1390,13 +1374,14 @@ impl TypeChecker {
             Expr::SeqLength(seq_expr) => {
                 // REVIEW - does this always have to be U32?
                 let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
-                let seq_t = self.infer_utype_expr(seq_expr.as_ref(), scope)?;
-                self.unify_utype(seq_t, Rc::new(UType::Seq(Rc::new(UType::Hole))))?;
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+                let elem_var = self.get_new_uvar();
+                self.unify_var_proj_elem(seq_var, elem_var)?;
                 newvar
             }
             Expr::SubSeq(seq_expr, start_expr, len_expr) => {
                 let newvar = self.get_new_uvar();
-                let seq_t = self.infer_utype_expr(seq_expr.as_ref(), scope)?;
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
 
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
@@ -1406,21 +1391,23 @@ impl TypeChecker {
                 self.unify_utype_baseset(len_t, BaseSet::USome)?;
 
                 // ensure that seq_t is a sequence type, and then equate it to newvar
-                self.unify_utype(seq_t.clone(), Rc::new(UType::Seq(Rc::new(UType::Hole))))?;
-                self.unify_var_utype(newvar, seq_t)?;
+                let elem_var = self.get_new_uvar();
+                self.unify_var_proj_elem(seq_var, elem_var)?;
+                self.unify_var_pair(newvar, seq_var)?;
 
                 newvar
             }
             Expr::FlatMap(f_expr, seq_expr) => {
                 let newvar = self.get_new_uvar();
 
-                let (in_var, out_var) = self.infer_vars_expr_lambda(f_expr.as_ref(), scope)?;
-                let seq_t = self.infer_utype_expr(seq_expr.as_ref(), scope)?;
+                let (in_v, out_v) = self.infer_vars_expr_lambda(f_expr.as_ref(), scope)?;
+                let seq_v = self.infer_var_expr(seq_expr.as_ref(), scope)?;
 
-                self.unify_utype(seq_t, Rc::new(UType::Seq(Rc::new(UType::Var(in_var)))))?;
-                self.unify_var_utype(out_var, Rc::new(UType::Seq(Rc::new(UType::Hole))))?;
+                let out_elem_v = self.get_new_uvar();
 
-                self.unify_var_pair(newvar, out_var)?;
+                self.unify_var_proj_elem(seq_v, in_v)?;
+                self.unify_var_proj_elem(out_v, out_elem_v)?;
+                self.unify_var_pair(newvar, out_v)?;
 
                 newvar
             }
@@ -1446,25 +1433,22 @@ impl TypeChecker {
             Expr::Dup(count, x) => {
                 let newvar = self.get_new_uvar();
                 let count_t = self.infer_utype_expr(&count, scope)?;
-                let x_t = self.infer_utype_expr(&x, scope)?;
+                let x_var = self.infer_var_expr(&x, scope)?;
 
                 // REVIEW - this choice may have effects down the road if forced to unify against an incompatible numeric type
                 self.unify_utype_baseset(count_t, BaseSet::USome)?;
-                self.unify_var_utype(newvar, Rc::new(UType::Seq(x_t)))?;
+                self.unify_var_proj_elem(newvar, x_var)?;
 
                 newvar
             }
             Expr::Inflate(seq_expr) => {
                 let newvar = self.get_new_uvar();
-                let seq_t = self.infer_utype_expr(&seq_expr, scope)?;
-                let Some(elem_t) = self.substitute_hole(
-                    Rc::new(UType::Seq(Rc::new(UType::Hole))),
-                    seq_t
-                )? else {
-                    unreachable!("substitute_hole failure")
-                };
-                // FIXME - not sure what checks to apply to elem_t
-                debug_assert!(matches!(elem_t, _));
+                let seq_v = self.infer_var_expr(&seq_expr, scope)?;
+                let elem_v = self.get_new_uvar();
+
+                self.unify_var_proj_elem(seq_v, elem_v)?;
+
+                // FIXME - not sure what unifications to apply to elem_v
 
                 self.unify_var_utype(
                     newvar,
@@ -1494,81 +1478,19 @@ impl TypeChecker {
                 Ok(ret)
             }
             UType::Base(b) => {
-                let ret = bs.union(&BaseSet::Single(*b))?.to_constraint();
+                let ret = bs.unify(&BaseSet::Single(*b))?.to_constraint();
                 Ok(ret)
             }
-            other =>
+            UType::Hole => {
+                Ok(bs.to_constraint())
+            }
+            _other =>
                 Err(
                     UnificationError::Unsatisfiable(
                         Constraint::Equiv(ut),
                         bs.to_constraint()
                     ).into()
                 ),
-        }
-    }
-
-    /// Attempts to replace a single `UType::Hole` (either the only one, or the first encountered in DFS order)
-    /// in `pattern` with the non-Hole UType its equivalent-position value in `tree`.
-    ///
-    /// If no hole is found in `pattern`, returns `Ok(None)`.
-    /// If unification is impossible, returns `Err` with the corresponding error.
-    ///
-    /// Note that mutability is not technically required, except we have no version of a non-destructive check
-    /// for potential unification, and so we perform a mutable unification internally to propogate the
-    /// relevant errors.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if any hole is found in `tree` (but only before a hole is found in `pattern`).
-    fn substitute_hole(&self, pattern: Rc<UType>, tree: Rc<UType>) -> TCResult<Option<Rc<UType>>> {
-        let VType::Abstract(tree) = self.to_whnf_vtype(tree.clone()) else {
-            unreachable!("bad tree: {tree:?}");
-        };
-        match (pattern.as_ref(), tree.as_ref()) {
-            (_, UType::Hole) =>
-                unreachable!(
-                    "subsitute_hole: only pattern-argument should contain holes, but found one in tree-argument position"
-                ),
-            (UType::Hole, _) => Ok(Some(tree)),
-            (UType::Var(_) | UType::Base(_) | UType::Empty, _) => {
-                // These can never be Hole or contain Hole, so skip even if they might not unify
-                Ok(None)
-            }
-            (UType::Tuple(pats), UType::Tuple(trees)) => {
-                for (pat0, tree0) in Iterator::zip(pats.iter(), trees.iter()) {
-                    match self.substitute_hole(pat0.clone(), tree0.clone())? {
-                        None => {
-                            continue;
-                        }
-                        Some(ret) => {
-                            return Ok(Some(ret));
-                        }
-                    }
-                }
-                Ok(None)
-            }
-            (UType::Record(lpats), UType::Record(ltrees)) => {
-                for ((p_lbl, pat0), (t_lbl, tree0)) in Iterator::zip(lpats.iter(), ltrees.iter()) {
-                    if p_lbl != t_lbl {
-                        unreachable!(
-                            "mismatched fields `{p_lbl}` and `{t_lbl}` of `{pattern:?}` and `{tree:?}`"
-                        );
-                    }
-                    match self.substitute_hole(pat0.clone(), tree0.clone())? {
-                        None => {
-                            continue;
-                        }
-                        Some(ret) => {
-                            return Ok(Some(ret));
-                        }
-                    }
-                }
-                Ok(None)
-            }
-            (UType::Seq(pat0), UType::Seq(tree0)) => {
-                self.substitute_hole(pat0.clone(), tree0.clone())
-            }
-            _ => Err(TypeError::Unsatisfiable(pattern, tree).into()),
         }
     }
 
@@ -1622,10 +1544,48 @@ impl TypeChecker {
                 Ok(())
             }
             _ => {
-                let Some(ut) = UType::from_valuetype(vt) else {
-                    todo!("unify_var_vtype: handle unions properly")
+                let ut = match UType::from_valuetype(vt) {
+                    Some(ut) => self.unify_var_utype(uv, Rc::new(ut))?,
+                    _ => {
+                        match vt {
+                            ValueType::Union(branches) => {
+                                self.unify_var_valuetype_union(uv, branches)?;
+                            }
+                            ValueType::Record(fs) => {
+                                let mut ufs = Vec::with_capacity(fs.len());
+                                for (lbl, fvt) in fs.iter() {
+                                    if let Some(ut) = UType::from_valuetype(fvt) {
+                                        ufs.push((lbl.clone(), Rc::new(ut)));
+                                    } else {
+                                        let f_v = self.get_new_uvar();
+                                        self.unify_var_valuetype(f_v, fvt)?;
+                                        ufs.push((lbl.clone(), f_v.into()));
+                                    }
+                                }
+                                self.unify_var_utype(uv, Rc::new(UType::Record(ufs)))?;
+                            }
+                            ValueType::Tuple(ts) => {
+                                let mut uts = Vec::with_capacity(ts.len());
+                                for t in ts.iter() {
+                                    if let Some(ut) = UType::from_valuetype(t) {
+                                        uts.push(Rc::new(ut));
+                                    } else {
+                                        let t_v = self.get_new_uvar();
+                                        self.unify_var_valuetype(t_v, t)?;
+                                        uts.push(t_v.into());
+                                    }
+                                }
+                                self.unify_var_utype(uv, Rc::new(UType::Tuple(uts)))?;
+                            }
+                            ValueType::Seq(inner) => {
+                                let elem_v = self.get_new_uvar();
+                                self.unify_var_valuetype(elem_v, &inner)?;
+                                self.unify_var_proj_elem(uv, elem_v)?;
+                            }
+                            other => unreachable!("unify_var_utype failed on non-nested ValueType {other:?}"),
+                        }
+                    }
                 };
-                self.unify_var_utype(uv, Rc::new(ut))?;
                 Ok(())
             }
         }
@@ -1652,7 +1612,7 @@ impl TypeChecker {
                 Ok(self.unify_utype_baseset(ut.clone(), bs)?)
             }
             (Constraint::Elem(bs1), Constraint::Elem(bs2)) => {
-                let bs0 = bs1.union(&bs2)?;
+                let bs0 = bs1.unify(&bs2)?;
                 Ok(bs0.to_constraint())
             }
             (
@@ -1715,6 +1675,13 @@ impl TypeChecker {
 
                 Ok(Constraint::Proj(ProjShape::RecordWith(r0)))
             }
+            (
+                Constraint::Proj(ProjShape::SeqOf(elvar1)),
+                Constraint::Proj(ProjShape::SeqOf(elvar2)),
+            ) => {
+                self.unify_var_pair(elvar1, elvar2)?;
+                Ok(Constraint::Proj(ProjShape::SeqOf(elvar1)))
+            }
             | (ref c1 @ Constraint::Proj(ref p), ref c2 @ Constraint::Equiv(ref ut))
             | (ref c1 @ Constraint::Equiv(ref ut), ref c2 @ Constraint::Proj(ref p)) => {
                 match (p, ut.as_ref()) {
@@ -1768,7 +1735,13 @@ impl TypeChecker {
                     (ProjShape::SeqOf(_), other) => unreachable!("could not match Seq-Shape against {other:?}"),
                 }
             }
-            (c1, c2) => Err(UnificationError::Unsatisfiable(c1, c2).into()),
+            | (ref c1 @ Constraint::Proj(ProjShape::RecordWith(..)), ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::TupleWith(..)))
+            | (ref c1 @ Constraint::Proj(ProjShape::TupleWith(..)), ref c2 @ Constraint::Proj(ProjShape::SeqOf(..) | ProjShape::RecordWith(..)))
+            | (ref c1 @ Constraint::Proj(ProjShape::SeqOf(..)), ref c2 @ Constraint::Proj(ProjShape::TupleWith(..) | ProjShape::RecordWith(..)))
+            | (ref c1 @ Constraint::Elem(_), ref c2 @ Constraint::Proj(_))
+            | (ref c1 @ Constraint::Proj(_), ref c2 @ Constraint::Elem(_)) => {
+                Err(UnificationError::Unsatisfiable(c1.clone(), c2.clone()).into())
+            }
         }
     }
 
@@ -1871,7 +1844,7 @@ impl TypeChecker {
                 }
                 VType::ImplicitRecord(flat)
             }
-            ProjShape::SeqOf(v) => VType::Abstract((*v).into()),
+            ProjShape::SeqOf(v) => VType::Abstract(Rc::new(UType::Seq((*v).into()))),
         }
     }
 
@@ -2003,7 +1976,7 @@ impl TypeChecker {
                 }
             }
             (a1 @ Alias::BackRef(tgt), a2 @ Alias::Canonical(fwds)) => {
-                let left = fwds.contains(tgt);
+                let left = fwds.contains(&v1.0);
                 let right = *tgt == v2.0;
 
                 match (left, right) {
@@ -2028,7 +2001,7 @@ impl TypeChecker {
                 }
             }
             (a1 @ Alias::Canonical(fwds), a2 @ Alias::BackRef(tgt)) => {
-                let left = fwds.contains(tgt);
+                let left = fwds.contains(&v2.0);
                 let right = *tgt == v1.0;
 
                 match (left, right) {
@@ -2071,12 +2044,13 @@ impl TypeChecker {
     /// assumed or asserted, in order to ensure that the call is sound and valid. These preconditions are numerous enough to merit unsafe status for
     /// the call to this method, at least as a temporary linting-helper, to avoid unguarded calls from neutral contexts.
     ///
+    /// Preconditions:
     /// - `a1 < a2`
-    /// - `a1` has no back-references but may have some forward-references
-    /// - `a2` has no back-references
+    /// - `a1` has no back-references, and is allowed (but not required) to have forward-references
+    /// - `a2` has no back-references, and is allowed (but not required) to have forward-references
     unsafe fn recanonicalize(&mut self, a1: usize, a2: usize) -> TCResult<&Constraints> {
         let tmp = self.aliases[a2].set_backref(a1);
-        let mut iter = tmp.iter_fwd_refs();
+        let iter = tmp.iter_fwd_refs();
         for a in iter {
             assert!(
                 !self.aliases[a1].contains_fwd_ref(a),
@@ -2121,7 +2095,7 @@ impl TypeChecker {
             }
             | (Constraints::Variant(vmid), Constraints::Invariant(c))
             | (Constraints::Invariant(c), Constraints::Variant(vmid)) => {
-                return Err(TCError::VarianceMismatch(Ord::min(v1, v2), *vmid, c.clone()));
+                return Err(TCError::VarianceMismatch(Ord::min(v1, v2), *vmid, self.varmaps.get_varmap(*vmid).clone(), c.clone()));
             }
             (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
                 let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
@@ -2182,9 +2156,9 @@ impl TypeChecker {
                     let typ = self.infer_utype_format(inner.as_ref(), ctxt)?;
                     self.add_uvar_variant(newvar, lbl.clone(), typ)?;
                 }
-                // FIXME - other is probably going to come up but it should be easy to fix later, this handles the hardest known case
                 other => {
-                    unreachable!("register_vars_format_union: found non-variant branch {other:?}");
+                    let branch_type = self.infer_utype_format(other, ctxt)?;
+                    self.unify_var_utype(newvar, branch_type)?;
                 }
             }
         }
@@ -2197,13 +2171,16 @@ impl TypeChecker {
         match f {
             Format::ItemVar(level, args) => {
                 let newvar = self.get_new_uvar();
-                if !args.is_empty() {
-                    for arg in args.iter() {
-                        let _ = self.infer_var_expr(arg, ctxt.scope)?;
-                    }
+                let mut child = UMultiScope::with_capacity(ctxt.scope, args.len());
+                let arg_name_vts = &ctxt.module.args[*level];
+                for ((lbl, vt), arg_expr) in Iterator::zip(arg_name_vts.iter(), args.iter()) {
+                    let arg_v = self.infer_var_expr(arg_expr, ctxt.scope)?;
+                    self.unify_var_valuetype(arg_v, vt)?;
+                    child.push(lbl.clone(), arg_v);
                 }
-                let ut = self.infer_utype_format(ctxt.module.get_format(*level), ctxt)?;
-                self.unify_var_utype(newvar, ut)?;
+                let newscope = UScope::Multi(&child);
+                let format_v = self.infer_var_format(ctxt.module.get_format(*level), ctxt.with_scope(&newscope))?;
+                self.unify_var_pair(newvar, format_v)?;
                 Ok(newvar.into())
             }
             Format::Fail => Ok(self.init_var_simple(UType::Empty)?.0),
@@ -2237,7 +2214,7 @@ impl TypeChecker {
             }
             Format::Record(fs) => {
                 let newvar = self.get_new_uvar();
-                let mut child = UMultiScope::new(ctxt.scope);
+                let mut child = UMultiScope::with_capacity(ctxt.scope, fs.len());
                 for (lbl, f) in fs {
                     let scope = UScope::Multi(&child);
                     let child_ctxt = ctxt.with_scope(&scope);
@@ -2348,8 +2325,40 @@ impl TypeChecker {
                 }
                 Ok(newvar)
             }
-            Format::Dynamic(_, _, _) => todo!(),
-            Format::Apply(_) => todo!(),
+            Format::Dynamic(lbl, dynf, inner) => {
+                let newvar = self.get_new_uvar();
+                let newctxt = ctxt.with_dyn_binding(&lbl, dynf);
+                let inner_t = self.infer_utype_format(&inner, newctxt)?;
+                self.unify_var_utype(newvar, inner_t)?;
+                Ok(newvar)
+            }
+            Format::Apply(label) => {
+                let newvar = self.get_new_uvar();
+                let dynf = ctxt.dyns.get_dynformat_by_name(label).unwrap_or_else(|| panic!("missing dynformat {label}"));
+                match dynf {
+                    DynFormat::Huffman(code_lengths, opt_values_expr) => {
+                        let codes_var = self.infer_var_expr(code_lengths, ctxt.scope)?;
+                        let code_var = self.get_new_uvar();
+
+                        // unify on expected type of Seq<u8> | Seq<u16>
+                        self.unify_var_proj_elem(codes_var, code_var)?;
+                        self.unify_var_constraint(code_var, Constraint::Elem(BaseSet::U(UintSet::Short8)))?;
+
+                        if let Some(values_expr) = opt_values_expr {
+                            let values_var = self.infer_var_expr(values_expr, ctxt.scope)?;
+                            let value_var = self.get_new_uvar();
+
+                            self.unify_var_proj_elem(values_var, value_var)?;
+                            self.unify_var_constraint(value_var, Constraint::Elem(BaseSet::U(UintSet::Short8)))?;
+                        }
+
+                        // FIXME - this is a best-guess based on decoder::make_huffman_codes, which maps each code to U16
+                        self.unify_var_constraint(newvar, Constraint::Elem(BaseSet::Single(BaseType::U16)))?;
+
+                        Ok(newvar)
+                    }
+                }
+            }
         }
     }
 
@@ -2384,7 +2393,6 @@ impl TypeChecker {
                                     Err(_) => None,
                                 }
                             }
-                            VType::Concrete(vt) => Some(vt.as_ref().clone()),
                             VType::Abstract(ut) => self.reify(ut),
                             VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
                             _ =>
@@ -2446,14 +2454,14 @@ impl From<TypeError> for ConstraintError {
 
 #[derive(Clone, Debug)]
 // Generic error in unification between two type-constraints, which are represented generically
-pub(crate) enum UnificationError<T: std::fmt::Debug> {
+pub enum UnificationError<T: std::fmt::Debug> {
     // Incompatible(UVar, T, T), // two independent assertions about a UVar are incompatible
     Unsatisfiable(T, T), // a single non-variable assertion is directly unsatisfiable
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum TCError {
-    VarianceMismatch(UVar, VMId, Constraint), // attempted unification of a variant and non-variant constraint
+pub enum TCError {
+    VarianceMismatch(UVar, VMId, VarMap, Constraint), // attempted unification of a variant and non-variant constraint
     Unification(ConstraintError),
     InfiniteType(UVar, Constraints),
     MultipleSolutions(UVar, BaseSet),
@@ -2474,10 +2482,10 @@ impl From<ConstraintError> for TCError {
 impl std::fmt::Display for TCError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TCError::VarianceMismatch(uv, vmid, constraint) =>
+            TCError::VarianceMismatch(uv, vmid, vm, constraint) =>
                 write!(
                     f,
-                    "unable to proceed after attempted unification `{uv} {constraint} ∧ {uv} ⊇ {vmid}`"
+                    "unable to proceed after attempted unification `{uv} {constraint} ∧ {uv} ⊇ {vmid} (:= {vm:?})`"
                 ),
             TCError::Unification(c_err) => write!(f, "{c_err}"),
             TCError::InfiniteType(v, constraints) =>
@@ -2509,6 +2517,16 @@ impl std::fmt::Display for TCError {
     }
 }
 
+impl std::error::Error for TCError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            TCError::Unification(u_err) => Some(u_err),
+            _ => None,
+        }
+    }
+}
+
+
 impl<T: std::fmt::Debug> std::fmt::Display for UnificationError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -2522,16 +2540,25 @@ impl<T: std::fmt::Debug> std::fmt::Display for UnificationError<T> {
 
 impl<T: std::fmt::Debug> std::error::Error for UnificationError<T> {}
 
-pub(crate) fn typecheck(module: &FormatModule, f: &Format) -> TCResult<TypeChecker> {
+/// Perform a standalone type-inference on a format within a format-module, returning
+/// the inferred value-type, if one could be inferred.
+///
+/// Will return `Ok(None)` if there were no typechecking errors, but a concrete ValueType
+/// could not be inferred.
+///
+/// Will return `Err(_)` if any type-error is encountered.
+///
+/// Otherwise returns `Ok(Some(vt))` where `vt` is the inferred value-type of `f`
+pub fn typecheck(module: &FormatModule, f: &Format) -> TCResult<Option<ValueType>> {
     let mut tc = TypeChecker::new();
     let scope = UScope::new();
     let ctxt = Ctxt::new(module, &scope);
     let _ut = tc.infer_utype_format(f, ctxt)?;
     // FIXME - there should be a lot more that goes on under the covers here, especially since we want to detect errors
-    Ok(tc)
+    Ok(tc.reify(_ut))
 }
 
-pub(crate) type TCResult<T> = Result<T, TCError>;
+pub type TCResult<T> = Result<T, TCError>;
 
 mod __impls {
     use super::{ Constraint, ProjShape, UVar, VMId };
