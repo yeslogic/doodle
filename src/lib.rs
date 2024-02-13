@@ -932,19 +932,39 @@ impl FormatModule {
             }
             Format::Dynamic(name, dynformat, format) => {
                 match dynformat {
-                    DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
+                    DynFormat::Huffman(lengths_expr, opt_values_expr) => {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) => match &*t {
-                                ValueType::U8 | ValueType::U16 => {}
+                                ValueType::U8 => {}
                                 other => {
                                     return Err(format!(
-                                        "Huffman: expected U8 or U16, found {other:?}"
+                                        "Huffman: expected U8 for lengths_expr, found {other:?}"
                                     ))
                                 }
                             },
-                            other => return Err(format!("Huffman: expected Seq, found {other:?}")),
+                            other => {
+                                return Err(format!(
+                                    "Huffman: expected Seq(U8) for lengths_expr, found {other:?}"
+                                ))
+                            }
                         }
-                        // FIXME check opt_values_expr type
+                        if let Some(values_expr) = opt_values_expr {
+                            match values_expr.infer_type(scope)? {
+                                ValueType::Seq(t) => match &*t {
+                                    ValueType::U8 => {}
+                                    other => {
+                                        return Err(format!(
+                                            "Huffman: expected U8 for values_expr, found {other:?}"
+                                        ))
+                                    }
+                                },
+                                other => {
+                                    return Err(format!(
+                                    "Huffman: expected Seq(U8) for values_expr, found {other:?}"
+                                ))
+                                }
+                            }
+                        }
                     }
                 }
                 let mut child_scope = TypeScope::child(scope);
