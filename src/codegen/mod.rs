@@ -12,9 +12,9 @@ use std::rc::Rc;
 
 use rust_ast::{
     AtomType, CompType, Constructor, DefParams, FnSig, LocalType, MatchCaseLHS, Mut, Operator,
-    PrimType, RustControl, RustDecl, RustEntity, RustExpr, RustFn, RustImport, RustImportItems,
-    RustItem, RustLt, RustOp, RustParams, RustPattern, RustPrimLit, RustProgram, RustStmt,
-    RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
+    PrimType, ReturnKind, RustControl, RustDecl, RustEntity, RustExpr, RustFn, RustImport,
+    RustImportItems, RustItem, RustLt, RustOp, RustParams, RustPattern, RustPrimLit, RustProgram,
+    RustStmt, RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
 };
 
 #[repr(transparent)]
@@ -550,7 +550,7 @@ fn embed_expr(expr: &Expr) -> RustExpr {
                     (
                         // FIXME - add actual type_hint when possible
                         MatchCaseLHS::Pattern(embed_pattern(pat, None)),
-                        vec![RustStmt::Return(false, embed_expr(rhs))],
+                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
                     )
                 })
                 .collect(),
@@ -707,12 +707,15 @@ impl CaseLogic {
 impl SimpleLogic {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            SimpleLogic::Fail => (vec![RustStmt::Return(true, RustExpr::NONE)], None),
+            SimpleLogic::Fail => (
+                vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
+                None,
+            ),
             SimpleLogic::ExpectEnd => {
                 let call = RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte");
                 let cond = call.call_method("is_none");
-                let b_true = [RustStmt::Return(false, RustExpr::UNIT)];
-                let b_false = [RustStmt::Return(true, RustExpr::NONE)];
+                let b_true = [RustStmt::Return(ReturnKind::Implicit, RustExpr::UNIT)];
+                let b_false = [RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)];
                 (
                     Vec::new(),
                     Some(RustExpr::Control(Box::new(RustControl::If(
@@ -768,8 +771,8 @@ impl SimpleLogic {
                 let logic = if always_true {
                     RustExpr::local("b")
                 } else {
-                    let b_true = vec![RustStmt::Return(false, RustExpr::local("b"))];
-                    let b_false = vec![RustStmt::Return(true, RustExpr::local("None"))];
+                    let b_true = vec![RustStmt::Return(false.into(), RustExpr::local("b"))];
+                    let b_false = vec![RustStmt::Return(true.into(), RustExpr::local("None"))];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
                 ([b_let].to_vec(), Some(logic))
@@ -818,7 +821,7 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
     let body = stmts
         .into_iter()
         .chain(std::iter::once(RustStmt::Return(
-            false,
+            ReturnKind::Implicit,
             RustExpr::some(ret.unwrap()),
         )))
         .collect();
@@ -912,7 +915,7 @@ impl From<RustBlock> for RustExpr {
 fn implicate_return(value: RustBlock) -> Vec<RustStmt> {
     let (mut stmts, o_expr) = value;
     if let Some(expr) = o_expr {
-        stmts.push(RustStmt::Return(false, expr))
+        stmts.push(RustStmt::Return(ReturnKind::Implicit, expr))
     }
     stmts
 }
@@ -924,7 +927,10 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             if let Some(ix) = tree.accept {
                 return (Vec::new(), Some(RustExpr::num_lit(ix)));
             } else {
-                return (vec![RustStmt::Return(true, RustExpr::NONE)], None);
+                return (
+                    vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
+                    None,
+                );
             }
         }
 
@@ -945,9 +951,12 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 let b_true: Vec<RustStmt> = implicate_return(expand_matchtree(branch, ctxt));
                 let b_false = {
                     if let Some(ix) = tree.accept {
-                        vec![RustStmt::Return(false, RustExpr::num_lit(ix))]
+                        vec![RustStmt::Return(
+                            ReturnKind::Implicit,
+                            RustExpr::num_lit(ix),
+                        )]
                     } else {
-                        vec![RustStmt::Return(true, RustExpr::NONE)]
+                        vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)]
                     }
                 };
                 return (
