@@ -56,7 +56,7 @@ impl Pattern {
                 }
             }
             (Pattern::Variant(label, p), ValueType::Union(branches)) => {
-                if let Some((_l, t)) = branches.iter().find(|(l, _t)| label == l) {
+                if let Some(t) = branches.get(label) {
                     // FIXME - this is pretty bad, but it is hard to do better without more destructive changes
                     let tmp = Rc::new(t.clone());
                     p.build_scope(scope, tmp);

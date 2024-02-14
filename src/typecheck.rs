@@ -604,12 +604,10 @@ impl TypeChecker {
 
     fn reify_union(&self, vmid: VMId) -> Option<ValueType> {
         let vm = self.varmaps.get_varmap(vmid);
-        let mut branches = Vec::with_capacity(vm.len());
+        let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
-            branches.push((label.clone(), self.reify(ut.clone())?));
+            branches.insert(label.clone(), self.reify(ut.clone())?);
         }
-        // ensure branches are sorted lexically by label
-        branches.sort_by_key(|x| x.0.to_owned());
         Some(ValueType::Union(branches))
     }
 
@@ -742,31 +740,20 @@ impl TypeChecker {
         }
     }
 
-    fn unify_var_valuetype_union(
+    fn unify_var_valuetype_union<'a>(
         &mut self,
         var: UVar,
-        branches: &[(Label, ValueType)],
+        branches: impl IntoIterator<Item = (&'a Label, &'a ValueType)> + 'a,
     ) -> TCResult<()> {
-        for (lbl, branch_vt) in branches.iter() {
+        for (lbl, branch_vt) in branches.into_iter() {
             let ut = if let Some(ut) = UType::from_valuetype(branch_vt) {
                 Rc::new(ut)
             } else {
                 let branch_var = self.get_new_uvar();
-                self.unify_var_valuetype(branch_var, branch_vt)
-                    .map_err(|err| {
-                        eprintln!(
-                        "unify_var_valuetype_union({var}, {branches:?})@unify_var_valuetype: {err}"
-                    );
-                        err
-                    })?;
+                self.unify_var_valuetype(branch_var, branch_vt)?;
                 branch_var.into()
             };
-            self.add_uvar_variant(var, lbl.clone(), ut).map_err(|err| {
-                eprintln!(
-                    "unify_var_valuetype_union({var}, {branches:?})@unify_var_valuetype failed: {err}"
-                );
-                err
-            })?;
+            self.add_uvar_variant(var, lbl.clone(), ut)?;
         }
         Ok(())
     }
@@ -2043,7 +2030,6 @@ impl TypeChecker {
         }
         self.aliases[a1].add_forward_ref(a2);
         self.transfer_constraints(a1, a2)
-            .map_err(|tc_err| tc_err.with_trace((a1, a2)))
     }
 
     /// Rewrites the aliasing of `self` so that `lo<->hi` is enforced, without any other changes.
@@ -2385,8 +2371,12 @@ impl TypeChecker {
 
     /// Attempt to fully solve a `UType` until all free metavariables are replaced with concrete type-assignments
     ///
-    /// Returns None if at least one metavariable canoot be reduced without more information, or if any unification
+    /// Returns None if at least one metavariable cannot be reduced without more information, or if any unification
     /// is insoluble.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if [`UType::Hole`] is encountered, or if any `UVar` has an unresolved record- or tuple- `ProjShape` constraint.
     pub fn reify(&self, t: Rc<UType>) -> Option<ValueType> {
         match t.as_ref() {
             UType::Hole => {
@@ -2404,7 +2394,7 @@ impl TypeChecker {
                         },
                         VType::Abstract(ut) => self.reify(ut),
                         VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
-                        _ => unreachable!(
+                        VType::ImplicitRecord(..) | VType::ImplicitTuple(..) => unreachable!(
                             "Unsolved implicit Tuple or Record leftover from un-unified projection"
                         ),
                     },
@@ -2492,6 +2482,7 @@ impl From<TCErrorKind> for TCError {
 }
 
 impl TCError {
+    #[allow(dead_code)]
     fn with_trace<T>(mut self, trace: T) -> Self
     where
         T: std::fmt::Debug + Send + Sync + 'static,
@@ -2744,10 +2735,10 @@ mod tests {
         let oput = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = ValueType::Union(vec![
+        let expected = ValueType::Union(BTreeMap::from([
             ("A".into(), ValueType::Base(BaseType::U8)),
             ("B".into(), ValueType::Tuple(vec![])),
-        ]);
+        ]));
         assert_eq!(oput, expected);
         return Ok(());
     }
@@ -2828,10 +2819,10 @@ mod tests {
             ("number".into(), ValueType::Base(BaseType::U8)),
             (
                 "parity".into(),
-                ValueType::Union(vec![
+                ValueType::Union(BTreeMap::from([
                     ("Even".into(), ValueType::UNIT),
                     ("Odd".into(), ValueType::UNIT),
-                ]),
+                ])),
             ),
         ]);
         assert_eq!(oput, expected);
@@ -2864,7 +2855,7 @@ mod tests {
                                 Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0)),
                                 Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 1)),
                             ),
-                            Expr::Arith(
+                            Expr::Seq(vec![Expr::Arith(
                                 Arith::Add,
                                 Box::new(Expr::U32(1)),
                                 Box::new(Expr::Arith(
@@ -2878,7 +2869,7 @@ mod tests {
                                         1,
                                     )),
                                 )),
-                            ),
+                            )]),
                         ])),
                     )),
                     Box::new(Expr::U32(1)),
@@ -2891,12 +2882,11 @@ mod tests {
         // module.define_format("prod32", format.clone());
         let scope = UScope::new();
         let ut = tc.infer_utype_format(&format, Ctxt::new(&module, &scope))?;
-        println!("ut: {ut:?}");
-        println!("tc: {tc:?}");
+        let _trace = format!("ut: {ut:?}\ntc: {tc:?}");
         let oput = tc
             .reify(ut)
             .unwrap_or_else(|| panic!("reify returned None"));
-        let expected = ValueType::Base(BaseType::U32);
+        let expected = ValueType::Seq(Box::new(ValueType::Base(BaseType::U32)));
         assert_eq!(oput, expected);
         return Ok(());
     }

@@ -1,7 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
 
@@ -65,7 +65,7 @@ pub enum ValueType {
     Base(BaseType),
     Tuple(Vec<ValueType>),
     Record(Vec<(Label, ValueType)>),
-    Union(Vec<(Label, ValueType)>),
+    Union(BTreeMap<Label, ValueType>),
     Seq(Box<ValueType>),
 }
 
@@ -97,7 +97,7 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             Some(Expr::Record(xs))
         }
         ValueType::Union(branches) => {
-            let (lbl, branch) = &branches[0];
+            let (lbl, branch) = branches.first_key_value()?;
             Some(Expr::Variant(lbl.clone(), Box::new(mk_value_expr(branch)?)))
         }
         ValueType::Seq(t) => Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?])),
@@ -129,6 +129,11 @@ impl ValueType {
             ValueType::Tuple(ts) => ts.as_slice(),
             other => panic!("type is not a tuple: {other:?}"),
         }
+    }
+
+    pub fn is_equivalent(&self, other: &ValueType) -> Result<(), UnificationError<ValueType>> {
+        self.unify(other)?;
+        Ok(())
     }
 
     fn unify(&self, other: &ValueType) -> Result<ValueType, UnificationError<ValueType>> {
@@ -171,20 +176,26 @@ impl ValueType {
                 Ok(ValueType::Record(fs))
             }
             (ValueType::Union(bs1), ValueType::Union(bs2)) => {
-                let mut bs: Vec<(Label, ValueType)> = Vec::new();
-                for (label, t2) in bs2 {
-                    let t = if let Some((_l, t1)) = bs.iter().find(|(l, _)| label == l) {
-                        t1.unify(t2)?
-                    } else {
-                        t2.clone()
-                    };
-                    bs.push((label.clone(), t));
-                }
-                for (label, t1) in bs1 {
-                    if !bs.iter().any(|(l, _)| label == l) {
-                        bs.push((label.clone(), t1.clone()));
+                let mut bs: BTreeMap<Label, ValueType> = BTreeMap::new();
+
+                let keys1 = bs1.keys().collect::<HashSet<_>>();
+                let keys2 = bs2.keys().collect::<HashSet<_>>();
+
+                let keys_common = HashSet::union(&keys1, &keys2).cloned();
+
+                for key in keys_common.into_iter() {
+                    match (bs1.get(key), bs2.get(key)) {
+                        (Some(t1), Some(t2)) => {
+                            let t = t1.unify(t2)?;
+                            bs.insert(key.clone(), t);
+                        }
+                        (Some(t), None) | (None, Some(t)) => {
+                            bs.insert(key.clone(), t.clone());
+                        }
+                        (None, None) => unreachable!("key must appear in at least one operand"),
                     }
                 }
+
                 Ok(ValueType::Union(bs))
             }
             (ValueType::Seq(t1), ValueType::Seq(t2)) => Ok(ValueType::Seq(Box::new(t1.unify(t2)?))),
@@ -316,10 +327,10 @@ impl Expr {
             }
             // FIXME - TupleProj
             Expr::RecordProj(head, label) => Ok(head.infer_type(scope)?.record_proj(label)),
-            Expr::Variant(label, expr) => Ok(ValueType::Union(vec![(
+            Expr::Variant(label, expr) => Ok(ValueType::Union(BTreeMap::from([(
                 label.clone(),
                 expr.infer_type(scope)?,
-            )])),
+            )]))),
             Expr::Seq(exprs) => {
                 let mut t = ValueType::Any;
                 for e in exprs {
@@ -901,10 +912,10 @@ impl FormatModule {
             Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
             Format::Byte(_bs) => Ok(ValueType::Base(BaseType::U8)),
-            Format::Variant(label, f) => Ok(ValueType::Union(vec![(
+            Format::Variant(label, f) => Ok(ValueType::Union(BTreeMap::from([(
                 label.clone(),
                 self.infer_format_type(scope, f)?,
-            )])),
+            )]))),
             Format::Union(branches) | Format::UnionNondet(branches) => {
                 let mut t = ValueType::Any;
                 for f in branches {

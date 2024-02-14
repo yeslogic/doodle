@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
+use anyhow::{anyhow, Result as AResult};
 use std::fs;
 use std::path::PathBuf;
 
@@ -8,7 +9,7 @@ use clap::{Parser, ValueEnum};
 use doodle::decoder::Compiler;
 use doodle::read::ReadCtxt;
 use doodle::FormatModule;
-use doodle::{typecheck, TCError, TCResult};
+use doodle::typecheck;
 
 mod format;
 
@@ -95,33 +96,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         Command::TypeCheck => {
             let mut module = FormatModule::new();
             let _top_format = format::main(&mut module);
-            let errs = check_types(&module);
-            for (level, name, err) in errs {
-                eprintln!("Format {level} ('{name}') typecheck-error: {err}");
-            }
             Ok(check_all(&module)?)
         }
     }
 }
 
-fn check_types<'a>(module: &'a FormatModule) -> Vec<(usize, &'a str, TCError)> {
-    module
-        .iter_formats()
-        .filter_map(|(level, f)| match typecheck(module, &f) {
-            Err(e) => Some((level, module.get_name(level), e)),
-            Ok(_) => None,
-        })
-        .collect()
-}
-
-fn check_all<'a>(module: &'a FormatModule) -> TCResult<()> {
+fn check_all<'a>(module: &'a FormatModule) -> AResult<()> {
     for (level, f) in module.iter_formats() {
-        match typecheck(module, &f)? {
-            Some(_vt) => (),
-            None => eprintln!(
-                "format '{}': no inferred type, but no error",
-                module.get_name(level)
-            ),
+        match typecheck(module, &f).map_err(|err| anyhow!("{err}"))? {
+            Some(vt) => {
+                let mod_vt = module.get_format_type(level);
+                assert_eq!(&vt, mod_vt);
+            }
+            None => (),
         }
     }
     Ok(())
