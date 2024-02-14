@@ -2,8 +2,7 @@ mod rust_ast;
 
 use crate::byte_set::ByteSet;
 use crate::{
-    Arith, BaseType, Expr, Format, FormatModule, IntRel, Label, MatchTree,
-    Pattern, ValueType,
+    Arith, BaseType, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern, ValueType,
 };
 
 use crate::decoder::{Decoder, Program};
@@ -1583,7 +1582,10 @@ impl<'a> Generator<'a> {
 pub enum VTShadowTree {
     Tip,
     Leaf(Rc<ValueType>),
-    Node { node_type: Rc<ValueType>, children: Vec<VTShadowTree> },
+    Node {
+        node_type: Rc<ValueType>,
+        children: Vec<VTShadowTree>,
+    },
 }
 
 impl VTShadowTree {
@@ -1594,7 +1596,9 @@ impl VTShadowTree {
     pub fn node_type(&self) -> Rc<ValueType> {
         match self {
             VTShadowTree::Tip => Rc::new(ValueType::Empty),
-            VTShadowTree::Leaf(node_type) | VTShadowTree::Node { node_type, .. } => node_type.clone(),
+            VTShadowTree::Leaf(node_type) | VTShadowTree::Node { node_type, .. } => {
+                node_type.clone()
+            }
         }
     }
 }
