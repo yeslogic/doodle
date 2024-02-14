@@ -105,23 +105,23 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 }
 
 fn check_types<'a>(module: &'a FormatModule) -> Vec<(usize, &'a str, TCError)> {
-    module.iter_formats().filter_map(|(level, f)| {
-        match typecheck(module, &f) {
+    module
+        .iter_formats()
+        .filter_map(|(level, f)| match typecheck(module, &f) {
             Err(e) => Some((level, module.get_name(level), e)),
-            Ok(Some(vt)) => {
-                println!("format '{}': {vt:?}", module.get_name(level));
-                None
-            }
-            Ok(None) => None,
-        }
-    }).collect()
+            Ok(_) => None,
+        })
+        .collect()
 }
 
 fn check_all<'a>(module: &'a FormatModule) -> TCResult<()> {
     for (level, f) in module.iter_formats() {
         match typecheck(module, &f)? {
-            Some(vt) => (), //println!("format '{}': {vt:?}", module.get_name(level)),
-            None => eprintln!("format '{}': no inferred type, but no error", module.get_name(level)),
+            Some(_vt) => (),
+            None => eprintln!(
+                "format '{}': no inferred type, but no error",
+                module.get_name(level)
+            ),
         }
     }
     Ok(())

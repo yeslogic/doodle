@@ -97,11 +97,10 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             Some(Expr::Record(xs))
         }
         ValueType::Union(branches) => {
-            mk_value_expr(&branches[0].1)
+            let (lbl, branch) = &branches[0];
+            Some(Expr::Variant(lbl.clone(), Box::new(mk_value_expr(branch)?)))
         }
-        ValueType::Seq(t) => {
-            Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?]))
-        }
+        ValueType::Seq(t) => Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?])),
     }
 }
 
