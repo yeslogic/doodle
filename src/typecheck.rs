@@ -221,15 +221,6 @@ impl<'a> Ctxt<'a> {
         }
     }
 
-    fn shed_scope(&'a self) -> Ctxt<'a> {
-        let scope = match self.scope {
-            UScope::Empty => &UScope::Empty,
-            UScope::Multi(multi) => multi.parent,
-            UScope::Single(single) => single.parent,
-        };
-        self.with_scope(scope)
-    }
-
     fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
         Self {
             module,
