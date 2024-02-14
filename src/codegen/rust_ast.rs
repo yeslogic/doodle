@@ -1019,9 +1019,12 @@ impl ToFragmentExt for RustExpr {
             RustExpr::BorrowMut(expr) => Fragment::string("&mut ").cat(expr.to_fragment()),
             RustExpr::Try(expr) => expr.to_fragment().cat(Fragment::Char('?')),
             RustExpr::Operation(op) => op.to_fragment_precedence(prec),
-            RustExpr::BlockScope(stmts, val) => RustStmt::block(stmts.iter().chain(
-                std::iter::once(&RustStmt::Return(false, val.as_ref().clone())),
-            )),
+            RustExpr::BlockScope(stmts, val) => {
+                RustStmt::block(stmts.iter().chain(std::iter::once(&RustStmt::Return(
+                    ReturnKind::Implicit,
+                    val.as_ref().clone(),
+                ))))
+            }
             RustExpr::Control(ctrl) => ctrl.to_fragment(),
             RustExpr::Closure(lab, sig, body) => cond_paren(
                 (lab.to_fragment().intervene(
@@ -1049,7 +1052,33 @@ impl ToFragmentExt for RustExpr {
 
 impl ToFragment for RustExpr {
     fn to_fragment(&self) -> Fragment {
-        self.to_fragment_precedence(Precedence::ATOM)
+        self.to_fragment_precedence(Precedence::Top)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+pub(crate) enum ReturnKind {
+    #[default]
+    Implicit,
+    Keyword,
+}
+impl ReturnKind {
+    pub(crate) const fn is_keyword(&self) -> bool {
+        matches!(self, Self::Keyword)
+    }
+
+    pub(crate) const fn as_bool(&self) -> bool {
+        self.is_keyword()
+    }
+}
+
+impl From<bool> for ReturnKind {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Keyword
+        } else {
+            Self::Implicit
+        }
     }
 }
 
@@ -1058,7 +1087,7 @@ pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
     Reassign(Label, RustExpr),
     Expr(RustExpr),
-    Return(bool, RustExpr), // bool: true for explicit return, false for implicit return
+    Return(ReturnKind, RustExpr), // bool: true for explicit return, false for implicit return
     Control(RustControl),
 }
 
@@ -1208,8 +1237,8 @@ impl ToFragment for RustStmt {
                 .cat(expr.to_fragment())
                 .cat(Fragment::Char(';')),
             Self::Expr(expr) => expr.to_fragment().cat(Fragment::Char(';')),
-            Self::Return(is_keyword, expr) => {
-                let (before, after) = if *is_keyword {
+            Self::Return(kind, expr) => {
+                let (before, after) = if kind.is_keyword() {
                     (Fragment::String("return ".into()), Fragment::Char(';'))
                 } else {
                     (Fragment::Empty, Fragment::Empty)
