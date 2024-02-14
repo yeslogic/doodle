@@ -1,5 +1,7 @@
 use crate::format::BaseModule;
 use doodle::helper::*;
+use std::collections::BTreeMap;
+
 use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, BaseType, ValueType};
 
 fn tuple_proj(x: Expr, i: usize) -> Expr {
@@ -549,10 +551,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                     ),
                                     variant("none", Expr::UNIT),
-                                    ValueType::Union(vec![
+                                    ValueType::Union(BTreeMap::from([
                                         ("none".into(), ValueType::Tuple(vec![])),
                                         ("some".into(), ValueType::Base(BaseType::U8)),
-                                    ]),
+                                    ])),
                                     var("y"),
                                 )),
                                 add(as_u32(add(var("hlit"), var("hdist"))), Expr::U32(258)),
@@ -640,10 +642,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     ),
                     variant("none", Expr::UNIT),
-                    ValueType::Union(vec![
+                    ValueType::Union(BTreeMap::from([
                         ("none".into(), ValueType::Tuple(vec![])),
                         ("some".into(), ValueType::Base(BaseType::U8)),
-                    ]),
+                    ])),
                     var("literal-length-distance-alphabet-code-lengths"),
                 )),
             ),
