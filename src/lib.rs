@@ -16,6 +16,7 @@ pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
 pub mod error;
+pub mod helper;
 
 pub mod output;
 pub mod prelude;
@@ -614,24 +615,6 @@ pub enum Format {
 impl Format {
     pub const EMPTY: Format = Format::Tuple(Vec::new());
 
-    pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::Union(
-            (fields.into_iter())
-                .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
-                .collect(),
-        )
-    }
-
-    pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::Record(
-            (fields.into_iter())
-                .map(|(label, format)| (label.into(), format))
-                .collect(),
-        )
-    }
-}
-
-impl Format {
     /// Conservative bounds for number of bytes matched by a format
     fn match_bounds(&self, module: &FormatModule) -> Bounds {
         match self {

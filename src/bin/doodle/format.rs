@@ -1,6 +1,6 @@
+use crate::format::base::BaseModule;
+use doodle::helper::*;
 use doodle::{Format, FormatModule, FormatRef};
-
-use crate::format::base::*;
 
 mod base;
 
