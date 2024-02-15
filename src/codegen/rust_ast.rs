@@ -527,6 +527,19 @@ pub(crate) enum PrimType {
     Usize,
 }
 
+impl From<BaseType> for PrimType {
+    fn from(value: BaseType) -> Self {
+        match value {
+            BaseType::Bool => PrimType::Bool,
+            BaseType::U8 => PrimType::U8,
+            BaseType::U16 => PrimType::U16,
+            BaseType::U32 => PrimType::U32,
+            BaseType::Char => PrimType::Char,
+        }
+    }
+}
+
+
 impl ToFragment for PrimType {
     fn to_fragment(&self) -> Fragment {
         Fragment::string(match self {

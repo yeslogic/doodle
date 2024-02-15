@@ -1457,7 +1457,7 @@ impl<'a> MatchTreeLevel<'a> {
             Some(tree)
         } else if depth > 0 {
             let mut tree = Self::reject();
-            let mut tmp = Vec::from_iter(nexts.into_iter());
+            let mut tmp = Vec::from_iter(nexts);
             tmp.sort_by_key(|(ix, _)| *ix);
             for (i, next) in tmp.into_iter() {
                 let subtree = MatchTreeStep::from_next(module, next);

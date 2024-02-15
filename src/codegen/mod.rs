@@ -1,60 +1,34 @@
 mod rust_ast;
+mod typed_format;
 
-use crate::byte_set::ByteSet;
 use crate::{
-    Arith, BaseType, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern, ValueType,
+    byte_set::ByteSet,
+    decoder::{ Compiler, Decoder, Program },
+    typecheck::{ Ctxt, TypeChecker, UScope, UType, UVar },
+    Arith,
+    BaseType,
+    Expr,
+    Format,
+    FormatModule,
+    IntRel,
+    Label,
+    MatchTree,
+    Pattern,
+    ValueType,
 };
 
-use crate::decoder::{Decoder, Program};
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{ collections::{ HashMap, HashSet }, rc::Rc };
 
-use rust_ast::{
-    AtomType, CompType, Constructor, DefParams, FnSig, LocalType, MatchCaseLHS, Mut, Operator,
-    PrimType, ReturnKind, RustControl, RustDecl, RustEntity, RustExpr, RustFn, RustImport,
-    RustImportItems, RustItem, RustLt, RustOp, RustParams, RustPattern, RustPrimLit, RustProgram,
-    RustStmt, RustStruct, RustType, RustTypeDef, RustVariant, ToFragment,
-};
+use rust_ast::*;
 
+/// Simple type for ad-hoc names using a counter value
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
-/// Simple type for ad-hoc names using a counter value
 struct IxLabel(usize);
 
 impl IxLabel {
     fn to_usize(self) -> usize {
         self.0
-    }
-}
-
-impl From<usize> for IxLabel {
-    fn from(value: usize) -> Self {
-        Self(value)
-    }
-}
-
-impl From<IxLabel> for Label {
-    fn from(value: IxLabel) -> Self {
-        Cow::Owned(format!("Type{}", value.0))
-    }
-}
-
-impl From<&IxLabel> for Label {
-    fn from(value: &IxLabel) -> Self {
-        Cow::Owned(format!("Type{}", value.0))
-    }
-}
-
-impl AsRef<usize> for IxLabel {
-    fn as_ref(&self) -> &usize {
-        &self.0
-    }
-}
-
-impl std::borrow::Borrow<usize> for IxLabel {
-    fn borrow(&self) -> &usize {
-        &self.0
     }
 }
 
@@ -122,7 +96,7 @@ impl Codegen {
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.iter() {
-                    buf.push(self.lift_type(v))
+                    buf.push(self.lift_type(v));
                 }
                 RustType::AnonTuple(buf)
             }
@@ -220,45 +194,71 @@ impl Codegen {
                             Some(RustVariant::Unit(_)) => {
                                 // FIXME - this is not quite correct, as it calls `Var(inner)` where `inner = ()` instead of `Var`
                                 let inner = self.translate(inner, Some(&RustType::UNIT));
-                                CaseLogic::Derived(DerivedLogic::UnitVariantOf(constr, Box::new(inner)))
+                                CaseLogic::Derived(
+                                    DerivedLogic::UnitVariantOf(constr, Box::new(inner))
+                                )
                             }
                             Some(RustVariant::Tuple(_, typs)) => {
                                 if typs.is_empty() {
-                                    unreachable!("unexpected Tuple-Variant with 0 positional arguments");
+                                    unreachable!(
+                                        "unexpected Tuple-Variant with 0 positional arguments"
+                                    );
                                 }
-                                    match inner.as_ref() {
-                                        Decoder::Tuple(decs) => {
-                                            if decs.len() != typs.len() {
-                                                if typs.len() == 1 {
-                                                    // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
-                                                    match &typs[0] {
-                                                        tt @ RustType::AnonTuple(..) => {
-                                                            let cl_mono_tuple = self.translate(inner, Some(tt));
-                                                            CaseLogic::Derived(DerivedLogic::VariantOf(constr, Box::new(cl_mono_tuple)))
-                                                        }
-                                                        other => panic!("unable to translate Decoder::Tuple with hint ({other:?}) implied by {tname}::{vname}"),
+                                match inner.as_ref() {
+                                    Decoder::Tuple(decs) => {
+                                        if decs.len() != typs.len() {
+                                            if typs.len() == 1 {
+                                                // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
+                                                match &typs[0] {
+                                                    tt @ RustType::AnonTuple(..) => {
+                                                        let cl_mono_tuple = self.translate(
+                                                            inner,
+                                                            Some(tt)
+                                                        );
+                                                        CaseLogic::Derived(
+                                                            DerivedLogic::VariantOf(
+                                                                constr,
+                                                                Box::new(cl_mono_tuple)
+                                                            )
+                                                        )
                                                     }
-                                                } else {
-                                                    unreachable!("mismatched arity between decoder (== {}) and variant {tname}::{vname} (== {})", decs.len(), typs.len());
+                                                    other =>
+                                                        panic!(
+                                                            "unable to translate Decoder::Tuple with hint ({other:?}) implied by {tname}::{vname}"
+                                                        ),
                                                 }
                                             } else {
-                                                let mut cl_args = Vec::new();
-                                                for (dec, typ) in decs.iter().zip(typs.iter()) {
-                                                    let cl_arg = self.translate(dec, Some(typ));
-                                                    cl_args.push(cl_arg);
-                                                }
-                                                CaseLogic::Sequential(SequentialLogic::AccumTuple { constructor: Some(constr), elements: cl_args })
+                                                unreachable!(
+                                                    "mismatched arity between decoder (== {}) and variant {tname}::{vname} (== {})",
+                                                    decs.len(),
+                                                    typs.len()
+                                                );
                                             }
-                                        }
-                                        _ => {
-                                            if typs.len() == 1  {
-                                                let cl_mono = self.translate(inner, Some(&typs[0]));
-                                                CaseLogic::Derived(DerivedLogic::VariantOf(constr, Box::new(cl_mono)))
-                                            } else {
-                                                panic!("Variant {tname}::{vname}({typs:#?}) mismatches non-tuple Decoder {inner:?}");
+                                        } else {
+                                            let mut cl_args = Vec::new();
+                                            for (dec, typ) in decs.iter().zip(typs.iter()) {
+                                                let cl_arg = self.translate(dec, Some(typ));
+                                                cl_args.push(cl_arg);
                                             }
+                                            CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                                                constructor: Some(constr),
+                                                elements: cl_args,
+                                            })
                                         }
                                     }
+                                    _ => {
+                                        if typs.len() == 1 {
+                                            let cl_mono = self.translate(inner, Some(&typs[0]));
+                                            CaseLogic::Derived(
+                                                DerivedLogic::VariantOf(constr, Box::new(cl_mono))
+                                            )
+                                        } else {
+                                            panic!(
+                                                "Variant {tname}::{vname}({typs:#?}) mismatches non-tuple Decoder {inner:?}"
+                                            );
+                                        }
+                                    }
+                                }
                             }
                             Some(RustVariant::Record(_, fields)) => {
                                 match inner.as_ref() {
@@ -266,15 +266,29 @@ impl Codegen {
                                         let mut assocs = Vec::new();
                                         for (i, (l0, d)) in inner_fields.iter().enumerate() {
                                             let (l1, t) = &fields[i];
-                                            assert_eq!(l0.as_ref(), l1.as_ref(), "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})");
+                                            assert_eq!(
+                                                l0.as_ref(),
+                                                l1.as_ref(),
+                                                "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
+                                            );
                                             assocs.push((l0.clone(), self.translate(d, Some(t))));
                                         }
-                                        CaseLogic::Sequential(SequentialLogic::AccumRecord { constructor: constr, fields: assocs })
+                                        CaseLogic::Sequential(SequentialLogic::AccumRecord {
+                                            constructor: constr,
+                                            fields: assocs,
+                                        })
                                     }
-                                    _ => unreachable!("Variant {tname}::{vname} expects record ({fields:#?}) but found {:?}", inner),
+                                    _ =>
+                                        unreachable!(
+                                            "Variant {tname}::{vname} expects record ({fields:#?}) but found {:?}",
+                                            inner
+                                        ),
                                 }
                             }
-                            None => unreachable!("VariantOf called for nonexistent variant `{vname}` of enum-type `{tname}`"),
+                            None =>
+                                unreachable!(
+                                    "VariantOf called for nonexistent variant `{vname}` of enum-type `{tname}`"
+                                ),
                         }
                     }
                     RustTypeDef::Struct(_) => {
@@ -282,157 +296,199 @@ impl Codegen {
                     }
                 }
             }
-            Decoder::Parallel(alts) => CaseLogic::Parallel(ParallelLogic::Alts(
-                alts.iter()
-                    .map(|alt| self.translate(alt, type_hint))
-                    .collect(),
-            )),
-            Decoder::Branch(tree, flat) => CaseLogic::Other(OtherLogic::Descend(
-                tree.clone(),
-                flat.iter()
-                    .map(|alt| self.translate(alt, type_hint))
-                    .collect(),
-            )),
-            Decoder::Tuple(elts) => match type_hint {
-                None => CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                    constructor: None,
-                    elements: elts.iter().map(|elt| self.translate(elt, None)).collect(),
-                }),
-                Some(RustType::AnonTuple(tys)) => {
-                    CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                        constructor: None,
-                        elements: elts
+            Decoder::Parallel(alts) =>
+                CaseLogic::Parallel(
+                    ParallelLogic::Alts(
+                        alts
                             .iter()
-                            .zip(tys)
-                            .map(|(elt, ty)| self.translate(elt, Some(ty)))
-                            .collect(),
-                    })
-                }
-                Some(RustType::Atom(AtomType::Prim(PrimType::Unit))) if elts.is_empty() => {
-                    CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
-                }
-                Some(other) => unreachable!(
-                    "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
-                    other
+                            .map(|alt| self.translate(alt, type_hint))
+                            .collect()
+                    )
                 ),
-            },
+            Decoder::Branch(tree, flat) =>
+                CaseLogic::Other(
+                    OtherLogic::Descend(
+                        tree.clone(),
+                        flat
+                            .iter()
+                            .map(|alt| self.translate(alt, type_hint))
+                            .collect()
+                    )
+                ),
+            Decoder::Tuple(elts) =>
+                match type_hint {
+                    None =>
+                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                            constructor: None,
+                            elements: elts
+                                .iter()
+                                .map(|elt| self.translate(elt, None))
+                                .collect(),
+                        }),
+                    Some(RustType::AnonTuple(tys)) => {
+                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                            constructor: None,
+                            elements: elts
+                                .iter()
+                                .zip(tys)
+                                .map(|(elt, ty)| self.translate(elt, Some(ty)))
+                                .collect(),
+                        })
+                    }
+                    Some(RustType::Atom(AtomType::Prim(PrimType::Unit))) if elts.is_empty() => {
+                        CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
+                    }
+                    Some(other) =>
+                        unreachable!(
+                            "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
+                            other
+                        ),
+                }
             Decoder::Record(flds) => {
                 match type_hint {
                     Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
                         let tdef = &self.defined_types[*ix];
                         let tfields = match tdef {
                             RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
-                            _ => unreachable!("unexpected non-Struct::Record definition for type `{lab}`: {tdef:?}"),
+                            _ =>
+                                unreachable!(
+                                    "unexpected non-Struct::Record definition for type `{lab}`: {tdef:?}"
+                                ),
                         };
                         // FIXME - for now we rely on a consistent order of field names between the decoder and type definition
                         let mut assocs = Vec::new();
                         for (i, (l0, d)) in flds.iter().enumerate() {
                             let (l1, t) = &tfields[i];
-                            assert_eq!(l0.as_ref(), l1.as_ref(), "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})");
+                            assert_eq!(
+                                l0.as_ref(),
+                                l1.as_ref(),
+                                "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
+                            );
                             assocs.push((l0.clone(), self.translate(d, Some(t))));
                         }
-                        CaseLogic::Sequential(SequentialLogic::AccumRecord { constructor: Constructor::Simple(lab.clone()), fields: assocs })
+                        CaseLogic::Sequential(SequentialLogic::AccumRecord {
+                            constructor: Constructor::Simple(lab.clone()),
+                            fields: assocs,
+                        })
                     }
 
-                    None => unreachable!("Cannot generate CaseLogic for a Record without a definite type-name"),
-                    Some(other) => unreachable!("Decoder::Record expected to have type RustType::Atom(AtomType::TypeRef(..)), found {:?}", other),
+                    None =>
+                        unreachable!(
+                            "Cannot generate CaseLogic for a Record without a definite type-name"
+                        ),
+                    Some(other) =>
+                        unreachable!(
+                            "Decoder::Record expected to have type RustType::Atom(AtomType::TypeRef(..)), found {:?}",
+                            other
+                        ),
                 }
             }
-            Decoder::While(tree_continue, single) => match type_hint {
-                Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                    let cl_single = self.translate(single, Some(t.as_ref()));
-                    CaseLogic::Repeat(RepeatLogic::ContinueOnMatch(
-                        tree_continue.clone(),
-                        Box::new(cl_single),
-                    ))
+            Decoder::While(tree_continue, single) =>
+                match type_hint {
+                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
+                        let cl_single = self.translate(single, Some(t.as_ref()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ContinueOnMatch(tree_continue.clone(), Box::new(cl_single))
+                        )
+                    }
+                    Some(other) => {
+                        unreachable!("Hint for Decoder::While should be Vec<_>, found {other:?}")
+                    }
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ContinueOnMatch(tree_continue.clone(), Box::new(cl_single))
+                        )
+                    }
                 }
-                Some(other) => {
-                    unreachable!("Hint for Decoder::While should be Vec<_>, found {other:?}")
+            Decoder::Until(tree_break, single) =>
+                match type_hint {
+                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
+                        let cl_single = self.translate(single, Some(t.as_ref()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(cl_single))
+                        )
+                    }
+                    Some(other) => {
+                        unreachable!("Hint for Decoder::Until should be Vec<_>, found {other:?}")
+                    }
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(cl_single))
+                        )
+                    }
                 }
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ContinueOnMatch(
-                        tree_continue.clone(),
-                        Box::new(cl_single),
-                    ))
+            Decoder::RepeatCount(expr_count, single) =>
+                match type_hint {
+                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
+                        let cl_single = self.translate(single, Some(t.as_ref()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ExactCount(embed_expr(expr_count), Box::new(cl_single))
+                        )
+                    }
+                    Some(other) => {
+                        unreachable!(
+                            "Hint for Decoder::RepeatCount should be Vec<_>, found {other:?}"
+                        )
+                    }
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ExactCount(embed_expr(expr_count), Box::new(cl_single))
+                        )
+                    }
                 }
-            },
-            Decoder::Until(tree_break, single) => match type_hint {
-                Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                    let cl_single = self.translate(single, Some(t.as_ref()));
-                    CaseLogic::Repeat(RepeatLogic::BreakOnMatch(
-                        tree_break.clone(),
-                        Box::new(cl_single),
-                    ))
+            Decoder::RepeatUntilLast(pred_terminal, single) =>
+                match type_hint {
+                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
+                        let cl_single = self.translate(single, Some(t.as_ref()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionTerminal(
+                                embed_expr(pred_terminal),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
+                    Some(other) =>
+                        unreachable!(
+                            "Hint for Decoder::RepeatUntilLast should be Vec<_>, found {other:?}"
+                        ),
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionTerminal(
+                                embed_expr(pred_terminal),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
                 }
-                Some(other) => {
-                    unreachable!("Hint for Decoder::Until should be Vec<_>, found {other:?}")
+            Decoder::RepeatUntilSeq(pred_complete, single) =>
+                match type_hint {
+                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
+                        let cl_single = self.translate(single, Some(t.as_ref()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionComplete(
+                                embed_expr(pred_complete),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
+                    Some(other) =>
+                        unreachable!(
+                            "Hint for Decoder::RepeatUntilSeq should be Vec<_>, found {other:?}"
+                        ),
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionComplete(
+                                embed_expr(pred_complete),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
                 }
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::BreakOnMatch(
-                        tree_break.clone(),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
-            Decoder::RepeatCount(expr_count, single) => match type_hint {
-                Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                    let cl_single = self.translate(single, Some(t.as_ref()));
-                    CaseLogic::Repeat(RepeatLogic::ExactCount(
-                        embed_expr(expr_count),
-                        Box::new(cl_single),
-                    ))
-                }
-                Some(other) => {
-                    unreachable!("Hint for Decoder::RepeatCount should be Vec<_>, found {other:?}")
-                }
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ExactCount(
-                        embed_expr(expr_count),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
-            Decoder::RepeatUntilLast(pred_terminal, single) => match type_hint {
-                Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                    let cl_single = self.translate(single, Some(t.as_ref()));
-                    CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
-                        embed_expr(pred_terminal),
-                        Box::new(cl_single),
-                    ))
-                }
-                Some(other) => unreachable!(
-                    "Hint for Decoder::RepeatUntilLast should be Vec<_>, found {other:?}"
-                ),
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
-                        embed_expr(pred_terminal),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
-            Decoder::RepeatUntilSeq(pred_complete, single) => match type_hint {
-                Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                    let cl_single = self.translate(single, Some(t.as_ref()));
-                    CaseLogic::Repeat(RepeatLogic::ConditionComplete(
-                        embed_expr(pred_complete),
-                        Box::new(cl_single),
-                    ))
-                }
-                Some(other) => unreachable!(
-                    "Hint for Decoder::RepeatUntilSeq should be Vec<_>, found {other:?}"
-                ),
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ConditionComplete(
-                        embed_expr(pred_complete),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
             // FIXME - implement CaseLogic variants and translation rules for the remaining cases
             Decoder::Map(inner, f) => {
                 // FIXME - we have no way of inferring a proper type-hint for inner
@@ -442,11 +498,9 @@ impl Codegen {
             Decoder::Compute(expr) => CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr))),
             Decoder::Let(name, expr, inner) => {
                 let cl_inner = self.translate(inner, type_hint);
-                CaseLogic::Derived(DerivedLogic::Let(
-                    name.clone(),
-                    embed_expr(expr),
-                    Box::new(cl_inner),
-                ))
+                CaseLogic::Derived(
+                    DerivedLogic::Let(name.clone(), embed_expr(expr), Box::new(cl_inner))
+                )
             }
             Decoder::Match(scrutinee, cases) => {
                 let mut cl_cases = Vec::new();
@@ -494,10 +548,20 @@ fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
         Pattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
         Pattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::Char(*c)),
         Pattern::Tuple(pats) => {
-            RustPattern::TupleLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
+            RustPattern::TupleLiteral(
+                pats
+                    .iter()
+                    .map(|x| embed_pattern(x, None))
+                    .collect()
+            )
         }
         Pattern::Seq(pats) => {
-            RustPattern::ArrayLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
+            RustPattern::ArrayLiteral(
+                pats
+                    .iter()
+                    .map(|x| embed_pattern(x, None))
+                    .collect()
+            )
         }
         Pattern::Variant(vname, pat) => {
             let constr = match type_hint {
@@ -529,32 +593,39 @@ fn embed_expr(expr: &Expr) -> RustExpr {
         Expr::TupleProj(expr_tup, ix) => embed_expr(expr_tup).nth(*ix),
         Expr::Record(_fields) => unreachable!("Record not bound in Variant"),
         Expr::RecordProj(expr_rec, fld) => embed_expr(expr_rec).field(fld.clone()),
-        Expr::Variant(vname, inner) => match inner.as_ref() {
-            Expr::Record(fields) => RustExpr::Struct(
-                RustEntity::Local(vname.clone()),
-                fields
-                    .iter()
-                    .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr(fval)))))
-                    .collect(),
-            ),
-            _ => RustExpr::local(vname.clone()).call_with([embed_expr(inner)]),
-        },
+        Expr::Variant(vname, inner) =>
+            match inner.as_ref() {
+                Expr::Record(fields) =>
+                    RustExpr::Struct(
+                        RustEntity::Local(vname.clone()),
+                        fields
+                            .iter()
+                            .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr(fval)))))
+                            .collect()
+                    ),
+                _ => RustExpr::local(vname.clone()).call_with([embed_expr(inner)]),
+            }
         Expr::Seq(elts) => {
             RustExpr::ArrayLit(elts.iter().map(embed_expr).collect()).call_method("to_vec")
         }
-        Expr::Match(scrutinee, cases) => RustExpr::Control(Box::new(RustControl::Match(
-            embed_expr(scrutinee),
-            cases
-                .iter()
-                .map(|(pat, rhs)| {
-                    (
-                        // FIXME - add actual type_hint when possible
-                        MatchCaseLHS::Pattern(embed_pattern(pat, None)),
-                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
+        Expr::Match(scrutinee, cases) =>
+            RustExpr::Control(
+                Box::new(
+                    RustControl::Match(
+                        embed_expr(scrutinee),
+                        cases
+                            .iter()
+                            .map(|(pat, rhs)| {
+                                (
+                                    // FIXME - add actual type_hint when possible
+                                    MatchCaseLHS::Pattern(embed_pattern(pat, None)),
+                                    vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
+                                )
+                            })
+                            .collect()
                     )
-                })
-                .collect(),
-        ))),
+                )
+            ),
         // FIXME - we probably need to apply precedence rules similar to tree-output, which will require a lot of refactoring in AST
         Expr::Arith(Arith::BitAnd, lhs, rhs) => {
             RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs))
@@ -633,38 +704,41 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             let end_expr = RustExpr::infix(RustExpr::local("ix"), Operator::Add, embed_expr(len));
             RustExpr::BlockScope(
                 vec![bind_ix],
-                Box::new(RustExpr::Slice(
-                    Box::new(embed_expr(seq)),
-                    Box::new(RustExpr::local("ix")),
-                    Box::new(end_expr),
-                )),
+                Box::new(
+                    RustExpr::Slice(
+                        Box::new(embed_expr(seq)),
+                        Box::new(RustExpr::local("ix")),
+                        Box::new(end_expr)
+                    )
+                )
             )
         }
-        Expr::FlatMap(f, seq) => embed_expr(seq)
-            .call_method("into_iter")
-            .call_method_with("flat_map", [embed_expr(f)])
-            .call_method("collect"),
-        Expr::FlatMapAccum(f, acc_init, _acc_type, seq) => embed_expr(seq)
-            .call_method("into_iter")
-            .call_method_with("fold", [embed_expr(acc_init), embed_expr(f)])
-            .call_method("collect"),
-        Expr::Dup(n, expr) => RustExpr::scoped(["Vec"], "from_iter").call_with([RustExpr::scoped(
-            ["std", "iter"],
-            "repeat",
-        )
-        .call_with([embed_expr(expr)])
-        .call_method_with("take", [embed_expr(n)])]),
+        Expr::FlatMap(f, seq) =>
+            embed_expr(seq)
+                .call_method("into_iter")
+                .call_method_with("flat_map", [embed_expr(f)])
+                .call_method("collect"),
+        Expr::FlatMapAccum(f, acc_init, _acc_type, seq) =>
+            embed_expr(seq)
+                .call_method("into_iter")
+                .call_method_with("fold", [embed_expr(acc_init), embed_expr(f)])
+                .call_method("collect"),
+        Expr::Dup(n, expr) =>
+            RustExpr::scoped(["Vec"], "from_iter").call_with([
+                RustExpr::scoped(["std", "iter"], "repeat")
+                    .call_with([embed_expr(expr)])
+                    .call_method_with("take", [embed_expr(n)]),
+            ]),
         Expr::Inflate(_) => {
             // FIXME - not clear what the proper thing to do here is
-            RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(
-                "embed_expr is not implemented for Expr::Inflate",
-            )])
+            RustExpr::local("unimplemented!").call_with([
+                RustExpr::str_lit("embed_expr is not implemented for Expr::Inflate"),
+            ])
         }
-        Expr::Lambda(head, body) => RustExpr::Paren(Box::new(RustExpr::Closure(
-            head.clone(),
-            None,
-            Box::new(embed_expr(body)),
-        ))),
+        Expr::Lambda(head, body) =>
+            RustExpr::Paren(
+                Box::new(RustExpr::Closure(head.clone(), None, Box::new(embed_expr(body))))
+            ),
     }
 }
 
@@ -696,10 +770,15 @@ impl CaseLogic {
             CaseLogic::Repeat(r) => r.to_ast(ctxt),
             CaseLogic::Parallel(p) => p.to_ast(ctxt),
             CaseLogic::Other(o) => o.to_ast(ctxt),
-            CaseLogic::Unhandled(msg) => (
-                Vec::new(),
-                Some(RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(msg.clone())])),
-            ),
+            CaseLogic::Unhandled(msg) =>
+                (
+                    Vec::new(),
+                    Some(
+                        RustExpr::local("unimplemented!").call_with([
+                            RustExpr::str_lit(msg.clone()),
+                        ])
+                    ),
+                ),
         }
     }
 }
@@ -707,10 +786,8 @@ impl CaseLogic {
 impl SimpleLogic {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            SimpleLogic::Fail => (
-                vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
-                None,
-            ),
+            SimpleLogic::Fail =>
+                (vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)], None),
             SimpleLogic::ExpectEnd => {
                 let call = RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte");
                 let cond = call.call_method("is_none");
@@ -718,11 +795,11 @@ impl SimpleLogic {
                 let b_false = [RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)];
                 (
                     Vec::new(),
-                    Some(RustExpr::Control(Box::new(RustControl::If(
-                        cond,
-                        b_true.to_vec(),
-                        Some(b_false.to_vec()),
-                    )))),
+                    Some(
+                        RustExpr::Control(
+                            Box::new(RustControl::If(cond, b_true.to_vec(), Some(b_false.to_vec())))
+                        )
+                    ),
                 )
             }
             // FIXME - not sure what should be done with _args
@@ -742,37 +819,37 @@ impl SimpleLogic {
                     RustExpr::infix(
                         RustExpr::local("input").call_method("offset"),
                         Operator::Rem,
-                        RustExpr::num_lit(*n),
+                        RustExpr::num_lit(*n)
                     ),
                     Operator::Neq,
-                    RustExpr::num_lit(0usize),
+                    RustExpr::num_lit(0usize)
                 );
                 let body = {
                     let let_tmp = RustStmt::assign(
                         "_",
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("read_byte")
-                            .wrap_try(),
+                            .wrap_try()
                     );
                     vec![let_tmp]
                 };
-                (
-                    vec![RustStmt::Control(RustControl::While(cond, body))],
-                    Some(RustExpr::UNIT),
-                )
+                (vec![RustStmt::Control(RustControl::While(cond, body))], Some(RustExpr::UNIT))
             }
             SimpleLogic::ByteIn(bs) => {
                 let call = RustExpr::local(ctxt.input_varname.clone())
                     .call_method("read_byte")
                     .wrap_try();
                 let b_let = RustStmt::assign("b", call);
-                let (cond, always_true) =
-                    ByteCriterion::from(bs).as_predicate(RustExpr::local("b"));
+                let (cond, always_true) = ByteCriterion::from(bs).as_predicate(
+                    RustExpr::local("b")
+                );
                 let logic = if always_true {
                     RustExpr::local("b")
                 } else {
-                    let b_true = vec![RustStmt::Return(false.into(), RustExpr::local("b"))];
-                    let b_false = vec![RustStmt::Return(true.into(), RustExpr::local("None"))];
+                    let b_true = vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::local("b"))];
+                    let b_false = vec![
+                        RustStmt::Return(ReturnKind::Keyword, RustExpr::local("None"))
+                    ];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
                 ([b_let].to_vec(), Some(logic))
@@ -804,7 +881,7 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
                     RustType::borrow_of(
                         None,
                         Mut::Mutable,
-                        RustType::verbatim("ParseCtxt", Some(params)),
+                        RustType::verbatim("ParseCtxt", Some(params))
                     )
                 };
                 (name, ty)
@@ -820,10 +897,9 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
     let (stmts, ret) = logic.to_ast(ctxt);
     let body = stmts
         .into_iter()
-        .chain(std::iter::once(RustStmt::Return(
-            ReturnKind::Implicit,
-            RustExpr::some(ret.unwrap()),
-        )))
+        .chain(
+            std::iter::once(RustStmt::Return(ReturnKind::Implicit, RustExpr::some(ret.unwrap())))
+        )
         .collect();
     RustFn::new(name, Some(params), sig, body)
 }
@@ -831,8 +907,8 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 enum ByteCriterion {
     Any,
-    MustBe(u8),         // singleton
-    OtherThan(u8),      // negated singleton
+    MustBe(u8), // singleton
+    OtherThan(u8), // negated singleton
     WithinSet(ByteSet), // use embed_byteset to bridge to RustExpr
 }
 
@@ -866,14 +942,10 @@ impl ByteCriterion {
     fn as_predicate(&self, arg: RustExpr) -> (RustExpr, bool) {
         match self {
             ByteCriterion::Any => (RustExpr::TRUE, true),
-            ByteCriterion::MustBe(byte) => (
-                RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))),
-                false,
-            ),
-            ByteCriterion::OtherThan(byte) => (
-                RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))),
-                false,
-            ),
+            ByteCriterion::MustBe(byte) =>
+                (RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))), false),
+            ByteCriterion::OtherThan(byte) =>
+                (RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))), false),
             ByteCriterion::WithinSet(bs) => {
                 (embed_byteset(bs).call_method_with("contains", [arg]), false)
             }
@@ -885,18 +957,20 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
     if bs.is_full() {
         RustExpr::scoped(["ByteSet"], "full").call()
     } else if bs.len() == 1 {
-        let Some(elt) = bs.min_elem() else {
-            unreachable!("len == 1 but no min_elem")
-        };
+        let Some(elt) = bs.min_elem() else { unreachable!("len == 1 but no min_elem") };
         RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::num_lit(elt)])
     } else {
         let [q0, q1, q2, q3] = bs.to_bits();
-        RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
-            RustExpr::num_lit(q0 as usize),
-            RustExpr::num_lit(q1 as usize),
-            RustExpr::num_lit(q2 as usize),
-            RustExpr::num_lit(q3 as usize),
-        ])])
+        RustExpr::scoped(["ByteSet"], "from_bits").call_with([
+            RustExpr::ArrayLit(
+                vec![
+                    RustExpr::num_lit(q0 as usize),
+                    RustExpr::num_lit(q1 as usize),
+                    RustExpr::num_lit(q2 as usize),
+                    RustExpr::num_lit(q3 as usize)
+                ]
+            ),
+        ])
     }
 }
 
@@ -915,7 +989,7 @@ impl From<RustBlock> for RustExpr {
 fn implicate_return(value: RustBlock) -> Vec<RustStmt> {
     let (mut stmts, o_expr) = value;
     if let Some(expr) = o_expr {
-        stmts.push(RustStmt::Return(ReturnKind::Implicit, expr))
+        stmts.push(RustStmt::Return(ReturnKind::Implicit, expr));
     }
     stmts
 }
@@ -927,18 +1001,13 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             if let Some(ix) = tree.accept {
                 return (Vec::new(), Some(RustExpr::num_lit(ix)));
             } else {
-                return (
-                    vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
-                    None,
-                );
+                return (vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)], None);
             }
         }
 
         let bind = RustStmt::assign(
             "b",
-            RustExpr::local(ctxt.input_varname.clone())
-                .call_method("read_byte")
-                .wrap_try(),
+            RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte").wrap_try()
         );
 
         if tree.branches.len() == 1 {
@@ -951,21 +1020,16 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 let b_true: Vec<RustStmt> = implicate_return(expand_matchtree(branch, ctxt));
                 let b_false = {
                     if let Some(ix) = tree.accept {
-                        vec![RustStmt::Return(
-                            ReturnKind::Implicit,
-                            RustExpr::num_lit(ix),
-                        )]
+                        vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::num_lit(ix))]
                     } else {
                         vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)]
                     }
                 };
                 return (
                     vec![bind],
-                    Some(RustExpr::Control(Box::new(RustControl::If(
-                        guard,
-                        b_true,
-                        Some(b_false),
-                    )))),
+                    Some(
+                        RustExpr::Control(Box::new(RustControl::If(guard, b_true, Some(b_false))))
+                    ),
                 );
             }
         }
@@ -976,23 +1040,23 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             let crit = ByteCriterion::from(bs);
             match crit {
                 ByteCriterion::Any => {
-                    unreachable!("unconditional descent with more than one branch")
+                    unreachable!("unconditional descent with more than one branch");
                 }
                 ByteCriterion::MustBe(b) => {
-                    let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
-                        RustPrimLit::Numeric(b as usize),
-                    ));
+                    let lhs = MatchCaseLHS::Pattern(
+                        RustPattern::PrimLiteral(RustPrimLit::Numeric(b as usize))
+                    );
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
-                    cases.push((lhs, rhs))
+                    cases.push((lhs, rhs));
                 }
                 ByteCriterion::OtherThan(_) | ByteCriterion::WithinSet(_) => {
                     let (guard, _) = crit.as_predicate(RustExpr::local("tmp"));
                     let lhs = MatchCaseLHS::WithGuard(
                         RustPattern::CatchAll(Some(Label::from("tmp"))),
-                        guard,
+                        guard
                     );
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
-                    cases.push((lhs, rhs))
+                    cases.push((lhs, rhs));
                 }
             }
         }
@@ -1002,9 +1066,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 
     let b_lookahead = RustStmt::assign(
         "lookahead",
-        RustExpr::BorrowMut(Box::new(
-            RustExpr::local(ctxt.input_varname.clone()).call_method("clone"),
-        )),
+        RustExpr::BorrowMut(
+            Box::new(RustExpr::local(ctxt.input_varname.clone()).call_method("clone"))
+        )
     );
     let ll_context = ProdCtxt {
         input_varname: &Label::from("lookahead"),
@@ -1012,12 +1076,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
     };
 
     let (stmts, expr) = expand_matchtree(tree, ll_context);
-    (
-        std::iter::once(b_lookahead)
-            .chain(stmts.into_iter())
-            .collect(),
-        expr,
-    )
+    (std::iter::once(b_lookahead).chain(stmts).collect(), expr)
 }
 
 /// Abstraction type use to sub-categorize different Decoders and ensure that the codegen layer
@@ -1038,8 +1097,8 @@ enum CaseLogic {
 #[derive(Clone, Debug)]
 enum RepeatLogic {
     ContinueOnMatch(MatchTree, Box<CaseLogic>), // evaluates a matchtree and continues if it is matched
-    BreakOnMatch(MatchTree, Box<CaseLogic>),    // evaluates a matchtree and breaks if it is matched
-    ExactCount(RustExpr, Box<CaseLogic>),       // repeats a specific numnber of times
+    BreakOnMatch(MatchTree, Box<CaseLogic>), // evaluates a matchtree and breaks if it is matched
+    ExactCount(RustExpr, Box<CaseLogic>), // repeats a specific numnber of times
     ConditionTerminal(RustExpr, Box<CaseLogic>), // stops when a predicate for 'terminal element' is satisfied
     ConditionComplete(RustExpr, Box<CaseLogic>), // stops when a predicate for 'complete sequence' is satisfied
 }
@@ -1052,34 +1111,38 @@ impl RepeatLogic {
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let tree_index_expr: RustExpr = embed_matchtree(ctree, ctxt).into();
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
                         Operator::Eq,
-                        RustExpr::num_lit(0usize),
+                        RustExpr::num_lit(0usize)
                     );
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("next_elem"),
+                            ])
                         ),
-                    ]
-                    .to_vec();
+                    ].to_vec();
                     let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_continue, Some(b_stop));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![bind_ix, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1089,34 +1152,38 @@ impl RepeatLogic {
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let tree_index_expr: RustExpr = embed_matchtree(btree, ctxt).into();
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
                         Operator::Eq,
-                        RustExpr::num_lit(0usize),
+                        RustExpr::num_lit(0usize)
                     );
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("next_elem"),
+                            ])
                         ),
-                    ]
-                    .to_vec();
+                    ].to_vec();
                     let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![bind_ix, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1126,21 +1193,23 @@ impl RepeatLogic {
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 // N non-loop blocks rather than 1 block representing an N-iteration loop
-                let body = vec![RustStmt::Expr(
-                    RustExpr::local("accum").call_method_with("push", [elt_expr]),
-                )];
-                stmts.push(RustStmt::Control(RustControl::ForRange0(
-                    Label::from("_"),
-                    expr_n.clone(),
-                    body,
-                )));
+                let body = vec![
+                    RustStmt::Expr(RustExpr::local("accum").call_method_with("push", [elt_expr]))
+                ];
+                stmts.push(
+                    RustStmt::Control(
+                        RustControl::ForRange0(Label::from("_"), expr_n.clone(), body)
+                    )
+                );
 
                 (stmts, Some(RustExpr::local("accum")))
             }
@@ -1148,12 +1217,14 @@ impl RepeatLogic {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let cond = tpred
@@ -1162,22 +1233,26 @@ impl RepeatLogic {
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("elem")))]);
                     let b_terminal = [
                         RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("elem")]),
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("elem"),
+                            ])
                         ),
                         RustStmt::Control(RustControl::Break),
-                    ]
-                    .to_vec();
-                    let b_else = [RustStmt::Expr(
-                        RustExpr::local("accum")
-                            .call_method_with("push", [RustExpr::local("elem")]),
-                    )]
-                    .to_vec();
+                    ].to_vec();
+                    let b_else = [
+                        RustStmt::Expr(
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("elem"),
+                            ])
+                        ),
+                    ].to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, Some(b_else));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![elt_bind, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![elt_bind, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1186,17 +1261,18 @@ impl RepeatLogic {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let elt_push = RustStmt::Expr(
-                        RustExpr::local("accum")
-                            .call_method_with("push", [RustExpr::local("elem")]),
+                        RustExpr::local("accum").call_method_with("push", [RustExpr::local("elem")])
                     );
                     let cond = cpred
                         .clone()
@@ -1204,10 +1280,12 @@ impl RepeatLogic {
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("accum")))]);
                     let b_terminal = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, None);
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![elt_bind, elt_push, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![elt_bind, elt_push, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1232,10 +1310,7 @@ enum SequentialLogic {
 impl SequentialLogic {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            SequentialLogic::AccumTuple {
-                constructor,
-                elements,
-            } => {
+            SequentialLogic::AccumTuple { constructor, elements } => {
                 if elements.is_empty() {
                     return (Vec::new(), Some(RustExpr::UNIT));
                 }
@@ -1248,10 +1323,9 @@ impl SequentialLogic {
                     names.push(varname.clone().into());
                     let (mut preamble, o_val) = elt_cl.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        body.push(RustStmt::assign(
-                            varname,
-                            RustExpr::BlockScope(preamble, Box::new(val)),
-                        ));
+                        body.push(
+                            RustStmt::assign(varname, RustExpr::BlockScope(preamble, Box::new(val)))
+                        );
                     } else {
                         // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of elt_cl)
                         body.append(&mut preamble);
@@ -1263,23 +1337,16 @@ impl SequentialLogic {
                     (
                         body,
                         Some(
-                            RustExpr::local(con.clone())
-                                .call_with(names.into_iter().map(RustExpr::local)),
+                            RustExpr::local(con.clone()).call_with(
+                                names.into_iter().map(RustExpr::local)
+                            )
                         ),
                     )
                 } else {
-                    (
-                        body,
-                        Some(RustExpr::Tuple(
-                            names.into_iter().map(RustExpr::local).collect(),
-                        )),
-                    )
+                    (body, Some(RustExpr::Tuple(names.into_iter().map(RustExpr::local).collect())))
                 }
             }
-            SequentialLogic::AccumRecord {
-                constructor,
-                fields,
-            } => {
+            SequentialLogic::AccumRecord { constructor, fields } => {
                 if fields.is_empty() {
                     unreachable!(
                         "SequentialLogic::AccumRecord has no fields, which is not an expected case"
@@ -1294,10 +1361,9 @@ impl SequentialLogic {
                     names.push(varname.clone());
                     let (mut preamble, o_val) = fld_cl.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        body.push(RustStmt::assign(
-                            varname,
-                            RustExpr::BlockScope(preamble, Box::new(val)),
-                        ));
+                        body.push(
+                            RustStmt::assign(varname, RustExpr::BlockScope(preamble, Box::new(val)))
+                        );
                     } else {
                         // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of fld_cl)
                         body.append(&mut preamble);
@@ -1306,12 +1372,186 @@ impl SequentialLogic {
 
                 (
                     body,
-                    Some(RustExpr::Struct(
-                        constructor.clone().into(),
-                        names.into_iter().map(|l| (l, None)).collect(),
-                    )),
+                    Some(
+                        RustExpr::Struct(
+                            constructor.clone().into(),
+                            names
+                                .into_iter()
+                                .map(|l| (l, None))
+                                .collect()
+                        )
+                    ),
                 )
             }
+        }
+    }
+}
+
+pub struct Traversal<'a> {
+    items: Vec<FormatTerm<'a>>,
+    index: usize,
+}
+
+impl<'a> Iterator for Traversal<'a> {
+    type Item = FormatTerm<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.items.len() {
+            self.index += 1;
+            Some(self.items[self.index])
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> Traversal<'a> {
+    pub fn new(module: &'a FormatModule, top_format: &'a Format) -> Self {
+        let mut items = Vec::new();
+        let mut seen_levels: HashSet<usize> = HashSet::new();
+        let ctxt = Ctxt::new(module, &UScope::Empty);
+        Self::enqueue_format(&mut items, top_format, ctxt, &mut seen_levels);
+        Self { items, index: 0 }
+    }
+
+    fn enqueue_format(
+        items: &mut Vec<FormatTerm<'a>>,
+        format: &'a Format,
+        ctxt: Ctxt<'a>,
+        seen_levels: &mut HashSet<usize>
+    ) {
+        items.push(FormatTerm::Format(format));
+        match format {
+            Format::ItemVar(level, args) => {
+                for arg in args {
+                    Self::enqueue_expr(items, arg, ctxt.scope);
+                }
+                if !seen_levels.contains(level) {
+                    Self::enqueue_format(items, ctxt.module.get_format(*level), ctxt, seen_levels);
+                    seen_levels.insert(*level);
+                }
+            }
+            Format::Fail | Format::EndOfInput | Format::Align(_) | Format::Byte(_) => (),
+            Format::Union(branches) | Format::UnionNondet(branches) => {
+                for branch in branches {
+                    Self::enqueue_format(items, branch, ctxt, seen_levels);
+                }
+            }
+            Format::Tuple(ts) => {
+                for t in ts {
+                    Self::enqueue_format(items, t, ctxt, seen_levels);
+                }
+            }
+            Format::Record(fs) => {
+                for (_lbl, t) in fs {
+                    Self::enqueue_format(items, t, ctxt, seen_levels);
+                }
+            }
+            | Format::Variant(_, inner)
+            | Format::Repeat(inner)
+            | Format::Repeat1(inner)
+            | Format::Bits(inner)
+            | Format::Peek(inner)
+            | Format::PeekNot(inner) => {
+                Self::enqueue_format(items, inner, ctxt, seen_levels);
+            }
+            | Format::Slice(expr, inner)
+            | Format::WithRelativeOffset(expr, inner)
+            | Format::RepeatCount(expr, inner)
+            | Format::RepeatUntilLast(expr, inner)
+            | Format::RepeatUntilSeq(expr, inner) => {
+                Self::enqueue_expr(items, expr, ctxt.scope);
+                Self::enqueue_format(items, inner, ctxt, seen_levels);
+            }
+            Format::Map(inner, lambda) => {
+                Self::enqueue_format(items, inner, ctxt, seen_levels);
+                Self::enqueue_expr_lambda(items, lambda, ctxt.scope);
+            }
+            Format::Compute(expr) => {
+                Self::enqueue_expr(items, expr, ctxt.scope);
+            }
+            Format::Let(_, expr, inner) => {
+                Self::enqueue_expr(items, expr, ctxt.scope);
+                Self::enqueue_format(items, inner, ctxt, seen_levels);
+            }
+            Format::Match(x, branches) => {
+                Self::enqueue_expr(items, x, ctxt.scope);
+                for (pat, rhs) in branches {
+                    Self::enqueue_pattern(items, pat);
+                    Self::enqueue_format(items, rhs, ctxt, seen_levels);
+                }
+            }
+            Format::Dynamic(lbl, dynf, inner) => {
+                let newctxt = ctxt.with_dyn_binding(lbl, dynf);
+                Self::enqueue_format(items, inner, newctxt, seen_levels);
+            }
+            Format::Apply(lbl) => {
+                let dynf = ctxt.dyns
+                    .get_dynformat_by_name(label)
+                    .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
+                match dynf {
+                    DynFormat::Huffman(code_lengths, opt_values_expr) => {
+                        Self::enqueue_expr(items, code_lengths, ctxt.scope);
+                        Self::push_phantom(items);
+
+                        if let Some(values_expr) = opt_values_expr {
+                            Self::enqueue_expr(items, code_lengths, ctxt.scope);
+                            Self::push_phantom(items);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn enqueue_expr(items: &mut Vec<FormatTerm<'a>>, expr: &Expr, scope: &UScope<'a>) {
+        items.push(FormatTerm::Expr(expr));
+        match expr {
+            Expr::Var(_) | Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) => (),
+            Expr::Tuple(ts) => {
+                for t in ts {
+                    Self::enqueue_expr(items, t, scope);
+                }
+            }
+            Expr::RecordProj(e, _) | Expr::TupleProj(e, _) => {
+                Self::enqueue_expr(items, e, scope);
+            }
+            Expr::Record(_) => todo!(),
+            Expr::Variant(_, _) => todo!(),
+            Expr::Seq(_) => todo!(),
+            Expr::Match(_, _) => todo!(),
+            Expr::Lambda(_, _) => todo!(),
+            Expr::IntRel(_, _, _) => todo!(),
+            Expr::Arith(_, _, _) => todo!(),
+            Expr::AsU8(_) => todo!(),
+            Expr::AsU16(_) => todo!(),
+            Expr::AsU32(_) => todo!(),
+            Expr::AsChar(_) => todo!(),
+            Expr::U16Be(_) => todo!(),
+            Expr::U16Le(_) => todo!(),
+            Expr::U32Be(_) => todo!(),
+            Expr::U32Le(_) => todo!(),
+            Expr::SeqLength(_) => todo!(),
+            Expr::SubSeq(_, _, _) => todo!(),
+            Expr::FlatMap(_, _) => todo!(),
+            Expr::FlatMapAccum(_, _, _, _) => todo!(),
+            Expr::Dup(_, _) => todo!(),
+            Expr::Inflate(_) => todo!(),
+        }
+    }
+
+    fn enqueue_pattern(items: &mut Vec<FormatTerm<'_>>, pat: &Pattern) {
+        items.push(FormatTerm::Pattern(pat));
+        match pat {
+            Pattern::Binding(_) | Pattern::Wildcard => todo!(),
+            Pattern::Bool(_) => todo!(),
+            Pattern::U8(_) => todo!(),
+            Pattern::U16(_) => todo!(),
+            Pattern::U32(_) => todo!(),
+            Pattern::Char(_) => todo!(),
+            Pattern::Tuple(_) => todo!(),
+            Pattern::Variant(_, _) => todo!(),
+            Pattern::Seq(_) => todo!(),
         }
     }
 }
@@ -1331,18 +1571,17 @@ impl OtherLogic {
                 for (ix, case) in cases.iter().enumerate() {
                     let (mut rhs, o_val) = case.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        rhs.push(RustStmt::Return(false, val));
-                    };
+                        rhs.push(RustStmt::Return(ReturnKind::Implicit, val));
+                    }
                     branches.push((
                         MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Numeric(ix))),
                         rhs,
                     ));
                 }
                 let bind = RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt));
-                let ret = RustExpr::Control(Box::new(RustControl::Match(
-                    RustExpr::local("tree_index"),
-                    branches,
-                )));
+                let ret = RustExpr::Control(
+                    Box::new(RustControl::Match(RustExpr::local("tree_index"), branches))
+                );
                 (vec![bind], Some(ret))
             }
             OtherLogic::ExprMatch(expr, cases) => {
@@ -1350,7 +1589,7 @@ impl OtherLogic {
                 for (lhs, logic) in cases.iter() {
                     let (mut rhs, o_val) = logic.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        rhs.push(RustStmt::Return(false, val));
+                        rhs.push(RustStmt::Return(ReturnKind::Implicit, val));
                     }
                     branches.push((lhs.clone(), rhs));
                 }
@@ -1381,8 +1620,9 @@ impl ParallelLogic {
                 (
                     Vec::new(),
                     Some(
-                        RustExpr::local("unimplemented!")
-                            .call_with([RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)")]),
+                        RustExpr::local("unimplemented!").call_with([
+                            RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)"),
+                        ])
                     ),
                 )
             }
@@ -1418,24 +1658,19 @@ impl DerivedLogic {
                 (
                     vec![assign_inner],
                     Some(
-                        RustExpr::local(Label::from(constr.clone()))
-                            .call_with([RustExpr::local("inner")]),
+                        RustExpr::local(Label::from(constr.clone())).call_with([
+                            RustExpr::local("inner"),
+                        ])
                     ),
                 )
             }
             DerivedLogic::UnitVariantOf(constr, inner) => {
                 let assign_inner = RustStmt::assign("_", RustExpr::from(inner.to_ast(ctxt)));
-                (
-                    vec![assign_inner],
-                    Some(RustExpr::local(Label::from(constr.clone()))),
-                )
+                (vec![assign_inner], Some(RustExpr::local(Label::from(constr.clone()))))
             }
             DerivedLogic::MapOf(f, inner) => {
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
-                (
-                    vec![assign_inner],
-                    Some(f.clone().call_with([RustExpr::local("inner")])),
-                )
+                (vec![assign_inner], Some(f.clone().call_with([RustExpr::local("inner")])))
             }
             DerivedLogic::Let(name, expr, inner) => {
                 let mut stmts = Vec::new();
@@ -1472,7 +1707,8 @@ pub fn print_program(program: &Program) {
         uses: RustImportItems::Wildcard,
     });
 
-    let extra = r#"
+    let extra =
+        r#"
 #[test]
 fn test_decoder_27() {
     // PNG signature
@@ -1566,8 +1802,16 @@ pub struct Generator<'a> {
     sourcemap: SourceMap,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum FormatTerm<'a> {
+    Format(&'a Format),
+    Pattern(&'a Pattern),
+    Expr(&'a Expr),
+    EmbeddedType,
+}
+
 impl<'a> Generator<'a> {
-    fn new(module: &'a FormatModule) -> Self {
+    pub(crate) fn new(module: &'a FormatModule) -> Self {
         let module_ftypes = HashMap::new();
         let codegen = Codegen::new();
         let sourcemap = SourceMap::new();
@@ -1578,28 +1822,66 @@ impl<'a> Generator<'a> {
             sourcemap,
         }
     }
+
+    pub fn compile(module: &'a FormatModule, top_format: &Format) -> Self {
+        let mut gen = Self::new(module);
+        let mut tc = TypeChecker::new();
+        let ctxt = Ctxt::new(module, &crate::typecheck::UScope::Empty);
+        let _ = tc
+            .infer_utype_format(top_format, ctxt)
+            .unwrap_or_else(|err| panic!("Failed to infer topl-level format type: {err}"));
+        let mut trav = Traversal::new(module, top_format);
+        for (ix, term) in trav.enumerate() {
+            let uv = UVar::new(ix);
+            let Some(vt) = tc.reify(Rc::new(UType::Var(uv))) else {
+                unreachable!("None returned by TypeChecker::reify call on {uv}");
+            };
+            match term {
+                FormatTerm::Format(fmt) => {
+                    let rust_t = gen.codegen.lift_type(&vt);
+                    let dec = Compiler::compile_one(fmt).unwrap_or_else(|err| panic!("{}", err));
+                    let logic = gen.codegen.translate(&dec, Some(&rust_t));
+                    gen.sourcemap.decoder_skels.push(DecoderFn(logic, rust_t));
+                }
+                FormatTerm::Pattern(pat) => {}
+                FormatTerm::Expr() => todo!(),
+                FormatTerm::EmbeddedType => (),
+            }
+        }
+        gen
+    }
 }
 
-pub enum VTShadowTree {
-    Tip,
-    Leaf(Rc<ValueType>),
-    Node {
-        node_type: Rc<ValueType>,
-        children: Vec<VTShadowTree>,
-    },
-}
-
-impl VTShadowTree {
-    pub const fn new() -> Self {
-        Self::Tip
+mod __impls {
+    use super::IxLabel;
+    use crate::Label;
+    impl From<usize> for IxLabel {
+        fn from(value: usize) -> Self {
+            Self(value)
+        }
     }
 
-    pub fn node_type(&self) -> Rc<ValueType> {
-        match self {
-            VTShadowTree::Tip => Rc::new(ValueType::Empty),
-            VTShadowTree::Leaf(node_type) | VTShadowTree::Node { node_type, .. } => {
-                node_type.clone()
-            }
+    impl From<IxLabel> for Label {
+        fn from(value: IxLabel) -> Self {
+            Label::Owned(format!("Type{}", value.0))
+        }
+    }
+
+    impl From<&IxLabel> for Label {
+        fn from(value: &IxLabel) -> Self {
+            Label::Owned(format!("Type{}", value.0))
+        }
+    }
+
+    impl AsRef<usize> for IxLabel {
+        fn as_ref(&self) -> &usize {
+            &self.0
+        }
+    }
+
+    impl std::borrow::Borrow<usize> for IxLabel {
+        fn borrow(&self) -> &usize {
+            &self.0
         }
     }
 }

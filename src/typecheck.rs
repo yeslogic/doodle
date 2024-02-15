@@ -30,6 +30,16 @@ macro_rules! try_with {
 #[repr(transparent)]
 pub struct UVar(usize);
 
+impl UVar {
+    pub fn new(ix: usize) -> Self {
+        Self(ix)
+    }
+
+    pub fn to_usize(self) -> usize {
+        self.0
+    }
+}
+
 /// Unification type, equivalent to ValueType up to abstraction
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum UType {
@@ -159,9 +169,9 @@ pub(crate) struct USingleScope<'a> {
 
 #[derive(Clone, Copy)]
 pub(crate) struct Ctxt<'a> {
-    module: &'a FormatModule,
-    scope: &'a UScope<'a>,
-    dyns: DynScope<'a>,
+    pub(crate) module: &'a FormatModule,
+    pub(crate) scope: &'a UScope<'a>,
+    pub(crate) dyns: DynScope<'a>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,7 +185,7 @@ impl<'a> DynScope<'a> {
         Self::Empty
     }
 
-    fn get_dynf_var_by_name(&self, label: &str) -> Option<UVar> {
+    pub(crate) fn get_dynf_var_by_name(&self, label: &str) -> Option<UVar> {
         match self {
             DynScope::Empty => None,
             DynScope::Single(single) => single.get_dynf_var_by_name(label),
@@ -209,7 +219,7 @@ impl<'a> DynSingleScope<'a> {
 }
 
 impl<'a> Ctxt<'a> {
-    fn with_scope(&'a self, newscope: &'a UScope<'a>) -> Ctxt<'a> {
+    pub(crate) fn with_scope(&'a self, newscope: &'a UScope<'a>) -> Ctxt<'a> {
         Self {
             module: self.module,
             dyns: self.dyns,
@@ -217,7 +227,7 @@ impl<'a> Ctxt<'a> {
         }
     }
 
-    fn with_dyn_binding(&'a self, name: &'a str, dynf_var: UVar) -> Ctxt<'a> {
+    pub(crate) fn with_dyn_binding(&'a self, name: &'a str, dynf_var: UVar) -> Ctxt<'a> {
         Self {
             module: self.module,
             dyns: DynScope::Single(DynSingleScope::new(&self.dyns, name, dynf_var)),
@@ -225,7 +235,7 @@ impl<'a> Ctxt<'a> {
         }
     }
 
-    fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
+    pub fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
         Self {
             module,
             scope,
@@ -285,13 +295,13 @@ pub(crate) struct TypeChecker {
     constraints: Vec<Constraints>,
     aliases: Vec<Alias>, // set of non-identity metavariables that are aliased to ?ix
     varmaps: VarMapMap, // logically separate table of metacontext variant-maps for indirect aliasing
-    level_types: HashMap<usize, Rc<UType>>, // perma-cache of utypes for called itemvars
+    level_vars: HashMap<usize, UVar>,
 }
 
 #[derive(Clone, Debug, Default)]
 enum Alias {
     #[default]
-    Singleton, // no aliases anywhere
+    Ground, // no aliases anywhere
     BackRef(usize),            // direct back-ref to earliest alias (must be canonical)
     Canonical(HashSet<usize>), // list of forward-references to update if usurped by an earlier canonical alias
 }
@@ -299,7 +309,7 @@ enum Alias {
 impl Alias {
     /// New, empty alias-set
     pub const fn new() -> Alias {
-        Self::Singleton
+        Self::Ground
     }
 
     /// Returns `true` if `self` is the canonical alias of at least one other metavariable (i.e. [`Alias::Canonical`] over a non-empty set).
@@ -312,7 +322,7 @@ impl Alias {
 
     pub fn as_backref(&self) -> Option<usize> {
         match self {
-            Alias::Singleton | Alias::Canonical(_) => None,
+            Alias::Ground | Alias::Canonical(_) => None,
             Alias::BackRef(ix) => Some(*ix),
         }
     }
@@ -324,7 +334,7 @@ impl Alias {
     /// Will panic if `self` is [`Alias::BackRef`]
     fn add_forward_ref(&mut self, tgt: usize) {
         match self {
-            Alias::Singleton => {
+            Alias::Ground => {
                 let _ = std::mem::replace(self, Alias::Canonical(HashSet::from([tgt])));
             }
             Alias::BackRef(_) => panic!("cannot add forward-ref to Alias::BackRef"),
@@ -342,14 +352,14 @@ impl Alias {
 
     fn iter_fwd_refs<'a>(&'a self) -> Box<dyn Iterator<Item = usize> + 'a> {
         match self {
-            Alias::Singleton | Alias::BackRef(_) => Box::new(std::iter::empty()),
+            Alias::Ground | Alias::BackRef(_) => Box::new(std::iter::empty()),
             Alias::Canonical(fwds) => Box::new(fwds.iter().copied()),
         }
     }
 
     fn contains_fwd_ref(&self, tgt: usize) -> bool {
         match self {
-            Alias::Singleton | Alias::BackRef(_) => false,
+            Alias::Ground | Alias::BackRef(_) => false,
             Alias::Canonical(fwds) => fwds.contains(&tgt),
         }
     }
@@ -575,7 +585,7 @@ impl TypeChecker {
             constraints: Vec::new(),
             aliases: Vec::new(),
             varmaps: VarMapMap::new(),
-            level_types: HashMap::new(),
+            level_vars: HashMap::new(),
         }
     }
 
@@ -608,19 +618,11 @@ impl TypeChecker {
         ret
     }
 
-    fn reify_union(&self, vmid: VMId) -> Option<ValueType> {
-        let vm = self.varmaps.get_varmap(vmid);
-        let mut branches = BTreeMap::new();
-        for (label, ut) in vm.iter() {
-            branches.insert(label.clone(), self.reify(ut.clone())?);
-        }
-        Some(ValueType::Union(branches))
-    }
 
     fn infer_var_scope_pattern(
         &mut self,
         pat: &Pattern,
-        scope: &'_ mut UMultiScope<'_>,
+        scope: &mut UMultiScope<'_>,
     ) -> TCResult<UVar> {
         match pat {
             Pattern::Binding(name) => {
@@ -764,12 +766,12 @@ impl TypeChecker {
         Ok(())
     }
 
-    fn infer_utype_format_level(&mut self, level: usize, ctxt: Ctxt<'_>) -> TCResult<Rc<UType>> {
-        if let Some(ret) = self.level_types.get(&level) {
+    fn infer_var_format_level(&mut self, level: usize, ctxt: Ctxt<'_>) -> TCResult<UVar> {
+        if let Some(ret) = self.level_vars.get(&level) {
             Ok(ret.clone())
         } else {
-            let ret = self.infer_utype_format(ctxt.module.get_format(level), ctxt)?;
-            self.level_types.insert(level, ret.clone());
+            let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
+            self.level_vars.insert(level, ret);
             Ok(ret)
         }
     }
@@ -947,6 +949,8 @@ impl TypeChecker {
             }
         }
     }
+
+
 
     fn set_uvar_vmid(&mut self, uvar: UVar, vmid: VMId) -> TCResult<()> {
         assert!(
@@ -1248,23 +1252,6 @@ impl TypeChecker {
                 Ok(())
             }
         }
-    }
-
-    /// Overwrites the [`Constraints`] at the specified index `tgt_ix` with the immediate value at the specified index `src_ix`, returning
-    /// an up-to-date reference to the value at the rewritten index.
-    #[must_use]
-    fn replace_constraints_from_index(&mut self, tgt_ix: usize, src_ix: usize) -> &Constraints {
-        assert_ne!(tgt_ix, src_ix);
-        let val = self.constraints[src_ix].clone();
-        self.replace_constraints_with_value(tgt_ix, val)
-    }
-
-    /// Overwrites the constraints at the specified index with the provided value, returning
-    /// an up-to-date reference to the target-indexed [`Constraints`]` element.
-    #[must_use]
-    fn replace_constraints_with_value(&mut self, ix: usize, val: Constraints) -> &Constraints {
-        self.constraints[ix] = val;
-        &self.constraints[ix]
     }
 
     fn infer_var_expr_acc(
@@ -1831,7 +1818,7 @@ impl TypeChecker {
     ///
     /// Otherwise, returns Some(t) where t is a UType other than UType::Var(v) or UType::Var(v1) where
     /// v1 is an isomorphic alias to v.
-    fn substitute_uvar_vtype(&self, v: UVar) -> Result<Option<VType>, TCError> {
+    pub(crate) fn substitute_uvar_vtype(&self, v: UVar) -> Result<Option<VType>, TCError> {
         self.occurs(v)?;
         Ok(match &self.constraints[self.get_canonical_uvar(v).0] {
             Constraints::Indefinite => None,
@@ -1888,7 +1875,7 @@ impl TypeChecker {
 
         // short-circuit if already equated
         match (&self.aliases[v1.0], &self.aliases[v2.0]) {
-            (Alias::Singleton, Alias::Singleton) => {
+            (Alias::Ground, Alias::Ground) => {
                 if v1 < v2 {
                     unsafe {
                         self.repoint(v1.0, v2.0);
@@ -1901,11 +1888,11 @@ impl TypeChecker {
                     }
                 }
             }
-            (Alias::Singleton, &Alias::BackRef(can_ix)) if v1.0 > can_ix => unsafe {
+            (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 > can_ix => unsafe {
                 self.repoint(can_ix, v1.0);
                 self.transfer_constraints(can_ix, v1.0)
             },
-            (Alias::Singleton, &Alias::BackRef(can_ix)) if v1.0 < can_ix => {
+            (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 < can_ix => {
                 debug_assert!(
                     self.aliases[can_ix].is_canonical_nonempty(),
                     "half-alias ?{can_ix}-|<-{v2}"
@@ -1916,14 +1903,14 @@ impl TypeChecker {
                 );
                 unsafe { self.recanonicalize(v1.0, can_ix) }
             }
-            (Alias::Singleton, Alias::BackRef(_)) => {
+            (Alias::Ground, &Alias::BackRef(_can_ix)) => {
                 unreachable!("unexpected half-alias {v1}-|<-{v2}");
             }
-            (&Alias::BackRef(can_ix), Alias::Singleton) if v2.0 > can_ix => unsafe {
+            (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 > can_ix => unsafe {
                 self.repoint(can_ix, v2.0);
                 self.transfer_constraints(can_ix, v2.0)
             },
-            (&Alias::BackRef(can_ix), Alias::Singleton) if v2.0 < can_ix => {
+            (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 < can_ix => {
                 debug_assert!(
                     self.aliases[can_ix].is_canonical_nonempty(),
                     "half-alias ?{can_ix}-|<-{v1}"
@@ -1934,10 +1921,10 @@ impl TypeChecker {
                 );
                 unsafe { self.recanonicalize(v2.0, can_ix) }
             }
-            (Alias::BackRef(_), Alias::Singleton) => {
+            (&Alias::BackRef(_can_ix), Alias::Ground) => {
                 unreachable!("unexpected half-alias {v2}-|<-{v1}");
             }
-            (Alias::Singleton, Alias::Canonical(_)) => {
+            (Alias::Ground, Alias::Canonical(_)) => {
                 if v1.0 < v2.0 {
                     debug_assert!(
                         !self.aliases[v2.0].contains_fwd_ref(v1.0),
@@ -1951,7 +1938,7 @@ impl TypeChecker {
                     }
                 }
             }
-            (Alias::Canonical(_), Alias::Singleton) => {
+            (Alias::Canonical(_), Alias::Ground) => {
                 if v2.0 < v1.0 {
                     debug_assert!(
                         !self.aliases[v1.0].contains_fwd_ref(v2.0),
@@ -1971,7 +1958,7 @@ impl TypeChecker {
             (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) if ix2 < ix1 => unsafe {
                 self.recanonicalize(ix2, ix1)
             },
-            (&Alias::BackRef(ix), &Alias::BackRef(_)) => {
+            (&Alias::BackRef(ix), &Alias::BackRef(_ix)) => {
                 // the two are equal so nothing needs to be changed; we will check both are forward-aliased, however
                 let common = &self.aliases[ix];
                 debug_assert!(
@@ -2133,9 +2120,26 @@ impl TypeChecker {
         }
     }
 
-    fn get_canonical_uvar(&self, v: UVar) -> UVar {
+    /// Overwrites the [`Constraints`] at the specified index `tgt_ix` with the immediate value at the specified index `src_ix`, returning
+    /// an up-to-date reference to the value at the rewritten index.
+    #[must_use]
+    fn replace_constraints_from_index(&mut self, tgt_ix: usize, src_ix: usize) -> &Constraints {
+        assert_ne!(tgt_ix, src_ix);
+        let val = self.constraints[src_ix].clone();
+        self.replace_constraints_with_value(tgt_ix, val)
+    }
+
+    /// Overwrites the constraints at the specified index with the provided value, returning
+    /// an up-to-date reference to the target-indexed [`Constraints`]` element.
+    #[must_use]
+    fn replace_constraints_with_value(&mut self, ix: usize, val: Constraints) -> &Constraints {
+        self.constraints[ix] = val;
+        &self.constraints[ix]
+    }
+
+    pub fn get_canonical_uvar(&self, v: UVar) -> UVar {
         match self.aliases[v.0] {
-            Alias::Canonical(_) | Alias::Singleton => v,
+            Alias::Canonical(_) | Alias::Ground => v,
             Alias::BackRef(ix) => UVar(ix),
         }
     }
@@ -2152,7 +2156,7 @@ impl TypeChecker {
         let a1 = &self.aliases[v1.0];
 
         match (a, a1) {
-            (Alias::Singleton, _) | (_, Alias::Singleton) => false,
+            (Alias::Ground, _) | (_, Alias::Ground) => false,
             (Alias::BackRef(tgt1), Alias::BackRef(tgt2)) => tgt1 == tgt2,
             (Alias::BackRef(tgt), Alias::Canonical(..)) => *tgt == v1.0,
             (Alias::Canonical(..), Alias::BackRef(tgt)) => *tgt == v.0,
@@ -2202,8 +2206,8 @@ impl TypeChecker {
                         self.unify_var_valuetype(v_arg, vt)?;
                     }
                 }
-                let ut = self.infer_utype_format_level(*level, ctxt)?;
-                self.unify_var_utype(newvar, ut)?;
+                let level_var = self.infer_var_format_level(*level, ctxt)?;
+                self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)
             }
             Format::Fail => Ok(self.init_var_simple(UType::Empty)?.0),
@@ -2270,7 +2274,7 @@ impl TypeChecker {
                 let (in_var, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(in_var, inner_t.clone())?;
-                self.unify_var_utype(out_var, BaseType::Bool.into())?;
+                self.unify_var_utype(out_var, Rc::new(UType::Base(BaseType::Bool)))?;
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar)
             }
@@ -2279,7 +2283,7 @@ impl TypeChecker {
                 let (in_var, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
                 let inner_t = self.infer_utype_format(inner, ctxt)?;
                 self.unify_var_utype(in_var, Rc::new(UType::Seq(inner_t.clone())))?;
-                self.unify_var_utype(out_var, BaseType::Bool.into())?;
+                self.unify_var_utype(out_var, Rc::new(UType::Base(BaseType::Bool)))?;
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar)
             }
@@ -2375,6 +2379,14 @@ impl TypeChecker {
         Ok(uv.into())
     }
 
+    pub fn lookup_level_var(&self, level: usize) -> Option<UVar> {
+        if level == 0 {
+            Some(UVar(0))
+        } else {
+            Some(*self.level_vars.get(&level)?)
+        }
+    }
+
     /// Attempt to fully solve a `UType` until all free metavariables are replaced with concrete type-assignments
     ///
     /// Returns None if at least one metavariable cannot be reduced without more information, or if any unification
@@ -2432,6 +2444,15 @@ impl TypeChecker {
             }
             UType::Seq(t0) => Some(ValueType::Seq(Box::new(self.reify(t0.clone())?))),
         }
+    }
+
+    fn reify_union(&self, vmid: VMId) -> Option<ValueType> {
+        let vm = self.varmaps.get_varmap(vmid);
+        let mut branches = BTreeMap::new();
+        for (label, ut) in vm.iter() {
+            branches.insert(label.clone(), self.reify(ut.clone())?);
+        }
+        Some(ValueType::Union(branches))
     }
 }
 // !SECTION
@@ -2641,13 +2662,17 @@ pub fn typecheck(module: &FormatModule, f: &Format) -> TCResult<Option<ValueType
     let ctxt = Ctxt::new(module, &scope);
     let _ut = tc.infer_utype_format(f, ctxt)?;
     // FIXME - there should be a lot more that goes on under the covers here, especially since we want to detect errors
-    Ok(tc.reify(_ut))
+    let ret = Ok(tc.reify(_ut));
+    tc.check_uvar_sanity();
+    ret
 }
 
 pub type TCResult<T> = Result<T, TCError>;
 
 mod __impls {
-    use super::{Constraint, ProjShape, UVar, VMId};
+    use crate::FormatModule;
+
+    use super::{Constraint, Ctxt, ProjShape, UScope, UVar, VMId};
     use std::borrow::{Borrow, BorrowMut};
 
     impl std::fmt::Display for Constraint {
@@ -2674,6 +2699,18 @@ mod __impls {
         }
     }
 
+    impl From<UVar> for usize {
+        fn from(value: UVar) -> Self {
+            value.0
+        }
+    }
+
+    impl From<usize> for UVar {
+        fn from(value: usize) -> Self {
+            Self(value)
+        }
+    }
+
     impl AsRef<usize> for UVar {
         fn as_ref(&self) -> &usize {
             &self.0
@@ -2697,6 +2734,7 @@ mod __impls {
             &mut self.0
         }
     }
+
     impl std::fmt::Display for VMId {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             write!(f, "#{}", self.0)
@@ -2706,6 +2744,13 @@ mod __impls {
     impl AsRef<usize> for VMId {
         fn as_ref(&self) -> &usize {
             &self.0
+        }
+    }
+
+    impl<'a> From<&'a FormatModule> for Ctxt<'a> {
+        fn from(value: &'a FormatModule) -> Self {
+            let scope = &UScope::Empty;
+            Self::new(value, scope)
         }
     }
 }
