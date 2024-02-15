@@ -1274,45 +1274,8 @@ fn inflate(codes: &[Value]) -> Vec<Value> {
 #[cfg(test)]
 #[allow(clippy::redundant_clone)]
 mod tests {
-    use crate::IntoLabel;
-
     use super::*;
-
-    fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::Union(
-            (fields.into_iter())
-                .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
-                .collect(),
-        )
-    }
-
-    fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
-        Format::Record(
-            (fields.into_iter())
-                .map(|(label, format)| (label.into(), format))
-                .collect(),
-        )
-    }
-
-    fn optional(format: Format) -> Format {
-        alts([("some", format), ("none", Format::EMPTY)])
-    }
-
-    fn repeat(format: Format) -> Format {
-        Format::Repeat(Box::new(format))
-    }
-
-    fn repeat1(format: Format) -> Format {
-        Format::Repeat1(Box::new(format))
-    }
-
-    fn is_byte(b: u8) -> Format {
-        Format::Byte(ByteSet::from([b]))
-    }
-
-    fn not_byte(b: u8) -> Format {
-        Format::Byte(!ByteSet::from([b]))
-    }
+    use crate::helper::*;
 
     fn accepts(d: &Decoder, input: &[u8], tail: &[u8], expect: Value) {
         let program = Program::new();

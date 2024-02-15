@@ -1,6 +1,6 @@
+use crate::format::BaseModule;
+use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef};
-
-use crate::format::base::*;
 
 /// Graphics Interchange Format (GIF)
 ///

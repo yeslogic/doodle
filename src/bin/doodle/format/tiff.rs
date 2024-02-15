@@ -1,6 +1,6 @@
+use crate::format::BaseModule;
+use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
-
-use crate::format::base::*;
 
 /// TIFF Image file header
 ///
