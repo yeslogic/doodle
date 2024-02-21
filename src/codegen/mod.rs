@@ -23,7 +23,7 @@ use rust_ast::{
 struct IxLabel(usize);
 
 impl IxLabel {
-    fn to_usize(&self) -> usize {
+    fn to_usize(self) -> usize {
         self.0
     }
 }
@@ -198,7 +198,7 @@ impl Codegen {
             Decoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             Decoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             Decoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
-            Decoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(bs.clone())),
+            Decoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             Decoder::Variant(vname, inner) => {
                 let (tname, tdef) = match type_hint {
                     Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
@@ -284,13 +284,13 @@ impl Codegen {
             }
             Decoder::Parallel(alts) => CaseLogic::Parallel(ParallelLogic::Alts(
                 alts.iter()
-                    .map(|alt| self.translate(alt, type_hint.clone()))
+                    .map(|alt| self.translate(alt, type_hint))
                     .collect(),
             )),
             Decoder::Branch(tree, flat) => CaseLogic::Other(OtherLogic::Descend(
                 tree.clone(),
                 flat.iter()
-                    .map(|alt| self.translate(alt, type_hint.clone()))
+                    .map(|alt| self.translate(alt, type_hint))
                     .collect(),
             )),
             Decoder::Tuple(elts) => match type_hint {
@@ -319,7 +319,7 @@ impl Codegen {
             Decoder::Record(flds) => {
                 match type_hint {
                     Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
-                        let ref tdef = self.defined_types[*ix];
+                        let tdef = &self.defined_types[*ix];
                         let tfields = match tdef {
                             RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
                             _ => unreachable!("unexpected non-Struct::Record definition for type `{lab}`: {tdef:?}"),
@@ -476,7 +476,7 @@ impl Codegen {
     }
 }
 
-fn get_enum_name<'a>(typ: &'a RustType) -> &'a Label {
+fn get_enum_name(typ: &RustType) -> &Label {
     match typ {
         RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_, name))) => name,
         other => unreachable!("get_enum_name: non-LocalDef type {other:?}"),
@@ -487,12 +487,12 @@ fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
     match pat {
         Pattern::Wildcard => RustPattern::CatchAll(None),
         Pattern::Binding(name) => RustPattern::CatchAll(Some(name.clone())),
-        Pattern::Bool(b) => RustPattern::PrimLiteral(RustPrimLit::BooleanLit(*b)),
-        Pattern::U8(n) => RustPattern::PrimLiteral(RustPrimLit::NumericLit(*n as usize)),
-        Pattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::NumericLit(*n as usize)),
-        Pattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::NumericLit(*n as usize)),
-        Pattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::NumericLit(*n as usize)),
-        Pattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::CharLit(*c)),
+        Pattern::Bool(b) => RustPattern::PrimLiteral(RustPrimLit::Boolean(*b)),
+        Pattern::U8(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
+        Pattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
+        Pattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
+        Pattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
+        Pattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::Char(*c)),
         Pattern::Tuple(pats) => {
             RustPattern::TupleLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
         }
@@ -520,7 +520,7 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             // FIXME - as currently implemented, the scoping is almost certainly not implemented to reference local assignments properly
             RustExpr::local(vname.clone())
         }
-        Expr::Bool(b) => RustExpr::PrimitiveLit(RustPrimLit::BooleanLit(*b)),
+        Expr::Bool(b) => RustExpr::PrimitiveLit(RustPrimLit::Boolean(*b)),
         Expr::U8(n) => RustExpr::num_lit(*n as usize),
         Expr::U16(n) => RustExpr::num_lit(*n as usize),
         Expr::U32(n) => RustExpr::num_lit(*n as usize),
@@ -971,7 +971,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 }
                 ByteCriterion::MustBe(b) => {
                     let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
-                        RustPrimLit::NumericLit(b as usize),
+                        RustPrimLit::Numeric(b as usize),
                     ));
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
                     cases.push((lhs, rhs))
@@ -1321,16 +1321,11 @@ impl OtherLogic {
                 let mut branches = Vec::new();
                 for (ix, case) in cases.iter().enumerate() {
                     let (mut rhs, o_val) = case.to_ast(ctxt);
-                    match o_val {
-                        Some(val) => {
-                            rhs.push(RustStmt::Return(false, val));
-                        }
-                        None => (),
+                    if let Some(val) = o_val {
+                        rhs.push(RustStmt::Return(false, val));
                     };
                     branches.push((
-                        MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::NumericLit(
-                            ix,
-                        ))),
+                        MatchCaseLHS::Pattern(RustPattern::PrimLiteral(RustPrimLit::Numeric(ix))),
                         rhs,
                     ));
                 }
@@ -1345,11 +1340,8 @@ impl OtherLogic {
                 let mut branches = Vec::new();
                 for (lhs, logic) in cases.iter() {
                     let (mut rhs, o_val) = logic.to_ast(ctxt);
-                    match o_val {
-                        Some(val) => {
-                            rhs.push(RustStmt::Return(false, val));
-                        }
-                        None => (),
+                    if let Some(val) = o_val {
+                        rhs.push(RustStmt::Return(false, val));
                     }
                     branches.push((lhs.clone(), rhs));
                 }

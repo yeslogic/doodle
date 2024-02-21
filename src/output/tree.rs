@@ -895,22 +895,22 @@ impl<'module> MonoidalPrinter<'module> {
                 Precedence::FUNAPP,
             ),
             Expr::SubSeq(seq, start, length) => cond_paren(
-                self.compile_prefix("sub-seq", Some(&[&start, &length]), seq),
+                self.compile_prefix("sub-seq", Some(&[start, length]), seq),
                 prec,
                 Precedence::FUNAPP,
             ),
             Expr::FlatMap(expr, seq) => cond_paren(
-                self.compile_prefix("flat-map", Some(&[&expr]), seq),
+                self.compile_prefix("flat-map", Some(&[expr]), seq),
                 prec,
                 Precedence::FUNAPP,
             ),
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => cond_paren(
-                self.compile_prefix("flat-map-accum", Some(&[&expr, &accum]), seq),
+                self.compile_prefix("flat-map-accum", Some(&[expr, accum]), seq),
                 prec,
                 Precedence::FUNAPP,
             ),
             Expr::Dup(count, expr) => cond_paren(
-                self.compile_prefix("dup", Some(&[&count]), expr),
+                self.compile_prefix("dup", Some(&[count]), expr),
                 prec,
                 Precedence::FUNAPP,
             ),

@@ -282,7 +282,7 @@ impl Expr {
         let head: Box<Expr> = head.into();
         let label: Label = label.into();
 
-        Expr::RecordProj(head.into(), label.into())
+        Expr::RecordProj(head, label)
     }
 }
 
@@ -876,7 +876,7 @@ impl FormatModule {
         &self.names[level]
     }
 
-    pub fn iter_formats<'a>(&'a self) -> impl Iterator<Item = (usize, Format)> + 'a {
+    pub fn iter_formats(&self) -> impl Iterator<Item = (usize, Format)> + '_ {
         (0..self.formats.len()).filter_map(|ix| {
             let mut x_args = Vec::with_capacity(self.args[ix].len());
             for (_, vt) in self.args[ix].iter() {
