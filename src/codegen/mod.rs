@@ -7,6 +7,7 @@ use crate::{
     typecheck::{ Ctxt, TypeChecker, UScope, UType, UVar },
     Arith,
     BaseType,
+    DynFormat,
     Expr,
     Format,
     FormatModule,
@@ -20,6 +21,10 @@ use crate::{
 use std::{ collections::{ HashMap, HashSet }, rc::Rc };
 
 use rust_ast::*;
+
+use typed_format::{GenType, TypedExpr, TypedFormat, TypedPattern};
+
+use self::typed_format::TypedDynFormat;
 
 /// Simple type for ad-hoc names using a counter value
 #[repr(transparent)]
@@ -1387,174 +1392,7 @@ impl SequentialLogic {
     }
 }
 
-pub struct Traversal<'a> {
-    items: Vec<FormatTerm<'a>>,
-    index: usize,
-}
 
-impl<'a> Iterator for Traversal<'a> {
-    type Item = FormatTerm<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.items.len() {
-            self.index += 1;
-            Some(self.items[self.index])
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a> Traversal<'a> {
-    pub fn new(module: &'a FormatModule, top_format: &'a Format) -> Self {
-        let mut items = Vec::new();
-        let mut seen_levels: HashSet<usize> = HashSet::new();
-        let ctxt = Ctxt::new(module, &UScope::Empty);
-        Self::enqueue_format(&mut items, top_format, ctxt, &mut seen_levels);
-        Self { items, index: 0 }
-    }
-
-    fn enqueue_format(
-        items: &mut Vec<FormatTerm<'a>>,
-        format: &'a Format,
-        ctxt: Ctxt<'a>,
-        seen_levels: &mut HashSet<usize>
-    ) {
-        items.push(FormatTerm::Format(format));
-        match format {
-            Format::ItemVar(level, args) => {
-                for arg in args {
-                    Self::enqueue_expr(items, arg, ctxt.scope);
-                }
-                if !seen_levels.contains(level) {
-                    Self::enqueue_format(items, ctxt.module.get_format(*level), ctxt, seen_levels);
-                    seen_levels.insert(*level);
-                }
-            }
-            Format::Fail | Format::EndOfInput | Format::Align(_) | Format::Byte(_) => (),
-            Format::Union(branches) | Format::UnionNondet(branches) => {
-                for branch in branches {
-                    Self::enqueue_format(items, branch, ctxt, seen_levels);
-                }
-            }
-            Format::Tuple(ts) => {
-                for t in ts {
-                    Self::enqueue_format(items, t, ctxt, seen_levels);
-                }
-            }
-            Format::Record(fs) => {
-                for (_lbl, t) in fs {
-                    Self::enqueue_format(items, t, ctxt, seen_levels);
-                }
-            }
-            | Format::Variant(_, inner)
-            | Format::Repeat(inner)
-            | Format::Repeat1(inner)
-            | Format::Bits(inner)
-            | Format::Peek(inner)
-            | Format::PeekNot(inner) => {
-                Self::enqueue_format(items, inner, ctxt, seen_levels);
-            }
-            | Format::Slice(expr, inner)
-            | Format::WithRelativeOffset(expr, inner)
-            | Format::RepeatCount(expr, inner)
-            | Format::RepeatUntilLast(expr, inner)
-            | Format::RepeatUntilSeq(expr, inner) => {
-                Self::enqueue_expr(items, expr, ctxt.scope);
-                Self::enqueue_format(items, inner, ctxt, seen_levels);
-            }
-            Format::Map(inner, lambda) => {
-                Self::enqueue_format(items, inner, ctxt, seen_levels);
-                Self::enqueue_expr_lambda(items, lambda, ctxt.scope);
-            }
-            Format::Compute(expr) => {
-                Self::enqueue_expr(items, expr, ctxt.scope);
-            }
-            Format::Let(_, expr, inner) => {
-                Self::enqueue_expr(items, expr, ctxt.scope);
-                Self::enqueue_format(items, inner, ctxt, seen_levels);
-            }
-            Format::Match(x, branches) => {
-                Self::enqueue_expr(items, x, ctxt.scope);
-                for (pat, rhs) in branches {
-                    Self::enqueue_pattern(items, pat);
-                    Self::enqueue_format(items, rhs, ctxt, seen_levels);
-                }
-            }
-            Format::Dynamic(lbl, dynf, inner) => {
-                let newctxt = ctxt.with_dyn_binding(lbl, dynf);
-                Self::enqueue_format(items, inner, newctxt, seen_levels);
-            }
-            Format::Apply(lbl) => {
-                let dynf = ctxt.dyns
-                    .get_dynformat_by_name(label)
-                    .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
-                match dynf {
-                    DynFormat::Huffman(code_lengths, opt_values_expr) => {
-                        Self::enqueue_expr(items, code_lengths, ctxt.scope);
-                        Self::push_phantom(items);
-
-                        if let Some(values_expr) = opt_values_expr {
-                            Self::enqueue_expr(items, code_lengths, ctxt.scope);
-                            Self::push_phantom(items);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn enqueue_expr(items: &mut Vec<FormatTerm<'a>>, expr: &Expr, scope: &UScope<'a>) {
-        items.push(FormatTerm::Expr(expr));
-        match expr {
-            Expr::Var(_) | Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) => (),
-            Expr::Tuple(ts) => {
-                for t in ts {
-                    Self::enqueue_expr(items, t, scope);
-                }
-            }
-            Expr::RecordProj(e, _) | Expr::TupleProj(e, _) => {
-                Self::enqueue_expr(items, e, scope);
-            }
-            Expr::Record(_) => todo!(),
-            Expr::Variant(_, _) => todo!(),
-            Expr::Seq(_) => todo!(),
-            Expr::Match(_, _) => todo!(),
-            Expr::Lambda(_, _) => todo!(),
-            Expr::IntRel(_, _, _) => todo!(),
-            Expr::Arith(_, _, _) => todo!(),
-            Expr::AsU8(_) => todo!(),
-            Expr::AsU16(_) => todo!(),
-            Expr::AsU32(_) => todo!(),
-            Expr::AsChar(_) => todo!(),
-            Expr::U16Be(_) => todo!(),
-            Expr::U16Le(_) => todo!(),
-            Expr::U32Be(_) => todo!(),
-            Expr::U32Le(_) => todo!(),
-            Expr::SeqLength(_) => todo!(),
-            Expr::SubSeq(_, _, _) => todo!(),
-            Expr::FlatMap(_, _) => todo!(),
-            Expr::FlatMapAccum(_, _, _, _) => todo!(),
-            Expr::Dup(_, _) => todo!(),
-            Expr::Inflate(_) => todo!(),
-        }
-    }
-
-    fn enqueue_pattern(items: &mut Vec<FormatTerm<'_>>, pat: &Pattern) {
-        items.push(FormatTerm::Pattern(pat));
-        match pat {
-            Pattern::Binding(_) | Pattern::Wildcard => todo!(),
-            Pattern::Bool(_) => todo!(),
-            Pattern::U8(_) => todo!(),
-            Pattern::U16(_) => todo!(),
-            Pattern::U32(_) => todo!(),
-            Pattern::Char(_) => todo!(),
-            Pattern::Tuple(_) => todo!(),
-            Pattern::Variant(_, _) => todo!(),
-            Pattern::Seq(_) => todo!(),
-        }
-    }
-}
 
 /// Catch-all for hard-to-classify cases
 #[derive(Clone, Debug)]
@@ -1802,14 +1640,6 @@ pub struct Generator<'a> {
     sourcemap: SourceMap,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum FormatTerm<'a> {
-    Format(&'a Format),
-    Pattern(&'a Pattern),
-    Expr(&'a Expr),
-    EmbeddedType,
-}
-
 impl<'a> Generator<'a> {
     pub(crate) fn new(module: &'a FormatModule) -> Self {
         let module_ftypes = HashMap::new();
@@ -1823,6 +1653,7 @@ impl<'a> Generator<'a> {
         }
     }
 
+
     pub fn compile(module: &'a FormatModule, top_format: &Format) -> Self {
         let mut gen = Self::new(module);
         let mut tc = TypeChecker::new();
@@ -1830,25 +1661,431 @@ impl<'a> Generator<'a> {
         let _ = tc
             .infer_utype_format(top_format, ctxt)
             .unwrap_or_else(|err| panic!("Failed to infer topl-level format type: {err}"));
-        let mut trav = Traversal::new(module, top_format);
-        for (ix, term) in trav.enumerate() {
-            let uv = UVar::new(ix);
-            let Some(vt) = tc.reify(Rc::new(UType::Var(uv))) else {
-                unreachable!("None returned by TypeChecker::reify call on {uv}");
-            };
-            match term {
-                FormatTerm::Format(fmt) => {
-                    let rust_t = gen.codegen.lift_type(&vt);
-                    let dec = Compiler::compile_one(fmt).unwrap_or_else(|err| panic!("{}", err));
-                    let logic = gen.codegen.translate(&dec, Some(&rust_t));
-                    gen.sourcemap.decoder_skels.push(DecoderFn(logic, rust_t));
-                }
-                FormatTerm::Pattern(pat) => {}
-                FormatTerm::Expr() => todo!(),
-                FormatTerm::EmbeddedType => (),
+        let mut trav = Traversal::new(&tc, &mut gen.codegen);
+        gen
+    }
+}
+
+pub(crate) struct Traversal<'a> {
+    tree_index: usize,
+    t_formats: HashMap<usize, Rc<GTFormat>>,
+    tc: &'a TypeChecker,
+    codegen: &'a mut Codegen,
+}
+
+impl Traversal<'_> {
+    pub fn get_and_increment(&mut self) -> usize {
+        let ret = self.tree_index;
+        self.tree_index += 1;
+        ret
+    }
+
+    pub fn increment(&mut self) {
+        self.tree_index += 1;
+    }
+
+    pub fn get(&self) -> usize {
+        self.tree_index
+    }
+
+    fn decorate_dynamic_format(&mut self, dynf: &DynFormat, ctxt: GenCtxt<'_>) -> TypedDynFormat<GenType> {
+        let dynf_index = self.get_and_increment();
+
+        match dynf {
+            DynFormat::Huffman(code_lengths, opt_values_expr) => {
+                let t_codes = self.decorate_expr(code_lengths);
+                self.increment();
+
+                let t_values_expr = opt_values_expr.as_ref().map(|values_expr| {
+                    let t_values = self.decorate_expr(&values_expr);
+                    self.increment();
+                    t_values
+                });
+                GTDynFormat::Huffman(t_codes, t_values_expr)
             }
         }
-        gen
+
+    }
+}
+
+type GTFormat = TypedFormat<GenType>;
+type GTExpr = TypedExpr<GenType>;
+type GTPattern = TypedPattern<GenType>;
+
+#[derive(Debug, Clone)]
+
+struct GenCtxt<'a> {
+    module: &'a FormatModule,
+    dyns: TypedDynScope<'a>,
+}
+
+impl<'a> GenCtxt<'a> {
+    fn with_dyn_binding(&'a self, lbl: &'a str, t_dynf: Rc<TypedDynFormat<GenType>>) -> Self {
+        Self {
+            module: self.module,
+            dyns: TypedDynScope::Dyn(&self.dyns, lbl, t_dynf)
+        }
+    }
+}
+
+type GTDynFormat = TypedDynFormat<GenType>;
+
+#[derive(Debug, Clone)]
+enum TypedDynScope<'a> {
+    Empty,
+    Dyn(&'a TypedDynScope<'a>, &'a str, Rc<GTDynFormat>),
+}
+
+impl<'a> TypedDynScope<'a> {
+    fn get_typed_dynf_by_name(&self, name: &'a str) -> Option<Rc<GTDynFormat>> {
+        match self {
+            TypedDynScope::Empty => None,
+            TypedDynScope::Dyn(parent, lbl, t_dynf) if *lbl == name => Some(t_dynf.clone()),
+            TypedDynScope::Dyn(parent, ..) => parent.get_typed_dynf_by_name(name),
+        }
+    }
+}
+
+
+impl<'a> Traversal<'a> {
+    pub(crate) fn new(tc: &'a TypeChecker, codegen: &'a mut Codegen) -> Self {
+        Self { tree_index: 0, t_formats: HashMap::new(), tc, codegen }
+    }
+
+    fn decorate_format(&mut self, format: &Format, ctxt: GenCtxt<'_>) -> GTFormat {
+        let root_index = self.get_and_increment();
+        match format {
+            Format::ItemVar(level, args) => {
+                let fm_args = &ctxt.module.args[*level];
+                let mut t_args = Vec::with_capacity(args.len());
+                for ((lbl, _), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
+                    let t_arg = self.decorate_expr(arg);
+                    t_args.push((lbl.clone(), t_arg));
+                }
+                let t_inner = if let Some(val) = self.t_formats.get(level) {
+                    val.clone()
+                } else {
+                    let fresh_ctxt = GenCtxt { dyns: TypedDynScope::Empty, module: ctxt.module };
+                    let tmp = Rc::new(self.decorate_format(ctxt.module.get_format(*level), fresh_ctxt));
+                    self.t_formats.insert(*level, tmp.clone());
+                    tmp
+                };
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::FormatCall(gt, t_args, t_inner)
+            }
+            Format::Fail => GTFormat::Fail,
+            Format::EndOfInput => GTFormat::EndOfInput,
+            Format::Align(n) => GTFormat::Align(*n),
+            Format::Byte(bs) => GTFormat::Byte(*bs),
+            Format::Union(branches) => {
+                let mut t_branches = Vec::with_capacity(branches.len());
+                for branch in branches {
+                    let t_branch = self.decorate_format(format, ctxt.clone());
+                    t_branches.push(t_branch);
+                }
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Union(gt, t_branches)
+            }
+            Format::UnionNondet(branches) => {
+                let mut t_branches = Vec::with_capacity(branches.len());
+                for branch in branches {
+                    let t_branch = self.decorate_format(format, ctxt.clone());
+                    t_branches.push(t_branch);
+                }
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::UnionNondet(gt, t_branches)
+            }
+            Format::Tuple(elts) => {
+                let mut t_elts = Vec::with_capacity(elts.len());
+                for t in elts {
+                    let t_elt = self.decorate_format(t, ctxt.clone());
+                    t_elts.push(t_elt);
+                }
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Tuple(gt, t_elts)
+            }
+            Format::Record(flds) => {
+                let mut t_flds = Vec::with_capacity(flds.len());
+                for (lbl, t) in flds {
+                    let t_fld = self.decorate_format(t, ctxt.clone());
+                    t_flds.push((lbl.clone(), t_fld));
+                }
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Record(gt, t_flds)
+            }
+            Format::Variant(label, inner) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
+            }
+            Format::Repeat(inner) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Repeat(gt, Box::new(t_inner))
+            }
+            | Format::Repeat1(inner) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Repeat1(gt, Box::new(t_inner))
+            }
+            Format::Bits(inner) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Bits(gt, Box::new(t_inner))
+            }
+            Format::Peek(inner) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Peek(gt, Box::new(t_inner))
+            }
+            Format::PeekNot(inner) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::PeekNot(gt, Box::new(t_inner))
+            }
+            Format::Slice(expr, inner) => {
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Slice(gt, t_expr, Box::new(t_inner))
+            }
+            Format::WithRelativeOffset(expr, inner) => {
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
+            }
+            Format::RepeatCount(expr, inner) => {
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
+            }
+            Format::RepeatUntilLast(expr, inner) => {
+                // FIXME - figure out the pattern to apply here
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::RepeatUntilLast(gt, t_expr, Box::new(t_inner))
+            }
+            Format::RepeatUntilSeq(expr, inner) => {
+                // FIXME - figure out the pattern to apply here
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::RepeatUntilSeq(gt, t_expr, Box::new(t_inner))
+            }
+            Format::Map(inner, lambda) => {
+                let t_inner = self.decorate_format(inner, ctxt);
+                let t_lambda = self.decorate_expr(lambda);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Map(gt, Box::new(t_inner), t_lambda)
+            }
+            Format::Compute(expr) => {
+                let t_expr = self.decorate_expr(expr);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Compute(gt, t_expr)
+            }
+            Format::Let(lbl, expr, inner) => {
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, ctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Let(gt, lbl.clone(), t_expr, Box::new(t_inner))
+            }
+            Format::Match(x, branches) => {
+                let t_x = self.decorate_expr(x);
+                let mut t_branches = Vec::with_capacity(branches.len());
+                for (pat, rhs) in branches {
+                    let t_pat = self.decorate_pattern(pat);
+                    let t_rhs = self.decorate_format(rhs, ctxt.clone());
+                    t_branches.push((t_pat, t_rhs));
+                }
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Match(gt, t_x, t_branches)
+            }
+            Format::Dynamic(lbl, dynf, inner) => {
+                let t_dynf = self.decorate_dynamic_format(dynf, ctxt.clone());
+                let newctxt = ctxt.with_dyn_binding(lbl, Rc::new(t_dynf.clone()));
+                let inner_t = self.decorate_format(inner, newctxt);
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(inner_t))
+            }
+            Format::Apply(lbl) => {
+                let t_dynf = ctxt.dyns.get_typed_dynf_by_name(lbl).unwrap_or_else(|| panic!("missing dynformat {lbl}"));
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTFormat::Apply(gt, t_dynf)
+            }
+        }
+    }
+
+    fn get_gt_from_index(&mut self, index: usize) -> GenType {
+        let uvar = UVar::new(index);
+        let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+        GenType::Inline(self.codegen.lift_type(&vt))
+    }
+
+    fn decorate_expr(&mut self, expr: &Expr) -> GTExpr {
+        let root_index = self.get_and_increment();
+        match expr {
+            Expr::Var(lbl) => {
+                let gt = {
+                    let uvar = UVar::new(root_index);
+                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
+                    GenType::Inline(self.codegen.lift_type(&vt))
+                };
+                GTExpr::Var(gt, lbl.clone())
+            }
+            Expr::Bool(b) => GTExpr::Bool(*b),
+            Expr::U8(n) => GTExpr::U8(*n),
+            Expr::U16(n) => GTExpr::U16(*n),
+            Expr::U32(n) => GTExpr::U32(*n),
+            Expr::U64(n) => GTExpr::U64(*n),
+            Expr::Tuple(elts) => {
+                let mut t_elts = Vec::with_capacity(elts.len());
+                for elt in elts {
+                    let t_elt = self.decorate_expr(elt);
+                    t_elts.push(t_elt);
+                }
+                let gt = self.get_gt_from_index(root_index);
+                GTExpr::Tuple(gt, t_elts)
+            }
+            Expr::Record(_) => todo!(),
+            Expr::RecordProj(e, _) => {
+                let t_e = self.decorate_expr(e);
+                todo!()
+            }
+            Expr::TupleProj(e, _) => {
+                let t_e = self.decorate_expr(e);
+                todo!()
+            }
+            Expr::Variant(_, _) => todo!(),
+            Expr::Seq(_) => todo!(),
+            Expr::Match(_, _) => todo!(),
+            Expr::Lambda(_, _) => todo!(),
+            Expr::IntRel(_, _, _) => todo!(),
+            Expr::Arith(_, _, _) => todo!(),
+            Expr::AsU8(_) => todo!(),
+            Expr::AsU16(_) => todo!(),
+            Expr::AsU32(_) => todo!(),
+            Expr::AsU64(_) => todo!(),
+            Expr::AsChar(_) => todo!(),
+            Expr::U16Be(_) => todo!(),
+            Expr::U16Le(_) => todo!(),
+            Expr::U32Be(_) => todo!(),
+            Expr::U32Le(_) => todo!(),
+            Expr::U64Be(_) => todo!(),
+            Expr::U64Le(_) => todo!(),
+            Expr::SeqLength(_) => todo!(),
+            Expr::SubSeq(_, _, _) => todo!(),
+            Expr::FlatMap(_, _) => todo!(),
+            Expr::FlatMapAccum(_, _, _, _) => todo!(),
+            Expr::Dup(_, _) => todo!(),
+            Expr::Inflate(_) => todo!(),
+        }
+    }
+
+    fn decorate_pattern(&mut self, pat: &Pattern) -> GTPattern {
+        // items.push(TreeNode::Pattern(pat));
+        match pat {
+            Pattern::Binding(_) | Pattern::Wildcard => todo!(),
+            Pattern::Bool(_) => todo!(),
+            Pattern::U8(_) => todo!(),
+            Pattern::U16(_) => todo!(),
+            Pattern::U32(_) => todo!(),
+            Pattern::U64(_) => todo!(),
+            Pattern::Char(_) => todo!(),
+            Pattern::Tuple(_) => todo!(),
+            Pattern::Variant(_, _) => todo!(),
+            Pattern::Seq(_) => todo!(),
+        }
     }
 }
 
