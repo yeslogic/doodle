@@ -8,8 +8,8 @@ use std::path::PathBuf;
 use clap::{Parser, ValueEnum};
 use doodle::decoder::Compiler;
 use doodle::read::ReadCtxt;
-use doodle::FormatModule;
 use doodle::typecheck;
+use doodle::FormatModule;
 
 mod format;
 
@@ -101,14 +101,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     }
 }
 
-fn check_all<'a>(module: &'a FormatModule) -> AResult<()> {
+fn check_all(module: &FormatModule) -> AResult<()> {
     for (level, f) in module.iter_formats() {
-        match typecheck(module, &f).map_err(|err| anyhow!("{err}"))? {
-            Some(vt) => {
-                let mod_vt = module.get_format_type(level);
-                assert_eq!(&vt, mod_vt);
-            }
-            None => (),
+        if let Some(vt) = typecheck(module, &f).map_err(|err| anyhow!("{err}"))? {
+            let mod_vt = module.get_format_type(level);
+            assert_eq!(&vt, mod_vt);
         }
     }
     Ok(())
