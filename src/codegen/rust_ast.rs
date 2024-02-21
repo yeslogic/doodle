@@ -745,20 +745,20 @@ impl ToFragment for SubIdent {
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustPrimLit {
-    BooleanLit(bool),
-    NumericLit(usize),
-    CharLit(char),
-    StringLit(Label),
+    Boolean(bool),
+    Numeric(usize),
+    Char(char),
+    String(Label),
 }
 
 impl ToFragment for RustPrimLit {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustPrimLit::BooleanLit(b) => Fragment::DisplayAtom(Rc::new(*b)),
-            RustPrimLit::NumericLit(n) => Fragment::DisplayAtom(Rc::new(*n)),
-            RustPrimLit::CharLit(c) => Fragment::DisplayAtom(Rc::new(*c))
+            RustPrimLit::Boolean(b) => Fragment::DisplayAtom(Rc::new(*b)),
+            RustPrimLit::Numeric(n) => Fragment::DisplayAtom(Rc::new(*n)),
+            RustPrimLit::Char(c) => Fragment::DisplayAtom(Rc::new(*c))
                 .delimit(Fragment::Char('\''), Fragment::Char('\'')),
-            RustPrimLit::StringLit(s) => Fragment::String(s.clone())
+            RustPrimLit::String(s) => Fragment::String(s.clone())
                 .delimit(Fragment::string("r#\""), Fragment::string("\"#")),
         }
     }
@@ -898,9 +898,9 @@ impl RustExpr {
 
     pub const NONE: Self = Self::Entity(RustEntity::Local(Label::Borrowed("None")));
 
-    pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::BooleanLit(true));
+    pub const TRUE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(true));
 
-    pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::BooleanLit(false));
+    pub const FALSE: Self = Self::PrimitiveLit(RustPrimLit::Boolean(false));
 
     pub fn cond_paren(&self, prec: Precedence) -> Self {
         match &self {
@@ -924,7 +924,7 @@ impl RustExpr {
     }
 
     pub fn num_lit<N: Into<usize>>(num: N) -> Self {
-        Self::PrimitiveLit(RustPrimLit::NumericLit(num.into()))
+        Self::PrimitiveLit(RustPrimLit::Numeric(num.into()))
     }
 
     pub fn scoped<Name: Into<Label>>(
@@ -974,7 +974,7 @@ impl RustExpr {
     }
 
     pub fn str_lit(str: impl Into<Label>) -> Self {
-        Self::PrimitiveLit(RustPrimLit::StringLit(str.into()))
+        Self::PrimitiveLit(RustPrimLit::String(str.into()))
     }
 }
 
