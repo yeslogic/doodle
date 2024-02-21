@@ -623,7 +623,7 @@ pub enum Format {
     /// Let binding
     Let(Label, Expr, Box<Format>),
     /// Pattern match on an expression
-    Match(Expr, Vec<(pattern::Pattern, Format)>),
+    Match(Expr, Vec<(Pattern, Format)>),
     /// Format generated dynamically
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope

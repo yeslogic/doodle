@@ -534,6 +534,7 @@ impl From<BaseType> for PrimType {
             BaseType::U8 => PrimType::U8,
             BaseType::U16 => PrimType::U16,
             BaseType::U32 => PrimType::U32,
+            BaseType::U64 => PrimType::U64,
             BaseType::Char => PrimType::Char,
         }
     }
