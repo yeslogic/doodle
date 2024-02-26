@@ -214,7 +214,7 @@ impl ValueType {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum IntRel {
     Eq,
     Ne,
@@ -224,7 +224,7 @@ pub enum IntRel {
     Gte,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum Arith {
     Add,
     Sub,
