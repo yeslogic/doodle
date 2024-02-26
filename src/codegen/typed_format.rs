@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::byte_set::ByteSet;
-use crate::{ Arith, DynFormat, Expr, Format, FormatModule, IntRel, Label, Pattern, ValueType };
-use crate::typecheck::{ TypeChecker, UType, UVar, VMId };
+use crate::{ Arith, FormatModule, IntRel, Label, ValueType };
+use crate::typecheck::VMId;
 use super::rust_ast::{ RustType, RustTypeDef };
 
 
@@ -81,12 +81,15 @@ pub enum TypedExpr<TypeRep> {
     AsU8(Box<TypedExpr<TypeRep>>),
     AsU16(Box<TypedExpr<TypeRep>>),
     AsU32(Box<TypedExpr<TypeRep>>),
+    AsU64(Box<TypedExpr<TypeRep>>),
     AsChar(Box<TypedExpr<TypeRep>>),
 
     U16Be(Box<TypedExpr<TypeRep>>),
     U16Le(Box<TypedExpr<TypeRep>>),
     U32Be(Box<TypedExpr<TypeRep>>),
     U32Le(Box<TypedExpr<TypeRep>>),
+    U64Be(Box<TypedExpr<TypeRep>>),
+    U64Le(Box<TypedExpr<TypeRep>>),
 
     SeqLength(Box<TypedExpr<TypeRep>>),
     SubSeq(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
@@ -104,6 +107,7 @@ pub enum TypedPattern<TypeRep> {
     U8(u8),
     U16(u16),
     U32(u32),
+    U64(u64),
     Char(char),
     Tuple(TypeRep, Vec<TypedPattern<TypeRep>>),
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
