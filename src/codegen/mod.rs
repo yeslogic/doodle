@@ -3,22 +3,13 @@ mod typed_format;
 
 use crate::{
     byte_set::ByteSet,
-    decoder::{ Decoder, Program },
-    typecheck::{ TypeChecker, UScope, UVar },
-    Arith,
-    BaseType,
-    DynFormat,
-    Expr,
-    Format,
-    FormatModule,
-    IntRel,
-    Label,
-    MatchTree,
-    Pattern,
+    decoder::{Decoder, Program},
+    typecheck::{TypeChecker, UScope, UVar},
+    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern,
     ValueType,
 };
 
-use std::{ collections::HashMap, rc::Rc };
+use std::{collections::HashMap, rc::Rc};
 
 use rust_ast::*;
 
@@ -71,7 +62,7 @@ impl NameGen {
 pub struct Codegen {
     namegen: NameGen,
     defined_types: Vec<RustTypeDef>,
-    decoder_types: Vec<RustType>,
+    decoder_types: Vec<GenType>,
 }
 
 impl Codegen {
@@ -86,12 +77,21 @@ impl Codegen {
         }
     }
 
+    pub(crate) fn substitute_definition(&self, t: GenType) -> GenType {
+        if let GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lbl)))) = t
+        {
+            GenType::Def((ix, lbl), self.defined_types[ix].clone())
+        } else {
+            t
+        }
+    }
+
     /// Converts a `ValueType` to a `RustType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
-    fn lift_type(&mut self, vt: &ValueType) -> RustType {
+    fn lift_type(&mut self, vt: &ValueType) -> GenType {
         match vt {
-            ValueType::Empty => RustType::UNIT,
+            ValueType::Empty => RustType::UNIT.into(),
             ValueType::Base(BaseType::Bool) => PrimType::Bool.into(),
             ValueType::Base(BaseType::U8) => PrimType::U8.into(),
             ValueType::Base(BaseType::U16) => PrimType::U16.into(),
@@ -101,12 +101,12 @@ impl Codegen {
             ValueType::Tuple(vs) => {
                 let mut buf = Vec::with_capacity(vs.len());
                 for v in vs.iter() {
-                    buf.push(self.lift_type(v));
+                    buf.push(self.lift_type(v).to_rust_type());
                 }
-                RustType::AnonTuple(buf)
+                RustType::AnonTuple(buf).into()
             }
             ValueType::Seq(t) => {
-                let inner = self.lift_type(t.as_ref());
+                let inner = self.lift_type(t.as_ref()).to_rust_type();
                 CompType::Vec(Box::new(inner)).into()
             }
             ValueType::Any => panic!("ValueType::Any"),
@@ -114,14 +114,14 @@ impl Codegen {
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
                     let rt_field = self.lift_type(ty);
-                    rt_fields.push((lab.clone(), rt_field));
+                    rt_fields.push((lab.clone(), rt_field.to_rust_type()));
                 }
                 let rtdef = RustTypeDef::Struct(RustStruct::Record(rt_fields));
                 let (tname, (ix, is_new)) = self.namegen.get_name(&rtdef);
                 if is_new {
-                    self.defined_types.push(rtdef);
+                    self.defined_types.push(rtdef.clone());
                 }
-                RustType::defined(ix, tname)
+                GenType::Def((ix, tname), rtdef)
             }
             ValueType::Union(vars) => {
                 let mut rt_vars = Vec::new();
@@ -134,7 +134,7 @@ impl Codegen {
                             } else {
                                 let mut rt_args = Vec::new();
                                 for arg in args.iter() {
-                                    rt_args.push(self.lift_type(arg));
+                                    rt_args.push(self.lift_type(arg).to_rust_type());
                                 }
                                 RustVariant::Tuple(vname.clone(), rt_args)
                             }
@@ -147,7 +147,7 @@ impl Codegen {
                             RustVariant::Record(vname.clone(), rt_fields)
                         } */
                         other => {
-                            let inner = self.lift_type(other);
+                            let inner = self.lift_type(other).to_rust_type();
                             RustVariant::Tuple(vname.clone(), vec![inner])
                         }
                     };
@@ -156,9 +156,10 @@ impl Codegen {
                 let rtdef = RustTypeDef::Enum(rt_vars);
                 let (tname, (ix, is_new)) = self.namegen.get_name(&rtdef);
                 if is_new {
-                    self.defined_types.push(rtdef);
+                    self.defined_types.push(rtdef.clone());
                 }
-                RustType::defined(ix, tname)
+                GenType::Def((ix, tname), rtdef)
+                // RustType::defined(ix, tname)
             }
         }
     }
@@ -171,7 +172,7 @@ impl Codegen {
         }
     }
 
-    fn translate(&self, decoder: &Decoder, type_hint: Option<&RustType>) -> CaseLogic {
+    fn translate(&self, decoder: &Decoder, type_hint: Option<&GenType>) -> CaseLogic {
         match decoder {
             Decoder::Call(ix, args) => CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
             Decoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
@@ -180,9 +181,13 @@ impl Codegen {
             Decoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             Decoder::Variant(vname, inner) => {
                 let (tname, tdef) = match type_hint {
-                    Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
-                        (lab.clone(), &self.defined_types[*ix])
-                    }
+                    Some(
+                        GenType::Def((ix, lab), ..)
+                        | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                            ix,
+                            lab,
+                        )))),
+                    ) => (lab.clone(), &self.defined_types[*ix]),
                     Some(other) => panic!("unexpected type_hint for Decoder::Variant: {:?}", other),
                     _ => unreachable!("must have type_hint to translate Decoder::Variant"),
                 };
@@ -198,7 +203,7 @@ impl Codegen {
                         match matching {
                             Some(RustVariant::Unit(_)) => {
                                 // FIXME - this is not quite correct, as it calls `Var(inner)` where `inner = ()` instead of `Var`
-                                let inner = self.translate(inner, Some(&RustType::UNIT));
+                                let inner = self.translate(inner, Some(&GenType::Inline(RustType::UNIT)));
                                 CaseLogic::Derived(
                                     DerivedLogic::UnitVariantOf(constr, Box::new(inner))
                                 )
@@ -218,7 +223,7 @@ impl Codegen {
                                                     tt @ RustType::AnonTuple(..) => {
                                                         let cl_mono_tuple = self.translate(
                                                             inner,
-                                                            Some(tt)
+                                                            Some(&tt.clone().into())
                                                         );
                                                         CaseLogic::Derived(
                                                             DerivedLogic::VariantOf(
@@ -241,8 +246,8 @@ impl Codegen {
                                             }
                                         } else {
                                             let mut cl_args = Vec::new();
-                                            for (dec, typ) in decs.iter().zip(typs.iter()) {
-                                                let cl_arg = self.translate(dec, Some(typ));
+                                            for (dec, typ) in Iterator::zip(decs.iter(), typs.iter()) {
+                                                let cl_arg = self.translate(dec, Some(&typ.clone().into()));
                                                 cl_args.push(cl_arg);
                                             }
                                             CaseLogic::Sequential(SequentialLogic::AccumTuple {
@@ -253,7 +258,7 @@ impl Codegen {
                                     }
                                     _ => {
                                         if typs.len() == 1 {
-                                            let cl_mono = self.translate(inner, Some(&typs[0]));
+                                            let cl_mono = self.translate(inner, Some(&typs[0].clone().into()));
                                             CaseLogic::Derived(
                                                 DerivedLogic::VariantOf(constr, Box::new(cl_mono))
                                             )
@@ -276,7 +281,7 @@ impl Codegen {
                                                 l1.as_ref(),
                                                 "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
                                             );
-                                            assocs.push((l0.clone(), self.translate(d, Some(t))));
+                                            assocs.push((l0.clone(), self.translate(d, Some(&t.clone().into()))));
                                         }
                                         CaseLogic::Sequential(SequentialLogic::AccumRecord {
                                             constructor: constr,
@@ -301,57 +306,45 @@ impl Codegen {
                     }
                 }
             }
-            Decoder::Parallel(alts) =>
-                CaseLogic::Parallel(
-                    ParallelLogic::Alts(
-                        alts
+            Decoder::Parallel(alts) => CaseLogic::Parallel(ParallelLogic::Alts(
+                alts.iter()
+                    .map(|alt| self.translate(alt, type_hint))
+                    .collect(),
+            )),
+            Decoder::Branch(tree, flat) => CaseLogic::Other(OtherLogic::Descend(
+                tree.clone(),
+                flat.iter()
+                    .map(|alt| self.translate(alt, type_hint))
+                    .collect(),
+            )),
+            Decoder::Tuple(elts) => match type_hint {
+                None => CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                    constructor: None,
+                    elements: elts.iter().map(|elt| self.translate(elt, None)).collect(),
+                }),
+                Some(GenType::Inline(RustType::AnonTuple(tys))) => {
+                    CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                        constructor: None,
+                        elements: elts
                             .iter()
-                            .map(|alt| self.translate(alt, type_hint))
-                            .collect()
-                    )
-                ),
-            Decoder::Branch(tree, flat) =>
-                CaseLogic::Other(
-                    OtherLogic::Descend(
-                        tree.clone(),
-                        flat
-                            .iter()
-                            .map(|alt| self.translate(alt, type_hint))
-                            .collect()
-                    )
-                ),
-            Decoder::Tuple(elts) =>
-                match type_hint {
-                    None =>
-                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                            constructor: None,
-                            elements: elts
-                                .iter()
-                                .map(|elt| self.translate(elt, None))
-                                .collect(),
-                        }),
-                    Some(RustType::AnonTuple(tys)) => {
-                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                            constructor: None,
-                            elements: elts
-                                .iter()
-                                .zip(tys)
-                                .map(|(elt, ty)| self.translate(elt, Some(ty)))
-                                .collect(),
-                        })
-                    }
-                    Some(RustType::Atom(AtomType::Prim(PrimType::Unit))) if elts.is_empty() => {
-                        CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
-                    }
-                    Some(other) =>
-                        unreachable!(
-                            "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
-                            other
-                        ),
+                            .zip(tys)
+                            .map(|(elt, ty)| self.translate(elt, Some(&ty.clone().into())))
+                            .collect(),
+                    })
                 }
+                Some(GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit))))
+                    if elts.is_empty() =>
+                {
+                    CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
+                }
+                Some(other) => unreachable!(
+                    "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
+                    other
+                ),
+            },
             Decoder::Record(flds) => {
                 match type_hint {
-                    Some(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab)))) => {
+                    Some(GenType::Def((ix, lab), ..) | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab))))) => {
                         let tdef = &self.defined_types[*ix];
                         let tfields = match tdef {
                             RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
@@ -369,7 +362,7 @@ impl Codegen {
                                 l1.as_ref(),
                                 "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
                             );
-                            assocs.push((l0.clone(), self.translate(d, Some(t))));
+                            assocs.push((l0.clone(), self.translate(d, Some(&t.clone().into()))));
                         }
                         CaseLogic::Sequential(SequentialLogic::AccumRecord {
                             constructor: Constructor::Simple(lab.clone()),
@@ -388,112 +381,101 @@ impl Codegen {
                         ),
                 }
             }
-            Decoder::While(tree_continue, single) =>
-                match type_hint {
-                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                        let cl_single = self.translate(single, Some(t.as_ref()));
-                        CaseLogic::Repeat(
-                            RepeatLogic::ContinueOnMatch(tree_continue.clone(), Box::new(cl_single))
-                        )
-                    }
-                    Some(other) => {
-                        unreachable!("Hint for Decoder::While should be Vec<_>, found {other:?}")
-                    }
-                    None => {
-                        let cl_single = self.translate(single, None);
-                        CaseLogic::Repeat(
-                            RepeatLogic::ContinueOnMatch(tree_continue.clone(), Box::new(cl_single))
-                        )
-                    }
+            Decoder::While(tree_continue, single) => match type_hint {
+                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                    CaseLogic::Repeat(RepeatLogic::ContinueOnMatch(
+                        tree_continue.clone(),
+                        Box::new(cl_single),
+                    ))
                 }
-            Decoder::Until(tree_break, single) =>
-                match type_hint {
-                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                        let cl_single = self.translate(single, Some(t.as_ref()));
-                        CaseLogic::Repeat(
-                            RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(cl_single))
-                        )
-                    }
-                    Some(other) => {
-                        unreachable!("Hint for Decoder::Until should be Vec<_>, found {other:?}")
-                    }
-                    None => {
-                        let cl_single = self.translate(single, None);
-                        CaseLogic::Repeat(
-                            RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(cl_single))
-                        )
-                    }
+                Some(other) => {
+                    unreachable!("Hint for Decoder::While should be Vec<_>, found {other:?}")
                 }
-            Decoder::RepeatCount(expr_count, single) =>
-                match type_hint {
-                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                        let cl_single = self.translate(single, Some(t.as_ref()));
-                        CaseLogic::Repeat(
-                            RepeatLogic::ExactCount(embed_expr(expr_count), Box::new(cl_single))
-                        )
-                    }
-                    Some(other) => {
-                        unreachable!(
-                            "Hint for Decoder::RepeatCount should be Vec<_>, found {other:?}"
-                        )
-                    }
-                    None => {
-                        let cl_single = self.translate(single, None);
-                        CaseLogic::Repeat(
-                            RepeatLogic::ExactCount(embed_expr(expr_count), Box::new(cl_single))
-                        )
-                    }
+                None => {
+                    let cl_single = self.translate(single, None);
+                    CaseLogic::Repeat(RepeatLogic::ContinueOnMatch(
+                        tree_continue.clone(),
+                        Box::new(cl_single),
+                    ))
                 }
-            Decoder::RepeatUntilLast(pred_terminal, single) =>
-                match type_hint {
-                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                        let cl_single = self.translate(single, Some(t.as_ref()));
-                        CaseLogic::Repeat(
-                            RepeatLogic::ConditionTerminal(
-                                embed_expr(pred_terminal),
-                                Box::new(cl_single)
-                            )
-                        )
-                    }
-                    Some(other) =>
-                        unreachable!(
-                            "Hint for Decoder::RepeatUntilLast should be Vec<_>, found {other:?}"
-                        ),
-                    None => {
-                        let cl_single = self.translate(single, None);
-                        CaseLogic::Repeat(
-                            RepeatLogic::ConditionTerminal(
-                                embed_expr(pred_terminal),
-                                Box::new(cl_single)
-                            )
-                        )
-                    }
+            },
+            Decoder::Until(tree_break, single) => match type_hint {
+                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                    CaseLogic::Repeat(RepeatLogic::BreakOnMatch(
+                        tree_break.clone(),
+                        Box::new(cl_single),
+                    ))
                 }
-            Decoder::RepeatUntilSeq(pred_complete, single) =>
-                match type_hint {
-                    Some(RustType::Atom(AtomType::Comp(CompType::Vec(t)))) => {
-                        let cl_single = self.translate(single, Some(t.as_ref()));
-                        CaseLogic::Repeat(
-                            RepeatLogic::ConditionComplete(
-                                embed_expr(pred_complete),
-                                Box::new(cl_single)
-                            )
-                        )
-                    }
-                    Some(other) =>
-                        unreachable!(
-                            "Hint for Decoder::RepeatUntilSeq should be Vec<_>, found {other:?}"
-                        ),
-                    None => {
-                        let cl_single = self.translate(single, None);
-                        CaseLogic::Repeat(
-                            RepeatLogic::ConditionComplete(
-                                embed_expr(pred_complete),
-                                Box::new(cl_single)
-                            )
-                        )
-                    }
+                Some(other) => {
+                    unreachable!("Hint for Decoder::Until should be Vec<_>, found {other:?}")
                 }
+                None => {
+                    let cl_single = self.translate(single, None);
+                    CaseLogic::Repeat(RepeatLogic::BreakOnMatch(
+                        tree_break.clone(),
+                        Box::new(cl_single),
+                    ))
+                }
+            },
+            Decoder::RepeatCount(expr_count, single) => match type_hint {
+                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                    CaseLogic::Repeat(RepeatLogic::ExactCount(
+                        embed_expr(expr_count),
+                        Box::new(cl_single),
+                    ))
+                }
+                Some(other) => {
+                    unreachable!("Hint for Decoder::RepeatCount should be Vec<_>, found {other:?}")
+                }
+                None => {
+                    let cl_single = self.translate(single, None);
+                    CaseLogic::Repeat(RepeatLogic::ExactCount(
+                        embed_expr(expr_count),
+                        Box::new(cl_single),
+                    ))
+                }
+            },
+            Decoder::RepeatUntilLast(pred_terminal, single) => match type_hint {
+                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                    CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
+                        embed_expr(pred_terminal),
+                        Box::new(cl_single),
+                    ))
+                }
+                Some(other) => unreachable!(
+                    "Hint for Decoder::RepeatUntilLast should be Vec<_>, found {other:?}"
+                ),
+                None => {
+                    let cl_single = self.translate(single, None);
+                    CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
+                        embed_expr(pred_terminal),
+                        Box::new(cl_single),
+                    ))
+                }
+            },
+            Decoder::RepeatUntilSeq(pred_complete, single) => match type_hint {
+                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                    CaseLogic::Repeat(RepeatLogic::ConditionComplete(
+                        embed_expr(pred_complete),
+                        Box::new(cl_single),
+                    ))
+                }
+                Some(other) => unreachable!(
+                    "Hint for Decoder::RepeatUntilSeq should be Vec<_>, found {other:?}"
+                ),
+                None => {
+                    let cl_single = self.translate(single, None);
+                    CaseLogic::Repeat(RepeatLogic::ConditionComplete(
+                        embed_expr(pred_complete),
+                        Box::new(cl_single),
+                    ))
+                }
+            },
             // FIXME - implement CaseLogic variants and translation rules for the remaining cases
             Decoder::Map(inner, f) => {
                 // FIXME - we have no way of inferring a proper type-hint for inner
@@ -503,9 +485,11 @@ impl Codegen {
             Decoder::Compute(expr) => CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr))),
             Decoder::Let(name, expr, inner) => {
                 let cl_inner = self.translate(inner, type_hint);
-                CaseLogic::Derived(
-                    DerivedLogic::Let(name.clone(), embed_expr(expr), Box::new(cl_inner))
-                )
+                CaseLogic::Derived(DerivedLogic::Let(
+                    name.clone(),
+                    embed_expr(expr),
+                    Box::new(cl_inner),
+                ))
             }
             Decoder::Match(scrutinee, cases) => {
                 let mut cl_cases = Vec::new();
@@ -553,20 +537,10 @@ fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
         Pattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
         Pattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::Char(*c)),
         Pattern::Tuple(pats) => {
-            RustPattern::TupleLiteral(
-                pats
-                    .iter()
-                    .map(|x| embed_pattern(x, None))
-                    .collect()
-            )
+            RustPattern::TupleLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
         }
         Pattern::Seq(pats) => {
-            RustPattern::ArrayLiteral(
-                pats
-                    .iter()
-                    .map(|x| embed_pattern(x, None))
-                    .collect()
-            )
+            RustPattern::ArrayLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
         }
         Pattern::Variant(vname, pat) => {
             let constr = match type_hint {
@@ -598,39 +572,32 @@ fn embed_expr(expr: &Expr) -> RustExpr {
         Expr::TupleProj(expr_tup, ix) => embed_expr(expr_tup).nth(*ix),
         Expr::Record(_fields) => unreachable!("Record not bound in Variant"),
         Expr::RecordProj(expr_rec, fld) => embed_expr(expr_rec).field(fld.clone()),
-        Expr::Variant(vname, inner) =>
-            match inner.as_ref() {
-                Expr::Record(fields) =>
-                    RustExpr::Struct(
-                        RustEntity::Local(vname.clone()),
-                        fields
-                            .iter()
-                            .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr(fval)))))
-                            .collect()
-                    ),
-                _ => RustExpr::local(vname.clone()).call_with([embed_expr(inner)]),
-            }
+        Expr::Variant(vname, inner) => match inner.as_ref() {
+            Expr::Record(fields) => RustExpr::Struct(
+                RustEntity::Local(vname.clone()),
+                fields
+                    .iter()
+                    .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr(fval)))))
+                    .collect(),
+            ),
+            _ => RustExpr::local(vname.clone()).call_with([embed_expr(inner)]),
+        },
         Expr::Seq(elts) => {
             RustExpr::ArrayLit(elts.iter().map(embed_expr).collect()).call_method("to_vec")
         }
-        Expr::Match(scrutinee, cases) =>
-            RustExpr::Control(
-                Box::new(
-                    RustControl::Match(
-                        embed_expr(scrutinee),
-                        cases
-                            .iter()
-                            .map(|(pat, rhs)| {
-                                (
-                                    // FIXME - add actual type_hint when possible
-                                    MatchCaseLHS::Pattern(embed_pattern(pat, None)),
-                                    vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
-                                )
-                            })
-                            .collect()
+        Expr::Match(scrutinee, cases) => RustExpr::Control(Box::new(RustControl::Match(
+            embed_expr(scrutinee),
+            cases
+                .iter()
+                .map(|(pat, rhs)| {
+                    (
+                        // FIXME - add actual type_hint when possible
+                        MatchCaseLHS::Pattern(embed_pattern(pat, None)),
+                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
                     )
-                )
-            ),
+                })
+                .collect(),
+        ))),
         // FIXME - we probably need to apply precedence rules similar to tree-output, which will require a lot of refactoring in AST
         Expr::Arith(Arith::BitAnd, lhs, rhs) => {
             RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs))
@@ -709,41 +676,38 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             let end_expr = RustExpr::infix(RustExpr::local("ix"), Operator::Add, embed_expr(len));
             RustExpr::BlockScope(
                 vec![bind_ix],
-                Box::new(
-                    RustExpr::Slice(
-                        Box::new(embed_expr(seq)),
-                        Box::new(RustExpr::local("ix")),
-                        Box::new(end_expr)
-                    )
-                )
+                Box::new(RustExpr::Slice(
+                    Box::new(embed_expr(seq)),
+                    Box::new(RustExpr::local("ix")),
+                    Box::new(end_expr),
+                )),
             )
         }
-        Expr::FlatMap(f, seq) =>
-            embed_expr(seq)
-                .call_method("into_iter")
-                .call_method_with("flat_map", [embed_expr(f)])
-                .call_method("collect"),
-        Expr::FlatMapAccum(f, acc_init, _acc_type, seq) =>
-            embed_expr(seq)
-                .call_method("into_iter")
-                .call_method_with("fold", [embed_expr(acc_init), embed_expr(f)])
-                .call_method("collect"),
-        Expr::Dup(n, expr) =>
-            RustExpr::scoped(["Vec"], "from_iter").call_with([
-                RustExpr::scoped(["std", "iter"], "repeat")
-                    .call_with([embed_expr(expr)])
-                    .call_method_with("take", [embed_expr(n)]),
-            ]),
+        Expr::FlatMap(f, seq) => embed_expr(seq)
+            .call_method("into_iter")
+            .call_method_with("flat_map", [embed_expr(f)])
+            .call_method("collect"),
+        Expr::FlatMapAccum(f, acc_init, _acc_type, seq) => embed_expr(seq)
+            .call_method("into_iter")
+            .call_method_with("fold", [embed_expr(acc_init), embed_expr(f)])
+            .call_method("collect"),
+        Expr::Dup(n, expr) => RustExpr::scoped(["Vec"], "from_iter").call_with([RustExpr::scoped(
+            ["std", "iter"],
+            "repeat",
+        )
+        .call_with([embed_expr(expr)])
+        .call_method_with("take", [embed_expr(n)])]),
         Expr::Inflate(_) => {
             // FIXME - not clear what the proper thing to do here is
-            RustExpr::local("unimplemented!").call_with([
-                RustExpr::str_lit("embed_expr is not implemented for Expr::Inflate"),
-            ])
+            RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(
+                "embed_expr is not implemented for Expr::Inflate",
+            )])
         }
-        Expr::Lambda(head, body) =>
-            RustExpr::Paren(
-                Box::new(RustExpr::Closure(head.clone(), None, Box::new(embed_expr(body))))
-            ),
+        Expr::Lambda(head, body) => RustExpr::Paren(Box::new(RustExpr::Closure(
+            head.clone(),
+            None,
+            Box::new(embed_expr(body)),
+        ))),
     }
 }
 
@@ -775,15 +739,10 @@ impl CaseLogic {
             CaseLogic::Repeat(r) => r.to_ast(ctxt),
             CaseLogic::Parallel(p) => p.to_ast(ctxt),
             CaseLogic::Other(o) => o.to_ast(ctxt),
-            CaseLogic::Unhandled(msg) =>
-                (
-                    Vec::new(),
-                    Some(
-                        RustExpr::local("unimplemented!").call_with([
-                            RustExpr::str_lit(msg.clone()),
-                        ])
-                    ),
-                ),
+            CaseLogic::Unhandled(msg) => (
+                Vec::new(),
+                Some(RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(msg.clone())])),
+            ),
         }
     }
 }
@@ -791,8 +750,10 @@ impl CaseLogic {
 impl SimpleLogic {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            SimpleLogic::Fail =>
-                (vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)], None),
+            SimpleLogic::Fail => (
+                vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
+                None,
+            ),
             SimpleLogic::ExpectEnd => {
                 let call = RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte");
                 let cond = call.call_method("is_none");
@@ -800,11 +761,11 @@ impl SimpleLogic {
                 let b_false = [RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)];
                 (
                     Vec::new(),
-                    Some(
-                        RustExpr::Control(
-                            Box::new(RustControl::If(cond, b_true.to_vec(), Some(b_false.to_vec())))
-                        )
-                    ),
+                    Some(RustExpr::Control(Box::new(RustControl::If(
+                        cond,
+                        b_true.to_vec(),
+                        Some(b_false.to_vec()),
+                    )))),
                 )
             }
             // FIXME - not sure what should be done with _args
@@ -824,37 +785,40 @@ impl SimpleLogic {
                     RustExpr::infix(
                         RustExpr::local("input").call_method("offset"),
                         Operator::Rem,
-                        RustExpr::num_lit(*n)
+                        RustExpr::num_lit(*n),
                     ),
                     Operator::Neq,
-                    RustExpr::num_lit(0usize)
+                    RustExpr::num_lit(0usize),
                 );
                 let body = {
                     let let_tmp = RustStmt::assign(
                         "_",
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("read_byte")
-                            .wrap_try()
+                            .wrap_try(),
                     );
                     vec![let_tmp]
                 };
-                (vec![RustStmt::Control(RustControl::While(cond, body))], Some(RustExpr::UNIT))
+                (
+                    vec![RustStmt::Control(RustControl::While(cond, body))],
+                    Some(RustExpr::UNIT),
+                )
             }
             SimpleLogic::ByteIn(bs) => {
                 let call = RustExpr::local(ctxt.input_varname.clone())
                     .call_method("read_byte")
                     .wrap_try();
                 let b_let = RustStmt::assign("b", call);
-                let (cond, always_true) = ByteCriterion::from(bs).as_predicate(
-                    RustExpr::local("b")
-                );
+                let (cond, always_true) =
+                    ByteCriterion::from(bs).as_predicate(RustExpr::local("b"));
                 let logic = if always_true {
                     RustExpr::local("b")
                 } else {
                     let b_true = vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::local("b"))];
-                    let b_false = vec![
-                        RustStmt::Return(ReturnKind::Keyword, RustExpr::local("None"))
-                    ];
+                    let b_false = vec![RustStmt::Return(
+                        ReturnKind::Keyword,
+                        RustExpr::local("None"),
+                    )];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
                 ([b_let].to_vec(), Some(logic))
@@ -864,7 +828,7 @@ impl SimpleLogic {
     }
 }
 
-fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
+fn decoder_fn(ix: usize, t: &GenType, logic: CaseLogic) -> RustFn {
     let name = Label::from(format!("Decoder{ix}"));
     let params = {
         let mut tmp = DefParams::new();
@@ -886,14 +850,14 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
                     RustType::borrow_of(
                         None,
                         Mut::Mutable,
-                        RustType::verbatim("ParseCtxt", Some(params))
+                        RustType::verbatim("ParseCtxt", Some(params)),
                     )
                 };
                 (name, ty)
             };
             [arg0, arg1].to_vec()
         };
-        FnSig::new(args, Some(RustType::option_of(t.clone())))
+        FnSig::new(args, Some(RustType::option_of(t.clone().to_rust_type())))
     };
     let ctxt = ProdCtxt {
         input_varname: &Label::from("input"),
@@ -902,9 +866,10 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
     let (stmts, ret) = logic.to_ast(ctxt);
     let body = stmts
         .into_iter()
-        .chain(
-            std::iter::once(RustStmt::Return(ReturnKind::Implicit, RustExpr::some(ret.unwrap())))
-        )
+        .chain(std::iter::once(RustStmt::Return(
+            ReturnKind::Implicit,
+            RustExpr::some(ret.unwrap()),
+        )))
         .collect();
     RustFn::new(name, Some(params), sig, body)
 }
@@ -912,8 +877,8 @@ fn decoder_fn(ix: usize, t: &RustType, logic: CaseLogic) -> RustFn {
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 enum ByteCriterion {
     Any,
-    MustBe(u8), // singleton
-    OtherThan(u8), // negated singleton
+    MustBe(u8),         // singleton
+    OtherThan(u8),      // negated singleton
     WithinSet(ByteSet), // use embed_byteset to bridge to RustExpr
 }
 
@@ -947,10 +912,14 @@ impl ByteCriterion {
     fn as_predicate(&self, arg: RustExpr) -> (RustExpr, bool) {
         match self {
             ByteCriterion::Any => (RustExpr::TRUE, true),
-            ByteCriterion::MustBe(byte) =>
-                (RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))), false),
-            ByteCriterion::OtherThan(byte) =>
-                (RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))), false),
+            ByteCriterion::MustBe(byte) => (
+                RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))),
+                false,
+            ),
+            ByteCriterion::OtherThan(byte) => (
+                RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))),
+                false,
+            ),
             ByteCriterion::WithinSet(bs) => {
                 (embed_byteset(bs).call_method_with("contains", [arg]), false)
             }
@@ -962,20 +931,18 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
     if bs.is_full() {
         RustExpr::scoped(["ByteSet"], "full").call()
     } else if bs.len() == 1 {
-        let Some(elt) = bs.min_elem() else { unreachable!("len == 1 but no min_elem") };
+        let Some(elt) = bs.min_elem() else {
+            unreachable!("len == 1 but no min_elem")
+        };
         RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::num_lit(elt)])
     } else {
         let [q0, q1, q2, q3] = bs.to_bits();
-        RustExpr::scoped(["ByteSet"], "from_bits").call_with([
-            RustExpr::ArrayLit(
-                vec![
-                    RustExpr::num_lit(q0 as usize),
-                    RustExpr::num_lit(q1 as usize),
-                    RustExpr::num_lit(q2 as usize),
-                    RustExpr::num_lit(q3 as usize)
-                ]
-            ),
-        ])
+        RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
+            RustExpr::num_lit(q0 as usize),
+            RustExpr::num_lit(q1 as usize),
+            RustExpr::num_lit(q2 as usize),
+            RustExpr::num_lit(q3 as usize),
+        ])])
     }
 }
 
@@ -1006,13 +973,18 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             if let Some(ix) = tree.accept {
                 return (Vec::new(), Some(RustExpr::num_lit(ix)));
             } else {
-                return (vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)], None);
+                return (
+                    vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
+                    None,
+                );
             }
         }
 
         let bind = RustStmt::assign(
             "b",
-            RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte").wrap_try()
+            RustExpr::local(ctxt.input_varname.clone())
+                .call_method("read_byte")
+                .wrap_try(),
         );
 
         if tree.branches.len() == 1 {
@@ -1025,16 +997,21 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 let b_true: Vec<RustStmt> = implicate_return(expand_matchtree(branch, ctxt));
                 let b_false = {
                     if let Some(ix) = tree.accept {
-                        vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::num_lit(ix))]
+                        vec![RustStmt::Return(
+                            ReturnKind::Implicit,
+                            RustExpr::num_lit(ix),
+                        )]
                     } else {
                         vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)]
                     }
                 };
                 return (
                     vec![bind],
-                    Some(
-                        RustExpr::Control(Box::new(RustControl::If(guard, b_true, Some(b_false))))
-                    ),
+                    Some(RustExpr::Control(Box::new(RustControl::If(
+                        guard,
+                        b_true,
+                        Some(b_false),
+                    )))),
                 );
             }
         }
@@ -1048,9 +1025,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                     unreachable!("unconditional descent with more than one branch");
                 }
                 ByteCriterion::MustBe(b) => {
-                    let lhs = MatchCaseLHS::Pattern(
-                        RustPattern::PrimLiteral(RustPrimLit::Numeric(b as usize))
-                    );
+                    let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
+                        RustPrimLit::Numeric(b as usize),
+                    ));
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
                     cases.push((lhs, rhs));
                 }
@@ -1058,7 +1035,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                     let (guard, _) = crit.as_predicate(RustExpr::local("tmp"));
                     let lhs = MatchCaseLHS::WithGuard(
                         RustPattern::CatchAll(Some(Label::from("tmp"))),
-                        guard
+                        guard,
                     );
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
                     cases.push((lhs, rhs));
@@ -1071,9 +1048,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 
     let b_lookahead = RustStmt::assign(
         "lookahead",
-        RustExpr::BorrowMut(
-            Box::new(RustExpr::local(ctxt.input_varname.clone()).call_method("clone"))
-        )
+        RustExpr::BorrowMut(Box::new(
+            RustExpr::local(ctxt.input_varname.clone()).call_method("clone"),
+        )),
     );
     let ll_context = ProdCtxt {
         input_varname: &Label::from("lookahead"),
@@ -1102,8 +1079,8 @@ enum CaseLogic {
 #[derive(Clone, Debug)]
 enum RepeatLogic {
     ContinueOnMatch(MatchTree, Box<CaseLogic>), // evaluates a matchtree and continues if it is matched
-    BreakOnMatch(MatchTree, Box<CaseLogic>), // evaluates a matchtree and breaks if it is matched
-    ExactCount(RustExpr, Box<CaseLogic>), // repeats a specific numnber of times
+    BreakOnMatch(MatchTree, Box<CaseLogic>),    // evaluates a matchtree and breaks if it is matched
+    ExactCount(RustExpr, Box<CaseLogic>),       // repeats a specific numnber of times
     ConditionTerminal(RustExpr, Box<CaseLogic>), // stops when a predicate for 'terminal element' is satisfied
     ConditionComplete(RustExpr, Box<CaseLogic>), // stops when a predicate for 'complete sequence' is satisfied
 }
@@ -1116,38 +1093,34 @@ impl RepeatLogic {
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call()
-                    )
-                );
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::from("accum"),
+                    None,
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
                 let ctrl = {
                     let tree_index_expr: RustExpr = embed_matchtree(ctree, ctxt).into();
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
                         Operator::Eq,
-                        RustExpr::num_lit(0usize)
+                        RustExpr::num_lit(0usize),
                     );
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
-                            RustExpr::local("accum").call_method_with("push", [
-                                RustExpr::local("next_elem"),
-                            ])
+                            RustExpr::local("accum")
+                                .call_method_with("push", [RustExpr::local("next_elem")]),
                         ),
-                    ].to_vec();
+                    ]
+                    .to_vec();
                     let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_continue, Some(b_stop));
-                    RustStmt::Control(
-                        RustControl::While(
-                            RustExpr::TRUE,
-                            vec![bind_ix, RustStmt::Control(escape_clause)]
-                        )
-                    )
+                    RustStmt::Control(RustControl::While(
+                        RustExpr::TRUE,
+                        vec![bind_ix, RustStmt::Control(escape_clause)],
+                    ))
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1157,38 +1130,34 @@ impl RepeatLogic {
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call()
-                    )
-                );
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::from("accum"),
+                    None,
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
                 let ctrl = {
                     let tree_index_expr: RustExpr = embed_matchtree(btree, ctxt).into();
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
                         Operator::Eq,
-                        RustExpr::num_lit(0usize)
+                        RustExpr::num_lit(0usize),
                     );
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
-                            RustExpr::local("accum").call_method_with("push", [
-                                RustExpr::local("next_elem"),
-                            ])
+                            RustExpr::local("accum")
+                                .call_method_with("push", [RustExpr::local("next_elem")]),
                         ),
-                    ].to_vec();
+                    ]
+                    .to_vec();
                     let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
-                    RustStmt::Control(
-                        RustControl::While(
-                            RustExpr::TRUE,
-                            vec![bind_ix, RustStmt::Control(escape_clause)]
-                        )
-                    )
+                    RustStmt::Control(RustControl::While(
+                        RustExpr::TRUE,
+                        vec![bind_ix, RustStmt::Control(escape_clause)],
+                    ))
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1198,23 +1167,21 @@ impl RepeatLogic {
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call()
-                    )
-                );
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::from("accum"),
+                    None,
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
                 // N non-loop blocks rather than 1 block representing an N-iteration loop
-                let body = vec![
-                    RustStmt::Expr(RustExpr::local("accum").call_method_with("push", [elt_expr]))
-                ];
-                stmts.push(
-                    RustStmt::Control(
-                        RustControl::ForRange0(Label::from("_"), expr_n.clone(), body)
-                    )
-                );
+                let body = vec![RustStmt::Expr(
+                    RustExpr::local("accum").call_method_with("push", [elt_expr]),
+                )];
+                stmts.push(RustStmt::Control(RustControl::ForRange0(
+                    Label::from("_"),
+                    expr_n.clone(),
+                    body,
+                )));
 
                 (stmts, Some(RustExpr::local("accum")))
             }
@@ -1222,14 +1189,12 @@ impl RepeatLogic {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call()
-                    )
-                );
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::from("accum"),
+                    None,
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let cond = tpred
@@ -1238,26 +1203,22 @@ impl RepeatLogic {
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("elem")))]);
                     let b_terminal = [
                         RustStmt::Expr(
-                            RustExpr::local("accum").call_method_with("push", [
-                                RustExpr::local("elem"),
-                            ])
+                            RustExpr::local("accum")
+                                .call_method_with("push", [RustExpr::local("elem")]),
                         ),
                         RustStmt::Control(RustControl::Break),
-                    ].to_vec();
-                    let b_else = [
-                        RustStmt::Expr(
-                            RustExpr::local("accum").call_method_with("push", [
-                                RustExpr::local("elem"),
-                            ])
-                        ),
-                    ].to_vec();
+                    ]
+                    .to_vec();
+                    let b_else = [RustStmt::Expr(
+                        RustExpr::local("accum")
+                            .call_method_with("push", [RustExpr::local("elem")]),
+                    )]
+                    .to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, Some(b_else));
-                    RustStmt::Control(
-                        RustControl::While(
-                            RustExpr::TRUE,
-                            vec![elt_bind, RustStmt::Control(escape_clause)]
-                        )
-                    )
+                    RustStmt::Control(RustControl::While(
+                        RustExpr::TRUE,
+                        vec![elt_bind, RustStmt::Control(escape_clause)],
+                    ))
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1266,18 +1227,17 @@ impl RepeatLogic {
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(
-                    RustStmt::Let(
-                        Mut::Mutable,
-                        Label::from("accum"),
-                        None,
-                        RustExpr::scoped(["Vec"], "new").call()
-                    )
-                );
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::from("accum"),
+                    None,
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let elt_push = RustStmt::Expr(
-                        RustExpr::local("accum").call_method_with("push", [RustExpr::local("elem")])
+                        RustExpr::local("accum")
+                            .call_method_with("push", [RustExpr::local("elem")]),
                     );
                     let cond = cpred
                         .clone()
@@ -1285,12 +1245,10 @@ impl RepeatLogic {
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("accum")))]);
                     let b_terminal = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, None);
-                    RustStmt::Control(
-                        RustControl::While(
-                            RustExpr::TRUE,
-                            vec![elt_bind, elt_push, RustStmt::Control(escape_clause)]
-                        )
-                    )
+                    RustStmt::Control(RustControl::While(
+                        RustExpr::TRUE,
+                        vec![elt_bind, elt_push, RustStmt::Control(escape_clause)],
+                    ))
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1315,7 +1273,10 @@ enum SequentialLogic {
 impl SequentialLogic {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            SequentialLogic::AccumTuple { constructor, elements } => {
+            SequentialLogic::AccumTuple {
+                constructor,
+                elements,
+            } => {
                 if elements.is_empty() {
                     return (Vec::new(), Some(RustExpr::UNIT));
                 }
@@ -1328,9 +1289,10 @@ impl SequentialLogic {
                     names.push(varname.clone().into());
                     let (mut preamble, o_val) = elt_cl.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        body.push(
-                            RustStmt::assign(varname, RustExpr::BlockScope(preamble, Box::new(val)))
-                        );
+                        body.push(RustStmt::assign(
+                            varname,
+                            RustExpr::BlockScope(preamble, Box::new(val)),
+                        ));
                     } else {
                         // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of elt_cl)
                         body.append(&mut preamble);
@@ -1342,16 +1304,23 @@ impl SequentialLogic {
                     (
                         body,
                         Some(
-                            RustExpr::local(con.clone()).call_with(
-                                names.into_iter().map(RustExpr::local)
-                            )
+                            RustExpr::local(con.clone())
+                                .call_with(names.into_iter().map(RustExpr::local)),
                         ),
                     )
                 } else {
-                    (body, Some(RustExpr::Tuple(names.into_iter().map(RustExpr::local).collect())))
+                    (
+                        body,
+                        Some(RustExpr::Tuple(
+                            names.into_iter().map(RustExpr::local).collect(),
+                        )),
+                    )
                 }
             }
-            SequentialLogic::AccumRecord { constructor, fields } => {
+            SequentialLogic::AccumRecord {
+                constructor,
+                fields,
+            } => {
                 if fields.is_empty() {
                     unreachable!(
                         "SequentialLogic::AccumRecord has no fields, which is not an expected case"
@@ -1366,9 +1335,10 @@ impl SequentialLogic {
                     names.push(varname.clone());
                     let (mut preamble, o_val) = fld_cl.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        body.push(
-                            RustStmt::assign(varname, RustExpr::BlockScope(preamble, Box::new(val)))
-                        );
+                        body.push(RustStmt::assign(
+                            varname,
+                            RustExpr::BlockScope(preamble, Box::new(val)),
+                        ));
                     } else {
                         // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of fld_cl)
                         body.append(&mut preamble);
@@ -1377,22 +1347,15 @@ impl SequentialLogic {
 
                 (
                     body,
-                    Some(
-                        RustExpr::Struct(
-                            constructor.clone().into(),
-                            names
-                                .into_iter()
-                                .map(|l| (l, None))
-                                .collect()
-                        )
-                    ),
+                    Some(RustExpr::Struct(
+                        constructor.clone().into(),
+                        names.into_iter().map(|l| (l, None)).collect(),
+                    )),
                 )
             }
         }
     }
 }
-
-
 
 /// Catch-all for hard-to-classify cases
 #[derive(Clone, Debug)]
@@ -1417,9 +1380,10 @@ impl OtherLogic {
                     ));
                 }
                 let bind = RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt));
-                let ret = RustExpr::Control(
-                    Box::new(RustControl::Match(RustExpr::local("tree_index"), branches))
-                );
+                let ret = RustExpr::Control(Box::new(RustControl::Match(
+                    RustExpr::local("tree_index"),
+                    branches,
+                )));
                 (vec![bind], Some(ret))
             }
             OtherLogic::ExprMatch(expr, cases) => {
@@ -1458,9 +1422,8 @@ impl ParallelLogic {
                 (
                     Vec::new(),
                     Some(
-                        RustExpr::local("unimplemented!").call_with([
-                            RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)"),
-                        ])
+                        RustExpr::local("unimplemented!")
+                            .call_with([RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)")]),
                     ),
                 )
             }
@@ -1496,19 +1459,24 @@ impl DerivedLogic {
                 (
                     vec![assign_inner],
                     Some(
-                        RustExpr::local(Label::from(constr.clone())).call_with([
-                            RustExpr::local("inner"),
-                        ])
+                        RustExpr::local(Label::from(constr.clone()))
+                            .call_with([RustExpr::local("inner")]),
                     ),
                 )
             }
             DerivedLogic::UnitVariantOf(constr, inner) => {
                 let assign_inner = RustStmt::assign("_", RustExpr::from(inner.to_ast(ctxt)));
-                (vec![assign_inner], Some(RustExpr::local(Label::from(constr.clone()))))
+                (
+                    vec![assign_inner],
+                    Some(RustExpr::local(Label::from(constr.clone()))),
+                )
             }
             DerivedLogic::MapOf(f, inner) => {
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
-                (vec![assign_inner], Some(f.clone().call_with([RustExpr::local("inner")])))
+                (
+                    vec![assign_inner],
+                    Some(f.clone().call_with([RustExpr::local("inner")])),
+                )
             }
             DerivedLogic::Let(name, expr, inner) => {
                 let mut stmts = Vec::new();
@@ -1545,8 +1513,7 @@ pub fn print_program(program: &Program) {
         uses: RustImportItems::Wildcard,
     });
 
-    let extra =
-        r#"
+    let extra = r#"
 #[test]
 fn test_decoder_27() {
     // PNG signature
@@ -1659,7 +1626,6 @@ impl<'a> Generator<'a> {
         }
     }
 
-
     pub fn compile(module: &'a FormatModule, top_format: &Format) -> Self {
         let mut gen = Self::new(module);
         let mut tc = TypeChecker::new();
@@ -1668,63 +1634,61 @@ impl<'a> Generator<'a> {
             .infer_utype_format(top_format, ctxt)
             .unwrap_or_else(|err| panic!("Failed to infer topl-level format type: {err}"));
         let mut trav = Traversal::new(module, &tc, &mut gen.codegen);
-        let top = trav.decorate_format(top_format, &GenScope::Empty, &TypedDynScope::Empty);
+        let top = trav.decorate_format(top_format, &TypedDynScope::Empty);
         gen.populate_from_top_format(&top);
         gen
     }
 
-    fn populate_from_top_format(&mut self, top: &TypedFormat<GenType>) {
-    }
+    fn populate_from_top_format(&mut self, top: &TypedFormat<GenType>) {}
 }
 
 pub(crate) struct Traversal<'a> {
     module: &'a FormatModule,
-    tree_index: usize,
+    next_index: usize,
     t_formats: HashMap<usize, Rc<GTFormat>>,
     tc: &'a TypeChecker,
     codegen: &'a mut Codegen,
 }
 
 impl<'a> Traversal<'a> {
-    /// Increment the current `tree_index` by 1 and return its un-incremented value.
+    /// Increment the current `next_index` by 1 and return its un-incremented value.
     pub fn get_and_increment_index(&mut self) -> usize {
-        let ret = self.tree_index;
-        self.tree_index += 1;
+        let ret = self.next_index;
+        self.next_index += 1;
         ret
     }
 
     /// Increment the current `tree_index` by 1.
     pub fn increment_index(&mut self) {
-        self.tree_index += 1;
+        self.next_index += 1;
     }
 
     /// Return the current `tree_index` without mutation.
     pub fn get_index(&self) -> usize {
-        self.tree_index
+        self.next_index
     }
 
-    fn decorate_dynamic_format<'s>(&mut self, dynf: &DynFormat, scope: &GenScope<'_>, dyns: &TypedDynScope<'_>) -> TypedDynFormat<GenType> {
+    fn decorate_dynamic_format<'s>(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
         match dynf {
             DynFormat::Huffman(code_lengths, opt_values_expr) => {
-                let t_codes = self.decorate_expr(code_lengths, scope);
+                let t_codes = self.decorate_expr(code_lengths);
                 self.increment_index();
 
                 let t_values_expr = opt_values_expr.as_ref().map(|values_expr| {
-                    let t_values = self.decorate_expr(values_expr, scope);
+                    let t_values = self.decorate_expr(values_expr);
                     self.increment_index();
                     t_values
                 });
                 GTDynFormat::Huffman(t_codes, t_values_expr)
             }
         }
-
     }
 
     fn decorate_pattern(&mut self, pat: &Pattern) -> TypedPattern<GenType> {
         let index = self.get_and_increment_index();
 
         match pat {
-            Pattern::Binding(name) =>{
+            Pattern::Binding(name) => {
                 let gt = self.get_gt_from_index(index);
                 GTPattern::Binding(gt, name.clone())
             }
@@ -1761,25 +1725,63 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    pub fn new(module: &'a FormatModule, tc: &'a TypeChecker, codegen: &'a mut Codegen) -> Self {
-        Self { module, tree_index: 0, t_formats: HashMap::new(), tc, codegen }
+    pub(crate) fn new(
+        module: &'a FormatModule,
+        tc: &'a TypeChecker,
+        codegen: &'a mut Codegen,
+    ) -> Self {
+        Self {
+            module,
+            next_index: 0,
+            t_formats: HashMap::new(),
+            tc,
+            codegen,
+        }
     }
 
-    fn decorate_format(&mut self, format: &Format, scope: &GenScope<'_>, dyns: &TypedDynScope<'_>) -> GTFormat {
+    fn decorate_format_union(
+        &mut self,
+        branches: &[Format],
+        dyns: &TypedDynScope<'_>,
+        is_det: bool,
+    ) -> GTFormat {
         let index = self.get_and_increment_index();
+        let gt = self.get_gt_from_index(index);
+
+        let mut t_branches = Vec::with_capacity(branches.len());
+        for branch in branches {
+            let t_branch = match branch {
+                Format::Variant(name, inner) => {
+                    let t_inner = self.decorate_format(inner, dyns);
+                    GTFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner))
+                }
+                _ => self.decorate_format(branch, dyns),
+            };
+            t_branches.push(t_branch);
+        }
+
+        if is_det {
+            GTFormat::Union(gt, t_branches)
+        } else {
+            GTFormat::UnionNondet(gt, t_branches)
+        }
+    }
+
+    fn decorate_format(&mut self, format: &Format, dyns: &TypedDynScope<'_>) -> GTFormat {
         match format {
             Format::ItemVar(level, args) => {
+                let index = self.get_and_increment_index();
                 let fm_args = &self.module.args[*level];
                 let mut t_args = Vec::with_capacity(args.len());
                 for ((lbl, _), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
-                    let t_arg = self.decorate_expr(arg, scope);
+                    let t_arg = self.decorate_expr(arg);
                     t_args.push((lbl.clone(), t_arg));
                 }
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
                 } else {
                     let fmt = self.module.get_format(*level);
-                    let tmp = self.decorate_format(fmt, scope, &TypedDynScope::Empty);
+                    let tmp = self.decorate_format(fmt, &TypedDynScope::Empty);
                     let ret = Rc::new(tmp);
                     self.t_formats.insert(*level, ret.clone());
                     ret
@@ -1787,161 +1789,172 @@ impl<'a> Traversal<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTFormat::FormatCall(gt, t_args, t_inner)
             }
-            Format::Fail => GTFormat::Fail,
-            Format::EndOfInput => GTFormat::EndOfInput,
-            Format::Align(n) => GTFormat::Align(*n),
-            Format::Byte(bs) => GTFormat::Byte(*bs),
-            Format::Union(branches) => {
-                let mut t_branches = Vec::with_capacity(branches.len());
-                for branch in branches {
-                    let t_branch = self.decorate_format(branch, scope, dyns);
-                    t_branches.push(t_branch);
-                }
-                let gt = self.get_gt_from_index(index);
-                GTFormat::Union(gt, t_branches)
+            Format::Fail => {
+                self.increment_index();
+                GTFormat::Fail
             }
-            Format::UnionNondet(branches) => {
-                let mut t_branches = Vec::with_capacity(branches.len());
-                for branch in branches {
-                    let t_branch = self.decorate_format(branch, scope, dyns);
-                    t_branches.push(t_branch);
-                }
-                let gt = self.get_gt_from_index(index);
-                GTFormat::UnionNondet(gt, t_branches)
+            Format::EndOfInput => {
+                self.increment_index();
+                GTFormat::EndOfInput
             }
+            Format::Align(n) => {
+                self.increment_index();
+                GTFormat::Align(*n)
+            }
+            Format::Byte(bs) => {
+                self.increment_index();
+                GTFormat::Byte(*bs)
+            }
+            Format::Union(branches) => self.decorate_format_union(branches, dyns, true),
+            Format::UnionNondet(branches) => self.decorate_format_union(branches, dyns, false),
             Format::Tuple(elts) => {
+                let index = self.get_and_increment_index();
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for t in elts {
-                    let t_elt = self.decorate_format(t, scope, dyns);
+                    let t_elt = self.decorate_format(t, dyns);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Tuple(gt, t_elts)
             }
             Format::Record(flds) => {
+                let index = self.get_and_increment_index();
                 let mut t_flds = Vec::with_capacity(flds.len());
                 for (lbl, t) in flds {
-                    let t_fld = self.decorate_format(t, scope, dyns);
+                    let t_fld = self.decorate_format(t, dyns);
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Record(gt, t_flds)
             }
             Format::Variant(label, inner) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
             }
             Format::Repeat(inner) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
-                let gt = {
-                    let uvar = UVar::new(index);
-                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
-                    GenType::Inline(self.codegen.lift_type(&vt))
-                };
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
                 GTFormat::Repeat(gt, Box::new(t_inner))
             }
             Format::Repeat1(inner) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Repeat1(gt, Box::new(t_inner))
             }
             Format::Bits(inner) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Bits(gt, Box::new(t_inner))
             }
             Format::Peek(inner) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = {
                     let uvar = UVar::new(index);
-                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
-                    GenType::Inline(self.codegen.lift_type(&vt))
+                    let Some(vt) = self.tc.reify(uvar.into()) else {
+                        unreachable!("unable to reify {uvar}")
+                    };
+                    self.codegen.lift_type(&vt)
                 };
                 GTFormat::Peek(gt, Box::new(t_inner))
             }
             Format::PeekNot(inner) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::PeekNot(gt, Box::new(t_inner))
             }
             Format::Slice(expr, inner) => {
-                let t_expr = self.decorate_expr(expr, scope);
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Slice(gt, t_expr, Box::new(t_inner))
             }
             Format::WithRelativeOffset(expr, inner) => {
-                let t_expr = self.decorate_expr(expr, scope);
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
             }
             Format::RepeatCount(expr, inner) => {
-                let t_expr = self.decorate_expr(expr, scope);
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
             }
             Format::RepeatUntilLast(lambda, inner) => {
+                let index = self.get_and_increment_index();
                 // FIXME - figure out the pattern to apply here
-                let t_lambda = self.decorate_expr_lambda(lambda, scope);
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let t_lambda = self.decorate_expr_lambda(lambda);
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
             }
             Format::RepeatUntilSeq(lambda, inner) => {
+                let index = self.get_and_increment_index();
                 // FIXME - figure out the pattern to apply here
-                let t_lambda = self.decorate_expr_lambda(lambda, scope);
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let t_lambda = self.decorate_expr_lambda(lambda);
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
             }
             Format::Map(inner, lambda) => {
-                let t_inner = self.decorate_format(inner, scope, dyns);
-                let t_lambda = self.decorate_expr_lambda(lambda, scope);
-                let gt = {
-                    let uvar = UVar::new(index);
-                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
-                    GenType::Inline(self.codegen.lift_type(&vt))
-                };
+                let index = self.get_and_increment_index();
+                let t_inner = self.decorate_format(inner, dyns);
+                let t_lambda = self.decorate_expr_lambda(lambda);
+                let gt = self.get_gt_from_index(index);
                 GTFormat::Map(gt, Box::new(t_inner), t_lambda)
             }
             Format::Compute(expr) => {
-                let t_expr = self.decorate_expr(expr, scope);
-                let gt = {
-                    let uvar = UVar::new(index);
-                    let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
-                    GenType::Inline(self.codegen.lift_type(&vt))
-                };
+                let index = self.get_and_increment_index();
+                let t_expr = self.decorate_expr(expr);
+                let gt = self.get_gt_from_index(index);
                 GTFormat::Compute(gt, t_expr)
             }
             Format::Let(lbl, expr, inner) => {
-                let t_expr = self.decorate_expr(expr, scope);
-                let t_inner = self.decorate_format(inner, scope, dyns);
+                let index = self.get_and_increment_index();
+                let t_expr = self.decorate_expr(expr);
+                let t_inner = self.decorate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Let(gt, lbl.clone(), t_expr, Box::new(t_inner))
             }
             Format::Match(x, branches) => {
-                let t_x = self.decorate_expr(x, scope);
+                let index = self.get_and_increment_index();
+                let t_x = self.decorate_expr(x);
                 let mut t_branches = Vec::with_capacity(branches.len());
                 for (pat, rhs) in branches {
                     let t_pat = self.decorate_pattern(pat);
-                    let t_rhs = self.decorate_format(rhs, scope, dyns);
+                    let t_rhs = self.decorate_format(rhs, dyns);
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Match(gt, t_x, t_branches)
             }
             Format::Dynamic(lbl, dynf, inner) => {
-                let t_dynf = self.decorate_dynamic_format(dynf, scope, dyns);
-                let newdyns = TypedDynScope::Binding(TypedDynBinding::new(dyns, lbl, Rc::new(t_dynf.clone())));
-                let t_inner = self.decorate_format(inner, scope, &newdyns);
+                let index = self.get_and_increment_index();
+                let t_dynf = self.decorate_dynamic_format(dynf);
+                let newdyns = TypedDynScope::Binding(TypedDynBinding::new(
+                    dyns,
+                    lbl,
+                    Rc::new(t_dynf.clone()),
+                ));
+                let t_inner = self.decorate_format(inner, &newdyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(t_inner))
             }
             Format::Apply(lbl) => {
-                let t_dynf = dyns.get_typed_dynf_by_name(lbl).unwrap_or_else(|| panic!("missing dynformat {lbl}"));
+                let index = self.get_and_increment_index();
+                let t_dynf = dyns
+                    .get_typed_dynf_by_name(lbl)
+                    .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Apply(gt, t_dynf)
             }
@@ -1950,11 +1963,13 @@ impl<'a> Traversal<'a> {
 
     fn get_gt_from_index(&mut self, index: usize) -> GenType {
         let uvar = UVar::new(index);
-        let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
-        GenType::Inline(self.codegen.lift_type(&vt))
+        let Some(vt) = self.tc.reify(uvar.into()) else {
+            unreachable!("unable to reify {uvar}")
+        };
+        self.codegen.lift_type(&vt)
     }
 
-    fn decorate_expr<'s>(&mut self, expr: &Expr, _scope: &'s GenScope<'s>) -> GTExpr {
+    fn decorate_expr<'s>(&mut self, expr: &Expr) -> GTExpr {
         let index = self.get_and_increment_index();
         match expr {
             Expr::Var(lbl) => {
@@ -1969,7 +1984,7 @@ impl<'a> Traversal<'a> {
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
-                    let t_elt = self.decorate_expr(elt, _scope);
+                    let t_elt = self.decorate_expr(elt);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
@@ -1979,125 +1994,127 @@ impl<'a> Traversal<'a> {
                 // FIXME - integrate a multiscope (new) at this layer
                 let mut t_flds = Vec::with_capacity(flds.len());
                 for (lbl, fld) in flds {
-                    let t_fld = self.decorate_expr(fld, _scope);
+                    let t_fld = self.decorate_expr(fld);
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Record(gt, t_flds)
             }
             Expr::TupleProj(e, ix) => {
-                let t_e = self.decorate_expr(e, _scope);
+                let t_e = self.decorate_expr(e);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::TupleProj(gt, Box::new(t_e), *ix)
             }
             Expr::RecordProj(e, fld) => {
-                let t_e = self.decorate_expr(e, _scope);
+                let t_e = self.decorate_expr(e);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::RecordProj(gt, Box::new(t_e), fld.clone())
             }
             Expr::Variant(lbl, inner) => {
-                let t_inner = self.decorate_expr(inner, _scope);
+                let t_inner = self.decorate_expr(inner);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
             }
             Expr::Seq(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
-                    let t_elt = self.decorate_expr(elt, _scope);
+                    let t_elt = self.decorate_expr(elt);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Seq(gt, t_elts)
             }
             Expr::Match(head, branches) => {
-                let t_head = self.decorate_expr(head, _scope);
+                let t_head = self.decorate_expr(head);
                 let mut t_branches = Vec::with_capacity(branches.len());
                 for (pat, rhs) in branches {
                     let t_pat = self.decorate_pattern(pat);
-                    let t_rhs = self.decorate_expr(expr, _scope);
+                    let t_rhs = self.decorate_expr(rhs);
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Match(gt, Box::new(t_head), t_branches)
             }
-            Expr::Lambda(..) => unreachable!("Cannot decorate Expr::Lambda in neutral (i.e. not lambda-aware) context"),
+            Expr::Lambda(..) => unreachable!(
+                "Cannot decorate Expr::Lambda in neutral (i.e. not lambda-aware) context"
+            ),
             Expr::IntRel(rel, x, y) => {
-                let t_x = self.decorate_expr(x, _scope);
-                let t_y = self.decorate_expr(y, _scope);
+                let t_x = self.decorate_expr(x);
+                let t_y = self.decorate_expr(y);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::IntRel(gt, *rel, Box::new(t_x), Box::new(t_y))
             }
             Expr::Arith(op, x, y) => {
-                let t_x = self.decorate_expr(x, _scope);
-                let t_y = self.decorate_expr(y, _scope);
+                let t_x = self.decorate_expr(x);
+                let t_y = self.decorate_expr(y);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Arith(gt, *op, Box::new(t_x), Box::new(t_y))
             }
             Expr::AsU8(inner) => {
-                let t_inner = self.decorate_expr(inner, _scope);
+                let t_inner = self.decorate_expr(inner);
                 GTExpr::AsU8(Box::new(t_inner))
             }
             Expr::AsU16(inner) => {
-                let t_inner = self.decorate_expr(inner, _scope);
+                let t_inner = self.decorate_expr(inner);
                 GTExpr::AsU16(Box::new(t_inner))
             }
             Expr::AsU32(inner) => {
-                let t_inner = self.decorate_expr(inner, _scope);
+                let t_inner = self.decorate_expr(inner);
                 GTExpr::AsU32(Box::new(t_inner))
             }
             Expr::AsU64(inner) => {
-                let t_inner = self.decorate_expr(inner, _scope);
+                let t_inner = self.decorate_expr(inner);
                 GTExpr::AsU64(Box::new(t_inner))
             }
             Expr::AsChar(inner) => {
-                let t_inner = self.decorate_expr(inner, _scope);
+                let t_inner = self.decorate_expr(inner);
                 GTExpr::AsChar(Box::new(t_inner))
             }
             Expr::U16Be(bytes) => {
-                let t_bytes = self.decorate_expr(bytes, _scope);
+                let t_bytes = self.decorate_expr(bytes);
                 GTExpr::U16Be(Box::new(t_bytes))
             }
             Expr::U16Le(bytes) => {
-                let t_bytes = self.decorate_expr(bytes, _scope);
+                let t_bytes = self.decorate_expr(bytes);
                 GTExpr::U16Le(Box::new(t_bytes))
             }
             Expr::U32Be(bytes) => {
-                let t_bytes = self.decorate_expr(bytes, _scope);
+                let t_bytes = self.decorate_expr(bytes);
                 GTExpr::U32Be(Box::new(t_bytes))
             }
             Expr::U32Le(bytes) => {
-                let t_bytes = self.decorate_expr(bytes, _scope);
+                let t_bytes = self.decorate_expr(bytes);
                 GTExpr::U32Le(Box::new(t_bytes))
             }
             Expr::U64Be(bytes) => {
-                let t_bytes = self.decorate_expr(bytes, _scope);
+                let t_bytes = self.decorate_expr(bytes);
                 GTExpr::U64Be(Box::new(t_bytes))
             }
             Expr::U64Le(bytes) => {
-                let t_bytes = self.decorate_expr(bytes, _scope);
+                let t_bytes = self.decorate_expr(bytes);
                 GTExpr::U64Le(Box::new(t_bytes))
             }
             Expr::SeqLength(seq) => {
-                let t_seq = self.decorate_expr(seq, _scope);
+                let t_seq = self.decorate_expr(seq);
                 GTExpr::SeqLength(Box::new(t_seq))
             }
             Expr::SubSeq(seq, start, length) => {
-                let t_seq = self.decorate_expr(seq, _scope);
-                let t_start = self.decorate_expr(start, _scope);
-                let t_length = self.decorate_expr(length, _scope);
+                let t_seq = self.decorate_expr(seq);
+                let t_start = self.decorate_expr(start);
+                let t_length = self.decorate_expr(length);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
             Expr::FlatMap(seq, lambda) => {
-                let t_seq = self.decorate_expr(seq, _scope);
-                let t_lambda = self.decorate_expr_lambda(lambda, _scope);
+                let t_seq = self.decorate_expr(seq);
+                let t_lambda = self.decorate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::FlatMap(gt, Box::new(t_seq), Box::new(t_lambda))
             }
             Expr::FlatMapAccum(lambda, acc, _acc_vt, seq) => {
-                let t_lambda = self.decorate_expr_lambda(lambda, _scope);
-                let t_acc = self.decorate_expr(acc, _scope);
-                let t_seq = self.decorate_expr(seq, _scope);
+                let t_lambda = self.decorate_expr_lambda(lambda);
+                let t_acc = self.decorate_expr(acc);
+                let t_seq = self.decorate_expr(seq);
 
                 {
                     // account for two extra variables we generate in current TC implementation
@@ -2106,16 +2123,22 @@ impl<'a> Traversal<'a> {
                 }
 
                 let gt = self.get_gt_from_index(index);
-                GTExpr::FlatMapAccum(gt, Box::new(t_lambda), Box::new(t_acc), _acc_vt.clone(), Box::new(t_seq))
+                GTExpr::FlatMapAccum(
+                    gt,
+                    Box::new(t_lambda),
+                    Box::new(t_acc),
+                    _acc_vt.clone(),
+                    Box::new(t_seq),
+                )
             }
             Expr::Dup(count, x) => {
-                let count_t = self.decorate_expr(count, _scope);
-                let x_t = self.decorate_expr(x, _scope);
+                let count_t = self.decorate_expr(count);
+                let x_t = self.decorate_expr(x);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Dup(gt, Box::new(count_t), Box::new(x_t))
             }
             Expr::Inflate(seq) => {
-                let seq_t = self.decorate_expr(seq, _scope);
+                let seq_t = self.decorate_expr(seq);
 
                 // increment for extra variable generated by TC logic implementation in this case
                 self.increment_index();
@@ -2127,12 +2150,13 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    fn decorate_expr_lambda(&mut self, expr: &Expr, _scope: &GenScope<'_>) -> TypedExpr<GenType> {
+    fn decorate_expr_lambda(&mut self, expr: &Expr) -> TypedExpr<GenType> {
         match expr {
             Expr::Lambda(head, body) => {
                 let head_index = self.get_and_increment_index();
+                // we don't increment here because it will be incremented by the rhs assignment on t_body
                 let body_index = self.get_index();
-                let t_body = self.decorate_expr(body, _scope);
+                let t_body = self.decorate_expr(body);
                 let gt_head = self.get_gt_from_index(head_index);
                 let gt_body = self.get_gt_from_index(body_index);
                 GTExpr::Lambda((gt_head, gt_body), head.clone(), Box::new(t_body))
@@ -2146,8 +2170,6 @@ type GTFormat = TypedFormat<GenType>;
 type GTExpr = TypedExpr<GenType>;
 type GTPattern = TypedPattern<GenType>;
 
-
-
 #[derive(Clone, PartialEq, Debug)]
 enum GenScope<'a> {
     Empty,
@@ -2159,7 +2181,7 @@ type GTDynFormat = TypedDynFormat<GenType>;
 #[derive(Clone, Debug, PartialEq)]
 enum TypedDynScope<'a> {
     Empty,
-    Binding(TypedDynBinding<'a>)
+    Binding(TypedDynBinding<'a>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -2178,11 +2200,18 @@ impl<'a> TypedDynBinding<'a> {
         }
     }
 
-    fn new(parent: &'a TypedDynScope<'a>, label: &'a str, t_dynf: Rc<TypedDynFormat<GenType>>) -> Self {
-        Self { parent, label, t_dynf }
+    fn new(
+        parent: &'a TypedDynScope<'a>,
+        label: &'a str,
+        t_dynf: Rc<TypedDynFormat<GenType>>,
+    ) -> Self {
+        Self {
+            parent,
+            label,
+            t_dynf,
+        }
     }
 }
-
 
 impl<'a> TypedDynScope<'a> {
     fn get_typed_dynf_by_name(&self, name: &'a str) -> Option<Rc<GTDynFormat>> {
@@ -2192,8 +2221,6 @@ impl<'a> TypedDynScope<'a> {
         }
     }
 }
-
-
 
 mod __impls {
     use super::IxLabel;
@@ -2226,5 +2253,72 @@ mod __impls {
         fn borrow(&self) -> &usize {
             &self.0
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::typecheck::Ctxt;
+
+    use super::*;
+
+    fn population_check(module: &FormatModule, f: &Format) {
+        let mut tc = TypeChecker::new();
+        let _fv = tc.infer_var_format(f, Ctxt::new(module, &UScope::Empty));
+        let tc_pop = tc.size();
+
+        // println!("{tc:?}");
+
+        let mut cg = Codegen::new();
+        let mut tv = Traversal::new(module, &tc, &mut cg);
+        let dec_f = tv.decorate_format(f, &TypedDynScope::Empty);
+        let tv_pop = tv.next_index;
+
+        println!("{f:?} => {dec_f:?}");
+        assert_eq!(
+            tv_pop, tc_pop,
+            "failed population check ({} TC vs {} TV) on {:?}",
+            tc_pop, tv_pop, dec_f
+        );
+    }
+
+    fn run_popcheck(fs: &[(&'static str, Format)]) {
+        let mut module = FormatModule::new();
+        for (name, f) in fs.iter() {
+            module.define_format(*name, f.clone());
+            population_check(&module, f);
+        }
+    }
+
+    #[test]
+    fn test_popcheck_simple() {
+        let formats = vec![
+            ("test.fail", Format::Fail),
+            ("test.eoi", Format::EndOfInput),
+            ("test.align64", Format::Align(64)),
+            ("test.any_byte", Format::Byte(ByteSet::full())),
+        ];
+        run_popcheck(&formats);
+    }
+
+    #[test]
+    fn test_popcheck_record_simple() {
+        let f = Format::Record(vec![
+            ("any_byte".into(), Format::Byte(ByteSet::full())),
+            ("align64".into(), Format::Align(64)),
+            ("eoi".into(), Format::EndOfInput),
+        ]);
+
+        run_popcheck(&[("record_simple", f)]);
+    }
+
+    #[test]
+    fn test_popcheck_adt_simple() {
+        let f = Format::Union(vec![
+            (Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full())))),
+            (Format::Variant("none".into(), Box::new(Format::EMPTY))),
+        ]);
+
+        run_popcheck(&[("adt_simple", f)]);
     }
 }

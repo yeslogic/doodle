@@ -589,6 +589,15 @@ impl TypeChecker {
         }
     }
 
+    pub fn size(&self) -> usize {
+        let csize = self.constraints.len();
+        if cfg!(debug_assertions) {
+            let asize = self.aliases.len();
+            debug_assert_eq!(asize, csize);
+        }
+        csize
+    }
+
     /// Instantiates a new [`VarMap`] object in the typechecker metacontext and returns an identifier pointing to it.
     fn init_varmap(&mut self) -> VMId {
         self.varmaps.get_new_id()
@@ -617,7 +626,6 @@ impl TypeChecker {
         self.aliases.push(Alias::new());
         ret
     }
-
 
     fn infer_var_scope_pattern(
         &mut self,
@@ -949,8 +957,6 @@ impl TypeChecker {
             }
         }
     }
-
-
 
     fn set_uvar_vmid(&mut self, uvar: UVar, vmid: VMId) -> TCResult<()> {
         assert!(
@@ -2173,10 +2179,7 @@ impl TypeChecker {
         branches: &[Format],
         ctxt: Ctxt<'_>,
     ) -> TCResult<UVar> {
-        let newvar = UVar(self.constraints.len());
-        // populate new structures for each relevant cross-indexed vector
-        self.constraints.push(Constraints::new());
-        self.aliases.push(Alias::default());
+        let newvar = self.get_new_uvar();
 
         for f in branches {
             match f {
