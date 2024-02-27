@@ -1,16 +1,25 @@
 use std::rc::Rc;
 
+use super::rust_ast::{RustType, RustTypeDef};
 use crate::byte_set::ByteSet;
-use crate::{ Arith, FormatModule, IntRel, Label, ValueType };
 use crate::typecheck::VMId;
-use super::rust_ast::{ RustType, RustTypeDef };
-
+use crate::{Arith, FormatModule, IntRel, Label, ValueType};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum GenType {
     Void,
     Inline(RustType),
     Def((usize, Label), RustTypeDef),
+}
+
+impl GenType {
+    pub(crate) fn to_rust_type(self) -> RustType {
+        match self {
+            GenType::Void => unreachable!("encountered GenType::Void in to_rust_type call"),
+            GenType::Inline(rt) => rt,
+            GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -24,7 +33,11 @@ type VarTypeId = VMId;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypedFormat<TypeRep> {
-    FormatCall(TypeRep, Vec<(Label, TypedExpr<TypeRep>)>, Rc<TypedFormat<TypeRep>>),
+    FormatCall(
+        TypeRep,
+        Vec<(Label, TypedExpr<TypeRep>)>,
+        Rc<TypedFormat<TypeRep>>,
+    ),
     Fail,
     EndOfInput,
     Align(usize),
@@ -46,9 +59,23 @@ pub enum TypedFormat<TypeRep> {
     WithRelativeOffset(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     Map(TypeRep, Box<TypedFormat<TypeRep>>, TypedExpr<TypeRep>),
     Compute(TypeRep, TypedExpr<TypeRep>),
-    Let(TypeRep, Label, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
-    Match(TypeRep, TypedExpr<TypeRep>, Vec<(TypedPattern<TypeRep>, TypedFormat<TypeRep>)>),
-    Dynamic(TypeRep, Label, TypedDynFormat<TypeRep>, Box<TypedFormat<TypeRep>>),
+    Let(
+        TypeRep,
+        Label,
+        TypedExpr<TypeRep>,
+        Box<TypedFormat<TypeRep>>,
+    ),
+    Match(
+        TypeRep,
+        TypedExpr<TypeRep>,
+        Vec<(TypedPattern<TypeRep>, TypedFormat<TypeRep>)>,
+    ),
+    Dynamic(
+        TypeRep,
+        Label,
+        TypedDynFormat<TypeRep>,
+        Box<TypedFormat<TypeRep>>,
+    ),
     Apply(TypeRep, Rc<TypedDynFormat<TypeRep>>),
 }
 
@@ -56,7 +83,6 @@ pub enum TypedFormat<TypeRep> {
 pub enum TypedDynFormat<TypeRep> {
     Huffman(TypedExpr<TypeRep>, Option<TypedExpr<TypeRep>>),
 }
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TypedExpr<TypeRep> {
@@ -72,7 +98,11 @@ pub enum TypedExpr<TypeRep> {
     RecordProj(TypeRep, Box<TypedExpr<TypeRep>>, Label),
     Variant(TypeRep, Label, Box<TypedExpr<TypeRep>>),
     Seq(TypeRep, Vec<TypedExpr<TypeRep>>),
-    Match(TypeRep, Box<TypedExpr<TypeRep>>, Vec<(TypedPattern<TypeRep>, TypedExpr<TypeRep>)>),
+    Match(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Vec<(TypedPattern<TypeRep>, TypedExpr<TypeRep>)>,
+    ),
     Lambda((TypeRep, TypeRep), Label, Box<TypedExpr<TypeRep>>),
 
     IntRel(TypeRep, IntRel, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
@@ -92,9 +122,20 @@ pub enum TypedExpr<TypeRep> {
     U64Le(Box<TypedExpr<TypeRep>>),
 
     SeqLength(Box<TypedExpr<TypeRep>>),
-    SubSeq(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    SubSeq(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
     FlatMap(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
-    FlatMapAccum(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>, ValueType, Box<TypedExpr<TypeRep>>),
+    FlatMapAccum(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        ValueType,
+        Box<TypedExpr<TypeRep>>,
+    ),
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
     Inflate(TypeRep, Box<TypedExpr<TypeRep>>),
 }
@@ -112,4 +153,36 @@ pub enum TypedPattern<TypeRep> {
     Tuple(TypeRep, Vec<TypedPattern<TypeRep>>),
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
     Seq(TypeRep, Vec<TypedPattern<TypeRep>>),
+}
+
+mod __impls {
+    use super::GenType;
+    use crate::{
+        codegen::rust_ast::{AtomType, CompType, PrimType, RustType, RustTypeDef},
+        Label,
+    };
+
+    impl From<RustType> for GenType {
+        fn from(value: RustType) -> Self {
+            GenType::Inline(value)
+        }
+    }
+
+    impl From<PrimType> for GenType {
+        fn from(value: PrimType) -> Self {
+            GenType::Inline(RustType::from(value))
+        }
+    }
+
+    impl From<CompType> for GenType {
+        fn from(value: CompType) -> Self {
+            GenType::Inline(RustType::from(value))
+        }
+    }
+
+    impl From<AtomType> for GenType {
+        fn from(value: AtomType) -> Self {
+            GenType::Inline(RustType::from(value))
+        }
+    }
 }

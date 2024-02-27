@@ -540,7 +540,6 @@ impl From<BaseType> for PrimType {
     }
 }
 
-
 impl ToFragment for PrimType {
     fn to_fragment(&self) -> Fragment {
         Fragment::string(match self {
