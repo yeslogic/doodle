@@ -1634,7 +1634,7 @@ impl<'a> Generator<'a> {
             .infer_utype_format(top_format, ctxt)
             .unwrap_or_else(|err| panic!("Failed to infer topl-level format type: {err}"));
         let mut trav = Traversal::new(module, &tc, &mut gen.codegen);
-        let top = trav.decorate_format(top_format, &TypedDynScope::Empty);
+        let top = trav.elaborate_format(top_format, &TypedDynScope::Empty);
         gen.populate_from_top_format(&top);
         gen
     }
@@ -1668,14 +1668,14 @@ impl<'a> Traversal<'a> {
         self.next_index
     }
 
-    fn decorate_dynamic_format<'s>(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
+    fn elaborate_dynamic_format<'s>(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
         match dynf {
             DynFormat::Huffman(code_lengths, opt_values_expr) => {
-                let t_codes = self.decorate_expr(code_lengths);
+                let t_codes = self.elaborate_expr(code_lengths);
                 self.increment_index();
 
                 let t_values_expr = opt_values_expr.as_ref().map(|values_expr| {
-                    let t_values = self.decorate_expr(values_expr);
+                    let t_values = self.elaborate_expr(values_expr);
                     self.increment_index();
                     t_values
                 });
@@ -1684,7 +1684,7 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    fn decorate_pattern(&mut self, pat: &Pattern) -> TypedPattern<GenType> {
+    fn elaborate_pattern(&mut self, pat: &Pattern) -> TypedPattern<GenType> {
         let index = self.get_and_increment_index();
 
         match pat {
@@ -1702,21 +1702,21 @@ impl<'a> Traversal<'a> {
             Pattern::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
-                    let t_elt = self.decorate_pattern(elt);
+                    let t_elt = self.elaborate_pattern(elt);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
                 GTPattern::Tuple(gt, t_elts)
             }
             Pattern::Variant(name, inner) => {
-                let t_inner = self.decorate_pattern(inner);
+                let t_inner = self.elaborate_pattern(inner);
                 let gt = self.get_gt_from_index(index);
                 GTPattern::Variant(gt, name.clone(), Box::new(t_inner))
             }
             Pattern::Seq(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
-                    let t_elt = self.decorate_pattern(elt);
+                    let t_elt = self.elaborate_pattern(elt);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
@@ -1739,7 +1739,7 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    fn decorate_format_union(
+    fn elaborate_format_union(
         &mut self,
         branches: &[Format],
         dyns: &TypedDynScope<'_>,
@@ -1752,10 +1752,10 @@ impl<'a> Traversal<'a> {
         for branch in branches {
             let t_branch = match branch {
                 Format::Variant(name, inner) => {
-                    let t_inner = self.decorate_format(inner, dyns);
+                    let t_inner = self.elaborate_format(inner, dyns);
                     GTFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner))
                 }
-                _ => self.decorate_format(branch, dyns),
+                _ => self.elaborate_format(branch, dyns),
             };
             t_branches.push(t_branch);
         }
@@ -1767,21 +1767,21 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    fn decorate_format(&mut self, format: &Format, dyns: &TypedDynScope<'_>) -> GTFormat {
+    fn elaborate_format(&mut self, format: &Format, dyns: &TypedDynScope<'_>) -> GTFormat {
         match format {
             Format::ItemVar(level, args) => {
                 let index = self.get_and_increment_index();
                 let fm_args = &self.module.args[*level];
                 let mut t_args = Vec::with_capacity(args.len());
                 for ((lbl, _), arg) in Iterator::zip(fm_args.iter(), args.iter()) {
-                    let t_arg = self.decorate_expr(arg);
+                    let t_arg = self.elaborate_expr(arg);
                     t_args.push((lbl.clone(), t_arg));
                 }
                 let t_inner = if let Some(val) = self.t_formats.get(level) {
                     val.clone()
                 } else {
                     let fmt = self.module.get_format(*level);
-                    let tmp = self.decorate_format(fmt, &TypedDynScope::Empty);
+                    let tmp = self.elaborate_format(fmt, &TypedDynScope::Empty);
                     let ret = Rc::new(tmp);
                     self.t_formats.insert(*level, ret.clone());
                     ret
@@ -1805,13 +1805,13 @@ impl<'a> Traversal<'a> {
                 self.increment_index();
                 GTFormat::Byte(*bs)
             }
-            Format::Union(branches) => self.decorate_format_union(branches, dyns, true),
-            Format::UnionNondet(branches) => self.decorate_format_union(branches, dyns, false),
+            Format::Union(branches) => self.elaborate_format_union(branches, dyns, true),
+            Format::UnionNondet(branches) => self.elaborate_format_union(branches, dyns, false),
             Format::Tuple(elts) => {
                 let index = self.get_and_increment_index();
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for t in elts {
-                    let t_elt = self.decorate_format(t, dyns);
+                    let t_elt = self.elaborate_format(t, dyns);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
@@ -1821,7 +1821,7 @@ impl<'a> Traversal<'a> {
                 let index = self.get_and_increment_index();
                 let mut t_flds = Vec::with_capacity(flds.len());
                 for (lbl, t) in flds {
-                    let t_fld = self.decorate_format(t, dyns);
+                    let t_fld = self.elaborate_format(t, dyns);
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
@@ -1829,31 +1829,31 @@ impl<'a> Traversal<'a> {
             }
             Format::Variant(label, inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
             }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Repeat(gt, Box::new(t_inner))
             }
             Format::Repeat1(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Repeat1(gt, Box::new(t_inner))
             }
             Format::Bits(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Bits(gt, Box::new(t_inner))
             }
             Format::Peek(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = {
                     let uvar = UVar::new(index);
                     let Some(vt) = self.tc.reify(uvar.into()) else {
@@ -1865,74 +1865,74 @@ impl<'a> Traversal<'a> {
             }
             Format::PeekNot(inner) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::PeekNot(gt, Box::new(t_inner))
             }
             Format::Slice(expr, inner) => {
                 let index = self.get_and_increment_index();
-                let t_expr = self.decorate_expr(expr);
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_expr = self.elaborate_expr(expr);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Slice(gt, t_expr, Box::new(t_inner))
             }
             Format::WithRelativeOffset(expr, inner) => {
                 let index = self.get_and_increment_index();
-                let t_expr = self.decorate_expr(expr);
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_expr = self.elaborate_expr(expr);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
             }
             Format::RepeatCount(expr, inner) => {
                 let index = self.get_and_increment_index();
-                let t_expr = self.decorate_expr(expr);
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_expr = self.elaborate_expr(expr);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
             }
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 // FIXME - figure out the pattern to apply here
-                let t_lambda = self.decorate_expr_lambda(lambda);
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
             }
             Format::RepeatUntilSeq(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 // FIXME - figure out the pattern to apply here
-                let t_lambda = self.decorate_expr_lambda(lambda);
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
             }
             Format::Map(inner, lambda) => {
                 let index = self.get_and_increment_index();
-                let t_inner = self.decorate_format(inner, dyns);
-                let t_lambda = self.decorate_expr_lambda(lambda);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Map(gt, Box::new(t_inner), t_lambda)
             }
             Format::Compute(expr) => {
                 let index = self.get_and_increment_index();
-                let t_expr = self.decorate_expr(expr);
+                let t_expr = self.elaborate_expr(expr);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Compute(gt, t_expr)
             }
             Format::Let(lbl, expr, inner) => {
                 let index = self.get_and_increment_index();
-                let t_expr = self.decorate_expr(expr);
-                let t_inner = self.decorate_format(inner, dyns);
+                let t_expr = self.elaborate_expr(expr);
+                let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Let(gt, lbl.clone(), t_expr, Box::new(t_inner))
             }
             Format::Match(x, branches) => {
                 let index = self.get_and_increment_index();
-                let t_x = self.decorate_expr(x);
+                let t_x = self.elaborate_expr(x);
                 let mut t_branches = Vec::with_capacity(branches.len());
                 for (pat, rhs) in branches {
-                    let t_pat = self.decorate_pattern(pat);
-                    let t_rhs = self.decorate_format(rhs, dyns);
+                    let t_pat = self.elaborate_pattern(pat);
+                    let t_rhs = self.elaborate_format(rhs, dyns);
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
@@ -1940,13 +1940,13 @@ impl<'a> Traversal<'a> {
             }
             Format::Dynamic(lbl, dynf, inner) => {
                 let index = self.get_and_increment_index();
-                let t_dynf = self.decorate_dynamic_format(dynf);
+                let t_dynf = self.elaborate_dynamic_format(dynf);
                 let newdyns = TypedDynScope::Binding(TypedDynBinding::new(
                     dyns,
                     lbl,
                     Rc::new(t_dynf.clone()),
                 ));
-                let t_inner = self.decorate_format(inner, &newdyns);
+                let t_inner = self.elaborate_format(inner, &newdyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(t_inner))
             }
@@ -1969,7 +1969,7 @@ impl<'a> Traversal<'a> {
         self.codegen.lift_type(&vt)
     }
 
-    fn decorate_expr<'s>(&mut self, expr: &Expr) -> GTExpr {
+    fn elaborate_expr<'s>(&mut self, expr: &Expr) -> GTExpr {
         let index = self.get_and_increment_index();
         match expr {
             Expr::Var(lbl) => {
@@ -1984,7 +1984,7 @@ impl<'a> Traversal<'a> {
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
-                    let t_elt = self.decorate_expr(elt);
+                    let t_elt = self.elaborate_expr(elt);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
@@ -1994,72 +1994,72 @@ impl<'a> Traversal<'a> {
                 // FIXME - integrate a multiscope (new) at this layer
                 let mut t_flds = Vec::with_capacity(flds.len());
                 for (lbl, fld) in flds {
-                    let t_fld = self.decorate_expr(fld);
+                    let t_fld = self.elaborate_expr(fld);
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Record(gt, t_flds)
             }
             Expr::TupleProj(e, ix) => {
-                let t_e = self.decorate_expr(e);
+                let t_e = self.elaborate_expr(e);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::TupleProj(gt, Box::new(t_e), *ix)
             }
             Expr::RecordProj(e, fld) => {
-                let t_e = self.decorate_expr(e);
+                let t_e = self.elaborate_expr(e);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::RecordProj(gt, Box::new(t_e), fld.clone())
             }
             Expr::Variant(lbl, inner) => {
-                let t_inner = self.decorate_expr(inner);
+                let t_inner = self.elaborate_expr(inner);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
             }
             Expr::Seq(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
-                    let t_elt = self.decorate_expr(elt);
+                    let t_elt = self.elaborate_expr(elt);
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Seq(gt, t_elts)
             }
             Expr::Match(head, branches) => {
-                let t_head = self.decorate_expr(head);
+                let t_head = self.elaborate_expr(head);
                 let mut t_branches = Vec::with_capacity(branches.len());
                 for (pat, rhs) in branches {
-                    let t_pat = self.decorate_pattern(pat);
-                    let t_rhs = self.decorate_expr(rhs);
+                    let t_pat = self.elaborate_pattern(pat);
+                    let t_rhs = self.elaborate_expr(rhs);
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Match(gt, Box::new(t_head), t_branches)
             }
             Expr::Lambda(..) => unreachable!(
-                "Cannot decorate Expr::Lambda in neutral (i.e. not lambda-aware) context"
+                "Cannot elaborate Expr::Lambda in neutral (i.e. not lambda-aware) context"
             ),
             Expr::IntRel(rel, x, y) => {
-                let t_x = self.decorate_expr(x);
-                let t_y = self.decorate_expr(y);
+                let t_x = self.elaborate_expr(x);
+                let t_y = self.elaborate_expr(y);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::IntRel(gt, *rel, Box::new(t_x), Box::new(t_y))
             }
             Expr::Arith(op, x, y) => {
-                let t_x = self.decorate_expr(x);
-                let t_y = self.decorate_expr(y);
+                let t_x = self.elaborate_expr(x);
+                let t_y = self.elaborate_expr(y);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Arith(gt, *op, Box::new(t_x), Box::new(t_y))
             }
             Expr::AsU8(inner) => {
-                let t_inner = self.decorate_expr(inner);
+                let t_inner = self.elaborate_expr(inner);
                 GTExpr::AsU8(Box::new(t_inner))
             }
             Expr::AsU16(inner) => {
-                let t_inner = self.decorate_expr(inner);
+                let t_inner = self.elaborate_expr(inner);
                 GTExpr::AsU16(Box::new(t_inner))
             }
             Expr::AsU32(inner) => {
-                let t_inner = self.decorate_expr(inner);
+                let t_inner = self.elaborate_expr(inner);
                 GTExpr::AsU32(Box::new(t_inner))
             }
             Expr::AsU64(inner) => {
@@ -2067,23 +2067,23 @@ impl<'a> Traversal<'a> {
                 GTExpr::AsU64(Box::new(t_inner))
             }
             Expr::AsChar(inner) => {
-                let t_inner = self.decorate_expr(inner);
+                let t_inner = self.elaborate_expr(inner);
                 GTExpr::AsChar(Box::new(t_inner))
             }
             Expr::U16Be(bytes) => {
-                let t_bytes = self.decorate_expr(bytes);
+                let t_bytes = self.elaborate_expr(bytes);
                 GTExpr::U16Be(Box::new(t_bytes))
             }
             Expr::U16Le(bytes) => {
-                let t_bytes = self.decorate_expr(bytes);
+                let t_bytes = self.elaborate_expr(bytes);
                 GTExpr::U16Le(Box::new(t_bytes))
             }
             Expr::U32Be(bytes) => {
-                let t_bytes = self.decorate_expr(bytes);
+                let t_bytes = self.elaborate_expr(bytes);
                 GTExpr::U32Be(Box::new(t_bytes))
             }
             Expr::U32Le(bytes) => {
-                let t_bytes = self.decorate_expr(bytes);
+                let t_bytes = self.elaborate_expr(bytes);
                 GTExpr::U32Le(Box::new(t_bytes))
             }
             Expr::U64Be(bytes) => {
@@ -2095,26 +2095,26 @@ impl<'a> Traversal<'a> {
                 GTExpr::U64Le(Box::new(t_bytes))
             }
             Expr::SeqLength(seq) => {
-                let t_seq = self.decorate_expr(seq);
+                let t_seq = self.elaborate_expr(seq);
                 GTExpr::SeqLength(Box::new(t_seq))
             }
             Expr::SubSeq(seq, start, length) => {
-                let t_seq = self.decorate_expr(seq);
-                let t_start = self.decorate_expr(start);
-                let t_length = self.decorate_expr(length);
+                let t_seq = self.elaborate_expr(seq);
+                let t_start = self.elaborate_expr(start);
+                let t_length = self.elaborate_expr(length);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
             Expr::FlatMap(seq, lambda) => {
-                let t_seq = self.decorate_expr(seq);
-                let t_lambda = self.decorate_expr_lambda(lambda);
+                let t_seq = self.elaborate_expr(seq);
+                let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::FlatMap(gt, Box::new(t_seq), Box::new(t_lambda))
             }
             Expr::FlatMapAccum(lambda, acc, _acc_vt, seq) => {
-                let t_lambda = self.decorate_expr_lambda(lambda);
-                let t_acc = self.decorate_expr(acc);
-                let t_seq = self.decorate_expr(seq);
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let t_acc = self.elaborate_expr(acc);
+                let t_seq = self.elaborate_expr(seq);
 
                 {
                     // account for two extra variables we generate in current TC implementation
@@ -2132,13 +2132,13 @@ impl<'a> Traversal<'a> {
                 )
             }
             Expr::Dup(count, x) => {
-                let count_t = self.decorate_expr(count);
-                let x_t = self.decorate_expr(x);
+                let count_t = self.elaborate_expr(count);
+                let x_t = self.elaborate_expr(x);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Dup(gt, Box::new(count_t), Box::new(x_t))
             }
             Expr::Inflate(seq) => {
-                let seq_t = self.decorate_expr(seq);
+                let seq_t = self.elaborate_expr(seq);
 
                 // increment for extra variable generated by TC logic implementation in this case
                 self.increment_index();
@@ -2150,18 +2150,18 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    fn decorate_expr_lambda(&mut self, expr: &Expr) -> TypedExpr<GenType> {
+    fn elaborate_expr_lambda(&mut self, expr: &Expr) -> TypedExpr<GenType> {
         match expr {
             Expr::Lambda(head, body) => {
                 let head_index = self.get_and_increment_index();
                 // we don't increment here because it will be incremented by the rhs assignment on t_body
                 let body_index = self.get_index();
-                let t_body = self.decorate_expr(body);
+                let t_body = self.elaborate_expr(body);
                 let gt_head = self.get_gt_from_index(head_index);
                 let gt_body = self.get_gt_from_index(body_index);
                 GTExpr::Lambda((gt_head, gt_body), head.clone(), Box::new(t_body))
             }
-            _ => unreachable!("decorate_expr_lambda: unexpected non-lambda {expr:?}"),
+            _ => unreachable!("elaborate_expr_lambda: unexpected non-lambda {expr:?}"),
         }
     }
 }
@@ -2271,7 +2271,7 @@ mod tests {
 
         let mut cg = Codegen::new();
         let mut tv = Traversal::new(module, &tc, &mut cg);
-        let dec_f = tv.decorate_format(f, &TypedDynScope::Empty);
+        let dec_f = tv.elaborate_format(f, &TypedDynScope::Empty);
         let tv_pop = tv.next_index;
 
         println!("{f:?} => {dec_f:?}");
