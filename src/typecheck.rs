@@ -589,6 +589,7 @@ impl TypeChecker {
         }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn size(&self) -> usize {
         let csize = self.constraints.len();
         if cfg!(debug_assertions) {
@@ -1489,10 +1490,16 @@ impl TypeChecker {
 
                 self.unify_var_proj_elem(ys_var, y_var)?;
                 self.unify_var_proj_elem(xs_var, x_var)?;
-                self.unify_var_proj_index(acc_x_var, 0, acc_var)?;
-                self.unify_var_proj_index(acc_ys_var, 0, acc_var)?;
-                self.unify_var_proj_index(acc_x_var, 1, x_var)?;
-                self.unify_var_proj_index(acc_ys_var, 1, ys_var)?;
+
+                // constrain the shape to be exactly the tuple we expect
+                self.unify_var_utype(
+                    acc_x_var,
+                    Rc::new(UType::Tuple(vec![acc_var.into(), x_var.into()])),
+                )?;
+                self.unify_var_utype(
+                    acc_ys_var,
+                    Rc::new(UType::Tuple(vec![acc_var.into(), ys_var.into()])),
+                )?;
 
                 ys_var
             }
@@ -2416,7 +2423,7 @@ impl TypeChecker {
                         VType::Abstract(ut) => self.reify(ut),
                         VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
                         VType::ImplicitRecord(..) | VType::ImplicitTuple(..) => unreachable!(
-                            "Unsolved implicit Tuple or Record leftover from un-unified projection"
+                            "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
                         ),
                     },
                     Err(_) => None,
