@@ -1,5 +1,6 @@
-mod rust_ast;
-mod typed_format;
+pub(crate) mod rust_ast;
+pub(crate) mod typed_decoder;
+pub(crate) mod typed_format;
 
 use crate::{
     byte_set::ByteSet,
@@ -17,16 +18,8 @@ use typed_format::{GenType, TypedExpr, TypedFormat, TypedPattern};
 
 use self::typed_format::TypedDynFormat;
 
-/// Simple type for ad-hoc names using a counter value
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
-struct IxLabel(usize);
-
-impl IxLabel {
-    fn to_usize(self) -> usize {
-        self.0
-    }
-}
+pub(crate) mod ixlabel;
+pub(crate) use ixlabel::IxLabel;
 
 pub struct NameGen {
     ctr: usize,
@@ -74,15 +67,6 @@ impl Codegen {
             namegen,
             defined_types,
             decoder_types,
-        }
-    }
-
-    pub(crate) fn substitute_definition(&self, t: GenType) -> GenType {
-        if let GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lbl)))) = t
-        {
-            GenType::Def((ix, lbl), self.defined_types[ix].clone())
-        } else {
-            t
         }
     }
 
@@ -172,6 +156,231 @@ impl Codegen {
         }
     }
 
+    fn translate_gt_format(&self, gt_format: &GTFormat) -> CaseLogic<GTExpr> {
+        match gt_format {
+            TypedFormat::FormatCall(_, level, gt_args, ..) => {
+                CaseLogic::Simple(SimpleLogic::Invoke(*level, gt_args.clone()))
+            }
+            TypedFormat::Fail => CaseLogic::Simple(SimpleLogic::Fail),
+            TypedFormat::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
+            TypedFormat::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
+            TypedFormat::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
+            TypedFormat::Variant(gt, vname, inner) => {
+                let (tname, tdef) = match gt {
+                    GenType::Def((ix, lab), ..)
+                    | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                        ix,
+                        lab,
+                    )))) => (lab.clone(), &self.defined_types[*ix]),
+                    other => panic!("unexpected GenType for TypedFormat::Variant: {:?}", other),
+                };
+
+                let constr = Constructor::Compound(tname.clone(), vname.clone());
+
+                match tdef {
+                    RustTypeDef::Enum(vars) => {
+                        let matching = vars
+                            .iter()
+                            .find(|var| var.get_label().as_ref() == vname.as_ref());
+                        // REVIEW - should we force an exact match?
+                        match matching {
+                            Some(RustVariant::Unit(_)) => {
+                                // FIXME - this is not quite correct, as it calls `Var(inner)` where `inner = ()` instead of `Var`
+                                let _inner = self.translate_gt_format(inner);
+                                CaseLogic::Derived(
+                                    DerivedLogic::UnitVariantOf(constr, Box::new(_inner))
+                                )
+                            }
+                            Some(RustVariant::Tuple(_, elem_rts)) => {
+                                if elem_rts.is_empty() {
+                                    unreachable!(
+                                        "unexpected Tuple-Variant with 0 positional arguments"
+                                    );
+                                }
+                                match inner.as_ref() {
+                                    TypedFormat::Tuple(_t, gt_elems) => {
+                                        if gt_elems.len() != elem_rts.len() {
+                                            if elem_rts.len() == 1 {
+                                                // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
+                                                match &elem_rts[0] {
+                                                    tt @ RustType::AnonTuple(..) => {
+                                                        let cl_mono_tuple =
+                                                            self.translate_gt_format(
+                                                                inner.as_ref()
+                                                            );
+                                                        CaseLogic::Derived(
+                                                            DerivedLogic::VariantOf(
+                                                                constr,
+                                                                Box::new(cl_mono_tuple)
+                                                            )
+                                                        )
+                                                    }
+                                                    other =>
+                                                        panic!(
+                                                            "unable to translate TypedFormat::Tuple with node-type ({other:?}) implied by {tname}::{vname}"
+                                                        ),
+                                                }
+                                            } else {
+                                                unreachable!(
+                                                    "mismatched arity between decoder (== {}) and variant {tname}::{vname} (== {})",
+                                                    gt_elems.len(),
+                                                    elem_rts.len()
+                                                );
+                                            }
+                                        } else {
+                                            let mut cl_args = Vec::new();
+                                            for (gt_inner, typ) in Iterator::zip(
+                                                gt_elems.iter(),
+                                                elem_rts.iter()
+                                            ) {
+                                                let cl_arg = self.translate_gt_format(gt_inner);
+                                                cl_args.push(cl_arg);
+                                            }
+                                            CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                                                constructor: Some(constr),
+                                                elements: cl_args,
+                                            })
+                                        }
+                                    }
+                                    _ => {
+                                        let l = elem_rts.len();
+                                        if l == 1 {
+                                            let cl_mono = self.translate_gt_format(inner);
+                                            CaseLogic::Derived(
+                                                DerivedLogic::VariantOf(constr, Box::new(cl_mono))
+                                            )
+                                        } else {
+                                            panic!(
+                                                "Cannot promote non-tuple embedded-format {inner:?} into tuple-variant {tname}::{vname}, which has arity {l} > 1 ({elem_rts:#?})"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            Some(RustVariant::Record(_lbl, field_rts)) => {
+                                match inner.as_ref() {
+                                    TypedFormat::Record(_gt, inner_fields) => {
+                                        let mut assocs = Vec::new();
+                                        for (i, (l0, inner_field)) in inner_fields
+                                            .iter()
+                                            .enumerate() {
+                                            let (l1, _t) = &field_rts[i];
+                                            // FIXME - this validation step should be skipped once we are confident it is perfunctory
+                                            inner.expect_rust_type(_t);
+                                            assert_eq!(
+                                                l0.as_ref(),
+                                                l1.as_ref(),
+                                                "TypedFormat::Record field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {inner:?} | {tdef:?})"
+                                            );
+                                            assocs.push((
+                                                l0.clone(),
+                                                self.translate_gt_format(inner_field),
+                                            ));
+                                        }
+                                        CaseLogic::Sequential(SequentialLogic::AccumRecord {
+                                            constructor: constr,
+                                            fields: assocs,
+                                        })
+                                    }
+                                    _ =>
+                                        unreachable!(
+                                            "Variant {tname}::{vname} expects record ({field_rts:#?}) but found {:?}",
+                                            inner
+                                        ),
+                                }
+                            }
+                            None =>
+                                unreachable!(
+                                    "VariantOf called for nonexistent variant `{vname}` of enum-type `{tname}`"
+                                ),
+                        }
+                    }
+                    RustTypeDef::Struct(_) => {
+                        unreachable!(
+                            "TypedFormat::Variant incoherent against type defined as struct"
+                        )
+                    }
+                }
+            }
+            TypedFormat::Union(_gt, alts) | TypedFormat::UnionNondet(_gt, alts) => {
+                CaseLogic::Parallel(ParallelLogic::Alts(
+                    alts.iter()
+                        .map(|alt| self.translate_gt_format(alt))
+                        .collect(),
+                ))
+            }
+            TypedFormat::Tuple(gt, elts) => {
+                match (
+                    elts.is_empty(),
+                    matches!(
+                        gt,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit)))
+                    ),
+                ) {
+                    (true, true) => CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT)),
+                    (true, false) | (false, true) => {
+                        unreachable!("assumption 'tuple is empty' <=> 'type is unit' broken")
+                    }
+                    _ => CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                        constructor: None,
+                        elements: elts
+                            .iter()
+                            .map(|elt| self.translate_gt_format(elt))
+                            .collect(),
+                    }),
+                }
+            }
+            TypedFormat::Record(gt, flds) => {
+                let (ix, tname) = match gt {
+                    GenType::Def((ix, lab), ..)
+                    | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
+                        ix,
+                        lab,
+                    )))) => (ix, lab),
+                    other => unreachable!("unexpected type for TypedFormat::Record: {other:?}"),
+                };
+                let tdef = &self.defined_types[*ix];
+                let tfields = match tdef {
+                    RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
+                    other => unreachable!(
+                        "unexpected non-record-struct definition for type `{tname}`: {tdef:?}"
+                    ),
+                };
+                assert_eq!(tfields.len(), flds.len(), "definition of record-struct {tname} and provided type-rep disagree on number of fields ({} != {})", tfields.len(), flds.len());
+                let mut fields = Vec::new();
+                for (i, ((l1, fld), (l0, t_field))) in
+                    Iterator::zip(flds.iter(), tfields.iter()).enumerate()
+                {
+                    assert_eq!(l0.as_ref(), l1.as_ref(), "TypedFormat field `{l0}` != RustTypeDef RustTypeDef field `{l1}` (at index {i} in {gt_format:?} | {tdef:?})");
+                    fld.expect_rust_type(t_field);
+                    fields.push((l0.clone(), self.translate_gt_format(fld)));
+                }
+                let constructor = Constructor::Simple(tname.clone());
+
+                CaseLogic::Sequential(SequentialLogic::AccumRecord {
+                    constructor,
+                    fields,
+                })
+            }
+            TypedFormat::Repeat(_, _) => todo!(),
+            TypedFormat::Repeat1(_, _) => todo!(),
+            TypedFormat::RepeatCount(_, _, _) => todo!(),
+            TypedFormat::RepeatUntilLast(_, _, _) => todo!(),
+            TypedFormat::RepeatUntilSeq(_, _, _) => todo!(),
+            TypedFormat::Peek(_, _) => todo!(),
+            TypedFormat::PeekNot(_, _) => todo!(),
+            TypedFormat::Slice(_, _, _) => todo!(),
+            TypedFormat::Bits(_, _) => todo!(),
+            TypedFormat::WithRelativeOffset(_, _, _) => todo!(),
+            TypedFormat::Map(_, _, _) => todo!(),
+            TypedFormat::Compute(_, _) => todo!(),
+            TypedFormat::Let(_, _, _, _) => todo!(),
+            TypedFormat::Match(_, _, _) => todo!(),
+            TypedFormat::Dynamic(..) => todo!(),
+            TypedFormat::Apply(..) => todo!(),
+        }
+    }
+
     fn translate(&self, decoder: &Decoder, type_hint: Option<&GenType>) -> CaseLogic {
         match decoder {
             Decoder::Call(ix, args) => CaseLogic::Simple(SimpleLogic::Invoke(*ix, args.clone())),
@@ -203,7 +412,10 @@ impl Codegen {
                         match matching {
                             Some(RustVariant::Unit(_)) => {
                                 // FIXME - this is not quite correct, as it calls `Var(inner)` where `inner = ()` instead of `Var`
-                                let inner = self.translate(inner, Some(&GenType::Inline(RustType::UNIT)));
+                                let inner = self.translate(
+                                    inner,
+                                    Some(&GenType::Inline(RustType::UNIT))
+                                );
                                 CaseLogic::Derived(
                                     DerivedLogic::UnitVariantOf(constr, Box::new(inner))
                                 )
@@ -246,8 +458,14 @@ impl Codegen {
                                             }
                                         } else {
                                             let mut cl_args = Vec::new();
-                                            for (dec, typ) in Iterator::zip(decs.iter(), typs.iter()) {
-                                                let cl_arg = self.translate(dec, Some(&typ.clone().into()));
+                                            for (dec, typ) in Iterator::zip(
+                                                decs.iter(),
+                                                typs.iter()
+                                            ) {
+                                                let cl_arg = self.translate(
+                                                    dec,
+                                                    Some(&typ.clone().into())
+                                                );
                                                 cl_args.push(cl_arg);
                                             }
                                             CaseLogic::Sequential(SequentialLogic::AccumTuple {
@@ -258,7 +476,10 @@ impl Codegen {
                                     }
                                     _ => {
                                         if typs.len() == 1 {
-                                            let cl_mono = self.translate(inner, Some(&typs[0].clone().into()));
+                                            let cl_mono = self.translate(
+                                                inner,
+                                                Some(&typs[0].clone().into())
+                                            );
                                             CaseLogic::Derived(
                                                 DerivedLogic::VariantOf(constr, Box::new(cl_mono))
                                             )
@@ -281,7 +502,10 @@ impl Codegen {
                                                 l1.as_ref(),
                                                 "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
                                             );
-                                            assocs.push((l0.clone(), self.translate(d, Some(&t.clone().into()))));
+                                            assocs.push((
+                                                l0.clone(),
+                                                self.translate(d, Some(&t.clone().into())),
+                                            ));
                                         }
                                         CaseLogic::Sequential(SequentialLogic::AccumRecord {
                                             constructor: constr,
@@ -344,7 +568,12 @@ impl Codegen {
             },
             Decoder::Record(flds) => {
                 match type_hint {
-                    Some(GenType::Def((ix, lab), ..) | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab))))) => {
+                    Some(
+                        | GenType::Def((ix, lab), ..)
+                        | GenType::Inline(
+                              RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab))),
+                          ),
+                    ) => {
                         let tdef = &self.defined_types[*ix];
                         let tfields = match tdef {
                             RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
@@ -721,34 +950,48 @@ struct ProdCtxt<'a> {
     scope_varname: &'a Label,
 }
 
-impl CaseLogic {
-    /// Produces an RustExpr-valued AST for the given CaseLogic instance.
-    ///
-    /// The Expr should have the bare type of the value being parsed (i.e. not Option-wrapped),
-    /// but it is implicitly assumed to be contained in a block whose ultimate return value
-    /// is `Option<_>`, allowing `return None` and `?` expressions to be used anyway.
-    ///
-    /// Local bindings and control flow are allowed, as long as an explicit return
-    /// or a concrete, consistently-typed return value are used
-    #[allow(dead_code)]
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
-        match self {
-            CaseLogic::Simple(s) => s.to_ast(ctxt),
-            CaseLogic::Derived(d) => d.to_ast(ctxt),
-            CaseLogic::Sequential(sq) => sq.to_ast(ctxt),
-            CaseLogic::Repeat(r) => r.to_ast(ctxt),
-            CaseLogic::Parallel(p) => p.to_ast(ctxt),
-            CaseLogic::Other(o) => o.to_ast(ctxt),
-            CaseLogic::Unhandled(msg) => (
-                Vec::new(),
-                Some(RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(msg.clone())])),
-            ),
+macro_rules! impl_toast_caselogic {
+    ($($t:ident),+) => {
+        $(
+        impl ToAst for CaseLogic<$t>
+        {
+            type AstElem = RustBlock;
+
+            /// Produces an RustExpr-valued AST for the given CaseLogic instance.
+            ///
+            /// The ExprT should have the bare type of the value being parsed (i.e. not Option-wrapped),
+            /// but it is implicitly assumed to be contained in a block whose ultimate return value
+            /// is `Option<_>`, allowing `return None` and `?` expressions to be used anyway.
+            ///
+            /// Local bindings and control flow are allowed, as long as an explicit return
+            /// or a concrete, consistently-typed return value are used
+            #[allow(dead_code)]
+            fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
+                match self {
+                    CaseLogic::Simple(s) => s.to_ast(ctxt),
+                    CaseLogic::Derived(d) => d.to_ast(ctxt),
+                    CaseLogic::Sequential(sq) => sq.to_ast(ctxt),
+                    CaseLogic::Repeat(r) => r.to_ast(ctxt),
+                    CaseLogic::Parallel(p) => p.to_ast(ctxt),
+                    CaseLogic::Other(o) => o.to_ast(ctxt),
+                    CaseLogic::Unhandled(msg) => (
+                        Vec::new(),
+                        Some(RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(msg.clone())])),
+                    ),
+                }
+            }
         }
-    }
+        )+
+    };
 }
 
-impl SimpleLogic {
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
+impl_toast_caselogic!(Expr, GTExpr);
+
+impl<ExprT> SimpleLogic<ExprT> {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock
+    where
+        ExprT: Clone,
+    {
         match self {
             SimpleLogic::Fail => (
                 vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
@@ -828,7 +1071,11 @@ impl SimpleLogic {
     }
 }
 
-fn decoder_fn(ix: usize, t: &GenType, logic: CaseLogic) -> RustFn {
+fn decoder_fn<ExprT>(ix: usize, t: &GenType, logic: CaseLogic<ExprT>) -> RustFn
+where
+    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
+    ExprT: Clone,
+{
     let name = Label::from(format!("Decoder{ix}"));
     let params = {
         let mut tmp = DefParams::new();
@@ -1065,27 +1312,38 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 /// is more resilient to changes both upstream (in the Decoder model)
 /// and downstream (in the API made available for generated code to use)
 #[derive(Clone, Debug)]
-enum CaseLogic {
-    Simple(SimpleLogic),
-    Derived(DerivedLogic),
-    Sequential(SequentialLogic),
-    Parallel(ParallelLogic),
-    Repeat(RepeatLogic),
-    Other(OtherLogic),
+enum CaseLogic<ExprT = Expr> {
+    Simple(SimpleLogic<ExprT>),
+    Derived(DerivedLogic<ExprT>),
+    Sequential(SequentialLogic<ExprT>),
+    Parallel(ParallelLogic<ExprT>),
+    Repeat(RepeatLogic<ExprT>),
+    Other(OtherLogic<ExprT>),
     Unhandled(Label), // for generating a panic expression rather than panicking in codegen
 }
 
 /// Cases where a constant block of logic is repeated (0 or more times)
 #[derive(Clone, Debug)]
-enum RepeatLogic {
-    ContinueOnMatch(MatchTree, Box<CaseLogic>), // evaluates a matchtree and continues if it is matched
-    BreakOnMatch(MatchTree, Box<CaseLogic>),    // evaluates a matchtree and breaks if it is matched
-    ExactCount(RustExpr, Box<CaseLogic>),       // repeats a specific numnber of times
-    ConditionTerminal(RustExpr, Box<CaseLogic>), // stops when a predicate for 'terminal element' is satisfied
-    ConditionComplete(RustExpr, Box<CaseLogic>), // stops when a predicate for 'complete sequence' is satisfied
+enum RepeatLogic<ExprT> {
+    ContinueOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and continues if it is matched
+    BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and breaks if it is matched
+    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),    // repeats a specific numnber of times
+    ConditionTerminal(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'terminal element' is satisfied
+    ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'complete sequence' is satisfied
 }
 
-impl RepeatLogic {
+trait ToAst {
+    type AstElem;
+
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> Self::AstElem;
+}
+
+impl<ExprT> ToAst for RepeatLogic<ExprT>
+where
+    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
+{
+    type AstElem = RustBlock;
+
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             RepeatLogic::ContinueOnMatch(ctree, elt) => {
@@ -1259,18 +1517,23 @@ impl RepeatLogic {
 
 /// Cases that apply other case-logic in sequence to an incrementally updated input
 #[derive(Clone, Debug)]
-enum SequentialLogic {
+enum SequentialLogic<ExprT> {
     AccumTuple {
         constructor: Option<Constructor>,
-        elements: Vec<CaseLogic>,
+        elements: Vec<CaseLogic<ExprT>>,
     },
     AccumRecord {
         constructor: Constructor,
-        fields: Vec<(Label, CaseLogic)>,
+        fields: Vec<(Label, CaseLogic<ExprT>)>,
     },
 }
 
-impl SequentialLogic {
+impl<ExprT> ToAst for SequentialLogic<ExprT>
+where
+    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
+{
+    type AstElem = RustBlock;
+
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             SequentialLogic::AccumTuple {
@@ -1359,12 +1622,17 @@ impl SequentialLogic {
 
 /// Catch-all for hard-to-classify cases
 #[derive(Clone, Debug)]
-enum OtherLogic {
-    Descend(MatchTree, Vec<CaseLogic>),
-    ExprMatch(RustExpr, Vec<(MatchCaseLHS, CaseLogic)>),
+enum OtherLogic<ExprT> {
+    Descend(MatchTree, Vec<CaseLogic<ExprT>>),
+    ExprMatch(RustExpr, Vec<(MatchCaseLHS, CaseLogic<ExprT>)>),
 }
 
-impl OtherLogic {
+impl<ExprT> ToAst for OtherLogic<ExprT>
+where
+    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
+{
+    type AstElem = RustBlock;
+
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             OtherLogic::Descend(tree, cases) => {
@@ -1410,11 +1678,11 @@ fn invoke_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustExpr {
 
 /// Cases that require processing of multiple cases in parallel (on the same input-state)
 #[derive(Clone, Debug)]
-enum ParallelLogic {
-    Alts(Vec<CaseLogic>),
+enum ParallelLogic<ExprT> {
+    Alts(Vec<CaseLogic<ExprT>>),
 }
 
-impl ParallelLogic {
+impl<ExprT> ParallelLogic<ExprT> {
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             ParallelLogic::Alts(_alts) => {
@@ -1433,10 +1701,10 @@ impl ParallelLogic {
 
 /// Cases that require no recursion into other case-logic
 #[derive(Clone, Debug)]
-enum SimpleLogic {
+enum SimpleLogic<ExprT> {
     Fail,
     ExpectEnd,
-    Invoke(usize, Vec<(Label, Expr)>),
+    Invoke(usize, Vec<(Label, ExprT)>),
     SkipToNextMultiple(usize),
     ByteIn(ByteSet),
     Eval(RustExpr),
@@ -1444,14 +1712,19 @@ enum SimpleLogic {
 
 /// Cases that recurse into other case-logic only once
 #[derive(Clone, Debug)]
-enum DerivedLogic {
-    VariantOf(Constructor, Box<CaseLogic>),
-    UnitVariantOf(Constructor, Box<CaseLogic>),
-    MapOf(RustExpr, Box<CaseLogic>),
-    Let(Label, RustExpr, Box<CaseLogic>),
+enum DerivedLogic<ExprT> {
+    VariantOf(Constructor, Box<CaseLogic<ExprT>>),
+    UnitVariantOf(Constructor, Box<CaseLogic<ExprT>>),
+    MapOf(RustExpr, Box<CaseLogic<ExprT>>),
+    Let(Label, RustExpr, Box<CaseLogic<ExprT>>),
 }
 
-impl DerivedLogic {
+impl<ExprT> ToAst for DerivedLogic<ExprT>
+where
+    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
+{
+    type AstElem = RustBlock;
+
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             DerivedLogic::VariantOf(constr, inner) => {
@@ -1602,55 +1875,58 @@ impl<'a> RustTypeScope<'a> {
 
 pub struct Generator<'a> {
     module: &'a FormatModule,
-    module_ftypes: HashMap<usize, ValueType>,
-    codegen: Codegen,
+    elaborator: Option<Elaborator<'a>>,
     sourcemap: SourceMap,
-}
-
-pub(crate) enum TypedTreeNode {
-    Format(GTFormat),
-    Pattern(GTPattern),
-    Expr(GTExpr),
 }
 
 impl<'a> Generator<'a> {
     pub(crate) fn new(module: &'a FormatModule) -> Self {
-        let module_ftypes = HashMap::new();
-        let codegen = Codegen::new();
+        let elaborator = None;
         let sourcemap = SourceMap::new();
         Generator {
             module,
-            module_ftypes,
-            codegen,
+            elaborator,
             sourcemap,
         }
     }
 
-    pub fn compile(module: &'a FormatModule, top_format: &Format) -> Self {
+    pub fn precompile(module: &'a FormatModule, top_format: &Format) -> Self {
         let mut gen = Self::new(module);
         let mut tc = TypeChecker::new();
         let ctxt = crate::typecheck::Ctxt::new(module, &UScope::Empty);
         let _ = tc
             .infer_utype_format(top_format, ctxt)
             .unwrap_or_else(|err| panic!("Failed to infer topl-level format type: {err}"));
-        let mut trav = Traversal::new(module, &tc, &mut gen.codegen);
-        let top = trav.elaborate_format(top_format, &TypedDynScope::Empty);
-        gen.populate_from_top_format(&top);
+        gen.elaborator
+            .replace(Elaborator::new(module, tc, Codegen::new()));
+        let top = gen
+            .elaborator
+            .as_mut()
+            .unwrap()
+            .elaborate_format(top_format, &TypedDynScope::Empty);
         gen
     }
 
-    fn populate_from_top_format(&mut self, top: &TypedFormat<GenType>) {}
+    pub fn compile_format(&mut self, format: &Format) {
+        let gt_f = self
+            .elaborator
+            .as_mut()
+            .unwrap()
+            .elaborate_format(format, &TypedDynScope::Empty);
+        // TODO: add any novel adhocs to the sourcemap
+        todo!()
+    }
 }
 
-pub(crate) struct Traversal<'a> {
+pub struct Elaborator<'a> {
     module: &'a FormatModule,
     next_index: usize,
     t_formats: HashMap<usize, Rc<GTFormat>>,
-    tc: &'a TypeChecker,
-    codegen: &'a mut Codegen,
+    tc: TypeChecker,
+    codegen: Codegen,
 }
 
-impl<'a> Traversal<'a> {
+impl<'a> Elaborator<'a> {
     /// Increment the current `next_index` by 1 and return its un-incremented value.
     pub fn get_and_increment_index(&mut self) -> usize {
         let ret = self.next_index;
@@ -1725,11 +2001,7 @@ impl<'a> Traversal<'a> {
         }
     }
 
-    pub(crate) fn new(
-        module: &'a FormatModule,
-        tc: &'a TypeChecker,
-        codegen: &'a mut Codegen,
-    ) -> Self {
+    pub(crate) fn new(module: &'a FormatModule, tc: TypeChecker, codegen: Codegen) -> Self {
         Self {
             module,
             next_index: 0,
@@ -1787,7 +2059,7 @@ impl<'a> Traversal<'a> {
                     ret
                 };
                 let gt = self.get_gt_from_index(index);
-                GTFormat::FormatCall(gt, t_args, t_inner)
+                GTFormat::FormatCall(gt, *level, t_args, t_inner)
             }
             Format::Fail => {
                 self.increment_index();
@@ -1956,7 +2228,7 @@ impl<'a> Traversal<'a> {
                     .get_typed_dynf_by_name(lbl)
                     .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Apply(gt, t_dynf)
+                GTFormat::Apply(gt, lbl.clone(), t_dynf)
             }
         }
     }
@@ -2063,7 +2335,7 @@ impl<'a> Traversal<'a> {
                 GTExpr::AsU32(Box::new(t_inner))
             }
             Expr::AsU64(inner) => {
-                let t_inner = self.decorate_expr(inner);
+                let t_inner = self.elaborate_expr(inner);
                 GTExpr::AsU64(Box::new(t_inner))
             }
             Expr::AsChar(inner) => {
@@ -2087,11 +2359,11 @@ impl<'a> Traversal<'a> {
                 GTExpr::U32Le(Box::new(t_bytes))
             }
             Expr::U64Be(bytes) => {
-                let t_bytes = self.decorate_expr(bytes);
+                let t_bytes = self.elaborate_expr(bytes);
                 GTExpr::U64Be(Box::new(t_bytes))
             }
             Expr::U64Le(bytes) => {
-                let t_bytes = self.decorate_expr(bytes);
+                let t_bytes = self.elaborate_expr(bytes);
                 GTExpr::U64Le(Box::new(t_bytes))
             }
             Expr::SeqLength(seq) => {
@@ -2170,11 +2442,11 @@ type GTFormat = TypedFormat<GenType>;
 type GTExpr = TypedExpr<GenType>;
 type GTPattern = TypedPattern<GenType>;
 
-#[derive(Clone, PartialEq, Debug)]
-enum GenScope<'a> {
-    Empty,
-    Value(&'a GenScope<'a>, &'a str, Rc<GTExpr>),
-}
+// #[derive(Clone, PartialEq, Debug)]
+// enum GenScope<'a> {
+//     Empty,
+//     Value(&'a GenScope<'a>, &'a str, Rc<GTExpr>),
+// }
 
 type GTDynFormat = TypedDynFormat<GenType>;
 
@@ -2222,40 +2494,6 @@ impl<'a> TypedDynScope<'a> {
     }
 }
 
-mod __impls {
-    use super::IxLabel;
-    use crate::Label;
-    impl From<usize> for IxLabel {
-        fn from(value: usize) -> Self {
-            Self(value)
-        }
-    }
-
-    impl From<IxLabel> for Label {
-        fn from(value: IxLabel) -> Self {
-            Label::Owned(format!("Type{}", value.0))
-        }
-    }
-
-    impl From<&IxLabel> for Label {
-        fn from(value: &IxLabel) -> Self {
-            Label::Owned(format!("Type{}", value.0))
-        }
-    }
-
-    impl AsRef<usize> for IxLabel {
-        fn as_ref(&self) -> &usize {
-            &self.0
-        }
-    }
-
-    impl std::borrow::Borrow<usize> for IxLabel {
-        fn borrow(&self) -> &usize {
-            &self.0
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::typecheck::Ctxt;
@@ -2270,7 +2508,7 @@ mod tests {
         // println!("{tc:?}");
 
         let mut cg = Codegen::new();
-        let mut tv = Traversal::new(module, &tc, &mut cg);
+        let mut tv = Elaborator::new(module, tc, cg);
         let dec_f = tv.elaborate_format(f, &TypedDynScope::Empty);
         let tv_pop = tv.next_index;
 
@@ -2315,10 +2553,70 @@ mod tests {
     #[test]
     fn test_popcheck_adt_simple() {
         let f = Format::Union(vec![
-            (Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full())))),
-            (Format::Variant("none".into(), Box::new(Format::EMPTY))),
+            Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full()))),
+            Format::Variant("none".into(), Box::new(Format::EMPTY)),
         ]);
 
         run_popcheck(&[("adt_simple", f)]);
+    }
+
+    #[test]
+    fn test_popcheck_itemvar() {
+        let sub_f = Format::Byte(ByteSet::full());
+        let mut module = FormatModule::new();
+        let sub_ref = module.define_format("test.anybyte", sub_f);
+        let f = sub_ref.call();
+        module.define_format("test.call_anybyte", f.clone());
+        population_check(&module, &f);
+    }
+
+    #[test]
+    fn test_popcheck_compute_simple() {
+        let x = Format::Byte(ByteSet::full());
+        let fx = Format::Compute(Expr::Var("x".into()));
+        let gx = Format::Compute(Expr::Arith(
+            Arith::Add,
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("x".into())),
+        ));
+
+        let f = Format::Record(vec![("x".into(), x), ("fx".into(), fx), ("gx".into(), gx)]);
+        run_popcheck(&[("test.compute_simple", f)]);
+    }
+
+    #[test]
+    fn test_popcheck_compute_complex() {
+        let is_null = Expr::Lambda(
+            "x".into(),
+            Box::new(Expr::IntRel(
+                IntRel::Eq,
+                Box::new(Expr::U8(0)),
+                Box::new(Expr::Var("x".into())),
+            )),
+        );
+        let ixdup = Expr::Lambda(
+            "acc_x".into(),
+            Box::new(Expr::Tuple(vec![
+                Expr::Arith(
+                    Arith::Add,
+                    Box::new(Expr::U32(1)),
+                    Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0)),
+                ),
+                Expr::Dup(
+                    Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0)),
+                    Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 1)),
+                ),
+            ])),
+        );
+        let xs = Format::RepeatUntilLast(is_null, Box::new(Format::Byte(ByteSet::full())));
+        let fxs = Format::Compute(Expr::FlatMapAccum(
+            Box::new(ixdup),
+            Box::new(Expr::U32(1)),
+            ValueType::Base(BaseType::U32),
+            Box::new(Expr::Var("xs".into())),
+        ));
+
+        let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
+        run_popcheck(&[("test.compute_complex", f)]);
     }
 }

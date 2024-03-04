@@ -1002,17 +1002,17 @@ impl FormatModule {
 /// element, which is invariably the final positional argument for that variant. In the case of
 /// [`Next::Union`], the recursive descent is symmetric and may be balanced arbitrarily.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-enum Next<'a> {
+enum Next<'a, F = Format> {
     Empty,
-    Union(Rc<Next<'a>>, Rc<Next<'a>>),
-    Cat(&'a Format, Rc<Next<'a>>),
-    Tuple(&'a [Format], Rc<Next<'a>>),
-    Record(&'a [(Label, Format)], Rc<Next<'a>>),
-    Repeat(&'a Format, Rc<Next<'a>>),
-    RepeatCount(usize, &'a Format, Rc<Next<'a>>),
-    Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
-    Peek(Rc<Next<'a>>, Rc<Next<'a>>),
-    PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
+    Union(Rc<Next<'a, F>>, Rc<Next<'a, F>>),
+    Cat(&'a F, Rc<Next<'a, F>>),
+    Tuple(&'a [F], Rc<Next<'a, F>>),
+    Record(&'a [(Label, F)], Rc<Next<'a, F>>),
+    Repeat(&'a F, Rc<Next<'a, F>>),
+    RepeatCount(usize, &'a F, Rc<Next<'a, F>>),
+    Slice(usize, Rc<Next<'a, F>>, Rc<Next<'a, F>>),
+    Peek(Rc<Next<'a, F>>, Rc<Next<'a, F>>),
+    PeekNot(Rc<Next<'a, F>>, Rc<Next<'a, F>>),
 }
 
 /// A single choice-point in a conceptual [MatchTree] structure.
@@ -1311,7 +1311,7 @@ impl<'a> MatchTreeStep<'a> {
                 tree.peek_not(peek)
             }
             Format::Slice(expr, f) => {
-                let inside = Rc::new(Next::Cat(f, Rc::new(Next::Empty)));
+                let inside = Rc::new(Next::Cat(f.as_ref(), Rc::new(Next::Empty)));
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
                     Self::from_slice(module, n, inside, next)
@@ -1476,6 +1476,17 @@ impl<'a> MatchTreeLevel<'a> {
             None
         }
     }
+
+    fn grow_typed(
+        _module: &FormatModule,
+        _nexts: HashSet<(
+            usize,
+            Rc<Next<'_, codegen::typed_format::TypedFormat<codegen::typed_format::GenType>>>,
+        )>,
+        _depth: usize,
+    ) -> Option<MatchTree> {
+        todo!()
+    }
 }
 
 impl MatchTree {
@@ -1508,6 +1519,19 @@ impl MatchTree {
         }
         const MAX_DEPTH: usize = 32;
         MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
+    }
+
+    pub(crate) fn build_typed(
+        module: &FormatModule,
+        branches: &[codegen::typed_format::TypedFormat<codegen::typed_format::GenType>],
+        next: Rc<Next<'_, codegen::typed_format::TypedFormat<codegen::typed_format::GenType>>>,
+    ) -> Option<MatchTree> {
+        let mut nexts = HashSet::new();
+        for (i, f) in branches.iter().enumerate() {
+            nexts.insert((i, Rc::new(Next::Cat(f, next.clone()))));
+        }
+        const MAX_DEPTH: usize = 32;
+        MatchTreeLevel::grow_typed(module, nexts, MAX_DEPTH)
     }
 }
 
