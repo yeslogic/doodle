@@ -879,16 +879,6 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::CAST_PREFIX,
             ),
-            Expr::U64Be(bytes) => cond_paren(
-                self.compile_prefix("u64be", None, bytes),
-                prec,
-                Precedence::CAST_PREFIX,
-            ),
-            Expr::U64Le(bytes) => cond_paren(
-                self.compile_prefix("u64le", None, bytes),
-                prec,
-                Precedence::CAST_PREFIX,
-            ),
             Expr::SeqLength(seq) => cond_paren(
                 self.compile_prefix("seq-length", None, seq),
                 prec,
