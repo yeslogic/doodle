@@ -72,16 +72,14 @@ pub enum ValueType {
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
     match vt {
         ValueType::Any | ValueType::Empty => None,
-        ValueType::Base(b) => {
-            Some(match b {
-                BaseType::Bool => Expr::Bool(false),
-                BaseType::U8 => Expr::U8(0),
-                BaseType::U16 => Expr::U16(0),
-                BaseType::U32 => Expr::U32(0),
-                BaseType::U64 => Expr::U64(0),
-                BaseType::Char => Expr::AsChar(Box::new(Expr::U32(0))),
-            })
-        }
+        ValueType::Base(b) => Some(match b {
+            BaseType::Bool => Expr::Bool(false),
+            BaseType::U8 => Expr::U8(0),
+            BaseType::U16 => Expr::U16(0),
+            BaseType::U32 => Expr::U32(0),
+            BaseType::U64 => Expr::U64(0),
+            BaseType::Char => Expr::AsChar(Box::new(Expr::U32(0))),
+        }),
         ValueType::Tuple(ts) => {
             let mut xs = Vec::with_capacity(ts.len());
             for t in ts {
@@ -117,10 +115,10 @@ impl ValueType {
         }
     }
 
-    fn unwrap_tuple_type(self) -> Result<Vec<ValueType>, String> {
+    fn unwrap_tuple_type(self) -> AResult<Vec<ValueType>> {
         match self {
             ValueType::Tuple(ts) => Ok(ts),
-            t => Err(format!("type is not a tuple: {t:?}")),
+            t => Err(anyhow!("type is not a tuple: {t:?}")),
         }
     }
 
@@ -355,45 +353,43 @@ impl Expr {
             }
             Expr::Lambda(..) => Err(anyhow!("infer_type encountered unexpected lambda")),
 
-            Expr::IntRel(_rel, x, y) =>
-                match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                    (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() =>
-                        Ok(ValueType::Base(BaseType::Bool)),
-                    (x, y) => Err(anyhow!("mismatched operand types for {_rel:?}: {x:?}, {y:?}")),
+            Expr::IntRel(_rel, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
+                (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
+                    Ok(ValueType::Base(BaseType::Bool))
                 }
-            Expr::Arith(_arith, x, y) =>
-                match (x.infer_type(scope)?, y.infer_type(scope)?) {
-                    (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() =>
-                        Ok(ValueType::Base(b1)),
-                    (x, y) => Err(anyhow!("mismatched operand types for {_arith:?}: {x:?}, {y:?}")),
+                (x, y) => Err(anyhow!(
+                    "mismatched operand types for {_rel:?}: {x:?}, {y:?}"
+                )),
+            },
+            Expr::Arith(_arith, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
+                (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
+                    Ok(ValueType::Base(b1))
                 }
+                (x, y) => Err(anyhow!(
+                    "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
+                )),
+            },
 
-            Expr::AsU8(x) =>
-                match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
-                    x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
-                }
-            Expr::AsU16(x) =>
-                match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
-                    x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
-                }
-            Expr::AsU32(x) =>
-                match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
-                    x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
-                }
-            Expr::AsU64(x) =>
-                match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() =>
-                        Ok(ValueType::Base(BaseType::U64)),
-                    x => Err(anyhow!("cannot convert {x:?} to U64")),
-                }
-            Expr::AsChar(x) =>
-                match x.infer_type(scope)? {
-                    ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
-                    x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
-                }
+            Expr::AsU8(x) => match x.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U8)),
+                x => Err(anyhow!("unsound type cast AsU8(_ : {x:?})")),
+            },
+            Expr::AsU16(x) => match x.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U16)),
+                x => Err(anyhow!("unsound type cast AsU16(_ : {x:?})")),
+            },
+            Expr::AsU32(x) => match x.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U32)),
+                x => Err(anyhow!("unsound type cast AsU32(_ : {x:?})")),
+            },
+            Expr::AsU64(x) => match x.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::U64)),
+                x => Err(anyhow!("cannot convert {x:?} to U64")),
+            },
+            Expr::AsChar(x) => match x.infer_type(scope)? {
+                ValueType::Base(b) if b.is_numeric() => Ok(ValueType::Base(BaseType::Char)),
+                x => Err(anyhow!("unsound type cast AsChar(_ : {x:?})")),
+            },
             Expr::U16Be(bytes) => {
                 let _t = bytes.infer_type(scope)?;
                 match _t.as_tuple_type() {
@@ -433,91 +429,73 @@ impl Expr {
             Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
                 let _t = bytes.infer_type(scope)?;
                 match _t.as_tuple_type() {
-                    [
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                        ValueType::Base(BaseType::U8),
-                    ] => {
+                    [ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8), ValueType::Base(BaseType::U8)] => {
                         Ok(ValueType::Base(BaseType::U64))
                     }
-                    other =>
-                        Err(
-                            anyhow!(
-                                "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
-                            )
-                        ),
+                    other => Err(anyhow!(
+                        "U64Be/Le: expected (U8, U8, U8, U8, U8, U8, U8, U8), found {other:#?}"
+                    )),
                 }
             }
-            Expr::SeqLength(seq) =>
-                match seq.infer_type(scope)? {
-                    ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
-                    other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
-                }
-            Expr::SubSeq(seq, start, length) =>
-                match seq.infer_type(scope)? {
-                    ValueType::Seq(t) => {
-                        let start_type = start.infer_type(scope)?;
-                        let length_type = length.infer_type(scope)?;
-                        if start_type != ValueType::Base(BaseType::U32) {
-                            return Err(
-                                anyhow!("SubSeq `start` param: expected U32, found {start_type:?}")
-                            );
-                        }
-                        if length_type != ValueType::Base(BaseType::U32) {
-                            return Err(
-                                anyhow!("SubSeq length must be numeric, found {length_type:?}")
-                            );
-                        }
-                        Ok(ValueType::Seq(t))
+            Expr::SeqLength(seq) => match seq.infer_type(scope)? {
+                ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
+                other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
+            },
+            Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
+                ValueType::Seq(t) => {
+                    let start_type = start.infer_type(scope)?;
+                    let length_type = length.infer_type(scope)?;
+                    if start_type != ValueType::Base(BaseType::U32) {
+                        return Err(anyhow!(
+                            "SubSeq `start` param: expected U32, found {start_type:?}"
+                        ));
                     }
-                    other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
+                    if length_type != ValueType::Base(BaseType::U32) {
+                        return Err(anyhow!(
+                            "SubSeq length must be numeric, found {length_type:?}"
+                        ));
+                    }
+                    Ok(ValueType::Seq(t))
                 }
-            Expr::FlatMap(expr, seq) =>
-                match expr.as_ref() {
-                    Expr::Lambda(name, expr) =>
-                        match seq.infer_type(scope)? {
-                            ValueType::Seq(t) => {
-                                let mut child_scope = TypeScope::child(scope);
-                                child_scope.push(name.clone(), *t);
-                                match expr.infer_type(&child_scope)? {
-                                    ValueType::Seq(t2) => Ok(ValueType::Seq(t2)),
-                                    other => Err(anyhow!("FlatMap: expected Seq, found {other:?}")),
-                                }
-                            }
+                other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
+            },
+            Expr::FlatMap(expr, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(name.clone(), *t);
+                        match expr.infer_type(&child_scope)? {
+                            ValueType::Seq(t2) => Ok(ValueType::Seq(t2)),
                             other => Err(anyhow!("FlatMap: expected Seq, found {other:?}")),
                         }
-                    other => Err(anyhow!("FlatMap: expected Lambda, found {other:?}")),
-                }
-            Expr::FlatMapAccum(expr, accum, accum_type, seq) =>
-                match expr.as_ref() {
-                    Expr::Lambda(name, expr) =>
-                        match seq.infer_type(scope)? {
-                            ValueType::Seq(t) => {
-                                let accum_type = accum.infer_type(scope)?.unify(accum_type)?;
-                                let mut child_scope = TypeScope::child(scope);
-                                child_scope.push(
-                                    name.clone(),
-                                    ValueType::Tuple(vec![accum_type.clone(), *t])
-                                );
-                                let ValueType::Tuple(mut tup) = expr.infer_type(&child_scope)? else { return Err(anyhow!("non-tuple return value of lambda in FlatMapAccum")) };
-                                match tup.as_mut_slice()
-                                {
-                                    [accum_result, ValueType::Seq(t2)] => {
-                                        accum_result.unify(&accum_type)?;
-                                        Ok(ValueType::Seq(t2.clone()))
-                                    }
-                                    _ => Err(anyhow!("FlatMapAccum: expected two values")),
-                                }
+                    }
+                    other => Err(anyhow!("FlatMap: expected Seq, found {other:?}")),
+                },
+                other => Err(anyhow!("FlatMap: expected Lambda, found {other:?}")),
+            },
+            Expr::FlatMapAccum(expr, accum, accum_type, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        let accum_type = accum.infer_type(scope)?.unify(accum_type)?;
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope
+                            .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
+                        match expr
+                            .infer_type(&child_scope)?
+                            .unwrap_tuple_type()?
+                            .as_mut_slice()
+                        {
+                            [accum_result, ValueType::Seq(t2)] => {
+                                accum_result.unify(&accum_type)?;
+                                Ok(ValueType::Seq(t2.clone()))
                             }
-                            other => Err(anyhow!("FlatMapAccum: expected Seq, found {other:?}")),
+                            _ => Err(anyhow!("FlatMapAccum: expected two values")),
                         }
-                    other => Err(anyhow!("FlatMapAccum: expected Lambda, found {other:?}")),
-                }
+                    }
+                    other => Err(anyhow!("FlatMapAccum: expected Seq, found {other:?}")),
+                },
+                other => Err(anyhow!("FlatMapAccum: expected Lambda, found {other:?}")),
+            },
             Expr::Dup(count, expr) => {
                 if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
@@ -684,24 +662,21 @@ impl Format {
             Format::Align(n) => Bounds::new(0, Some(n - 1)),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
-            Format::Union(branches) | Format::UnionNondet(branches) =>
-                branches
-                    .iter()
-                    .map(|f| f.match_bounds(module))
-                    .reduce(Bounds::union)
-                    .unwrap(),
-            Format::Tuple(fields) =>
-                fields
-                    .iter()
-                    .map(|f| f.match_bounds(module))
-                    .reduce(Bounds::add)
-                    .unwrap_or(Bounds::exact(0)),
-            Format::Record(fields) =>
-                fields
-                    .iter()
-                    .map(|(_, f)| f.match_bounds(module))
-                    .reduce(Bounds::add)
-                    .unwrap_or(Bounds::exact(0)),
+            Format::Union(branches) | Format::UnionNondet(branches) => branches
+                .iter()
+                .map(|f| f.match_bounds(module))
+                .reduce(Bounds::union)
+                .unwrap(),
+            Format::Tuple(fields) => fields
+                .iter()
+                .map(|f| f.match_bounds(module))
+                .reduce(Bounds::add)
+                .unwrap_or(Bounds::exact(0)),
+            Format::Record(fields) => fields
+                .iter()
+                .map(|(_, f)| f.match_bounds(module))
+                .reduce(Bounds::add)
+                .unwrap_or(Bounds::exact(0)),
             Format::Repeat(_) => Bounds::new(0, None),
             Format::Repeat1(f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),

@@ -2,7 +2,7 @@ use crate::format::BaseModule;
 use doodle::helper::*;
 use std::collections::BTreeMap;
 
-use doodle::{DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, BaseType, ValueType};
+use doodle::{BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 fn tuple_proj(x: Expr, i: usize) -> Expr {
     Expr::TupleProj(Box::new(x), i)
