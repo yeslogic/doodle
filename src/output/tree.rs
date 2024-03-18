@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
-use crate::decoder::{MultiScope, Scope, SingleScope, Value};
+use crate::decoder::Value;
 use crate::precedence::{cond_paren, Precedence};
 use crate::Label;
 use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};

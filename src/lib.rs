@@ -966,7 +966,7 @@ impl FormatModule {
             }
             Format::Dynamic(name, dynformat, format) => {
                 match dynformat {
-                    DynFormat::Huffman(lengths_expr, opt_values_expr) => {
+                    DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) => match &*t {
                                 ValueType::Base(BaseType::U8) | ValueType::Base(BaseType::U16) => {}
