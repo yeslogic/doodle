@@ -51,7 +51,7 @@ enum Command {
         /// The binary file to decode
         filename: PathBuf,
     },
-    /// Typecheck the main FormatModle
+    /// Typecheck the main FormatModule
     TypeCheck,
 }
 
