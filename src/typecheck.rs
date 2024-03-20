@@ -291,7 +291,7 @@ pub(crate) enum VType {
 }
 
 #[derive(Debug)]
-pub(crate) struct TypeChecker {
+pub struct TypeChecker {
     constraints: Vec<Constraints>,
     aliases: Vec<Alias>, // set of non-identity metavariables that are aliased to ?ix
     varmaps: VarMapMap, // logically separate table of metacontext variant-maps for indirect aliasing
@@ -2181,7 +2181,7 @@ impl TypeChecker {
 
 // SECTION - interface between the typechecker and the rest of the crate
 impl TypeChecker {
-    pub fn infer_var_format_union(
+    pub(crate) fn infer_var_format_union(
         &mut self,
         branches: &[Format],
         ctxt: Ctxt<'_>,
@@ -2205,7 +2205,7 @@ impl TypeChecker {
 
     /// Assigns new metavariables and simple constraints for a format, and returns the novel toplevel UVar
     ///
-    pub fn infer_var_format(&mut self, f: &Format, ctxt: Ctxt<'_>) -> TCResult<UVar> {
+    pub(crate) fn infer_var_format(&mut self, f: &Format, ctxt: Ctxt<'_>) -> TCResult<UVar> {
         match f {
             Format::ItemVar(level, args) => {
                 let newvar = self.get_new_uvar();
@@ -2384,7 +2384,11 @@ impl TypeChecker {
         }
     }
 
-    pub fn infer_utype_format(&mut self, format: &Format, ctxt: Ctxt<'_>) -> TCResult<Rc<UType>> {
+    pub(crate) fn infer_utype_format(
+        &mut self,
+        format: &Format,
+        ctxt: Ctxt<'_>,
+    ) -> TCResult<Rc<UType>> {
         let uv = self.infer_var_format(format, ctxt)?;
         Ok(uv.into())
     }

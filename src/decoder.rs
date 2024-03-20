@@ -5,7 +5,7 @@ use crate::{
     pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
     TypeScope, ValueType,
 };
-use crate::{IntoLabel, Label};
+use crate::{CowVec, IntoLabel, Label};
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -648,7 +648,7 @@ impl<'a> Compiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some(f) = fields.next() {
-                    let next = Rc::new(Next::Tuple(fields.as_slice(), next.clone()));
+                    let next = Rc::new(Next::Tuple(CowVec::Slice(fields.as_slice()), next.clone()));
                     let df = self.compile_format(f, next)?;
                     dfields.push(df);
                 }
@@ -658,7 +658,7 @@ impl<'a> Compiler<'a> {
                 let mut dfields = Vec::with_capacity(fields.len());
                 let mut fields = fields.iter();
                 while let Some((name, f)) = fields.next() {
-                    let next = Rc::new(Next::Record(fields.as_slice(), next.clone()));
+                    let next = Rc::new(Next::Record(CowVec::Slice(fields.as_slice()), next.clone()));
                     let df = self.compile_format(f, next)?;
                     dfields.push((name.clone(), df));
                 }
@@ -668,7 +668,7 @@ impl<'a> Compiler<'a> {
                 if a.is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let da = self.compile_format(a, Rc::new(Next::Repeat(a, next.clone())))?;
+                let da = self.compile_format(a, Rc::new(Next::Repeat(Cow::Borrowed(a), next.clone())))?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::Tuple(vec![(**a).clone(), astar]);
                 let fb = Format::EMPTY;
@@ -682,7 +682,7 @@ impl<'a> Compiler<'a> {
                 if a.is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let da = self.compile_format(a, Rc::new(Next::Repeat(a, next.clone())))?;
+                let da = self.compile_format(a, Rc::new(Next::Repeat(Cow::Borrowed(a), next.clone())))?;
                 let astar = Format::Repeat(a.clone());
                 let fa = Format::EMPTY;
                 let fb = Format::Tuple(vec![(**a).clone(), astar]);
