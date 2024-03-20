@@ -725,7 +725,7 @@ mod __typed_value {
     }
 
     #[derive(Clone, Debug)]
-    pub enum ScopeEntry<TypeRep> {
+    pub(crate) enum TypedScopeEntry<TypeRep> {
         Value(TypedValue<TypeRep>),
         Decoder(TypedDecoder<TypeRep>),
     }
@@ -825,7 +825,7 @@ mod __typed_value {
             for (name, value) in self.entries.iter().rev() {
                 bindings.push((
                     name.clone(),
-                    Box::new(ScopeEntry::<GenType>::Value(value.clone())),
+                    Box::new(TypedScopeEntry::<GenType>::Value(value.clone())),
                 ));
             }
             self.parent.get_bindings(bindings);
@@ -858,7 +858,7 @@ mod __typed_value {
         fn get_bindings(&self, bindings: &mut Vec<(Label, Box<dyn std::fmt::Debug + 'static>)>) {
             bindings.push((
                 self.name.to_string().into(),
-                Box::new(ScopeEntry::Value(self.value.clone())),
+                Box::new(TypedScopeEntry::Value(self.value.clone())),
             ));
             self.parent.get_bindings(bindings);
         }
@@ -890,7 +890,7 @@ mod __typed_value {
         fn get_bindings(&self, bindings: &mut Vec<(Label, Box<dyn std::fmt::Debug + 'static>)>) {
             bindings.push((
                 self.name.to_string().into(),
-                Box::new(ScopeEntry::Decoder(self.decoder.clone())),
+                Box::new(TypedScopeEntry::Decoder(self.decoder.clone())),
             ));
             self.parent.get_bindings(bindings);
         }
@@ -1275,7 +1275,7 @@ mod __typed_value {
 
 /// Decoders with a fixed amount of lookahead
 #[derive(Clone, Debug)]
-pub enum TypedDecoder<TypeRep> {
+pub(crate) enum TypedDecoder<TypeRep> {
     Call(TypeRep, usize, Vec<(Label, TypedExpr<TypeRep>)>),
     Fail,
     EndOfInput,
@@ -1319,14 +1319,14 @@ pub enum TypedDecoder<TypeRep> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Program<TypeRep> {
+pub(crate) struct TypedProgram<TypeRep> {
     pub decoders: Vec<(TypedDecoder<TypeRep>, TypeRep)>,
 }
 
-impl Program<GenType> {
+impl TypedProgram<GenType> {
     fn new() -> Self {
         let decoders = Vec::new();
-        Program { decoders }
+        TypedProgram { decoders }
     }
 
     // pub fn run<'input>(
@@ -1339,7 +1339,7 @@ impl Program<GenType> {
 
 pub struct GTCompiler<'a> {
     module: &'a FormatModule,
-    program: Program<GenType>,
+    program: TypedProgram<GenType>,
     decoder_map: HashMap<(usize, Rc<Next<'a, GTFormat>>), usize>,
     compile_queue: Vec<(&'a GTFormat, Rc<Next<'a, GTFormat>>, usize)>,
 }
@@ -1348,7 +1348,7 @@ type GTDecoder = TypedDecoder<GenType>;
 
 impl<'a> GTCompiler<'a> {
     fn new(module: &'a FormatModule) -> Self {
-        let program = Program::new();
+        let program = TypedProgram::new();
         let decoder_map = HashMap::new();
         let compile_queue = Vec::new();
         GTCompiler {
@@ -1362,7 +1362,7 @@ impl<'a> GTCompiler<'a> {
     pub(crate) fn compile_program(
         module: &FormatModule,
         format: &GTFormat,
-    ) -> AResult<Program<GenType>> {
+    ) -> AResult<TypedProgram<GenType>> {
         let mut compiler = GTCompiler::new(module);
         // type
         let scope = TypeScope::new();
