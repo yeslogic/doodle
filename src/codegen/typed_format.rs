@@ -2,8 +2,7 @@ use std::borrow::Cow;
 use std::ops::Add;
 use std::rc::Rc;
 
-use super::rust_ast::{RustType, RustTypeDef};
-use super::{AtomType, LocalType, PrimType};
+use super::rust_ast::{PrimType, RustType, RustTypeDef};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{Arith, FormatModule, IntRel, Label, ValueType};
@@ -76,51 +75,51 @@ pub enum TypedFormat<TypeRep> {
 impl TypedFormat<GenType> {
     pub const EMPTY: Self = TypedFormat::Tuple(GenType::Inline(RustType::UNIT), Vec::new());
 
-    pub(crate) fn expect_rust_type(&self, expected: &RustType) {
-        match self {
-            TypedFormat::FormatCall(_, _, _, gt_f) => gt_f.expect_rust_type(expected),
-            TypedFormat::Fail =>
-                unreachable!("TypedFormat::Fail has no equivalent RustType, expected {expected:?}"),
-            TypedFormat::Align(_) | TypedFormat::EndOfInput =>
-                assert!(matches!(expected, RustType::Atom(AtomType::Prim(PrimType::Unit)))),
-            TypedFormat::Byte(_) =>
-                assert!(matches!(expected, RustType::Atom(AtomType::Prim(PrimType::U8)))),
-            | TypedFormat::Tuple(gt, ..)
-            | TypedFormat::Record(gt, ..)
-            | TypedFormat::Repeat(gt, ..)
-            | TypedFormat::Repeat1(gt, ..)
-            | TypedFormat::RepeatCount(gt, ..)
-            | TypedFormat::RepeatUntilLast(gt, ..)
-            | TypedFormat::RepeatUntilSeq(gt, ..)
-            | TypedFormat::Peek(gt, ..)
-            | TypedFormat::PeekNot(gt, ..)
-            | TypedFormat::Slice(gt, ..)
-            | TypedFormat::Bits(gt, ..)
-            | TypedFormat::WithRelativeOffset(gt, ..)
-            | TypedFormat::Map(gt, ..)
-            | TypedFormat::Compute(gt, ..)
-            | TypedFormat::Let(gt, ..)
-            | TypedFormat::Match(gt, ..)
-            | TypedFormat::Dynamic(gt, ..)
-            | TypedFormat::Apply(gt, ..)
-            | TypedFormat::Union(gt, ..)
-            | TypedFormat::UnionNondet(gt, ..)
-            | TypedFormat::Variant(gt, ..) =>
-                match gt {
-                    GenType::Inline(actual) => assert_eq!(actual, expected),
-                    GenType::Def((ix1, lb1), ..) =>
-                        match expected {
-                            RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, lb0))) => {
-                                assert_eq!((ix0, lb0), (ix1, lb1));
-                            }
-                            _ =>
-                                unreachable!(
-                                    "actual type GenType::Def({ix1}, {lb1}) != expected type ({expected:?}) [{self:?}]"
-                                ),
-                        }
-                }
-        }
-    }
+    // pub(crate) fn expect_rust_type(&self, expected: &RustType) {
+    //     match self {
+    //         TypedFormat::FormatCall(_, _, _, gt_f) => gt_f.expect_rust_type(expected),
+    //         TypedFormat::Fail =>
+    //             unreachable!("TypedFormat::Fail has no equivalent RustType, expected {expected:?}"),
+    //         TypedFormat::Align(_) | TypedFormat::EndOfInput =>
+    //             assert!(matches!(expected, RustType::Atom(AtomType::Prim(PrimType::Unit)))),
+    //         TypedFormat::Byte(_) =>
+    //             assert!(matches!(expected, RustType::Atom(AtomType::Prim(PrimType::U8)))),
+    //         | TypedFormat::Tuple(gt, ..)
+    //         | TypedFormat::Record(gt, ..)
+    //         | TypedFormat::Repeat(gt, ..)
+    //         | TypedFormat::Repeat1(gt, ..)
+    //         | TypedFormat::RepeatCount(gt, ..)
+    //         | TypedFormat::RepeatUntilLast(gt, ..)
+    //         | TypedFormat::RepeatUntilSeq(gt, ..)
+    //         | TypedFormat::Peek(gt, ..)
+    //         | TypedFormat::PeekNot(gt, ..)
+    //         | TypedFormat::Slice(gt, ..)
+    //         | TypedFormat::Bits(gt, ..)
+    //         | TypedFormat::WithRelativeOffset(gt, ..)
+    //         | TypedFormat::Map(gt, ..)
+    //         | TypedFormat::Compute(gt, ..)
+    //         | TypedFormat::Let(gt, ..)
+    //         | TypedFormat::Match(gt, ..)
+    //         | TypedFormat::Dynamic(gt, ..)
+    //         | TypedFormat::Apply(gt, ..)
+    //         | TypedFormat::Union(gt, ..)
+    //         | TypedFormat::UnionNondet(gt, ..)
+    //         | TypedFormat::Variant(gt, ..) =>
+    //             match gt {
+    //                 GenType::Inline(actual) => assert_eq!(actual, expected),
+    //                 GenType::Def((ix1, lb1), ..) =>
+    //                     match expected {
+    //                         RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, lb0))) => {
+    //                             assert_eq!((ix0, lb0), (ix1, lb1));
+    //                         }
+    //                         _ =>
+    //                             unreachable!(
+    //                                 "actual type GenType::Def({ix1}, {lb1}) != expected type ({expected:?}) [{self:?}]"
+    //                             ),
+    //                     }
+    //             }
+    //     }
+    // }
 
     pub(crate) fn match_bounds(&self, module: &FormatModule) -> Bounds {
         match self {
@@ -334,8 +333,6 @@ pub enum TypedPattern<TypeRep> {
 }
 
 mod __impls {
-    use std::f32::consts::E;
-
     use super::{GenType, TypedDynFormat, TypedExpr, TypedFormat, TypedPattern};
     use crate::{
         codegen::{

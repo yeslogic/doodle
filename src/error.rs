@@ -1,5 +1,4 @@
 use crate::byte_set::ByteSet;
-use crate::codegen::typed_format::GenType;
 use crate::decoder::{Scope, ScopeEntry};
 use crate::read::ReadCtxt;
 use crate::Label;

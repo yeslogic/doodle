@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
+use std::borrow::{Borrow, Cow};
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -995,24 +996,54 @@ impl FormatModule {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum CowVec<'a, T>
+{
+    Slice(&'a [T]),
+    Vec(Vec<T>),
+}
+
+impl<'a, T> std::ops::Deref for CowVec<'a, T> {
+    type Target = [T];
+
+    fn deref(&self) -> &[T] {
+        match self {
+            CowVec::Slice(s) => s,
+            CowVec::Vec(v) => v.as_slice(),
+        }
+    }
+}
+
+impl<'a, T> From<&'a [T]> for CowVec<'a, T> {
+    fn from(value: &'a [T]) -> Self {
+        Self::Slice(value)
+    }
+}
+
+impl<'a, T> From<Vec<T>> for CowVec<'a, T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Vec(value)
+    }
+}
+
 /// Incremental decomposition of a Format into a partially consumed head
 /// sub-format, and a possibly-empty tail of remaining sub-formats.
 ///
 /// All variants other than [`Next::Empty`] and [`Next::Union`] implicitly have a tail-recursive
 /// element, which is invariably the final positional argument for that variant. In the case of
 /// [`Next::Union`], the recursive descent is symmetric and may be balanced arbitrarily.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-enum Next<'a, F = Format> {
+#[derive(PartialEq, Eq, Hash, Debug)]
+enum Next<'a> {
     Empty,
-    Union(Rc<Next<'a, F>>, Rc<Next<'a, F>>),
-    Cat(&'a F, Rc<Next<'a, F>>),
-    Tuple(&'a [F], Rc<Next<'a, F>>),
-    Record(&'a [(Label, F)], Rc<Next<'a, F>>),
-    Repeat(&'a F, Rc<Next<'a, F>>),
-    RepeatCount(usize, &'a F, Rc<Next<'a, F>>),
-    Slice(usize, Rc<Next<'a, F>>, Rc<Next<'a, F>>),
-    Peek(Rc<Next<'a, F>>, Rc<Next<'a, F>>),
-    PeekNot(Rc<Next<'a, F>>, Rc<Next<'a, F>>),
+    Union(Rc<Next<'a>>, Rc<Next<'a>>),
+    Cat(Cow<'a, Format>, Rc<Next<'a>>),
+    Tuple(CowVec<'a, Format>, Rc<Next<'a>>),
+    Record(CowVec<'a, (Label, Format)>, Rc<Next<'a>>),
+    Repeat(Cow<'a, Format>, Rc<Next<'a>>),
+    RepeatCount(usize, Cow<'a, Format>, Rc<Next<'a>>),
+    Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
+    Peek(Rc<Next<'a>>, Rc<Next<'a>>),
+    PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
 }
 
 /// A single choice-point in a conceptual [MatchTree] structure.
@@ -1154,7 +1185,7 @@ impl<'a> MatchTreeStep<'a> {
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
             None => Self::from_next(module, next),
-            Some((f, fs)) => Self::from_format(module, f, Rc::new(Next::Tuple(fs, next))),
+            Some((f, fs)) => Self::from_format(module, f, Rc::new(Next::Tuple(CowVec::Slice(fs), next))),
         }
     }
 
@@ -1169,7 +1200,7 @@ impl<'a> MatchTreeStep<'a> {
         match fields.split_first() {
             None => Self::from_next(module, next),
             Some(((_label, f), fs)) => {
-                Self::from_format(module, f, Rc::new(Next::Record(fs, next)))
+                Self::from_format(module, f, Rc::new(Next::Record(CowVec::Slice(fs), next)))
             }
         }
     }
@@ -1185,7 +1216,7 @@ impl<'a> MatchTreeStep<'a> {
             Self::from_format(
                 module,
                 format,
-                Rc::new(Next::RepeatCount(n - 1, format, next)),
+                Rc::new(Next::RepeatCount(n - 1, Cow::Borrowed(format), next)),
             )
         } else {
             Self::from_next(module, next)
@@ -1218,6 +1249,7 @@ impl<'a> MatchTreeStep<'a> {
 
     /// Constructs a [MatchTreeStep] from a [`Next`]
     fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+        let orig = next.clone();
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
@@ -1225,12 +1257,16 @@ impl<'a> MatchTreeStep<'a> {
                 let tree2 = Self::from_next(module, next2.clone());
                 tree1.union(tree2)
             }
-            Next::Cat(f, next) => Self::from_format(module, f, next.clone()),
+            Next::Cat(f, next) => {
+                let next0: Rc<Next<'a>> = next.clone();
+                MatchTreeStep::<'a>::from_format(module, f, next0)
+            }
             Next::Tuple(fields, next) => Self::from_tuple(module, fields, next.clone()),
             Next::Record(fields, next) => Self::from_record(module, fields, next.clone()),
             Next::Repeat(a, next0) => {
-                let tree = Self::from_next(module, next0.clone());
-                tree.union(Self::from_format(module, a, next))
+                let tree = MatchTreeStep::<'a>::from_next(module, next0.clone());
+                let next1 = next.clone();
+                tree.union(MatchTreeStep::<'a>::from_format(module, a, next1))
             }
             Next::RepeatCount(n, a, next0) => Self::from_repeat_count(module, *n, a, next0.clone()),
             Next::Slice(n, inside, next0) => {
@@ -1280,11 +1316,11 @@ impl<'a> MatchTreeStep<'a> {
                 tree.union(Self::from_format(
                     module,
                     a,
-                    Rc::new(Next::Repeat(a, next.clone())),
+                    Rc::new(Next::Repeat(Cow::Borrowed(a), next.clone())),
                 ))
             }
             Format::Repeat1(a) => {
-                Self::from_format(module, a, Rc::new(Next::Repeat(a, next.clone())))
+                Self::from_format(module, a, Rc::new(Next::Repeat(Cow::Borrowed(a), next.clone())))
             }
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
@@ -1311,7 +1347,7 @@ impl<'a> MatchTreeStep<'a> {
                 tree.peek_not(peek)
             }
             Format::Slice(expr, f) => {
-                let inside = Rc::new(Next::Cat(f.as_ref(), Rc::new(Next::Empty)));
+                let inside = Rc::new(Next::Cat(Cow::Borrowed(f.as_ref()), Rc::new(Next::Empty)));
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
                     Self::from_slice(module, n, inside, next)
@@ -1335,7 +1371,7 @@ impl<'a> MatchTreeStep<'a> {
                                 module,
                                 n,
                                 Rc::new(Next::Empty),
-                                Rc::new(Next::Tuple(std::slice::from_ref(a.as_ref()), next)),
+                                Rc::new(Next::Tuple(CowVec::Slice(std::slice::from_ref(a.as_ref())), next)),
                             ),
                         };
                         tree.peek(peek)
@@ -1476,17 +1512,6 @@ impl<'a> MatchTreeLevel<'a> {
             None
         }
     }
-
-    fn grow_typed(
-        _module: &FormatModule,
-        _nexts: HashSet<(
-            usize,
-            Rc<Next<'_, codegen::typed_format::TypedFormat<codegen::typed_format::GenType>>>,
-        )>,
-        _depth: usize,
-    ) -> Option<MatchTree> {
-        todo!()
-    }
 }
 
 impl MatchTree {
@@ -1515,23 +1540,10 @@ impl MatchTree {
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
-            nexts.insert((i, Rc::new(Next::Cat(f, next.clone()))));
+            nexts.insert((i, Rc::new(Next::Cat(Cow::Borrowed(f), next.clone()))));
         }
         const MAX_DEPTH: usize = 32;
         MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
-    }
-
-    pub(crate) fn build_typed(
-        module: &FormatModule,
-        branches: &[codegen::typed_format::TypedFormat<codegen::typed_format::GenType>],
-        next: Rc<Next<'_, codegen::typed_format::TypedFormat<codegen::typed_format::GenType>>>,
-    ) -> Option<MatchTree> {
-        let mut nexts = HashSet::new();
-        for (i, f) in branches.iter().enumerate() {
-            nexts.insert((i, Rc::new(Next::Cat(f, next.clone()))));
-        }
-        const MAX_DEPTH: usize = 32;
-        MatchTreeLevel::grow_typed(module, nexts, MAX_DEPTH)
     }
 }
 
