@@ -2140,6 +2140,7 @@ impl<'a> Generator<'a> {
         let elab = &mut gen.elaborator;
 
         let top = elab.elaborate_format(top_format, &TypedDynScope::Empty);
+        // assert_eq!(elab.next_index, elab.tc.size());
         let prog = GTCompiler::compile_program(module, &top).expect("failed to compile program");
         for (ix, (dec, t)) in prog.decoders.iter().enumerate() {
             match t {
@@ -2188,11 +2189,15 @@ impl<'a> Elaborator<'a> {
     fn elaborate_dynamic_format<'s>(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
         match dynf {
             DynFormat::Huffman(code_lengths, opt_values_expr) => {
+                // for dynf itself
+                self.increment_index();
                 let t_codes = self.elaborate_expr(code_lengths);
+                // for the element-type of code_lengths
                 self.increment_index();
 
                 let t_values_expr = opt_values_expr.as_ref().map(|values_expr| {
                     let t_values = self.elaborate_expr(values_expr);
+                    // for the element-type of opt_values_expr
                     self.increment_index();
                     t_values
                 });
@@ -2231,6 +2236,8 @@ impl<'a> Elaborator<'a> {
                 GTPattern::Variant(gt, name.clone(), Box::new(t_inner))
             }
             Pattern::Seq(elts) => {
+                // for type of element
+                self.increment_index();
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
                     let t_elt = self.elaborate_pattern(elt);
@@ -2318,6 +2325,24 @@ impl<'a> Elaborator<'a> {
                 self.increment_index();
                 GTFormat::Byte(*bs)
             }
+            Format::Variant(label, inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                match gt.try_as_adhoc() {
+                    Some(_) => (),
+                    None => {
+                        let before = self.get_gt_from_index(index - 1);
+                        let after = self.get_gt_from_index(index + 1);
+                        eprintln!("Possible frame-shift error around {index} (looking for Enum)");
+                        eprintln!("[{}]: {before:?}", index - 1);
+                        eprintln!("[{}]: {gt:?}", index);
+                        eprintln!("[{}]: {after:?}", index + 1);
+                        // unreachable!("found non-adhoc type for variant format elaboration: {gt:?} @ {index} ({label}({inner:?})");
+                    }
+                }
+                GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
+            }
             Format::Union(branches) => self.elaborate_format_union(branches, dyns, true),
             Format::UnionNondet(branches) => self.elaborate_format_union(branches, dyns, false),
             Format::Tuple(elts) => {
@@ -2343,23 +2368,14 @@ impl<'a> Elaborator<'a> {
                     None => {
                         let before = self.get_gt_from_index(index - 1);
                         let after = self.get_gt_from_index(index + 1);
-                        eprintln!("Possible frame-shift error around {index}");
+                        eprintln!("Possible frame-shift error around {index} (looking for Struct)");
                         eprintln!("[{}]: {before:?}", index - 1);
                         eprintln!("[{}]: {gt:?}", index);
                         eprintln!("[{}]: {after:?}", index + 1);
-                        unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})")
+                        // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
                     }
                 }
                 GTFormat::Record(gt, t_flds)
-            }
-            Format::Variant(label, inner) => {
-                let index = self.get_and_increment_index();
-                let t_inner = self.elaborate_format(inner, dyns);
-                let gt = self.get_gt_from_index(index);
-                let _ = gt
-                    .try_as_adhoc()
-                    .expect("found non-adhoc type for variant format elaboration");
-                GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
             }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
@@ -2373,22 +2389,31 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Repeat1(gt, Box::new(t_inner))
             }
-            Format::Bits(inner) => {
+            Format::RepeatCount(expr, inner) => {
                 let index = self.get_and_increment_index();
+                let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Bits(gt, Box::new(t_inner))
+                GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
+            }
+            Format::RepeatUntilLast(lambda, inner) => {
+                let index = self.get_and_increment_index();
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
+            }
+            Format::RepeatUntilSeq(lambda, inner) => {
+                let index = self.get_and_increment_index();
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
             }
             Format::Peek(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
-                let gt = {
-                    let uvar = UVar::new(index);
-                    let Some(vt) = self.tc.reify(uvar.into()) else {
-                        unreachable!("unable to reify {uvar}")
-                    };
-                    self.codegen.lift_type(&vt)
-                };
+                let gt = self.get_gt_from_index(index);
                 GTFormat::Peek(gt, Box::new(t_inner))
             }
             Format::PeekNot(inner) => {
@@ -2404,35 +2429,18 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Slice(gt, t_expr, Box::new(t_inner))
             }
+            Format::Bits(inner) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::Bits(gt, Box::new(t_inner))
+            }
             Format::WithRelativeOffset(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
-            }
-            Format::RepeatCount(expr, inner) => {
-                let index = self.get_and_increment_index();
-                let t_expr = self.elaborate_expr(expr);
-                let t_inner = self.elaborate_format(inner, dyns);
-                let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
-            }
-            Format::RepeatUntilLast(lambda, inner) => {
-                let index = self.get_and_increment_index();
-                // FIXME - figure out the pattern to apply here
-                let t_lambda = self.elaborate_expr_lambda(lambda);
-                let t_inner = self.elaborate_format(inner, dyns);
-                let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
-            }
-            Format::RepeatUntilSeq(lambda, inner) => {
-                let index = self.get_and_increment_index();
-                // FIXME - figure out the pattern to apply here
-                let t_lambda = self.elaborate_expr_lambda(lambda);
-                let t_inner = self.elaborate_format(inner, dyns);
-                let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
             }
             Format::Map(inner, lambda) => {
                 let index = self.get_and_increment_index();
@@ -2526,9 +2534,18 @@ impl<'a> Elaborator<'a> {
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
-                let _ = gt
-                    .try_as_adhoc()
-                    .expect("found non-adhoc type for record expr elaboration");
+                match gt.try_as_adhoc() {
+                    Some(_) => (),
+                    None => {
+                        let before = self.get_gt_from_index(index - 1);
+                        let after = self.get_gt_from_index(index + 1);
+                        eprintln!("Possible frame-shift error around {index} (looking for Struct)");
+                        eprintln!("[{}]: {before:?}", index - 1);
+                        eprintln!("[{}]: {gt:?}", index);
+                        eprintln!("[{}]: {after:?}", index + 1);
+                        // unreachable!("found non-adhoc type for expr record elaboration: {gt:?} @ {index} ({flds:#?})");
+                    }
+                }
                 GTExpr::Record(gt, t_flds)
             }
             Expr::TupleProj(e, ix) => {
@@ -2544,9 +2561,18 @@ impl<'a> Elaborator<'a> {
             Expr::Variant(lbl, inner) => {
                 let t_inner = self.elaborate_expr(inner);
                 let gt = self.get_gt_from_index(index);
-                let _ = gt
-                    .try_as_adhoc()
-                    .expect("found non-adhoc type for variant expr elaboration");
+                match gt.try_as_adhoc() {
+                    Some(_) => (),
+                    None => {
+                        let before = self.get_gt_from_index(index - 1);
+                        let after = self.get_gt_from_index(index + 1);
+                        eprintln!("Possible frame-shift error around {index} (looking for Enum)");
+                        eprintln!("[{}]: {before:?}", index - 1);
+                        eprintln!("[{}]: {gt:?}", index);
+                        eprintln!("[{}]: {after:?}", index + 1);
+                        // unreachable!("found non-adhoc type for expr variant elaboration: {gt:?} @ {index} ({lbl}({inner?}))");
+                    }
+                }
                 GTExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
             }
             Expr::Seq(elts) => {
@@ -2643,7 +2669,7 @@ impl<'a> Elaborator<'a> {
                 let t_seq = self.elaborate_expr(seq);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                GTExpr::FlatMap(gt, Box::new(t_seq), Box::new(t_lambda))
+                GTExpr::FlatMap(gt, Box::new(t_lambda), Box::new(t_seq))
             }
             Expr::FlatMapAccum(lambda, acc, _acc_vt, seq) => {
                 let t_lambda = self.elaborate_expr_lambda(lambda);
@@ -2758,11 +2784,13 @@ impl<'a> TypedDynScope<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::typecheck::Ctxt;
+    use std::collections::BTreeMap;
+
+    use crate::{typecheck::Ctxt, FormatRef};
 
     use super::*;
 
-    fn population_check(module: &FormatModule, f: &Format) {
+    fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
         let mut tc = TypeChecker::new();
         let _fv = tc.infer_var_format(f, Ctxt::new(module, &UScope::Empty));
         let tc_pop = tc.size();
@@ -2772,13 +2800,25 @@ mod tests {
         let cg = Codegen::new();
         let mut tv = Elaborator::new(module, tc, cg);
         let dec_f = tv.elaborate_format(f, &TypedDynScope::Empty);
+        let re_f = Format::from(dec_f.clone());
+        assert_eq!(
+            &re_f,
+            f,
+            "post-elaboration format mismatch: {} != {}",
+            serde_json::ser::to_string(&re_f).unwrap(),
+            serde_json::ser::to_string(&f).unwrap()
+        );
         let tv_pop = tv.next_index;
 
-        println!("{f:?} => {dec_f:?}");
+        // println!("{f:?} => {dec_f:?}");
         assert_eq!(
-            tv_pop, tc_pop,
-            "failed population check ({} TC vs {} TV) on {:?}",
-            tc_pop, tv_pop, dec_f
+            tv_pop,
+            tc_pop,
+            "failed population check {} ({} TC vs {} TV) on {:?}",
+            label.unwrap_or_default(),
+            tc_pop,
+            tv_pop,
+            dec_f
         );
     }
 
@@ -2786,7 +2826,7 @@ mod tests {
         let mut module = FormatModule::new();
         for (name, f) in fs.iter() {
             module.define_format(*name, f.clone());
-            population_check(&module, f);
+            population_check(&module, f, None);
         }
     }
 
@@ -2823,13 +2863,1285 @@ mod tests {
     }
 
     #[test]
+    fn test_popcheck_deflate() {
+        pub struct BaseModule {
+            bit: FormatRef,
+            u8: FormatRef,
+            u16be: FormatRef,
+            u16le: FormatRef,
+            u32be: FormatRef,
+            u32le: FormatRef,
+            u64be: FormatRef,
+            u64le: FormatRef,
+            ascii_char: FormatRef,
+            ascii_char_strict: FormatRef,
+            asciiz_string: FormatRef,
+
+            // extensions to ascii-char
+            ascii_octal_digit: FormatRef,
+            #[allow(dead_code)]
+            ascii_decimal_digit: FormatRef,
+            ascii_hex_lower: FormatRef,
+            ascii_hex_upper: FormatRef,
+            ascii_hex_any: FormatRef,
+        }
+
+        impl BaseModule {
+            pub fn bit(&self) -> Format {
+                self.bit.call()
+            }
+            pub fn u8(&self) -> Format {
+                self.u8.call()
+            }
+            pub fn u16be(&self) -> Format {
+                self.u16be.call()
+            }
+            pub fn u16le(&self) -> Format {
+                self.u16le.call()
+            }
+            pub fn u32be(&self) -> Format {
+                self.u32be.call()
+            }
+            pub fn u32le(&self) -> Format {
+                self.u32le.call()
+            }
+            pub fn u64be(&self) -> Format {
+                self.u64be.call()
+            }
+            #[allow(dead_code)]
+            pub fn u64le(&self) -> Format {
+                self.u64le.call()
+            }
+            pub fn ascii_char(&self) -> Format {
+                self.ascii_char.call()
+            }
+            pub fn ascii_char_strict(&self) -> Format {
+                self.ascii_char_strict.call()
+            }
+            pub fn asciiz_string(&self) -> Format {
+                self.asciiz_string.call()
+            }
+        }
+
+        impl BaseModule {
+            pub const ASCII_OCTAL_DIGIT: [u8; 8] = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7'];
+
+            pub fn ascii_octal_digit(&self) -> Format {
+                self.ascii_octal_digit.call()
+            }
+
+            pub const ASCII_DECIMAL_DIGIT: [u8; 10] =
+                [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
+
+            #[allow(dead_code)]
+            pub fn ascii_decimal_digit(&self) -> Format {
+                self.ascii_decimal_digit.call()
+            }
+
+            pub const ASCII_HEX_LOWER: [u8; 16] = [
+                b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd',
+                b'e', b'f',
+            ];
+
+            pub const ASCII_HEX_UPPER: [u8; 16] = [
+                b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D',
+                b'E', b'F',
+            ];
+
+            pub const ASCII_HEX_ANY: [u8; 22] = [
+                b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D',
+                b'E', b'F', b'a', b'b', b'c', b'd', b'e', b'f',
+            ];
+
+            #[allow(dead_code)]
+            pub fn ascii_hex_lower(&self) -> Format {
+                self.ascii_hex_lower.call()
+            }
+            #[allow(dead_code)]
+            pub fn ascii_hex_upper(&self) -> Format {
+                self.ascii_hex_upper.call()
+            }
+            #[allow(dead_code)]
+            pub fn ascii_hex_any(&self) -> Format {
+                self.ascii_hex_any.call()
+            }
+        }
+
+        pub fn mkbase(module: &mut FormatModule) -> BaseModule {
+            let bit = module.define_format("base.bit", Format::Byte(ByteSet::full()));
+
+            let u8 = module.define_format("base.u8", Format::Byte(ByteSet::full()));
+
+            let u16be = module.define_format(
+                "base.u16be",
+                map(
+                    tuple([u8.call(), u8.call()]),
+                    lambda("x", Expr::U16Be(Box::new(var("x")))),
+                ),
+            );
+
+            let u16le = module.define_format(
+                "base.u16le",
+                map(
+                    tuple([u8.call(), u8.call()]),
+                    lambda("x", Expr::U16Le(Box::new(var("x")))),
+                ),
+            );
+
+            let u32be = module.define_format(
+                "base.u32be",
+                map(
+                    tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
+                    lambda("x", Expr::U32Be(Box::new(var("x")))),
+                ),
+            );
+
+            let u32le = module.define_format(
+                "base.u32le",
+                map(
+                    tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
+                    lambda("x", Expr::U32Le(Box::new(var("x")))),
+                ),
+            );
+
+            let u64be = module.define_format(
+                "base.u64be",
+                map(
+                    tuple([
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                    ]),
+                    lambda("x", Expr::U64Be(Box::new(var("x")))),
+                ),
+            );
+
+            let u64le = module.define_format(
+                "base.u64le",
+                map(
+                    tuple([
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                        u8.call(),
+                    ]),
+                    lambda("x", Expr::U64Le(Box::new(var("x")))),
+                ),
+            );
+
+            let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
+
+            let mut bs = ByteSet::from(32..=127);
+            bs.insert(b'\t');
+            bs.insert(b'\n');
+            bs.insert(b'\r');
+            let ascii_char_strict =
+                module.define_format("base.ascii-char.strict", Format::Byte(bs));
+
+            let asciiz_string = module.define_format(
+                "base.asciiz-string",
+                record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
+            );
+
+            let ascii_octal_digit = module.define_format(
+                "base.ascii-char.octal",
+                Format::Byte(ByteSet::from(BaseModule::ASCII_OCTAL_DIGIT)),
+            );
+
+            let ascii_decimal_digit = module.define_format(
+                "base.ascii-char.decimal",
+                Format::Byte(ByteSet::from(BaseModule::ASCII_DECIMAL_DIGIT)),
+            );
+
+            let ascii_hex_lower = module.define_format(
+                "base.ascii-char.hex.lower",
+                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_LOWER)),
+            );
+            let ascii_hex_upper = module.define_format(
+                "base.ascii-char.hex.upper",
+                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_UPPER)),
+            );
+            let ascii_hex_any = module.define_format(
+                "base.ascii-char.hex.any",
+                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_ANY)),
+            );
+
+            BaseModule {
+                bit,
+                u8,
+                u16be,
+                u16le,
+                u32be,
+                u32le,
+                u64be,
+                u64le,
+                ascii_char,
+                ascii_char_strict,
+                asciiz_string,
+                ascii_octal_digit,
+                ascii_decimal_digit,
+                ascii_hex_lower,
+                ascii_hex_upper,
+                ascii_hex_any,
+            }
+        }
+        use crate::helper::*;
+
+        fn tuple_proj(x: Expr, i: usize) -> Expr {
+            Expr::TupleProj(Box::new(x), i)
+        }
+
+        fn shl_u8(x: Expr, r: u8) -> Expr {
+            shl(x, Expr::U8(r))
+        }
+
+        fn shl_u16(x: Expr, r: u16) -> Expr {
+            shl(as_u16(x), Expr::U16(r))
+        }
+
+        fn bits_value_u8(name: &'static str, n: usize) -> Expr {
+            if n > 1 {
+                bit_or(
+                    shl_u8(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
+                    bits_value_u8(name, n - 1),
+                )
+            } else {
+                tuple_proj(var(name), 0)
+            }
+        }
+
+        fn bits_value_u16(name: &'static str, n: usize) -> Expr {
+            if n > 1 {
+                bit_or(
+                    shl_u16(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
+                    bits_value_u16(name, n - 1),
+                )
+            } else {
+                as_u16(tuple_proj(var(name), 0))
+            }
+        }
+
+        fn bits8(n: usize, base: &BaseModule) -> Format {
+            let mut fs = Vec::with_capacity(n);
+            for _ in 0..n {
+                fs.push(base.bit());
+            }
+            if n > 0 {
+                map(tuple(fs), lambda("bits", bits_value_u8("bits", n)))
+            } else {
+                /* if n == 0 */
+                Format::Compute(Expr::U8(0))
+            }
+        }
+
+        fn bits16(n: usize, base: &BaseModule) -> Format {
+            let mut fs = Vec::with_capacity(n);
+            for _ in 0..n {
+                fs.push(base.bit());
+            }
+            if n > 0 {
+                map(tuple(fs), lambda("bits", bits_value_u16("bits", n)))
+            } else {
+                /* if n == 0 */
+                Format::Compute(Expr::U16(0))
+            }
+        }
+
+        fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
+            record([
+                ("distance-extra-bits", bits16(extra_bits, base)),
+                (
+                    "distance",
+                    Format::Compute(add(Expr::U16(start as u16), var("distance-extra-bits"))),
+                ),
+            ])
+        }
+
+        fn distance_record(base: &BaseModule) -> Format {
+            Format::Match(
+                as_u8(var("distance-code")),
+                vec![
+                    (Pattern::U8(0), distance_record0(1, base, 0)),
+                    (Pattern::U8(1), distance_record0(2, base, 0)),
+                    (Pattern::U8(2), distance_record0(3, base, 0)),
+                    (Pattern::U8(3), distance_record0(4, base, 0)),
+                    (Pattern::U8(4), distance_record0(5, base, 1)),
+                    (Pattern::U8(5), distance_record0(7, base, 1)),
+                    (Pattern::U8(6), distance_record0(9, base, 2)),
+                    (Pattern::U8(7), distance_record0(13, base, 2)),
+                    (Pattern::U8(8), distance_record0(17, base, 3)),
+                    (Pattern::U8(9), distance_record0(25, base, 3)),
+                    (Pattern::U8(10), distance_record0(33, base, 4)),
+                    (Pattern::U8(11), distance_record0(49, base, 4)),
+                    (Pattern::U8(12), distance_record0(65, base, 5)),
+                    (Pattern::U8(13), distance_record0(97, base, 5)),
+                    (Pattern::U8(14), distance_record0(129, base, 6)),
+                    (Pattern::U8(15), distance_record0(193, base, 6)),
+                    (Pattern::U8(16), distance_record0(257, base, 7)),
+                    (Pattern::U8(17), distance_record0(385, base, 7)),
+                    (Pattern::U8(18), distance_record0(513, base, 8)),
+                    (Pattern::U8(19), distance_record0(769, base, 8)),
+                    (Pattern::U8(20), distance_record0(1025, base, 9)),
+                    (Pattern::U8(21), distance_record0(1537, base, 9)),
+                    (Pattern::U8(22), distance_record0(2049, base, 10)),
+                    (Pattern::U8(23), distance_record0(3073, base, 10)),
+                    (Pattern::U8(24), distance_record0(4097, base, 11)),
+                    (Pattern::U8(25), distance_record0(6145, base, 11)),
+                    (Pattern::U8(26), distance_record0(8193, base, 12)),
+                    (Pattern::U8(27), distance_record0(12289, base, 12)),
+                    (Pattern::U8(28), distance_record0(16385, base, 13)),
+                    (Pattern::U8(29), distance_record0(24577, base, 13)),
+                ],
+            )
+        }
+
+        fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
+            record([
+                ("length-extra-bits", bits8(extra_bits, base)),
+                (
+                    "length",
+                    Format::Compute(add(
+                        Expr::U16(start as u16),
+                        as_u16(var("length-extra-bits")),
+                    )),
+                ),
+                (
+                    "distance-code",
+                    Format::Apply("distance-alphabet-format".into()),
+                ),
+                ("distance-record", distance_record(base)),
+            ])
+        }
+
+        fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
+            record([
+                ("length-extra-bits", bits8(extra_bits, base)),
+                (
+                    "length",
+                    Format::Compute(add(
+                        Expr::U16(start as u16),
+                        as_u16(var("length-extra-bits")),
+                    )),
+                ),
+                ("distance-code", bits8(5, base)),
+                ("distance-record", distance_record(base)),
+            ])
+        }
+
+        fn reference_record() -> Expr {
+            expr_match(
+                record_proj(var("x"), "extra"),
+                vec![(
+                    Pattern::variant("some", Pattern::binding("rec")),
+                    Expr::Seq(vec![variant(
+                        "reference",
+                        Expr::Record(vec![
+                            ("length".into(), record_proj(var("rec"), "length")),
+                            (
+                                "distance".into(),
+                                record_proj(record_proj(var("rec"), "distance-record"), "distance"),
+                            ),
+                        ]),
+                    )]),
+                )],
+            )
+        }
+
+        fn fixed_code_lengths() -> Expr {
+            let mut ls = Vec::new();
+            for _ in 0..=143 {
+                ls.push(Expr::U8(8));
+            }
+            for _ in 144..=255 {
+                ls.push(Expr::U8(9));
+            }
+            for _ in 256..=279 {
+                ls.push(Expr::U8(7));
+            }
+            for _ in 280..=287 {
+                ls.push(Expr::U8(8));
+            }
+            Expr::Seq(ls)
+        }
+
+        fn deflate(base: &BaseModule) -> Vec<(&'static str, Format)> {
+            let bits2 = bits8(2, base);
+            let bits3 = bits8(3, base);
+            let bits4 = bits8(4, base);
+            let bits5 = bits8(5, base);
+            let bits7 = bits8(7, base);
+
+            let mut ret = Vec::new();
+
+            ret.push((
+                "deflate.uncompressed",
+                record([
+                    ("align", Format::Align(8)),
+                    ("len", bits16(16, base)),
+                    ("nlen", bits16(16, base)),
+                    ("bytes", repeat_count(var("len"), bits8(8, base))),
+                    (
+                        "codes-values",
+                        Format::Compute(flat_map(
+                            lambda("x", Expr::Seq(vec![variant("literal", var("x"))])),
+                            var("bytes"),
+                        )),
+                    ),
+                ]),
+            ));
+
+            // ret.push((
+            //     "deflate.fixed_huffman",
+            //     record([
+            //         (
+            //             "codes",
+            //             Format::Dynamic(
+            //                 "format".into(),
+            //                 DynFormat::Huffman(fixed_code_lengths(), None),
+            //                 Box::new(
+            //                     repeat_until_last(
+            //                         lambda(
+            //                             "x",
+            //                             expr_eq(
+            //                                 as_u16(record_proj(var("x"), "code")),
+            //                                 Expr::U16(256)
+            //                             )
+            //                         ),
+            //                         record([
+            //                             ("code", Format::Apply("format".into())),
+            //                             (
+            //                                 "extra",
+            //                                 match_variant(
+            //                                     var("code"),
+            //                                     vec![
+            //                                         (
+            //                                             Pattern::U16(257),
+            //                                             "some",
+            //                                             length_record_fixed(3, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(258),
+            //                                             "some",
+            //                                             length_record_fixed(4, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(259),
+            //                                             "some",
+            //                                             length_record_fixed(5, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(260),
+            //                                             "some",
+            //                                             length_record_fixed(6, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(261),
+            //                                             "some",
+            //                                             length_record_fixed(7, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(262),
+            //                                             "some",
+            //                                             length_record_fixed(8, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(263),
+            //                                             "some",
+            //                                             length_record_fixed(9, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(264),
+            //                                             "some",
+            //                                             length_record_fixed(10, base, 0),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(265),
+            //                                             "some",
+            //                                             length_record_fixed(11, base, 1),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(266),
+            //                                             "some",
+            //                                             length_record_fixed(13, base, 1),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(267),
+            //                                             "some",
+            //                                             length_record_fixed(15, base, 1),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(268),
+            //                                             "some",
+            //                                             length_record_fixed(17, base, 1),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(269),
+            //                                             "some",
+            //                                             length_record_fixed(19, base, 2),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(270),
+            //                                             "some",
+            //                                             length_record_fixed(23, base, 2),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(271),
+            //                                             "some",
+            //                                             length_record_fixed(27, base, 2),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(272),
+            //                                             "some",
+            //                                             length_record_fixed(31, base, 2),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(273),
+            //                                             "some",
+            //                                             length_record_fixed(35, base, 3),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(274),
+            //                                             "some",
+            //                                             length_record_fixed(43, base, 3),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(275),
+            //                                             "some",
+            //                                             length_record_fixed(51, base, 3),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(276),
+            //                                             "some",
+            //                                             length_record_fixed(59, base, 3),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(277),
+            //                                             "some",
+            //                                             length_record_fixed(67, base, 4),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(278),
+            //                                             "some",
+            //                                             length_record_fixed(83, base, 4),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(279),
+            //                                             "some",
+            //                                             length_record_fixed(99, base, 4),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(280),
+            //                                             "some",
+            //                                             length_record_fixed(115, base, 4),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(281),
+            //                                             "some",
+            //                                             length_record_fixed(131, base, 5),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(282),
+            //                                             "some",
+            //                                             length_record_fixed(163, base, 5),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(283),
+            //                                             "some",
+            //                                             length_record_fixed(195, base, 5),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(284),
+            //                                             "some",
+            //                                             length_record_fixed(227, base, 5),
+            //                                         ),
+            //                                         (
+            //                                             Pattern::U16(285),
+            //                                             "some",
+            //                                             length_record_fixed(258, base, 0),
+            //                                         ),
+            //                                         (Pattern::Wildcard, "none", Format::EMPTY)
+            //                                     ]
+            //                                 ),
+            //                             ),
+            //                         ])
+            //                     )
+            //                 )
+            //             ),
+            //         ),
+            //         (
+            //             "codes-values",
+            //             Format::Compute(
+            //                 flat_map(
+            //                     lambda(
+            //                         "x",
+            //                         expr_match(
+            //                             record_proj(var("x"), "code"),
+            //                             vec![
+            //                                 (Pattern::U16(256), Expr::Seq(vec![])),
+            //                                 (Pattern::U16(257), reference_record()),
+            //                                 (Pattern::U16(258), reference_record()),
+            //                                 (Pattern::U16(259), reference_record()),
+            //                                 (Pattern::U16(260), reference_record()),
+            //                                 (Pattern::U16(261), reference_record()),
+            //                                 (Pattern::U16(262), reference_record()),
+            //                                 (Pattern::U16(263), reference_record()),
+            //                                 (Pattern::U16(264), reference_record()),
+            //                                 (Pattern::U16(265), reference_record()),
+            //                                 (Pattern::U16(266), reference_record()),
+            //                                 (Pattern::U16(267), reference_record()),
+            //                                 (Pattern::U16(268), reference_record()),
+            //                                 (Pattern::U16(269), reference_record()),
+            //                                 (Pattern::U16(270), reference_record()),
+            //                                 (Pattern::U16(271), reference_record()),
+            //                                 (Pattern::U16(272), reference_record()),
+            //                                 (Pattern::U16(273), reference_record()),
+            //                                 (Pattern::U16(274), reference_record()),
+            //                                 (Pattern::U16(275), reference_record()),
+            //                                 (Pattern::U16(276), reference_record()),
+            //                                 (Pattern::U16(277), reference_record()),
+            //                                 (Pattern::U16(278), reference_record()),
+            //                                 (Pattern::U16(279), reference_record()),
+            //                                 (Pattern::U16(280), reference_record()),
+            //                                 (Pattern::U16(281), reference_record()),
+            //                                 (Pattern::U16(282), reference_record()),
+            //                                 (Pattern::U16(283), reference_record()),
+            //                                 (Pattern::U16(284), reference_record()),
+            //                                 (Pattern::U16(285), reference_record()),
+            //                                 (
+            //                                     Pattern::Wildcard,
+            //                                     Expr::Seq(
+            //                                         vec![
+            //                                             variant(
+            //                                                 "literal",
+            //                                                 as_u8(record_proj(var("x"), "code"))
+            //                                             )
+            //                                         ]
+            //                                     ),
+            //                                 )
+            //                             ]
+            //                         )
+            //                     ),
+            //                     var("codes")
+            //                 )
+            //             ),
+            //         ),
+            //     ])
+            // ));
+
+            // ret.push((
+            //     "deflate.dynamic_huffman",
+            //     record([
+            //         ("hlit", bits5.clone()),
+            //         ("hdist", bits5.clone()),
+            //         ("hclen", bits4.clone()),
+            //         (
+            //             "code-length-alphabet-code-lengths",
+            //             repeat_count(add(var("hclen"), Expr::U8(4)), bits3.clone()),
+            //         ),
+            //         (
+            //             "literal-length-distance-alphabet-code-lengths",
+            //             Format::Dynamic(
+            //                 "code-length-alphabet-format".into(),
+            //                 DynFormat::Huffman(
+            //                     var("code-length-alphabet-code-lengths"),
+            //                     Some(
+            //                         Expr::Seq(
+            //                             vec![
+            //                                 Expr::U8(16),
+            //                                 Expr::U8(17),
+            //                                 Expr::U8(18),
+            //                                 Expr::U8(0),
+            //                                 Expr::U8(8),
+            //                                 Expr::U8(7),
+            //                                 Expr::U8(9),
+            //                                 Expr::U8(6),
+            //                                 Expr::U8(10),
+            //                                 Expr::U8(5),
+            //                                 Expr::U8(11),
+            //                                 Expr::U8(4),
+            //                                 Expr::U8(12),
+            //                                 Expr::U8(3),
+            //                                 Expr::U8(13),
+            //                                 Expr::U8(2),
+            //                                 Expr::U8(14),
+            //                                 Expr::U8(1),
+            //                                 Expr::U8(15)
+            //                             ]
+            //                         )
+            //                     )
+            //                 ),
+            //                 Box::new(
+            //                     repeat_until_seq(
+            //                         lambda(
+            //                             "y",
+            //                             expr_gte(
+            //                                 seq_length(
+            //                                     flat_map_accum(
+            //                                         lambda(
+            //                                             "x",
+            //                                             expr_match(
+            //                                                 as_u8(
+            //                                                     record_proj(
+            //                                                         tuple_proj(var("x"), 1),
+            //                                                         "code"
+            //                                                     )
+            //                                                 ),
+            //                                                 vec![
+            //                                                     (
+            //                                                         Pattern::U8(16),
+            //                                                         Expr::Tuple(
+            //                                                             vec![
+            //                                                                 tuple_proj(var("x"), 0),
+            //                                                                 dup(
+            //                                                                     as_u32(
+            //                                                                         add(
+            //                                                                             record_proj(
+            //                                                                                 tuple_proj(
+            //                                                                                     var(
+            //                                                                                         "x"
+            //                                                                                     ),
+            //                                                                                     1
+            //                                                                                 ),
+            //                                                                                 "extra"
+            //                                                                             ),
+            //                                                                             Expr::U8(3)
+            //                                                                         )
+            //                                                                     ),
+            //                                                                     expr_match(
+            //                                                                         tuple_proj(
+            //                                                                             var("x"),
+            //                                                                             0
+            //                                                                         ),
+            //                                                                         vec![(
+            //                                                                             Pattern::variant(
+            //                                                                                 "some",
+            //                                                                                 Pattern::binding(
+            //                                                                                     "y"
+            //                                                                                 )
+            //                                                                             ),
+            //                                                                             var("y"),
+            //                                                                         )]
+            //                                                                     )
+            //                                                                 )
+            //                                                             ]
+            //                                                         ),
+            //                                                     ),
+            //                                                     (
+            //                                                         Pattern::U8(17),
+            //                                                         Expr::Tuple(
+            //                                                             vec![
+            //                                                                 tuple_proj(var("x"), 0),
+            //                                                                 dup(
+            //                                                                     as_u32(
+            //                                                                         add(
+            //                                                                             record_proj(
+            //                                                                                 tuple_proj(
+            //                                                                                     var(
+            //                                                                                         "x"
+            //                                                                                     ),
+            //                                                                                     1
+            //                                                                                 ),
+            //                                                                                 "extra"
+            //                                                                             ),
+            //                                                                             Expr::U8(3)
+            //                                                                         )
+            //                                                                     ),
+            //                                                                     Expr::U8(0)
+            //                                                                 )
+            //                                                             ]
+            //                                                         ),
+            //                                                     ),
+            //                                                     (
+            //                                                         Pattern::U8(18),
+            //                                                         Expr::Tuple(
+            //                                                             vec![
+            //                                                                 tuple_proj(var("x"), 0),
+            //                                                                 dup(
+            //                                                                     as_u32(
+            //                                                                         add(
+            //                                                                             record_proj(
+            //                                                                                 tuple_proj(
+            //                                                                                     var(
+            //                                                                                         "x"
+            //                                                                                     ),
+            //                                                                                     1
+            //                                                                                 ),
+            //                                                                                 "extra"
+            //                                                                             ),
+            //                                                                             Expr::U8(11)
+            //                                                                         )
+            //                                                                     ),
+            //                                                                     Expr::U8(0)
+            //                                                                 )
+            //                                                             ]
+            //                                                         ),
+            //                                                     ),
+            //                                                     (
+            //                                                         Pattern::binding("v"),
+            //                                                         Expr::Tuple(
+            //                                                             vec![
+            //                                                                 variant(
+            //                                                                     "some",
+            //                                                                     var("v")
+            //                                                                 ),
+            //                                                                 Expr::Seq(
+            //                                                                     vec![var("v")]
+            //                                                                 )
+            //                                                             ]
+            //                                                         ),
+            //                                                     )
+            //                                                 ]
+            //                                             )
+            //                                         ),
+            //                                         variant("none", Expr::UNIT),
+            //                                         ValueType::Union(
+            //                                             BTreeMap::from([
+            //                                                 (
+            //                                                     "none".into(),
+            //                                                     ValueType::Tuple(vec![]),
+            //                                                 ),
+            //                                                 (
+            //                                                     "some".into(),
+            //                                                     ValueType::Base(BaseType::U8),
+            //                                                 ),
+            //                                             ])
+            //                                         ),
+            //                                         var("y")
+            //                                     )
+            //                                 ),
+            //                                 add(
+            //                                     as_u32(add(var("hlit"), var("hdist"))),
+            //                                     Expr::U32(258)
+            //                                 )
+            //                             )
+            //                         ),
+            //                         record([
+            //                             (
+            //                                 "code",
+            //                                 Format::Apply("code-length-alphabet-format".into()),
+            //                             ),
+            //                             (
+            //                                 "extra",
+            //                                 Format::Match(
+            //                                     as_u8(var("code")),
+            //                                     vec![
+            //                                         (Pattern::U8(16), bits2.clone()),
+            //                                         (Pattern::U8(17), bits3.clone()),
+            //                                         (Pattern::U8(18), bits7.clone()),
+            //                                         (
+            //                                             Pattern::Wildcard,
+            //                                             Format::Compute(Expr::U8(0)),
+            //                                         )
+            //                                     ]
+            //                                 ),
+            //                             ),
+            //                         ])
+            //                     )
+            //                 )
+            //             ),
+            //         ),
+            //         (
+            //             "literal-length-distance-alphabet-code-lengths-value",
+            //             Format::Compute(
+            //                 flat_map_accum(
+            //                     lambda(
+            //                         "x",
+            //                         expr_match(
+            //                             as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
+            //                             vec![
+            //                                 (
+            //                                     Pattern::U8(16),
+            //                                     Expr::Tuple(
+            //                                         vec![
+            //                                             tuple_proj(var("x"), 0),
+            //                                             dup(
+            //                                                 as_u32(
+            //                                                     add(
+            //                                                         record_proj(
+            //                                                             tuple_proj(var("x"), 1),
+            //                                                             "extra"
+            //                                                         ),
+            //                                                         Expr::U8(3)
+            //                                                     )
+            //                                                 ),
+            //                                                 expr_match(
+            //                                                     tuple_proj(var("x"), 0),
+            //                                                     vec![(
+            //                                                         Pattern::variant(
+            //                                                             "some",
+            //                                                             Pattern::binding("y")
+            //                                                         ),
+            //                                                         var("y"),
+            //                                                     )]
+            //                                                 )
+            //                                             )
+            //                                         ]
+            //                                     ),
+            //                                 ),
+            //                                 (
+            //                                     Pattern::U8(17),
+            //                                     Expr::Tuple(
+            //                                         vec![
+            //                                             tuple_proj(var("x"), 0),
+            //                                             dup(
+            //                                                 as_u32(
+            //                                                     add(
+            //                                                         record_proj(
+            //                                                             tuple_proj(var("x"), 1),
+            //                                                             "extra"
+            //                                                         ),
+            //                                                         Expr::U8(3)
+            //                                                     )
+            //                                                 ),
+            //                                                 Expr::U8(0)
+            //                                             )
+            //                                         ]
+            //                                     ),
+            //                                 ),
+            //                                 (
+            //                                     Pattern::U8(18),
+            //                                     Expr::Tuple(
+            //                                         vec![
+            //                                             tuple_proj(var("x"), 0),
+            //                                             dup(
+            //                                                 as_u32(
+            //                                                     add(
+            //                                                         record_proj(
+            //                                                             tuple_proj(var("x"), 1),
+            //                                                             "extra"
+            //                                                         ),
+            //                                                         Expr::U8(11)
+            //                                                     )
+            //                                                 ),
+            //                                                 Expr::U8(0)
+            //                                             )
+            //                                         ]
+            //                                     ),
+            //                                 ),
+            //                                 (
+            //                                     Pattern::binding("v"),
+            //                                     Expr::Tuple(
+            //                                         vec![
+            //                                             variant("some", var("v")),
+            //                                             Expr::Seq(vec![var("v")])
+            //                                         ]
+            //                                     ),
+            //                                 )
+            //                             ]
+            //                         )
+            //                     ),
+            //                     variant("none", Expr::UNIT),
+            //                     ValueType::Union(
+            //                         BTreeMap::from([
+            //                             ("none".into(), ValueType::Tuple(vec![])),
+            //                             ("some".into(), ValueType::Base(BaseType::U8)),
+            //                         ])
+            //                     ),
+            //                     var("literal-length-distance-alphabet-code-lengths")
+            //                 )
+            //             ),
+            //         ),
+            //         (
+            //             "literal-length-alphabet-code-lengths-value",
+            //             Format::Compute(
+            //                 sub_seq(
+            //                     var("literal-length-distance-alphabet-code-lengths-value"),
+            //                     Expr::U32(0),
+            //                     add(as_u32(var("hlit")), Expr::U32(257))
+            //                 )
+            //             ),
+            //         ),
+            //         (
+            //             "distance-alphabet-code-lengths-value",
+            //             Format::Compute(
+            //                 sub_seq(
+            //                     var("literal-length-distance-alphabet-code-lengths-value"),
+            //                     add(as_u32(var("hlit")), Expr::U32(257)),
+            //                     add(as_u32(var("hdist")), Expr::U32(1))
+            //                 )
+            //             ),
+            //         ),
+            //         (
+            //             "codes",
+            //             Format::Dynamic(
+            //                 "distance-alphabet-format".into(),
+            //                 DynFormat::Huffman(var("distance-alphabet-code-lengths-value"), None),
+            //                 Box::new(
+            //                     Format::Dynamic(
+            //                         "literal-length-alphabet-format".into(),
+            //                         DynFormat::Huffman(
+            //                             var("literal-length-alphabet-code-lengths-value"),
+            //                             None
+            //                         ),
+            //                         Box::new(
+            //                             repeat_until_last(
+            //                                 lambda(
+            //                                     "x",
+            //                                     expr_eq(
+            //                                         as_u16(record_proj(var("x"), "code")),
+            //                                         Expr::U16(256)
+            //                                     )
+            //                                 ),
+            //                                 record([
+            //                                     (
+            //                                         "code",
+            //                                         Format::Apply(
+            //                                             "literal-length-alphabet-format".into()
+            //                                         ),
+            //                                     ),
+            //                                     (
+            //                                         "extra",
+            //                                         match_variant(
+            //                                             var("code"),
+            //                                             vec![
+            //                                                 (
+            //                                                     Pattern::U16(257),
+            //                                                     "some",
+            //                                                     length_record(3, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(258),
+            //                                                     "some",
+            //                                                     length_record(4, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(259),
+            //                                                     "some",
+            //                                                     length_record(5, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(260),
+            //                                                     "some",
+            //                                                     length_record(6, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(261),
+            //                                                     "some",
+            //                                                     length_record(7, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(262),
+            //                                                     "some",
+            //                                                     length_record(8, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(263),
+            //                                                     "some",
+            //                                                     length_record(9, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(264),
+            //                                                     "some",
+            //                                                     length_record(10, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(265),
+            //                                                     "some",
+            //                                                     length_record(11, base, 1),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(266),
+            //                                                     "some",
+            //                                                     length_record(13, base, 1),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(267),
+            //                                                     "some",
+            //                                                     length_record(15, base, 1),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(268),
+            //                                                     "some",
+            //                                                     length_record(17, base, 1),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(269),
+            //                                                     "some",
+            //                                                     length_record(19, base, 2),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(270),
+            //                                                     "some",
+            //                                                     length_record(23, base, 2),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(271),
+            //                                                     "some",
+            //                                                     length_record(27, base, 2),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(272),
+            //                                                     "some",
+            //                                                     length_record(31, base, 2),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(273),
+            //                                                     "some",
+            //                                                     length_record(35, base, 3),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(274),
+            //                                                     "some",
+            //                                                     length_record(43, base, 3),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(275),
+            //                                                     "some",
+            //                                                     length_record(51, base, 3),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(276),
+            //                                                     "some",
+            //                                                     length_record(59, base, 3),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(277),
+            //                                                     "some",
+            //                                                     length_record(67, base, 4),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(278),
+            //                                                     "some",
+            //                                                     length_record(83, base, 4),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(279),
+            //                                                     "some",
+            //                                                     length_record(99, base, 4),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(280),
+            //                                                     "some",
+            //                                                     length_record(115, base, 4),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(281),
+            //                                                     "some",
+            //                                                     length_record(131, base, 5),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(282),
+            //                                                     "some",
+            //                                                     length_record(163, base, 5),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(283),
+            //                                                     "some",
+            //                                                     length_record(195, base, 5),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(284),
+            //                                                     "some",
+            //                                                     length_record(227, base, 5),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::U16(285),
+            //                                                     "some",
+            //                                                     length_record(258, base, 0),
+            //                                                 ),
+            //                                                 (
+            //                                                     Pattern::Wildcard,
+            //                                                     "none",
+            //                                                     Format::EMPTY,
+            //                                                 )
+            //                                             ]
+            //                                         ),
+            //                                     ),
+            //                                 ])
+            //                             )
+            //                         )
+            //                     )
+            //                 )
+            //             ),
+            //         ),
+            //         (
+            //             "codes-values",
+            //             Format::Compute(
+            //                 flat_map(
+            //                     lambda(
+            //                         "x",
+            //                         expr_match(
+            //                             record_proj(var("x"), "code"),
+            //                             vec![
+            //                                 (Pattern::U16(256), Expr::Seq(vec![])),
+            //                                 (Pattern::U16(257), reference_record()),
+            //                                 (Pattern::U16(258), reference_record()),
+            //                                 (Pattern::U16(259), reference_record()),
+            //                                 (Pattern::U16(260), reference_record()),
+            //                                 (Pattern::U16(261), reference_record()),
+            //                                 (Pattern::U16(262), reference_record()),
+            //                                 (Pattern::U16(263), reference_record()),
+            //                                 (Pattern::U16(264), reference_record()),
+            //                                 (Pattern::U16(265), reference_record()),
+            //                                 (Pattern::U16(266), reference_record()),
+            //                                 (Pattern::U16(267), reference_record()),
+            //                                 (Pattern::U16(268), reference_record()),
+            //                                 (Pattern::U16(269), reference_record()),
+            //                                 (Pattern::U16(270), reference_record()),
+            //                                 (Pattern::U16(271), reference_record()),
+            //                                 (Pattern::U16(272), reference_record()),
+            //                                 (Pattern::U16(273), reference_record()),
+            //                                 (Pattern::U16(274), reference_record()),
+            //                                 (Pattern::U16(275), reference_record()),
+            //                                 (Pattern::U16(276), reference_record()),
+            //                                 (Pattern::U16(277), reference_record()),
+            //                                 (Pattern::U16(278), reference_record()),
+            //                                 (Pattern::U16(279), reference_record()),
+            //                                 (Pattern::U16(280), reference_record()),
+            //                                 (Pattern::U16(281), reference_record()),
+            //                                 (Pattern::U16(282), reference_record()),
+            //                                 (Pattern::U16(283), reference_record()),
+            //                                 (Pattern::U16(284), reference_record()),
+            //                                 (Pattern::U16(285), reference_record()),
+            //                                 (
+            //                                     Pattern::Wildcard,
+            //                                     Expr::Seq(
+            //                                         vec![
+            //                                             variant(
+            //                                                 "literal",
+            //                                                 as_u8(record_proj(var("x"), "code"))
+            //                                             )
+            //                                         ]
+            //                                     ),
+            //                                 )
+            //                             ]
+            //                         )
+            //                     ),
+            //                     var("codes")
+            //                 )
+            //             ),
+            //         ),
+            //     ])
+            // ));
+            ret
+        }
+        let mut module = FormatModule::new();
+        let base = mkbase(&mut module);
+
+        // let f = deflate(&mut module, &base);
+        for (lab, f) in deflate(&base) {
+            module.define_format(lab, f.clone());
+            population_check(&module, &f, Some(lab));
+        }
+    }
+
+    #[test]
     fn test_popcheck_itemvar() {
         let sub_f = Format::Byte(ByteSet::full());
         let mut module = FormatModule::new();
         let sub_ref = module.define_format("test.anybyte", sub_f);
         let f = sub_ref.call();
         module.define_format("test.call_anybyte", f.clone());
-        population_check(&module, &f);
+        population_check(&module, &f, None);
     }
 
     #[test]
