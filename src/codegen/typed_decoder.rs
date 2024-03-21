@@ -1,17 +1,17 @@
 use crate::byte_set::ByteSet;
-use crate::codegen::{ AtomType, LocalType, PrimType };
-use crate::{ Arith, CowVec, FormatModule, IntRel, MatchTree, Next, TypeScope };
-use crate::{ IntoLabel, Label };
-use anyhow::{ anyhow, Result as AResult };
+use crate::codegen::{AtomType, LocalType, PrimType};
+use crate::{Arith, FormatModule, IntRel, MatchTree, MaybeTyped, Next, TypeScope};
+use crate::{IntoLabel, Label};
+use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::codegen::typed_format::{ GenType, TypedPattern };
+use crate::codegen::typed_format::{GenType, TypedPattern};
 
-use super::typed_format::{ TypedDynFormat, TypedExpr, TypedFormat };
-use super::{ GTFormat, RustType };
+use super::typed_format::{TypedDynFormat, TypedExpr, TypedFormat};
+use super::{GTFormat, RustType};
 
 mod __typed_value {
     use super::*;
@@ -40,14 +40,14 @@ mod __typed_value {
     impl<TypeRep> TypedValue<TypeRep> {
         pub fn record<Name: IntoLabel>(
             t: TypeRep,
-            fields: impl IntoIterator<Item = (Name, Self)>
+            fields: impl IntoIterator<Item = (Name, Self)>,
         ) -> Self {
             TypedValue::Record(
                 t,
                 fields
                     .into_iter()
                     .map(|(label, value)| (label.into(), value))
-                    .collect()
+                    .collect(),
             )
         }
 
@@ -56,13 +56,15 @@ mod __typed_value {
             TypedValue::Variant(t, label.into(), value.into())
         }
 
-        pub fn record_proj(&self, label: &str) -> &Self where TypeRep: std::fmt::Debug {
+        pub fn record_proj(&self, label: &str) -> &Self
+        where
+            TypeRep: std::fmt::Debug,
+        {
             match self {
-                TypedValue::Record(_t, fields) =>
-                    match fields.iter().find(|(l, _)| label == l) {
-                        Some((_, v)) => v,
-                        None => panic!("{label} not found in record"),
-                    }
+                TypedValue::Record(_t, fields) => match fields.iter().find(|(l, _)| label == l) {
+                    Some((_, v)) => v,
+                    None => panic!("{label} not found in record"),
+                },
                 _ => panic!("expected record, found {self:?}"),
             }
         }
@@ -121,7 +123,7 @@ mod __typed_value {
         pub fn matches<'a>(
             &self,
             scope: &'a TScope<'a, GenType>,
-            pattern: &TypedPattern<GenType>
+            pattern: &TypedPattern<GenType>,
         ) -> Option<TMultiScope<'a, GenType>> {
             let mut pattern_scope = TMultiScope::new(scope);
             self.coerce_mapped_value()
@@ -132,22 +134,40 @@ mod __typed_value {
         fn matches_type(&self, t: &GenType) -> bool {
             match self {
                 TypedValue::Bool(_) => {
-                    matches!(t, GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool))))
+                    matches!(
+                        t,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Bool)))
+                    )
                 }
                 TypedValue::U8(_) => {
-                    matches!(t, GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8))))
+                    matches!(
+                        t,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8)))
+                    )
                 }
                 TypedValue::U16(_) => {
-                    matches!(t, GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U16))))
+                    matches!(
+                        t,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U16)))
+                    )
                 }
                 TypedValue::U32(_) => {
-                    matches!(t, GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U32))))
+                    matches!(
+                        t,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U32)))
+                    )
                 }
                 TypedValue::U64(_) => {
-                    matches!(t, GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U64))))
+                    matches!(
+                        t,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U64)))
+                    )
                 }
                 TypedValue::Char(_) => {
-                    matches!(t, GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Char))))
+                    matches!(
+                        t,
+                        GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Char)))
+                    )
                 }
                 TypedValue::Tuple(t1, _elts) => {
                     if _elts.is_empty() {
@@ -177,14 +197,14 @@ mod __typed_value {
                     assert!(!_flds.is_empty(), "empty record found: {self:?}");
                     match (t, t1) {
                         (
-                            | GenType::Def((ix0, tn0), _)
-                            | GenType::Inline(
-                                  RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, tn0))),
-                              ),
-                            | GenType::Def((ix1, tn1), _)
-                            | GenType::Inline(
-                                  RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix1, tn1))),
-                              ),
+                            GenType::Def((ix0, tn0), _)
+                            | GenType::Inline(RustType::Atom(AtomType::TypeRef(
+                                LocalType::LocalDef(ix0, tn0),
+                            ))),
+                            GenType::Def((ix1, tn1), _)
+                            | GenType::Inline(RustType::Atom(AtomType::TypeRef(
+                                LocalType::LocalDef(ix1, tn1),
+                            ))),
                         ) => ix0 == ix1 && tn0.as_ref() == tn1.as_ref(),
                         _ => unreachable!(),
                     }
@@ -199,7 +219,7 @@ mod __typed_value {
         fn matches_inner(
             &self,
             scope: &mut TMultiScope<'_, GenType>,
-            pattern: &TypedPattern<GenType>
+            pattern: &TypedPattern<GenType>,
         ) -> bool {
             match (pattern, self) {
                 (TypedPattern::Binding(_t, name), head) => {
@@ -214,8 +234,10 @@ mod __typed_value {
                 (TypedPattern::U32(i0), TypedValue::U32(i1)) => i0 == i1,
                 (TypedPattern::U64(i0), TypedValue::U64(i1)) => i0 == i1,
                 (TypedPattern::Char(c0), TypedValue::Char(c1)) => c0 == c1,
-                | (TypedPattern::Tuple(_t0, ps), TypedValue::Tuple(_t1, vs))
-                | (TypedPattern::Seq(_t0, ps), TypedValue::Seq(_t1, vs)) if ps.len() == vs.len() => {
+                (TypedPattern::Tuple(_t0, ps), TypedValue::Tuple(_t1, vs))
+                | (TypedPattern::Seq(_t0, ps), TypedValue::Seq(_t1, vs))
+                    if ps.len() == vs.len() =>
+                {
                     for (p, v) in Iterator::zip(ps.iter(), vs.iter()) {
                         if !v.matches_inner(scope, p) {
                             return false;
@@ -223,9 +245,9 @@ mod __typed_value {
                     }
                     true
                 }
-                (TypedPattern::Variant(t0, label0, p), TypedValue::Variant(t1, label1, v)) if
-                    label0 == label1
-                => {
+                (TypedPattern::Variant(t0, label0, p), TypedValue::Variant(t1, label1, v))
+                    if label0 == label1 =>
+                {
                     self.matches_type(t0) && v.matches_inner(scope, p)
                 }
                 _ => false,
@@ -242,53 +264,33 @@ mod __typed_value {
                 TypedExpr::U16(i) => Cow::Owned(TypedValue::U16(*i)),
                 TypedExpr::U32(i) => Cow::Owned(TypedValue::U32(*i)),
                 TypedExpr::U64(i) => Cow::Owned(TypedValue::U64(*i)),
-                TypedExpr::Tuple(t, exprs) =>
-                    Cow::Owned(
-                        TypedValue::Tuple(
-                            t.clone(),
-                            exprs
-                                .iter()
-                                .map(|expr| expr.eval_value(scope))
-                                .collect()
-                        )
-                    ),
-                TypedExpr::TupleProj(_t, head, index) =>
-                    match head.eval(scope) {
-                        Cow::Owned(v) =>
-                            Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
-                        Cow::Borrowed(v) =>
-                            Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
-                    }
-                TypedExpr::Record(t, fields) =>
-                    Cow::Owned(
-                        TypedValue::record(
-                            t.clone(),
-                            fields
-                                .iter()
-                                .map(|(label, expr)| (label.clone(), expr.eval_value(scope)))
-                        )
-                    ),
-                TypedExpr::RecordProj(_t, head, label) =>
-                    match head.eval(scope) {
-                        Cow::Owned(v) =>
-                            Cow::Owned(v.coerce_mapped_value().record_proj(label).clone()),
-                        Cow::Borrowed(v) =>
-                            Cow::Borrowed(v.coerce_mapped_value().record_proj(label)),
-                    }
-                TypedExpr::Variant(t, label, expr) =>
-                    Cow::Owned(
-                        TypedValue::variant(t.clone(), label.clone(), expr.eval_value(scope))
-                    ),
-                TypedExpr::Seq(t, exprs) =>
-                    Cow::Owned(
-                        TypedValue::Seq(
-                            t.clone(),
-                            exprs
-                                .iter()
-                                .map(|expr| expr.eval_value(scope))
-                                .collect()
-                        )
-                    ),
+                TypedExpr::Tuple(t, exprs) => Cow::Owned(TypedValue::Tuple(
+                    t.clone(),
+                    exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
+                )),
+                TypedExpr::TupleProj(_t, head, index) => match head.eval(scope) {
+                    Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
+                    Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
+                },
+                TypedExpr::Record(t, fields) => Cow::Owned(TypedValue::record(
+                    t.clone(),
+                    fields
+                        .iter()
+                        .map(|(label, expr)| (label.clone(), expr.eval_value(scope))),
+                )),
+                TypedExpr::RecordProj(_t, head, label) => match head.eval(scope) {
+                    Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().record_proj(label).clone()),
+                    Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().record_proj(label)),
+                },
+                TypedExpr::Variant(t, label, expr) => Cow::Owned(TypedValue::variant(
+                    t.clone(),
+                    label.clone(),
+                    expr.eval_value(scope),
+                )),
+                TypedExpr::Seq(t, exprs) => Cow::Owned(TypedValue::Seq(
+                    t.clone(),
+                    exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
+                )),
                 TypedExpr::Match(t, head, branches) => {
                     let head = head.eval(scope);
                     for (pattern, expr) in branches {
@@ -522,38 +524,34 @@ mod __typed_value {
                     })
                 }
 
-                TypedExpr::AsU8(x) =>
-                    Cow::Owned(match x.eval_value(scope) {
-                        TypedValue::U8(x) => TypedValue::U8(x),
-                        TypedValue::U16(x) if x < 0xff => TypedValue::U8(x as u8),
-                        TypedValue::U32(x) if x < 0xff => TypedValue::U8(x as u8),
-                        TypedValue::U64(x) if x < 0xff => TypedValue::U8(x as u8),
-                        x => panic!("cannot convert {x:?} to U8"),
-                    }),
-                TypedExpr::AsU16(x) =>
-                    Cow::Owned(match x.eval_value(scope) {
-                        TypedValue::U8(x) => TypedValue::U16(u16::from(x)),
-                        TypedValue::U16(x) => TypedValue::U16(x),
-                        TypedValue::U32(x) if x < 0xffff => TypedValue::U16(x as u16),
-                        TypedValue::U64(x) if x < 0xffff => TypedValue::U16(x as u16),
-                        x => panic!("cannot convert {x:?} to U16"),
-                    }),
-                TypedExpr::AsU32(x) =>
-                    Cow::Owned(match x.eval_value(scope) {
-                        TypedValue::U8(x) => TypedValue::U32(u32::from(x)),
-                        TypedValue::U16(x) => TypedValue::U32(u32::from(x)),
-                        TypedValue::U32(x) => TypedValue::U32(x),
-                        TypedValue::U64(x) if x < 0xffff_ffff => TypedValue::U32(x as u32),
-                        x => panic!("cannot convert {x:?} to U32"),
-                    }),
-                TypedExpr::AsU64(x) =>
-                    Cow::Owned(match x.eval_value(scope) {
-                        TypedValue::U8(x) => TypedValue::U64(u64::from(x)),
-                        TypedValue::U16(x) => TypedValue::U64(u64::from(x)),
-                        TypedValue::U32(x) => TypedValue::U64(u64::from(x)),
-                        TypedValue::U64(x) => TypedValue::U64(x),
-                        x => panic!("cannot convert {x:?} to U64"),
-                    }),
+                TypedExpr::AsU8(x) => Cow::Owned(match x.eval_value(scope) {
+                    TypedValue::U8(x) => TypedValue::U8(x),
+                    TypedValue::U16(x) if x < 0xff => TypedValue::U8(x as u8),
+                    TypedValue::U32(x) if x < 0xff => TypedValue::U8(x as u8),
+                    TypedValue::U64(x) if x < 0xff => TypedValue::U8(x as u8),
+                    x => panic!("cannot convert {x:?} to U8"),
+                }),
+                TypedExpr::AsU16(x) => Cow::Owned(match x.eval_value(scope) {
+                    TypedValue::U8(x) => TypedValue::U16(u16::from(x)),
+                    TypedValue::U16(x) => TypedValue::U16(x),
+                    TypedValue::U32(x) if x < 0xffff => TypedValue::U16(x as u16),
+                    TypedValue::U64(x) if x < 0xffff => TypedValue::U16(x as u16),
+                    x => panic!("cannot convert {x:?} to U16"),
+                }),
+                TypedExpr::AsU32(x) => Cow::Owned(match x.eval_value(scope) {
+                    TypedValue::U8(x) => TypedValue::U32(u32::from(x)),
+                    TypedValue::U16(x) => TypedValue::U32(u32::from(x)),
+                    TypedValue::U32(x) => TypedValue::U32(x),
+                    TypedValue::U64(x) if x < 0xffff_ffff => TypedValue::U32(x as u32),
+                    x => panic!("cannot convert {x:?} to U32"),
+                }),
+                TypedExpr::AsU64(x) => Cow::Owned(match x.eval_value(scope) {
+                    TypedValue::U8(x) => TypedValue::U64(u64::from(x)),
+                    TypedValue::U16(x) => TypedValue::U64(u64::from(x)),
+                    TypedValue::U32(x) => TypedValue::U64(u64::from(x)),
+                    TypedValue::U64(x) => TypedValue::U64(x),
+                    x => panic!("cannot convert {x:?} to U64"),
+                }),
 
                 TypedExpr::U16Be(bytes) => {
                     match bytes.eval_value(scope).unwrap_tuple().as_slice() {
@@ -573,12 +571,7 @@ mod __typed_value {
                 }
                 TypedExpr::U32Be(bytes) => {
                     match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                        [
-                            TypedValue::U8(a),
-                            TypedValue::U8(b),
-                            TypedValue::U8(c),
-                            TypedValue::U8(d),
-                        ] => {
+                        [TypedValue::U8(a), TypedValue::U8(b), TypedValue::U8(c), TypedValue::U8(d)] => {
                             Cow::Owned(TypedValue::U32(u32::from_be_bytes([*a, *b, *c, *d])))
                         }
                         _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
@@ -586,12 +579,7 @@ mod __typed_value {
                 }
                 TypedExpr::U32Le(bytes) => {
                     match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                        [
-                            TypedValue::U8(a),
-                            TypedValue::U8(b),
-                            TypedValue::U8(c),
-                            TypedValue::U8(d),
-                        ] => {
+                        [TypedValue::U8(a), TypedValue::U8(b), TypedValue::U8(c), TypedValue::U8(d)] => {
                             Cow::Owned(TypedValue::U32(u32::from_le_bytes([*a, *b, *c, *d])))
                         }
                         _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
@@ -599,72 +587,44 @@ mod __typed_value {
                 }
                 TypedExpr::U64Be(bytes) => {
                     match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                        [
-                            TypedValue::U8(a),
-                            TypedValue::U8(b),
-                            TypedValue::U8(c),
-                            TypedValue::U8(d),
-                            TypedValue::U8(e),
-                            TypedValue::U8(f),
-                            TypedValue::U8(g),
-                            TypedValue::U8(h),
-                        ] => {
-                            Cow::Owned(
-                                TypedValue::U64(
-                                    u64::from_be_bytes([*a, *b, *c, *d, *e, *f, *g, *h])
-                                )
-                            )
+                        [TypedValue::U8(a), TypedValue::U8(b), TypedValue::U8(c), TypedValue::U8(d), TypedValue::U8(e), TypedValue::U8(f), TypedValue::U8(g), TypedValue::U8(h)] => {
+                            Cow::Owned(TypedValue::U64(u64::from_be_bytes([
+                                *a, *b, *c, *d, *e, *f, *g, *h,
+                            ])))
                         }
                         _ => panic!("U64Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
                     }
                 }
                 TypedExpr::U64Le(bytes) => {
                     match bytes.eval_value(scope).unwrap_tuple().as_slice() {
-                        [
-                            TypedValue::U8(a),
-                            TypedValue::U8(b),
-                            TypedValue::U8(c),
-                            TypedValue::U8(d),
-                            TypedValue::U8(e),
-                            TypedValue::U8(f),
-                            TypedValue::U8(g),
-                            TypedValue::U8(h),
-                        ] => {
-                            Cow::Owned(
-                                TypedValue::U64(
-                                    u64::from_le_bytes([*a, *b, *c, *d, *e, *f, *g, *h])
-                                )
-                            )
+                        [TypedValue::U8(a), TypedValue::U8(b), TypedValue::U8(c), TypedValue::U8(d), TypedValue::U8(e), TypedValue::U8(f), TypedValue::U8(g), TypedValue::U8(h)] => {
+                            Cow::Owned(TypedValue::U64(u64::from_le_bytes([
+                                *a, *b, *c, *d, *e, *f, *g, *h,
+                            ])))
                         }
                         _ => panic!("U64Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
                     }
                 }
-                TypedExpr::AsChar(bytes) =>
-                    Cow::Owned(match bytes.eval_value(scope) {
-                        TypedValue::U8(x) => TypedValue::Char(char::from(x)),
-                        TypedValue::U16(x) =>
-                            TypedValue::Char(
-                                char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER)
-                            ),
-                        TypedValue::U32(x) => {
-                            TypedValue::Char(
-                                char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER)
-                            )
-                        }
-                        TypedValue::U64(x) if x <= 0xffff_ffff =>
-                            TypedValue::Char(
-                                char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER)
-                            ),
-                        _ => panic!("AsChar: expected U8, U16, U32, or U64"),
-                    }),
-                TypedExpr::SeqLength(seq) =>
-                    match seq.eval(scope).coerce_mapped_value() {
-                        TypedValue::Seq(_t, values) => {
-                            let len = values.len();
-                            Cow::Owned(TypedValue::U32(len as u32))
-                        }
-                        _ => panic!("SeqLength: expected Seq"),
+                TypedExpr::AsChar(bytes) => Cow::Owned(match bytes.eval_value(scope) {
+                    TypedValue::U8(x) => TypedValue::Char(char::from(x)),
+                    TypedValue::U16(x) => TypedValue::Char(
+                        char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER),
+                    ),
+                    TypedValue::U32(x) => {
+                        TypedValue::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
                     }
+                    TypedValue::U64(x) if x <= 0xffff_ffff => TypedValue::Char(
+                        char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER),
+                    ),
+                    _ => panic!("AsChar: expected U8, U16, U32, or U64"),
+                }),
+                TypedExpr::SeqLength(seq) => match seq.eval(scope).coerce_mapped_value() {
+                    TypedValue::Seq(_t, values) => {
+                        let len = values.len();
+                        Cow::Owned(TypedValue::U32(len as u32))
+                    }
+                    _ => panic!("SeqLength: expected Seq"),
+                },
                 TypedExpr::SubSeq(_t, seq, start, length) => {
                     match seq.eval(scope).coerce_mapped_value() {
                         TypedValue::Seq(t, values) => {
@@ -677,21 +637,20 @@ mod __typed_value {
                         _ => panic!("SubSeq: expected Seq"),
                     }
                 }
-                TypedExpr::FlatMap(t, expr, seq) =>
-                    match seq.eval(scope).coerce_mapped_value() {
-                        TypedValue::Seq(_, values) => {
-                            let mut vs = Vec::new();
-                            for v in values {
-                                if let TypedValue::Seq(t0, vn) = expr.eval_lambda(scope, v) {
-                                    vs.extend(vn);
-                                } else {
-                                    panic!("FlatMap: expected Seq");
-                                }
+                TypedExpr::FlatMap(t, expr, seq) => match seq.eval(scope).coerce_mapped_value() {
+                    TypedValue::Seq(_, values) => {
+                        let mut vs = Vec::new();
+                        for v in values {
+                            if let TypedValue::Seq(t0, vn) = expr.eval_lambda(scope, v) {
+                                vs.extend(vn);
+                            } else {
+                                panic!("FlatMap: expected Seq");
                             }
-                            Cow::Owned(TypedValue::Seq(t.clone(), vs))
                         }
-                        _ => panic!("FlatMap: expected Seq"),
+                        Cow::Owned(TypedValue::Seq(t.clone(), vs))
                     }
+                    _ => panic!("FlatMap: expected Seq"),
+                },
                 TypedExpr::FlatMapAccum(t, expr, accum, _accum_type, seq) => {
                     match seq.eval_value(scope) {
                         TypedValue::Seq(seq_t, values) => {
@@ -702,8 +661,8 @@ mod __typed_value {
                                     scope,
                                     &TypedValue::Tuple(
                                         GenType::Inline(RustType::AnonTuple(vec![])),
-                                        vec![accum, v]
-                                    )
+                                        vec![accum, v],
+                                    ),
                                 );
                                 accum = match ret.unwrap_tuple().as_mut_slice() {
                                     [accum, TypedValue::Seq(_, vn)] => {
@@ -731,19 +690,16 @@ mod __typed_value {
                     }
                     Cow::Owned(TypedValue::Seq(t.clone(), vs))
                 }
-                TypedExpr::Inflate(_, seq) =>
-                    match seq.eval(scope).coerce_mapped_value() {
-                        TypedValue::Seq(t, values) => {
-                            let vs = inflate(values);
-                            Cow::Owned(
-                                TypedValue::Seq(
-                                    GenType::Inline(RustType::vec_of(RustType::from(PrimType::U8))),
-                                    vs
-                                )
-                            )
-                        }
-                        _ => panic!("Inflate: expected Seq"),
+                TypedExpr::Inflate(_, seq) => match seq.eval(scope).coerce_mapped_value() {
+                    TypedValue::Seq(t, values) => {
+                        let vs = inflate(values);
+                        Cow::Owned(TypedValue::Seq(
+                            GenType::Inline(RustType::vec_of(RustType::from(PrimType::U8))),
+                            vs,
+                        ))
                     }
+                    _ => panic!("Inflate: expected Seq"),
+                },
             }
         }
 
@@ -754,7 +710,7 @@ mod __typed_value {
         fn eval_lambda<'a>(
             &self,
             scope: &'a TScope<'a, GenType>,
-            arg: &TypedValue<GenType>
+            arg: &TypedValue<GenType>,
         ) -> TypedValue<GenType> {
             match self {
                 TypedExpr::Lambda(_, name, expr) => {
@@ -819,7 +775,7 @@ mod __typed_value {
     impl<'a> TScope<'a, GenType> {
         pub fn get_bindings(
             &self,
-            bindings: &mut Vec<(Label, Box<dyn std::fmt::Debug + 'static>)>
+            bindings: &mut Vec<(Label, Box<dyn std::fmt::Debug + 'static>)>,
         ) {
             match self {
                 TScope::Empty => {}
@@ -838,7 +794,7 @@ mod __typed_value {
 
         pub fn with_capacity(
             parent: &'a TScope<'a, TypeRep>,
-            capacity: usize
+            capacity: usize,
         ) -> TMultiScope<'a, TypeRep> {
             let entries = Vec::with_capacity(capacity);
             TMultiScope { parent, entries }
@@ -878,7 +834,7 @@ mod __typed_value {
         pub fn new(
             parent: &'a TScope<'a, TypeRep>,
             name: &'a str,
-            value: &'a TypedValue<TypeRep>
+            value: &'a TypedValue<TypeRep>,
         ) -> TSingleScope<'a, TypeRep> {
             TSingleScope {
                 parent,
@@ -888,7 +844,11 @@ mod __typed_value {
         }
 
         fn get_value_by_name(&self, name: &str) -> &TypedValue<TypeRep> {
-            if self.name == name { self.value } else { self.parent.get_value_by_name(name) }
+            if self.name == name {
+                self.value
+            } else {
+                self.parent.get_value_by_name(name)
+            }
         }
     }
 
@@ -906,7 +866,7 @@ mod __typed_value {
         fn new(
             parent: &'a TScope<'a, TypeRep>,
             name: &'a str,
-            decoder: TypedDecoder<TypeRep>
+            decoder: TypedDecoder<TypeRep>,
         ) -> TypedDecoderScope<'a, TypeRep> {
             TypedDecoderScope {
                 parent,
@@ -916,7 +876,11 @@ mod __typed_value {
         }
 
         fn get_decoder_by_name(&self, name: &str) -> &TypedDecoder<TypeRep> {
-            if self.name == name { &self.decoder } else { self.parent.get_decoder_by_name(name) }
+            if self.name == name {
+                &self.decoder
+            } else {
+                self.parent.get_decoder_by_name(name)
+            }
         }
     }
 
@@ -1195,12 +1159,10 @@ mod __typed_value {
             _ => panic!("expected Seq"),
         };
         vs.iter()
-            .map(|v| {
-                match v.coerce_mapped_value() {
-                    TypedValue::U8(n) => *n as usize,
-                    TypedValue::U16(n) => *n as usize,
-                    _ => panic!("expected U8 or U16"),
-                }
+            .map(|v| match v.coerce_mapped_value() {
+                TypedValue::U8(n) => *n as usize,
+                TypedValue::U16(n) => *n as usize,
+                _ => panic!("expected U8 or U16"),
             })
             .collect::<Vec<usize>>()
     }
@@ -1228,18 +1190,16 @@ mod __typed_value {
             if len != 0 {
                 let range = bit_range(len, next_code[len]);
                 let range_t = range.get_type().unwrap().into_owned();
-                codes.push(
-                    TypedFormat::Map(
-                        GenType::from(PrimType::U16),
-                        Box::new(range),
-                        TypedExpr::Lambda(
-                            // FIXME - this is obviously wrong but we want it to compile sooner so we will fix it later
-                            (range_t, GenType::from(PrimType::U16)),
-                            "_".into(),
-                            Box::new(TypedExpr::U16(n.try_into().unwrap()))
-                        )
-                    )
-                );
+                codes.push(TypedFormat::Map(
+                    GenType::from(PrimType::U16),
+                    Box::new(range),
+                    TypedExpr::Lambda(
+                        // FIXME - this is obviously wrong but we want it to compile sooner so we will fix it later
+                        (range_t, GenType::from(PrimType::U16)),
+                        "_".into(),
+                        Box::new(TypedExpr::U16(n.try_into().unwrap())),
+                    ),
+                ));
                 //println!("{:?}", codes[codes.len()-1]);
                 next_code[len] += 1;
             } else {
@@ -1268,44 +1228,42 @@ mod __typed_value {
         let mut vs = Vec::new();
         for code in codes {
             match code {
-                TypedValue::Variant(t, name, v) =>
-                    match (name.as_ref(), v.as_ref()) {
-                        ("literal", v) =>
-                            match v.coerce_mapped_value() {
-                                TypedValue::U8(b) => vs.push(TypedValue::U8(*b)),
-                                _ => panic!("inflate: expected U8"),
-                            }
-                        ("reference", TypedValue::Record(r_t, fields)) => {
-                            let length = &fields
-                                .iter()
-                                .find(|(label, _)| label == "length")
-                                .unwrap().1;
-                            let distance = &fields
-                                .iter()
-                                .find(|(label, _)| label == "distance")
-                                .unwrap().1;
-                            match (length, distance) {
-                                (TypedValue::U16(length), TypedValue::U16(distance)) => {
-                                    let length = *length as usize;
-                                    let distance = *distance as usize;
-                                    if distance > vs.len() {
-                                        panic!("inflate: distance out of range");
-                                    }
-                                    let start = vs.len() - distance;
-                                    for i in 0..length {
-                                        vs.push(vs[start + i].clone());
-                                    }
+                TypedValue::Variant(t, name, v) => match (name.as_ref(), v.as_ref()) {
+                    ("literal", v) => match v.coerce_mapped_value() {
+                        TypedValue::U8(b) => vs.push(TypedValue::U8(*b)),
+                        _ => panic!("inflate: expected U8"),
+                    },
+                    ("reference", TypedValue::Record(r_t, fields)) => {
+                        let length = &fields
+                            .iter()
+                            .find(|(label, _)| label == "length")
+                            .unwrap()
+                            .1;
+                        let distance = &fields
+                            .iter()
+                            .find(|(label, _)| label == "distance")
+                            .unwrap()
+                            .1;
+                        match (length, distance) {
+                            (TypedValue::U16(length), TypedValue::U16(distance)) => {
+                                let length = *length as usize;
+                                let distance = *distance as usize;
+                                if distance > vs.len() {
+                                    panic!("inflate: distance out of range");
                                 }
-                                _ =>
-                                    panic!(
-                                        "inflate: unexpected length/distance {:?} {:?}",
-                                        length,
-                                        distance
-                                    ),
+                                let start = vs.len() - distance;
+                                for i in 0..length {
+                                    vs.push(vs[start + i].clone());
+                                }
                             }
+                            _ => panic!(
+                                "inflate: unexpected length/distance {:?} {:?}",
+                                length, distance
+                            ),
                         }
-                        _ => panic!("inflate: unknown code"),
                     }
+                    _ => panic!("inflate: unknown code"),
+                },
                 _ => panic!("inflate: expected variant"),
             }
         }
@@ -1338,9 +1296,23 @@ pub(crate) enum TypedDecoder<TypeRep> {
     WithRelativeOffset(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoder<TypeRep>>),
     Map(TypeRep, Box<TypedDecoder<TypeRep>>, TypedExpr<TypeRep>),
     Compute(TypeRep, TypedExpr<TypeRep>),
-    Let(TypeRep, Label, TypedExpr<TypeRep>, Box<TypedDecoder<TypeRep>>),
-    Match(TypeRep, TypedExpr<TypeRep>, Vec<(TypedPattern<TypeRep>, TypedDecoder<TypeRep>)>),
-    Dynamic(TypeRep, Label, TypedDynFormat<TypeRep>, Box<TypedDecoder<TypeRep>>),
+    Let(
+        TypeRep,
+        Label,
+        TypedExpr<TypeRep>,
+        Box<TypedDecoder<TypeRep>>,
+    ),
+    Match(
+        TypeRep,
+        TypedExpr<TypeRep>,
+        Vec<(TypedPattern<TypeRep>, TypedDecoder<TypeRep>)>,
+    ),
+    Dynamic(
+        TypeRep,
+        Label,
+        TypedDynFormat<TypeRep>,
+        Box<TypedDecoder<TypeRep>>,
+    ),
     Apply(TypeRep, Label),
 }
 
@@ -1387,7 +1359,7 @@ impl<'a> GTCompiler<'a> {
 
     pub(crate) fn compile_program(
         module: &FormatModule,
-        format: &GTFormat
+        format: &GTFormat,
     ) -> AResult<TypedProgram<GenType>> {
         let mut compiler = GTCompiler::new(module);
         // type
@@ -1421,7 +1393,7 @@ impl<'a> GTCompiler<'a> {
     fn compile_gt_format(
         &mut self,
         format: &'a GTFormat,
-        next: Rc<Next<'a>>
+        next: Rc<Next<'a>>,
     ) -> AResult<GTDecoder> {
         match format {
             GTFormat::FormatCall(gt, level, arg_exprs, deref) => {
@@ -1450,7 +1422,11 @@ impl<'a> GTCompiler<'a> {
             GTFormat::Byte(bs) => Ok(TypedDecoder::Byte(*bs)),
             GTFormat::Variant(gt, label, f) => {
                 let d = self.compile_gt_format(f, next.clone())?;
-                Ok(TypedDecoder::Variant(gt.clone(), label.clone(), Box::new(d)))
+                Ok(TypedDecoder::Variant(
+                    gt.clone(),
+                    label.clone(),
+                    Box::new(d),
+                ))
             }
             GTFormat::Union(gt, branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
@@ -1485,7 +1461,10 @@ impl<'a> GTCompiler<'a> {
                     let Some(f) = fields.next() else {
                         unreachable!("mismatched length of two iterators raw_fields and fields")
                     };
-                    let next = Rc::new(Next::Tuple(CowVec::Vec(raw_fields.as_ref().to_vec()), next.clone()));
+                    let next = Rc::new(Next::Tuple(
+                        MaybeTyped::Typed(fields.as_slice()),
+                        next.clone(),
+                    ));
                     let df = self.compile_gt_format(&f, next)?;
                     dfields.push(df);
                 }
@@ -1503,7 +1482,10 @@ impl<'a> GTCompiler<'a> {
                     let Some((_name, f)) = fields.next() else {
                         unreachable!("bad length of fields")
                     };
-                    let next = Rc::new(Next::Record(CowVec::Vec(raw_fields.as_ref().to_vec()), next.clone()));
+                    let next = Rc::new(Next::Record(
+                        MaybeTyped::Typed(fields.as_slice()),
+                        next.clone(),
+                    ));
                     let df = self.compile_gt_format(f, next)?;
                     dfields.push((name.clone(), df));
                 }
@@ -1513,8 +1495,10 @@ impl<'a> GTCompiler<'a> {
                 if a.as_ref().is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let raw = (**a).clone().into();
-                let da = self.compile_gt_format(a, Rc::new(Next::Repeat(Cow::Owned(raw), next.clone())))?;
+                let da = self.compile_gt_format(
+                    a,
+                    Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                )?;
                 let astar = TypedFormat::Repeat(gt.clone(), a.clone());
                 let fa = TypedFormat::tuple(vec![(**a).clone(), astar]);
                 let fb = TypedFormat::EMPTY;
@@ -1528,8 +1512,10 @@ impl<'a> GTCompiler<'a> {
                 if a.is_nullable(self.module) {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
-                let raw: crate::Format = (**a).clone().into();
-                let da = self.compile_gt_format(a, Rc::new(Next::Repeat(Cow::<crate::Format>::Owned(raw), next.clone())))?;
+                let da = self.compile_gt_format(
+                    a,
+                    Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                )?;
                 let astar = TypedFormat::Repeat(gt.clone(), a.clone());
                 let fa = TypedFormat::EMPTY;
                 let fb = TypedFormat::tuple(vec![(**a).clone(), astar]);
@@ -1565,9 +1551,9 @@ impl<'a> GTCompiler<'a> {
                         return Err(anyhow!("PeekNot cannot require unbounded lookahead"));
                     }
                     Some(n) if n > MAX_LOOKAHEAD => {
-                        return Err(
-                            anyhow!("PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead")
-                        );
+                        return Err(anyhow!(
+                            "PeekNot cannot require > {MAX_LOOKAHEAD} bytes lookahead"
+                        ));
                     }
                     _ => {}
                 }
@@ -1584,7 +1570,11 @@ impl<'a> GTCompiler<'a> {
             }
             GTFormat::WithRelativeOffset(gt, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, Rc::new(Next::Empty))?);
-                Ok(TypedDecoder::WithRelativeOffset(gt.clone(), expr.clone(), da))
+                Ok(TypedDecoder::WithRelativeOffset(
+                    gt.clone(),
+                    expr.clone(),
+                    da,
+                ))
             }
             GTFormat::Map(gt, a, expr) => {
                 let da = Box::new(self.compile_gt_format(a, next.clone())?);
@@ -1593,7 +1583,12 @@ impl<'a> GTCompiler<'a> {
             GTFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
             GTFormat::Let(gt, name, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, next.clone())?);
-                Ok(TypedDecoder::Let(gt.clone(), name.clone(), expr.clone(), da))
+                Ok(TypedDecoder::Let(
+                    gt.clone(),
+                    name.clone(),
+                    expr.clone(),
+                    da,
+                ))
             }
             GTFormat::Match(gt, head, branches) => {
                 let branches = branches
@@ -1606,7 +1601,12 @@ impl<'a> GTCompiler<'a> {
             }
             GTFormat::Dynamic(gt, name, dynformat, a) => {
                 let da = Box::new(self.compile_gt_format(a, next.clone())?);
-                Ok(TypedDecoder::Dynamic(gt.clone(), name.clone(), dynformat.clone(), da))
+                Ok(TypedDecoder::Dynamic(
+                    gt.clone(),
+                    name.clone(),
+                    dynformat.clone(),
+                    da,
+                ))
             }
             GTFormat::Apply(gt, name, _) => Ok(TypedDecoder::Apply(gt.clone(), name.clone())),
         }

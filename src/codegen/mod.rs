@@ -331,27 +331,12 @@ impl Codegen {
                 }
             TypedDecoder::Record(gt, flds) => {
                 match gt {
-                    | GenType::Def((ix, lab), ..)
+                    | GenType::Def((_ix, lab), ..)
                     | GenType::Inline(
-                          RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab))),
+                          RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(_ix, lab))),
                       ) => {
-                        let tdef = &self.defined_types[*ix];
-                        let tfields = match tdef {
-                            RustTypeDef::Struct(RustStruct::Record(tfields)) => tfields,
-                            _ =>
-                                unreachable!(
-                                    "unexpected non-Struct::Record definition for type `{lab}`: {tdef:?}"
-                                ),
-                        };
-                        // FIXME - for now we rely on a consistent order of field names between the decoder and type definition
                         let mut assocs = Vec::new();
-                        for (i, (l0, d)) in flds.iter().enumerate() {
-                            let (l1, _t) = &tfields[i];
-                            assert_eq!(
-                                l0.as_ref(),
-                                l1.as_ref(),
-                                "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
-                            );
+                        for (l0, d) in flds.iter() {
                             assocs.push((l0.clone(), self.translate_gt(d)));
                         }
                         CaseLogic::Sequential(SequentialLogic::AccumRecord {
@@ -2353,12 +2338,27 @@ impl<'a> Elaborator<'a> {
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
+                match gt.try_as_adhoc() {
+                    Some(_) => (),
+                    None => {
+                        let before = self.get_gt_from_index(index - 1);
+                        let after = self.get_gt_from_index(index + 1);
+                        eprintln!("Possible frame-shift error around {index}");
+                        eprintln!("[{}]: {before:?}", index - 1);
+                        eprintln!("[{}]: {gt:?}", index);
+                        eprintln!("[{}]: {after:?}", index + 1);
+                        unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})")
+                    }
+                }
                 GTFormat::Record(gt, t_flds)
             }
             Format::Variant(label, inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
+                let _ = gt
+                    .try_as_adhoc()
+                    .expect("found non-adhoc type for variant format elaboration");
                 GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
             }
             Format::Repeat(inner) => {
@@ -2526,6 +2526,9 @@ impl<'a> Elaborator<'a> {
                     t_flds.push((lbl.clone(), t_fld));
                 }
                 let gt = self.get_gt_from_index(index);
+                let _ = gt
+                    .try_as_adhoc()
+                    .expect("found non-adhoc type for record expr elaboration");
                 GTExpr::Record(gt, t_flds)
             }
             Expr::TupleProj(e, ix) => {
@@ -2541,6 +2544,9 @@ impl<'a> Elaborator<'a> {
             Expr::Variant(lbl, inner) => {
                 let t_inner = self.elaborate_expr(inner);
                 let gt = self.get_gt_from_index(index);
+                let _ = gt
+                    .try_as_adhoc()
+                    .expect("found non-adhoc type for variant expr elaboration");
                 GTExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
             }
             Expr::Seq(elts) => {

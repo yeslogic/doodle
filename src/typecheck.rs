@@ -2263,7 +2263,6 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Record(fields)))?;
                 Ok(newvar)
             }
-            // FIXME - logically these should be grouped together, but anything containing an expression has to be typed as a special-case
             Format::Repeat(inner) | Format::Repeat1(inner) => {
                 let newvar = self.get_new_uvar();
                 let t = self.infer_utype_format(inner, ctxt)?;
