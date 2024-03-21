@@ -786,9 +786,9 @@ impl TypeChecker {
     }
 
     fn infer_var_dyn_format(&mut self, dynf: &DynFormat, ctxt: Ctxt<'_>) -> TCResult<UVar> {
-        let newvar = self.get_new_uvar();
         match dynf {
             DynFormat::Huffman(code_lengths, opt_values_expr) => {
+                let newvar = self.get_new_uvar();
                 let codes_var = self.infer_var_expr(code_lengths, ctxt.scope)?;
                 let code_var = self.get_new_uvar();
 
@@ -2304,7 +2304,6 @@ impl TypeChecker {
             }
             Format::PeekNot(peek) => {
                 let newvar = self.init_var_simple(UType::UNIT)?.0;
-                // FIXME - not sure if this is neccessary for any reason other than generating a variable tree...
                 let _peek_t = self.infer_utype_format(peek, ctxt)?;
                 Ok(newvar)
             }
@@ -2350,8 +2349,8 @@ impl TypeChecker {
                 let xvar = self.infer_var_expr(x, ctxt.scope)?;
                 let newscope = UScope::Single(USingleScope::new(ctxt.scope, lab, xvar));
                 let new_ctxt = ctxt.with_scope(&newscope);
-                let t_inner = self.infer_utype_format(inner, new_ctxt)?;
-                self.unify_var_utype(newvar, t_inner)?;
+                let inner_t = self.infer_utype_format(inner, new_ctxt)?;
+                self.unify_var_utype(newvar, inner_t)?;
                 Ok(newvar)
             }
             Format::Match(x, branches) => {
@@ -2364,7 +2363,6 @@ impl TypeChecker {
             }
             Format::Dynamic(lbl, dynf, inner) => {
                 let newvar = self.get_new_uvar();
-
                 let uv_dynf = self.infer_var_dyn_format(dynf, ctxt)?;
                 let newctxt = ctxt.with_dyn_binding(lbl, uv_dynf);
                 let inner_t = self.infer_utype_format(inner, newctxt)?;
@@ -2417,18 +2415,21 @@ impl TypeChecker {
             &UType::Var(uv) => {
                 let v = self.get_canonical_uvar(uv);
                 match self.substitute_uvar_vtype(v) {
-                    Ok(Some(t0)) => match t0 {
-                        VType::Base(bs) => match bs.get_unique_solution(uv).as_deref() {
-                            Ok(UType::Base(b)) => Some(ValueType::Base(*b)),
-                            Ok(other) => unreachable!("unexpected solution {other:?}"),
-                            Err(_) => None,
-                        },
-                        VType::Abstract(ut) => self.reify(ut),
-                        VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
-                        VType::ImplicitRecord(..) | VType::ImplicitTuple(..) => unreachable!(
-                            "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
-                        ),
-                    },
+                    Ok(Some(t0)) =>
+                        match t0 {
+                            VType::Base(bs) =>
+                                match bs.get_unique_solution(uv).as_deref() {
+                                    Ok(UType::Base(b)) => Some(ValueType::Base(*b)),
+                                    Ok(other) => unreachable!("unexpected solution {other:?}"),
+                                    Err(_) => None,
+                                }
+                            VType::Abstract(ut) => self.reify(ut),
+                            VType::IndefiniteUnion(vmid) => self.reify_union(vmid),
+                            VType::ImplicitRecord(..) | VType::ImplicitTuple(..) =>
+                                unreachable!(
+                                    "Unsolved implicit Tuple or Record leftover from un-unified projection: {t0:?}"
+                                ),
+                        }
                     Err(_) => None,
                     Ok(None) => {
                         // substitute_uvar_utype returns none for assumed-partial union types, so handle that case proactively

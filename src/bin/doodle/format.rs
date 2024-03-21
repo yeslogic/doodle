@@ -18,10 +18,10 @@ mod tiff;
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
 
-    let deflate = deflate::main(module, &base);
+    // let deflate = deflate::main(module, &base);
     let tiff = tiff::main(module, &base);
     let gif = gif::main(module, &base);
-    let gzip = gzip::main(module, deflate, &base);
+    // let gzip = gzip::main(module, deflate, &base);
     let jpeg = jpeg::main(module, &base, &tiff);
     let mpeg4 = mpeg4::main(module, &base);
     let png = png::main(module, &base);
@@ -36,7 +36,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 "data",
                 union_nondet(vec![
                     ("gif", gif.call()),
-                    ("gzip", gzip.call()),
+                    // ("gzip", gzip.call()),
                     ("jpeg", jpeg.call()),
                     ("mpeg4", mpeg4.call()),
                     ("png", png.call()),
