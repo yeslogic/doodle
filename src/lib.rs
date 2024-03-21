@@ -7,6 +7,7 @@ use std::ops::Add;
 use std::rc::Rc;
 
 use anyhow::{anyhow, Result as AResult};
+use codegen::typed_format::{GenType, TypedFormat};
 use serde::Serialize;
 
 use crate::bounds::Bounds;
@@ -996,35 +997,26 @@ impl FormatModule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum CowVec<'a, T>
-{
-    Slice(&'a [T]),
-    Vec(Vec<T>),
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum MaybeTyped<'a, U: ?Sized, T: ?Sized> {
+    Untyped(&'a U),
+    Typed(&'a T),
 }
 
-impl<'a, T> std::ops::Deref for CowVec<'a, T> {
-    type Target = [T];
-
-    fn deref(&self) -> &[T] {
+impl<'a, U: ?Sized + 'a, T: ?Sized + 'a> Clone for MaybeTyped<'a, U, T> {
+    fn clone(&self) -> Self {
         match self {
-            CowVec::Slice(s) => s,
-            CowVec::Vec(v) => v.as_slice(),
+            Self::Untyped(arg0) => Self::Untyped(*arg0),
+            Self::Typed(arg0) => Self::Typed(*arg0),
         }
     }
 }
 
-impl<'a, T> From<&'a [T]> for CowVec<'a, T> {
-    fn from(value: &'a [T]) -> Self {
-        Self::Slice(value)
-    }
-}
+impl<'a, U: ?Sized + 'a, T: ?Sized + 'a> Copy for MaybeTyped<'a, U, T> {}
 
-impl<'a, T> From<Vec<T>> for CowVec<'a, T> {
-    fn from(value: Vec<T>) -> Self {
-        Self::Vec(value)
-    }
-}
+type MTFormatRef<'a> = MaybeTyped<'a, Format, TypedFormat<GenType>>;
+type MTFormatSlice<'a> = MaybeTyped<'a, [Format], [TypedFormat<GenType>]>;
+type MTFieldSlice<'a> = MaybeTyped<'a, [(Label, Format)], [(Label, TypedFormat<GenType>)]>;
 
 /// Incremental decomposition of a Format into a partially consumed head
 /// sub-format, and a possibly-empty tail of remaining sub-formats.
@@ -1036,11 +1028,11 @@ impl<'a, T> From<Vec<T>> for CowVec<'a, T> {
 enum Next<'a> {
     Empty,
     Union(Rc<Next<'a>>, Rc<Next<'a>>),
-    Cat(Cow<'a, Format>, Rc<Next<'a>>),
-    Tuple(CowVec<'a, Format>, Rc<Next<'a>>),
-    Record(CowVec<'a, (Label, Format)>, Rc<Next<'a>>),
-    Repeat(Cow<'a, Format>, Rc<Next<'a>>),
-    RepeatCount(usize, Cow<'a, Format>, Rc<Next<'a>>),
+    Cat(MTFormatRef<'a>, Rc<Next<'a>>),
+    Tuple(MTFormatSlice<'a>, Rc<Next<'a>>),
+    Record(MTFieldSlice<'a>, Rc<Next<'a>>),
+    Repeat(MTFormatRef<'a>, Rc<Next<'a>>),
+    RepeatCount(usize, MTFormatRef<'a>, Rc<Next<'a>>),
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
     Peek(Rc<Next<'a>>, Rc<Next<'a>>),
     PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
@@ -1185,7 +1177,11 @@ impl<'a> MatchTreeStep<'a> {
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
             None => Self::from_next(module, next),
-            Some((f, fs)) => Self::from_format(module, f, Rc::new(Next::Tuple(CowVec::Slice(fs), next))),
+            Some((f, fs)) => Self::from_format(
+                module,
+                f,
+                Rc::new(Next::Tuple(MaybeTyped::Untyped(fs), next)),
+            ),
         }
     }
 
@@ -1199,9 +1195,11 @@ impl<'a> MatchTreeStep<'a> {
     ) -> MatchTreeStep<'a> {
         match fields.split_first() {
             None => Self::from_next(module, next),
-            Some(((_label, f), fs)) => {
-                Self::from_format(module, f, Rc::new(Next::Record(CowVec::Slice(fs), next)))
-            }
+            Some(((_label, f), fs)) => Self::from_format(
+                module,
+                f,
+                Rc::new(Next::Record(MaybeTyped::Untyped(fs), next)),
+            ),
         }
     }
 
@@ -1216,7 +1214,7 @@ impl<'a> MatchTreeStep<'a> {
             Self::from_format(
                 module,
                 format,
-                Rc::new(Next::RepeatCount(n - 1, Cow::Borrowed(format), next)),
+                Rc::new(Next::RepeatCount(n - 1, MaybeTyped::Untyped(format), next)),
             )
         } else {
             Self::from_next(module, next)
@@ -1259,16 +1257,64 @@ impl<'a> MatchTreeStep<'a> {
             }
             Next::Cat(f, next) => {
                 let next0: Rc<Next<'a>> = next.clone();
-                MatchTreeStep::<'a>::from_format(module, f, next0)
+                MatchTreeStep::<'a>::from_mt_format(module, *f, next0)
             }
-            Next::Tuple(fields, next) => Self::from_tuple(module, fields, next.clone()),
-            Next::Record(fields, next) => Self::from_record(module, fields, next.clone()),
+            Next::Tuple(fields, next) => {
+                let next = next.clone();
+                match fields {
+                    MaybeTyped::Untyped(fields) => match fields.split_first() {
+                        None => Self::from_next(module, next),
+                        Some((f, fs)) => Self::from_format(
+                            module,
+                            f,
+                            Rc::new(Next::Tuple(MaybeTyped::Untyped(fs), next)),
+                        ),
+                    },
+                    MaybeTyped::Typed(fields) => match fields.split_first() {
+                        None => Self::from_next(module, next),
+                        Some((f, fs)) => Self::from_gt_format(
+                            module,
+                            f,
+                            Rc::new(Next::Tuple(MaybeTyped::Typed(fs), next)),
+                        ),
+                    },
+                }
+            }
+            Next::Record(fields, next) => {
+                let next = next.clone();
+                match fields {
+                    MaybeTyped::Untyped(fields) => match fields.split_first() {
+                        None => Self::from_next(module, next),
+                        Some(((_label, f), fs)) => Self::from_format(
+                            module,
+                            f,
+                            Rc::new(Next::Record(MaybeTyped::Untyped(fs), next)),
+                        ),
+                    },
+                    MaybeTyped::Typed(fields) => match fields.split_first() {
+                        None => Self::from_next(module, next),
+                        Some(((_label, f), fs)) => Self::from_gt_format(
+                            module,
+                            f,
+                            Rc::new(Next::Record(MaybeTyped::Typed(fs), next)),
+                        ),
+                    },
+                }
+            }
             Next::Repeat(a, next0) => {
                 let tree = MatchTreeStep::<'a>::from_next(module, next0.clone());
                 let next1 = next.clone();
-                tree.union(MatchTreeStep::<'a>::from_format(module, a, next1))
+                tree.union(MatchTreeStep::<'a>::from_mt_format(module, *a, next1))
             }
-            Next::RepeatCount(n, a, next0) => Self::from_repeat_count(module, *n, a, next0.clone()),
+            Next::RepeatCount(n, a, next0) => {
+                let n = *n;
+                let next = next0.clone();
+                if n > 0 {
+                    Self::from_mt_format(module, *a, Rc::new(Next::RepeatCount(n - 1, *a, next)))
+                } else {
+                    Self::from_next(module, next)
+                }
+            }
             Next::Slice(n, inside, next0) => {
                 Self::from_slice(module, *n, inside.clone(), next0.clone())
             }
@@ -1282,6 +1328,170 @@ impl<'a> MatchTreeStep<'a> {
                 let tree2 = Self::from_next(module, next2.clone());
                 tree1.peek_not(tree2)
             }
+        }
+    }
+
+    pub fn from_mt_format(
+        module: &'a FormatModule,
+        f: MTFormatRef<'a>,
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        match f {
+            MaybeTyped::Untyped(f) => Self::from_format(module, f, next),
+            MaybeTyped::Typed(tf) => Self::from_gt_format(module, tf, next),
+        }
+    }
+
+    pub fn from_gt_format(
+        module: &'a FormatModule,
+        f: &'a TypedFormat<GenType>,
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
+        match f {
+            TypedFormat::FormatCall(_, level, ..) => {
+                Self::from_format(module, module.get_format(*level), next)
+            }
+            TypedFormat::Fail => Self::reject(),
+            TypedFormat::EndOfInput => Self::accept(),
+            TypedFormat::Align(_) => {
+                Self::accept() // FIXME
+            }
+            TypedFormat::Byte(bs) => Self::branch(*bs, next),
+            TypedFormat::Variant(_, _label, f) => Self::from_gt_format(module, f, next.clone()),
+            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => {
+                let mut tree = Self::reject();
+                for f in branches {
+                    tree = tree.union(Self::from_gt_format(module, f, next.clone()));
+                }
+                tree
+            }
+            TypedFormat::Tuple(_, fields) => match fields.split_first() {
+                None => Self::from_next(module, next),
+                Some((f, fs)) => Self::from_gt_format(
+                    module,
+                    f,
+                    Rc::new(Next::Tuple(MaybeTyped::Typed(fs), next)),
+                ),
+            },
+            TypedFormat::Record(_, fields) => match fields.split_first() {
+                None => Self::from_next(module, next),
+                Some(((_label, f), fs)) => Self::from_gt_format(
+                    module,
+                    f,
+                    Rc::new(Next::Record(MaybeTyped::Typed(fs), next)),
+                ),
+            },
+
+            TypedFormat::Repeat(_, a) => {
+                let tree = Self::from_next(module, next.clone());
+                tree.union(Self::from_gt_format(
+                    module,
+                    a,
+                    Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                ))
+            }
+            TypedFormat::Repeat1(_, a) => Self::from_gt_format(
+                module,
+                a,
+                Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+            ),
+            TypedFormat::RepeatCount(_, expr, a) => {
+                let bounds = expr.bounds();
+                if let Some(n) = bounds.is_exact() {
+                    {
+                        let next = next.clone();
+                        if n > 0 {
+                            Self::from_gt_format(
+                                module,
+                                a,
+                                Rc::new(Next::RepeatCount(n - 1, MaybeTyped::Typed(a), next)),
+                            )
+                        } else {
+                            Self::from_next(module, next)
+                        }
+                    }
+                } else {
+                    {
+                        let n = bounds.min;
+                        let next = Rc::new(Next::Empty);
+                        if n > 0 {
+                            Self::from_gt_format(
+                                module,
+                                a,
+                                Rc::new(Next::RepeatCount(n - 1, MaybeTyped::Typed(a), next)),
+                            )
+                        } else {
+                            Self::from_next(module, next)
+                        }
+                    }
+                }
+            }
+            TypedFormat::RepeatUntilLast(_, _expr, _a) => {
+                Self::accept() // FIXME
+            }
+            TypedFormat::RepeatUntilSeq(_, _expr, _a) => {
+                Self::accept() // FIXME
+            }
+            TypedFormat::Peek(_, a) => {
+                let tree = Self::from_next(module, next.clone());
+                let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty));
+                tree.peek(peek)
+            }
+            TypedFormat::PeekNot(_, a) => {
+                let tree = Self::from_next(module, next.clone());
+                let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty));
+                tree.peek_not(peek)
+            }
+            TypedFormat::Slice(_, expr, f) => {
+                let inside = Rc::new(Next::Cat(
+                    MaybeTyped::Typed(f.as_ref()),
+                    Rc::new(Next::Empty),
+                ));
+                let bounds = expr.bounds();
+                if let Some(n) = bounds.is_exact() {
+                    Self::from_slice(module, n, inside, next)
+                } else {
+                    Self::from_slice(module, bounds.min, inside, Rc::new(Next::Empty))
+                }
+            }
+            TypedFormat::Bits(_, _a) => {
+                Self::accept() // FIXME
+            }
+            TypedFormat::WithRelativeOffset(_, expr, a) => {
+                // REVIEW - this is a bit hackish but it is at least somewhat better than before
+                let tree = Self::from_next(module, next.clone());
+                let bounds = expr.bounds();
+                match bounds.is_exact() {
+                    None => tree, // if the lookahead is indeterminate, ignore it
+                    Some(n) => {
+                        let peek = match n {
+                            0 => Self::from_gt_format(module, a, Rc::new(Next::Empty)),
+                            _ => Self::from_slice(
+                                module,
+                                n,
+                                Rc::new(Next::Empty),
+                                Rc::new(Next::Tuple(
+                                    MaybeTyped::Typed(std::slice::from_ref(a.as_ref())),
+                                    next,
+                                )),
+                            ),
+                        };
+                        tree.peek(peek)
+                    }
+                }
+            }
+            TypedFormat::Map(_, f, _expr) => Self::from_gt_format(module, f, next),
+            TypedFormat::Compute(_, _expr) => Self::from_next(module, next),
+            TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::Match(_, _, branches) => {
+                let mut tree = Self::reject();
+                for (_, f) in branches {
+                    tree = tree.union(Self::from_gt_format(module, f, next.clone()));
+                }
+                tree
+            }
+            TypedFormat::Dynamic(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
+            TypedFormat::Apply(..) => Self::accept(),
         }
     }
 
@@ -1316,12 +1526,14 @@ impl<'a> MatchTreeStep<'a> {
                 tree.union(Self::from_format(
                     module,
                     a,
-                    Rc::new(Next::Repeat(Cow::Borrowed(a), next.clone())),
+                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
                 ))
             }
-            Format::Repeat1(a) => {
-                Self::from_format(module, a, Rc::new(Next::Repeat(Cow::Borrowed(a), next.clone())))
-            }
+            Format::Repeat1(a) => Self::from_format(
+                module,
+                a,
+                Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+            ),
             Format::RepeatCount(expr, a) => {
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
@@ -1347,7 +1559,10 @@ impl<'a> MatchTreeStep<'a> {
                 tree.peek_not(peek)
             }
             Format::Slice(expr, f) => {
-                let inside = Rc::new(Next::Cat(Cow::Borrowed(f.as_ref()), Rc::new(Next::Empty)));
+                let inside = Rc::new(Next::Cat(
+                    MaybeTyped::Untyped(f.as_ref()),
+                    Rc::new(Next::Empty),
+                ));
                 let bounds = expr.bounds();
                 if let Some(n) = bounds.is_exact() {
                     Self::from_slice(module, n, inside, next)
@@ -1371,7 +1586,10 @@ impl<'a> MatchTreeStep<'a> {
                                 module,
                                 n,
                                 Rc::new(Next::Empty),
-                                Rc::new(Next::Tuple(CowVec::Slice(std::slice::from_ref(a.as_ref())), next)),
+                                Rc::new(Next::Tuple(
+                                    MaybeTyped::Untyped(std::slice::from_ref(a.as_ref())),
+                                    next,
+                                )),
                             ),
                         };
                         tree.peek(peek)
@@ -1540,7 +1758,7 @@ impl MatchTree {
     fn build(module: &FormatModule, branches: &[Format], next: Rc<Next<'_>>) -> Option<MatchTree> {
         let mut nexts = HashSet::new();
         for (i, f) in branches.iter().enumerate() {
-            nexts.insert((i, Rc::new(Next::Cat(Cow::Borrowed(f), next.clone()))));
+            nexts.insert((i, Rc::new(Next::Cat(MaybeTyped::Untyped(f), next.clone()))));
         }
         const MAX_DEPTH: usize = 32;
         MatchTreeLevel::grow(module, nexts, MAX_DEPTH)

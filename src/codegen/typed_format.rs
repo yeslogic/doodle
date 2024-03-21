@@ -3,6 +3,7 @@ use std::ops::Add;
 use std::rc::Rc;
 
 use super::rust_ast::{PrimType, RustType, RustTypeDef};
+use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{Arith, FormatModule, IntRel, Label, ValueType};
@@ -18,6 +19,16 @@ impl GenType {
         match self {
             GenType::Inline(rt) => rt,
             GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),
+        }
+    }
+
+    pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label)> {
+        match self {
+            GenType::Def((ix, lbl), ..)
+            | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lbl)))) => {
+                Some((*ix, lbl))
+            }
+            _ => None,
         }
     }
 }
@@ -303,7 +314,7 @@ pub enum TypedExpr<TypeRep> {
 }
 
 impl<TypeRep> TypedExpr<TypeRep> {
-    fn bounds(&self) -> Bounds {
+    pub(crate) fn bounds(&self) -> Bounds {
         match self {
             TypedExpr::U8(n) => Bounds::exact(usize::from(*n)),
             TypedExpr::U16(n) => Bounds::exact(usize::from(*n)),

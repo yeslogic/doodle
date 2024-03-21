@@ -85,10 +85,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FileOutput::Debug => println!("{value:?}"),
                 FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
                 FileOutput::Tree => {
-                    doodle::output::tree::print_decoded_value(&module, &value, &format)
+                    doodle::output::tree::print_decoded_value(&module, &value, &format);
                 }
                 FileOutput::Flat => {
-                    doodle::output::flat::print_decoded_value(&module, &value, &format)
+                    doodle::output::flat::print_decoded_value(&module, &value, &format);
                 }
             }
 
@@ -110,4 +110,11 @@ fn check_all(module: &FormatModule) -> AResult<()> {
         }
     }
     Ok(())
+}
+
+#[test]
+fn test_codegen() {
+    let mut module = FormatModule::new();
+    let format = format::main(&mut module).call();
+    doodle::codegen::print_generated_code(&module, &format);
 }
