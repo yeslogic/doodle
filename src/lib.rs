@@ -1,7 +1,6 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
-use std::borrow::{Borrow, Cow};
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -968,7 +967,7 @@ impl FormatModule {
             }
             Format::Dynamic(name, dynformat, format) => {
                 match dynformat {
-                    DynFormat::Huffman(lengths_expr, opt_values_expr) => {
+                    DynFormat::Huffman(lengths_expr, _opt_values_expr) => {
                         match lengths_expr.infer_type(scope)? {
                             ValueType::Seq(t) => match &*t {
                                 ValueType::Base(BaseType::U8) | ValueType::Base(BaseType::U16) => {}
@@ -1247,7 +1246,6 @@ impl<'a> MatchTreeStep<'a> {
 
     /// Constructs a [MatchTreeStep] from a [`Next`]
     fn from_next(module: &'a FormatModule, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
-        let orig = next.clone();
         match next.as_ref() {
             Next::Empty => Self::accept(),
             Next::Union(next1, next2) => {
