@@ -4,22 +4,28 @@ pub mod typed_format;
 
 use crate::{
     byte_set::ByteSet,
-    decoder::{Decoder, Program},
-    typecheck::{TypeChecker, UScope, UVar},
-    Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern,
+    decoder::{ Decoder, Program },
+    typecheck::{ TypeChecker, UScope, UVar },
+    Arith,
+    BaseType,
+    DynFormat,
+    Expr,
+    Format,
+    FormatModule,
+    IntRel,
+    Label,
+    MatchTree,
+    Pattern,
     ValueType,
 };
 
-use std::{borrow::Cow, collections::HashMap, rc::Rc};
+use std::{ borrow::Cow, collections::HashMap, rc::Rc };
 
 use rust_ast::*;
 
-use typed_format::{GenType, TypedExpr, TypedFormat, TypedPattern};
+use typed_format::{ GenType, TypedExpr, TypedFormat, TypedPattern };
 
-use self::{
-    typed_decoder::{GTCompiler, GTDecoder, TypedDecoder},
-    typed_format::TypedDynFormat,
-};
+use self::{ typed_decoder::{ GTCompiler, GTDecoder, TypedDecoder }, typed_format::TypedDynFormat };
 
 pub(crate) mod ixlabel;
 pub(crate) use ixlabel::IxLabel;
@@ -440,11 +446,10 @@ impl Codegen {
             Decoder::Variant(vname, inner) => {
                 let (tname, tdef) = match type_hint {
                     Some(
-                        GenType::Def((ix, lab), ..)
-                        | GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(
-                            ix,
-                            lab,
-                        )))),
+                        | GenType::Def((ix, lab), ..)
+                        | GenType::Inline(
+                              RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, lab))),
+                          ),
                     ) => (lab.clone(), &self.defined_types[*ix]),
                     Some(other) => panic!("unexpected type_hint for Decoder::Variant: {:?}", other),
                     _ => unreachable!("must have type_hint to translate Decoder::Variant"),
@@ -579,42 +584,56 @@ impl Codegen {
                     }
                 }
             }
-            Decoder::Parallel(alts) => CaseLogic::Parallel(ParallelLogic::Alts(
-                alts.iter()
-                    .map(|alt| self.translate(alt, type_hint))
-                    .collect(),
-            )),
-            Decoder::Branch(tree, flat) => CaseLogic::Other(OtherLogic::Descend(
-                tree.clone(),
-                flat.iter()
-                    .map(|alt| self.translate(alt, type_hint))
-                    .collect(),
-            )),
-            Decoder::Tuple(elts) => match type_hint {
-                None => CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                    constructor: None,
-                    elements: elts.iter().map(|elt| self.translate(elt, None)).collect(),
-                }),
-                Some(GenType::Inline(RustType::AnonTuple(tys))) => {
-                    CaseLogic::Sequential(SequentialLogic::AccumTuple {
-                        constructor: None,
-                        elements: elts
+            Decoder::Parallel(alts) =>
+                CaseLogic::Parallel(
+                    ParallelLogic::Alts(
+                        alts
                             .iter()
-                            .zip(tys)
-                            .map(|(elt, ty)| self.translate(elt, Some(&ty.clone().into())))
-                            .collect(),
-                    })
-                }
-                Some(GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit))))
-                    if elts.is_empty() =>
-                {
-                    CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
-                }
-                Some(other) => unreachable!(
-                    "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
-                    other
+                            .map(|alt| self.translate(alt, type_hint))
+                            .collect()
+                    )
                 ),
-            },
+            Decoder::Branch(tree, flat) =>
+                CaseLogic::Other(
+                    OtherLogic::Descend(
+                        tree.clone(),
+                        flat
+                            .iter()
+                            .map(|alt| self.translate(alt, type_hint))
+                            .collect()
+                    )
+                ),
+            Decoder::Tuple(elts) =>
+                match type_hint {
+                    None =>
+                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                            constructor: None,
+                            elements: elts
+                                .iter()
+                                .map(|elt| self.translate(elt, None))
+                                .collect(),
+                        }),
+                    Some(GenType::Inline(RustType::AnonTuple(tys))) => {
+                        CaseLogic::Sequential(SequentialLogic::AccumTuple {
+                            constructor: None,
+                            elements: elts
+                                .iter()
+                                .zip(tys)
+                                .map(|(elt, ty)| self.translate(elt, Some(&ty.clone().into())))
+                                .collect(),
+                        })
+                    }
+                    Some(GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::Unit)))) if
+                        elts.is_empty()
+                    => {
+                        CaseLogic::Simple(SimpleLogic::Eval(RustExpr::UNIT))
+                    }
+                    Some(other) =>
+                        unreachable!(
+                            "Decoder::Tuple expected to have type RustType::AnonTuple(..), found {:?}",
+                            other
+                        ),
+                }
             Decoder::Record(flds) => {
                 match type_hint {
                     Some(
@@ -659,101 +678,112 @@ impl Codegen {
                         ),
                 }
             }
-            Decoder::While(tree_continue, single) => match type_hint {
-                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
-                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
-                    CaseLogic::Repeat(RepeatLogic::ContinueOnMatch(
-                        tree_continue.clone(),
-                        Box::new(cl_single),
-                    ))
+            Decoder::While(tree_continue, single) =>
+                match type_hint {
+                    Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                        let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ContinueOnMatch(tree_continue.clone(), Box::new(cl_single))
+                        )
+                    }
+                    Some(other) => {
+                        unreachable!("Hint for Decoder::While should be Vec<_>, found {other:?}")
+                    }
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ContinueOnMatch(tree_continue.clone(), Box::new(cl_single))
+                        )
+                    }
                 }
-                Some(other) => {
-                    unreachable!("Hint for Decoder::While should be Vec<_>, found {other:?}")
+            Decoder::Until(tree_break, single) =>
+                match type_hint {
+                    Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                        let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(cl_single))
+                        )
+                    }
+                    Some(other) => {
+                        unreachable!("Hint for Decoder::Until should be Vec<_>, found {other:?}")
+                    }
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(cl_single))
+                        )
+                    }
                 }
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ContinueOnMatch(
-                        tree_continue.clone(),
-                        Box::new(cl_single),
-                    ))
+            Decoder::RepeatCount(expr_count, single) =>
+                match type_hint {
+                    Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                        let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ExactCount(embed_expr(expr_count), Box::new(cl_single))
+                        )
+                    }
+                    Some(other) => {
+                        unreachable!(
+                            "Hint for Decoder::RepeatCount should be Vec<_>, found {other:?}"
+                        )
+                    }
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ExactCount(embed_expr(expr_count), Box::new(cl_single))
+                        )
+                    }
                 }
-            },
-            Decoder::Until(tree_break, single) => match type_hint {
-                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
-                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
-                    CaseLogic::Repeat(RepeatLogic::BreakOnMatch(
-                        tree_break.clone(),
-                        Box::new(cl_single),
-                    ))
+            Decoder::RepeatUntilLast(pred_terminal, single) =>
+                match type_hint {
+                    Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                        let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionTerminal(
+                                embed_expr(pred_terminal),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
+                    Some(other) =>
+                        unreachable!(
+                            "Hint for Decoder::RepeatUntilLast should be Vec<_>, found {other:?}"
+                        ),
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionTerminal(
+                                embed_expr(pred_terminal),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
                 }
-                Some(other) => {
-                    unreachable!("Hint for Decoder::Until should be Vec<_>, found {other:?}")
+            Decoder::RepeatUntilSeq(pred_complete, single) =>
+                match type_hint {
+                    Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
+                        let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionComplete(
+                                embed_expr(pred_complete),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
+                    Some(other) =>
+                        unreachable!(
+                            "Hint for Decoder::RepeatUntilSeq should be Vec<_>, found {other:?}"
+                        ),
+                    None => {
+                        let cl_single = self.translate(single, None);
+                        CaseLogic::Repeat(
+                            RepeatLogic::ConditionComplete(
+                                embed_expr(pred_complete),
+                                Box::new(cl_single)
+                            )
+                        )
+                    }
                 }
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::BreakOnMatch(
-                        tree_break.clone(),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
-            Decoder::RepeatCount(expr_count, single) => match type_hint {
-                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
-                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
-                    CaseLogic::Repeat(RepeatLogic::ExactCount(
-                        embed_expr(expr_count),
-                        Box::new(cl_single),
-                    ))
-                }
-                Some(other) => {
-                    unreachable!("Hint for Decoder::RepeatCount should be Vec<_>, found {other:?}")
-                }
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ExactCount(
-                        embed_expr(expr_count),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
-            Decoder::RepeatUntilLast(pred_terminal, single) => match type_hint {
-                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
-                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
-                    CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
-                        embed_expr(pred_terminal),
-                        Box::new(cl_single),
-                    ))
-                }
-                Some(other) => unreachable!(
-                    "Hint for Decoder::RepeatUntilLast should be Vec<_>, found {other:?}"
-                ),
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ConditionTerminal(
-                        embed_expr(pred_terminal),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
-            Decoder::RepeatUntilSeq(pred_complete, single) => match type_hint {
-                Some(GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(t))))) => {
-                    let cl_single = self.translate(single, Some(&t.as_ref().clone().into()));
-                    CaseLogic::Repeat(RepeatLogic::ConditionComplete(
-                        embed_expr(pred_complete),
-                        Box::new(cl_single),
-                    ))
-                }
-                Some(other) => unreachable!(
-                    "Hint for Decoder::RepeatUntilSeq should be Vec<_>, found {other:?}"
-                ),
-                None => {
-                    let cl_single = self.translate(single, None);
-                    CaseLogic::Repeat(RepeatLogic::ConditionComplete(
-                        embed_expr(pred_complete),
-                        Box::new(cl_single),
-                    ))
-                }
-            },
             // FIXME - implement CaseLogic variants and translation rules for the remaining cases
             Decoder::Map(inner, f) => {
                 // FIXME - we have no way of inferring a proper type-hint for inner
@@ -763,11 +793,9 @@ impl Codegen {
             Decoder::Compute(expr) => CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr))),
             Decoder::Let(name, expr, inner) => {
                 let cl_inner = self.translate(inner, type_hint);
-                CaseLogic::Derived(DerivedLogic::Let(
-                    name.clone(),
-                    embed_expr(expr),
-                    Box::new(cl_inner),
-                ))
+                CaseLogic::Derived(
+                    DerivedLogic::Let(name.clone(), embed_expr(expr), Box::new(cl_inner))
+                )
             }
             Decoder::Match(scrutinee, cases) => {
                 let mut cl_cases = Vec::new();
@@ -809,15 +837,18 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
         TypedPattern::Tuple(_, elts) => {
             RustPattern::TupleLiteral(elts.iter().map(embed_pattern_t).collect())
         }
-        TypedPattern::Variant(gt, vname, inner) => match gt {
-            GenType::Def((_, tname), _def) => {
-                let constr = Constructor::Compound(tname.clone(), vname.clone());
-                RustPattern::Variant(constr, Box::new(embed_pattern_t(inner)))
+        TypedPattern::Variant(gt, vname, inner) =>
+            match gt {
+                GenType::Def((_, tname), _def) => {
+                    let constr = Constructor::Compound(tname.clone(), vname.clone());
+                    RustPattern::Variant(constr, Box::new(embed_pattern_t(inner)))
+                }
+                other => {
+                    unreachable!(
+                        "cannot inline TypedPattern::Variant with abstract gentype: {other:?}"
+                    )
+                }
             }
-            other => {
-                unreachable!("cannot inline TypedPattern::Variant with abstract gentype: {other:?}")
-            }
-        },
         TypedPattern::Seq(_t, elts) => {
             RustPattern::ArrayLiteral(elts.iter().map(embed_pattern_t).collect())
         }
@@ -836,10 +867,20 @@ fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
         Pattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(*n as usize)),
         Pattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::Char(*c)),
         Pattern::Tuple(pats) => {
-            RustPattern::TupleLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
+            RustPattern::TupleLiteral(
+                pats
+                    .iter()
+                    .map(|x| embed_pattern(x, None))
+                    .collect()
+            )
         }
         Pattern::Seq(pats) => {
-            RustPattern::ArrayLiteral(pats.iter().map(|x| embed_pattern(x, None)).collect())
+            RustPattern::ArrayLiteral(
+                pats
+                    .iter()
+                    .map(|x| embed_pattern(x, None))
+                    .collect()
+            )
         }
         Pattern::Variant(vname, pat) => {
             let constr = match type_hint {
@@ -847,8 +888,7 @@ fn embed_pattern(pat: &Pattern, type_hint: Option<&RustType>) -> RustPattern {
                     let tname = get_enum_name(ty).clone();
                     Constructor::Compound(tname, vname.clone())
                 }
-                // FIXME - figure out a way to get around this
-                None => Constructor::Simple(vname.clone()),
+                None => unreachable!("must have hint to embed variant pattern"),
             };
             let inner = embed_pattern(pat, None);
             RustPattern::Variant(constr, Box::new(inner))
@@ -874,7 +914,7 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
                 fields
                     .iter()
                     .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr_t(fval)))))
-                    .collect(),
+                    .collect()
             )
         }
         TypedExpr::Variant(gt, vname, inner) => {
@@ -882,34 +922,40 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
                 GenType::Def((_ix, tname), def) => {
                     match def {
                         RustTypeDef::Enum(vars) => {
-                            let Some(this) = vars.iter().find(|var| var.get_label() == vname)
-                            else {
+                            let Some(this) = vars.iter().find(|var| var.get_label() == vname) else {
                                 unreachable!("Variant not found: {:?}::{:?}", tname, vname)
                             };
                             let constr_ent = RustEntity::Scoped(vec![tname.clone()], vname.clone());
                             match this {
-                                RustVariant::Unit(_vname) => RustExpr::BlockScope(
-                                    vec![RustStmt::Expr(embed_expr_t(inner))],
-                                    Box::new(RustExpr::Entity(constr_ent)),
-                                ),
+                                RustVariant::Unit(_vname) =>
+                                    RustExpr::BlockScope(
+                                        vec![RustStmt::Expr(embed_expr_t(inner))],
+                                        Box::new(RustExpr::Entity(constr_ent))
+                                    ),
                                 RustVariant::Tuple(_vname, _elts) => {
                                     // FIXME - not sure how to avoid unary-over-tuple if inner becomes RustExpr::Tuple...
                                     RustExpr::Entity(constr_ent).call_with([embed_expr_t(inner)])
                                 }
-                                RustVariant::Record(_vname, _flds) => match inner.as_ref() {
-                                    TypedExpr::Record(_gt, fields) => RustExpr::Struct(
-                                        constr_ent,
-                                        fields
-                                            .iter()
-                                            .map(|(fname, fval)| {
-                                                (fname.clone(), Some(Box::new(embed_expr_t(fval))))
-                                            })
-                                            .collect(),
-                                    ),
-                                    other => unreachable!(
-                                        "Record variant found non-record inner Expr: {other:?}"
-                                    ),
-                                },
+                                RustVariant::Record(_vname, _flds) =>
+                                    match inner.as_ref() {
+                                        TypedExpr::Record(_gt, fields) =>
+                                            RustExpr::Struct(
+                                                constr_ent,
+                                                fields
+                                                    .iter()
+                                                    .map(|(fname, fval)| {
+                                                        (
+                                                            fname.clone(),
+                                                            Some(Box::new(embed_expr_t(fval))),
+                                                        )
+                                                    })
+                                                    .collect()
+                                            ),
+                                        other =>
+                                            unreachable!(
+                                                "Record variant found non-record inner Expr: {other:?}"
+                                            ),
+                                    }
                             }
                         }
                         RustTypeDef::Struct(_) => {
@@ -917,23 +963,126 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
                         }
                     }
                 }
-                other => unreachable!(
-                    "Cannot embed variant expression with inlined (abstract) GenType: {other:?}"
-                ),
+                other =>
+                    unreachable!(
+                        "Cannot embed variant expression with inlined (abstract) GenType: {other:?}"
+                    ),
             }
         }
-        TypedExpr::Match(_t, scrutinee, cases) => RustExpr::Control(Box::new(RustControl::Match(
-            embed_expr_t(scrutinee),
-            cases
-                .iter()
-                .map(|(pat, rhs)| {
-                    (
-                        MatchCaseLHS::Pattern(embed_pattern_t(pat)),
-                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr_t(rhs))],
+        TypedExpr::Match(_t, scrutinee, cases) =>
+            RustExpr::Control(
+                Box::new(
+                    RustControl::Match(
+                        embed_expr_t(scrutinee),
+                        cases
+                            .iter()
+                            .map(|(pat, rhs)| {
+                                (
+                                    MatchCaseLHS::Pattern(embed_pattern_t(pat)),
+                                    vec![RustStmt::Return(ReturnKind::Implicit, embed_expr_t(rhs))],
+                                )
+                            })
+                            .collect()
                     )
-                })
-                .collect(),
-        ))),
+                )
+            ),
+        TypedExpr::Tuple(t, tup) => RustExpr::Tuple(tup.iter().map(embed_expr_t).collect()),
+        TypedExpr::TupleProj(_, expr_tup, ix) => embed_expr_t(expr_tup).nth(*ix),
+        TypedExpr::RecordProj(_, expr_rec, fld) => embed_expr_t(expr_rec).field(fld.clone()),
+        TypedExpr::Seq(_, elts) => {
+            RustExpr::ArrayLit(elts.iter().map(embed_expr_t).collect()).call_method("to_vec")
+        }
+        TypedExpr::Arith(_, arith, lhs, rhs) => {
+            let x = embed_expr_t(lhs);
+            let y = embed_expr_t(rhs);
+            let op = match arith {
+                Arith::BitAnd => Operator::BitAnd,
+                Arith::BitOr => Operator::BitOr,
+                Arith::Add => Operator::Add,
+                Arith::Sub => Operator::Sub,
+                Arith::Mul => Operator::Mul,
+                Arith::Div => Operator::Div,
+                Arith::Rem => Operator::Rem,
+                Arith::Shl => Operator::Shl,
+                Arith::Shr => Operator::Shr,
+            };
+            RustExpr::infix(x, op, y)
+        }
+
+        TypedExpr::IntRel(_, rel, lhs, rhs) => {
+            let x = embed_expr_t(lhs);
+            let y = embed_expr_t(rhs);
+            let op = match rel {
+                IntRel::Eq => Operator::Eq,
+                IntRel::Ne => Operator::Neq,
+                IntRel::Lt => Operator::Lt,
+                IntRel::Gt => Operator::Gt,
+                IntRel::Lte => Operator::Lte,
+                IntRel::Gte => Operator::Gte,
+            };
+            RustExpr::infix(x, op, y)
+        }
+        TypedExpr::AsU8(x) => {
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_t(x)), PrimType::U8.into()))
+        }
+        TypedExpr::AsU16(x) =>
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_t(x)), PrimType::U16.into())),
+        TypedExpr::AsU32(x) =>
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_t(x)), PrimType::U32.into())),
+        TypedExpr::AsU64(x) =>
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_t(x)), PrimType::U64.into())),
+        TypedExpr::U16Be(be_bytes) => RustExpr::local("u16be").call_with([embed_expr_t(be_bytes)]),
+        TypedExpr::U16Le(le_bytes) => RustExpr::local("u16le").call_with([embed_expr_t(le_bytes)]),
+        TypedExpr::U32Be(be_bytes) => RustExpr::local("u32be").call_with([embed_expr_t(be_bytes)]),
+        TypedExpr::U32Le(le_bytes) => RustExpr::local("u32le").call_with([embed_expr_t(le_bytes)]),
+        TypedExpr::U64Be(be_bytes) => RustExpr::local("u64be").call_with([embed_expr_t(be_bytes)]),
+        TypedExpr::U64Le(le_bytes) => RustExpr::local("u64le").call_with([embed_expr_t(le_bytes)]),
+        TypedExpr::AsChar(codepoint) =>
+            RustExpr::scoped(["char"], "from_u32")
+                .call_with([embed_expr_t(codepoint)])
+                .call_method("unwrap"),
+        TypedExpr::SeqLength(seq) => embed_expr_t(seq).call_method("len"),
+        TypedExpr::SubSeq(_, seq, ix, len) => {
+            let start_expr = embed_expr_t(ix);
+            let bind_ix = RustStmt::assign("ix", start_expr);
+            let end_expr = RustExpr::infix(RustExpr::local("ix"), Operator::Add, embed_expr_t(len));
+            RustExpr::BlockScope(
+                vec![bind_ix],
+                Box::new(
+                    RustExpr::Slice(
+                        Box::new(embed_expr_t(seq)),
+                        Box::new(RustExpr::local("ix")),
+                        Box::new(end_expr)
+                    )
+                )
+            )
+        }
+        TypedExpr::FlatMap(_, f, seq) =>
+            embed_expr_t(seq)
+                .call_method("into_iter")
+                .call_method_with("flat_map", [embed_expr_t(f)])
+                .call_method("collect"),
+        TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) =>
+            embed_expr_t(seq)
+                .call_method("into_iter")
+                .call_method_with("fold", [embed_expr_t(acc_init), embed_expr_t(f)])
+                .call_method("collect"),
+        TypedExpr::Dup(_, n, expr) =>
+            RustExpr::scoped(["Vec"], "from_iter").call_with([
+                RustExpr::scoped(["std", "iter"], "repeat")
+                    .call_with([embed_expr_t(expr)])
+                    .call_method_with("take", [embed_expr_t(n)]),
+            ]),
+        TypedExpr::Inflate(..) => {
+            // FIXME - not clear what the proper thing to do here is
+            RustExpr::local("unimplemented!").call_with([
+                RustExpr::str_lit("embed_expr is not implemented for Expr::Inflate"),
+            ])
+        }
+        TypedExpr::Lambda(_, head, body) =>
+            RustExpr::Paren(
+                Box::new(RustExpr::Closure(head.clone(), None, Box::new(embed_expr_t(body))))
+            ),
         other => embed_expr(&other.clone().into()),
     }
 }
@@ -953,32 +1102,39 @@ fn embed_expr(expr: &Expr) -> RustExpr {
         Expr::TupleProj(expr_tup, ix) => embed_expr(expr_tup).nth(*ix),
         Expr::Record(_fields) => unreachable!("Record not bound in Variant"),
         Expr::RecordProj(expr_rec, fld) => embed_expr(expr_rec).field(fld.clone()),
-        Expr::Variant(vname, inner) => match inner.as_ref() {
-            Expr::Record(fields) => RustExpr::Struct(
-                RustEntity::Local(vname.clone()),
-                fields
-                    .iter()
-                    .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr(fval)))))
-                    .collect(),
-            ),
-            _ => RustExpr::local(vname.clone()).call_with([embed_expr(inner)]),
-        },
+        Expr::Variant(vname, inner) =>
+            match inner.as_ref() {
+                Expr::Record(fields) =>
+                    RustExpr::Struct(
+                        RustEntity::Local(vname.clone()),
+                        fields
+                            .iter()
+                            .map(|(fname, fval)| (fname.clone(), Some(Box::new(embed_expr(fval)))))
+                            .collect()
+                    ),
+                _ => RustExpr::local(vname.clone()).call_with([embed_expr(inner)]),
+            }
         Expr::Seq(elts) => {
             RustExpr::ArrayLit(elts.iter().map(embed_expr).collect()).call_method("to_vec")
         }
-        Expr::Match(scrutinee, cases) => RustExpr::Control(Box::new(RustControl::Match(
-            embed_expr(scrutinee),
-            cases
-                .iter()
-                .map(|(pat, rhs)| {
-                    (
-                        // FIXME - add actual type_hint when possible
-                        MatchCaseLHS::Pattern(embed_pattern(pat, None)),
-                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
+        Expr::Match(scrutinee, cases) =>
+            RustExpr::Control(
+                Box::new(
+                    RustControl::Match(
+                        embed_expr(scrutinee),
+                        cases
+                            .iter()
+                            .map(|(pat, rhs)| {
+                                (
+                                    // FIXME - add actual type_hint when possible
+                                    MatchCaseLHS::Pattern(embed_pattern(pat, None)),
+                                    vec![RustStmt::Return(ReturnKind::Implicit, embed_expr(rhs))],
+                                )
+                            })
+                            .collect()
                     )
-                })
-                .collect(),
-        ))),
+                )
+            ),
         // FIXME - we probably need to apply precedence rules similar to tree-output, which will require a lot of refactoring in AST
         Expr::Arith(Arith::BitAnd, lhs, rhs) => {
             RustExpr::infix(embed_expr(lhs), Operator::BitAnd, embed_expr(rhs))
@@ -1029,27 +1185,22 @@ fn embed_expr(expr: &Expr) -> RustExpr {
         Expr::AsU8(x) => {
             RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr(x)), PrimType::U8.into()))
         }
-        Expr::AsU16(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr(x)),
-            PrimType::U16.into(),
-        )),
-        Expr::AsU32(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr(x)),
-            PrimType::U32.into(),
-        )),
-        Expr::AsU64(x) => RustExpr::Operation(RustOp::AsCast(
-            Box::new(embed_expr(x)),
-            PrimType::U64.into(),
-        )),
+        Expr::AsU16(x) =>
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr(x)), PrimType::U16.into())),
+        Expr::AsU32(x) =>
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr(x)), PrimType::U32.into())),
+        Expr::AsU64(x) =>
+            RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr(x)), PrimType::U64.into())),
         Expr::U16Be(be_bytes) => RustExpr::local("u16be").call_with([embed_expr(be_bytes)]),
         Expr::U16Le(le_bytes) => RustExpr::local("u16le").call_with([embed_expr(le_bytes)]),
         Expr::U32Be(be_bytes) => RustExpr::local("u32be").call_with([embed_expr(be_bytes)]),
         Expr::U32Le(le_bytes) => RustExpr::local("u32le").call_with([embed_expr(le_bytes)]),
         Expr::U64Be(be_bytes) => RustExpr::local("u64be").call_with([embed_expr(be_bytes)]),
         Expr::U64Le(le_bytes) => RustExpr::local("u64le").call_with([embed_expr(le_bytes)]),
-        Expr::AsChar(codepoint) => RustExpr::scoped(["char"], "from_u32")
-            .call_with([embed_expr(codepoint)])
-            .call_method("unwrap"),
+        Expr::AsChar(codepoint) =>
+            RustExpr::scoped(["char"], "from_u32")
+                .call_with([embed_expr(codepoint)])
+                .call_method("unwrap"),
         Expr::SeqLength(seq) => embed_expr(seq).call_method("len"),
         Expr::SubSeq(seq, ix, len) => {
             let start_expr = embed_expr(ix);
@@ -1057,38 +1208,41 @@ fn embed_expr(expr: &Expr) -> RustExpr {
             let end_expr = RustExpr::infix(RustExpr::local("ix"), Operator::Add, embed_expr(len));
             RustExpr::BlockScope(
                 vec![bind_ix],
-                Box::new(RustExpr::Slice(
-                    Box::new(embed_expr(seq)),
-                    Box::new(RustExpr::local("ix")),
-                    Box::new(end_expr),
-                )),
+                Box::new(
+                    RustExpr::Slice(
+                        Box::new(embed_expr(seq)),
+                        Box::new(RustExpr::local("ix")),
+                        Box::new(end_expr)
+                    )
+                )
             )
         }
-        Expr::FlatMap(f, seq) => embed_expr(seq)
-            .call_method("into_iter")
-            .call_method_with("flat_map", [embed_expr(f)])
-            .call_method("collect"),
-        Expr::FlatMapAccum(f, acc_init, _acc_type, seq) => embed_expr(seq)
-            .call_method("into_iter")
-            .call_method_with("fold", [embed_expr(acc_init), embed_expr(f)])
-            .call_method("collect"),
-        Expr::Dup(n, expr) => RustExpr::scoped(["Vec"], "from_iter").call_with([RustExpr::scoped(
-            ["std", "iter"],
-            "repeat",
-        )
-        .call_with([embed_expr(expr)])
-        .call_method_with("take", [embed_expr(n)])]),
+        Expr::FlatMap(f, seq) =>
+            embed_expr(seq)
+                .call_method("into_iter")
+                .call_method_with("flat_map", [embed_expr(f)])
+                .call_method("collect"),
+        Expr::FlatMapAccum(f, acc_init, _acc_type, seq) =>
+            embed_expr(seq)
+                .call_method("into_iter")
+                .call_method_with("fold", [embed_expr(acc_init), embed_expr(f)])
+                .call_method("collect"),
+        Expr::Dup(n, expr) =>
+            RustExpr::scoped(["Vec"], "from_iter").call_with([
+                RustExpr::scoped(["std", "iter"], "repeat")
+                    .call_with([embed_expr(expr)])
+                    .call_method_with("take", [embed_expr(n)]),
+            ]),
         Expr::Inflate(_) => {
             // FIXME - not clear what the proper thing to do here is
-            RustExpr::local("unimplemented!").call_with([RustExpr::str_lit(
-                "embed_expr is not implemented for Expr::Inflate",
-            )])
+            RustExpr::local("unimplemented!").call_with([
+                RustExpr::str_lit("embed_expr is not implemented for Expr::Inflate"),
+            ])
         }
-        Expr::Lambda(head, body) => RustExpr::Paren(Box::new(RustExpr::Closure(
-            head.clone(),
-            None,
-            Box::new(embed_expr(body)),
-        ))),
+        Expr::Lambda(head, body) =>
+            RustExpr::Paren(
+                Box::new(RustExpr::Closure(head.clone(), None, Box::new(embed_expr(body))))
+            ),
     }
 }
 
@@ -1148,15 +1302,10 @@ macro_rules! impl_toast_caselogic {
 impl_toast_caselogic!(Expr, GTExpr);
 
 impl<ExprT> SimpleLogic<ExprT> {
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock
-    where
-        ExprT: Clone,
-    {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock where ExprT: Clone {
         match self {
-            SimpleLogic::Fail => (
-                vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
-                None,
-            ),
+            SimpleLogic::Fail =>
+                (vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)], None),
             SimpleLogic::ExpectEnd => {
                 let call = RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte");
                 let cond = call.call_method("is_none");
@@ -1164,11 +1313,11 @@ impl<ExprT> SimpleLogic<ExprT> {
                 let b_false = [RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)];
                 (
                     Vec::new(),
-                    Some(RustExpr::Control(Box::new(RustControl::If(
-                        cond,
-                        b_true.to_vec(),
-                        Some(b_false.to_vec()),
-                    )))),
+                    Some(
+                        RustExpr::Control(
+                            Box::new(RustControl::If(cond, b_true.to_vec(), Some(b_false.to_vec())))
+                        )
+                    ),
                 )
             }
             // FIXME - not sure what should be done with _args
@@ -1188,40 +1337,37 @@ impl<ExprT> SimpleLogic<ExprT> {
                     RustExpr::infix(
                         RustExpr::local("input").call_method("offset"),
                         Operator::Rem,
-                        RustExpr::num_lit(*n),
+                        RustExpr::num_lit(*n)
                     ),
                     Operator::Neq,
-                    RustExpr::num_lit(0usize),
+                    RustExpr::num_lit(0usize)
                 );
                 let body = {
                     let let_tmp = RustStmt::assign(
                         "_",
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("read_byte")
-                            .wrap_try(),
+                            .wrap_try()
                     );
                     vec![let_tmp]
                 };
-                (
-                    vec![RustStmt::Control(RustControl::While(cond, body))],
-                    Some(RustExpr::UNIT),
-                )
+                (vec![RustStmt::Control(RustControl::While(cond, body))], Some(RustExpr::UNIT))
             }
             SimpleLogic::ByteIn(bs) => {
                 let call = RustExpr::local(ctxt.input_varname.clone())
                     .call_method("read_byte")
                     .wrap_try();
                 let b_let = RustStmt::assign("b", call);
-                let (cond, always_true) =
-                    ByteCriterion::from(bs).as_predicate(RustExpr::local("b"));
+                let (cond, always_true) = ByteCriterion::from(bs).as_predicate(
+                    RustExpr::local("b")
+                );
                 let logic = if always_true {
                     RustExpr::local("b")
                 } else {
                     let b_true = vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::local("b"))];
-                    let b_false = vec![RustStmt::Return(
-                        ReturnKind::Keyword,
-                        RustExpr::local("None"),
-                    )];
+                    let b_false = vec![
+                        RustStmt::Return(ReturnKind::Keyword, RustExpr::local("None"))
+                    ];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
                 ([b_let].to_vec(), Some(logic))
@@ -1232,9 +1378,7 @@ impl<ExprT> SimpleLogic<ExprT> {
 }
 
 fn decoder_fn<ExprT>(ix: usize, t: &GenType, logic: CaseLogic<ExprT>) -> RustFn
-where
-    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
-    ExprT: Clone,
+    where CaseLogic<ExprT>: ToAst<AstElem = RustBlock>, ExprT: Clone
 {
     let name = Label::from(format!("Decoder{ix}"));
     let params = {
@@ -1257,7 +1401,7 @@ where
                     RustType::borrow_of(
                         None,
                         Mut::Mutable,
-                        RustType::verbatim("ParseCtxt", Some(params)),
+                        RustType::verbatim("ParseCtxt", Some(params))
                     )
                 };
                 (name, ty)
@@ -1273,10 +1417,9 @@ where
     let (stmts, ret) = logic.to_ast(ctxt);
     let body = stmts
         .into_iter()
-        .chain(std::iter::once(RustStmt::Return(
-            ReturnKind::Implicit,
-            RustExpr::some(ret.unwrap()),
-        )))
+        .chain(
+            std::iter::once(RustStmt::Return(ReturnKind::Implicit, RustExpr::some(ret.unwrap())))
+        )
         .collect();
     RustFn::new(name, Some(params), sig, body)
 }
@@ -1284,8 +1427,8 @@ where
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 enum ByteCriterion {
     Any,
-    MustBe(u8),         // singleton
-    OtherThan(u8),      // negated singleton
+    MustBe(u8), // singleton
+    OtherThan(u8), // negated singleton
     WithinSet(ByteSet), // use embed_byteset to bridge to RustExpr
 }
 
@@ -1319,14 +1462,10 @@ impl ByteCriterion {
     fn as_predicate(&self, arg: RustExpr) -> (RustExpr, bool) {
         match self {
             ByteCriterion::Any => (RustExpr::TRUE, true),
-            ByteCriterion::MustBe(byte) => (
-                RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))),
-                false,
-            ),
-            ByteCriterion::OtherThan(byte) => (
-                RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))),
-                false,
-            ),
+            ByteCriterion::MustBe(byte) =>
+                (RustExpr::Operation(RustOp::op_eq(arg, RustExpr::num_lit(*byte))), false),
+            ByteCriterion::OtherThan(byte) =>
+                (RustExpr::Operation(RustOp::op_neq(arg, RustExpr::num_lit(*byte))), false),
             ByteCriterion::WithinSet(bs) => {
                 (embed_byteset(bs).call_method_with("contains", [arg]), false)
             }
@@ -1338,18 +1477,20 @@ fn embed_byteset(bs: &ByteSet) -> RustExpr {
     if bs.is_full() {
         RustExpr::scoped(["ByteSet"], "full").call()
     } else if bs.len() == 1 {
-        let Some(elt) = bs.min_elem() else {
-            unreachable!("len == 1 but no min_elem")
-        };
+        let Some(elt) = bs.min_elem() else { unreachable!("len == 1 but no min_elem") };
         RustExpr::scoped(["ByteSet"], "singleton").call_with([RustExpr::num_lit(elt)])
     } else {
         let [q0, q1, q2, q3] = bs.to_bits();
-        RustExpr::scoped(["ByteSet"], "from_bits").call_with([RustExpr::ArrayLit(vec![
-            RustExpr::num_lit(q0 as usize),
-            RustExpr::num_lit(q1 as usize),
-            RustExpr::num_lit(q2 as usize),
-            RustExpr::num_lit(q3 as usize),
-        ])])
+        RustExpr::scoped(["ByteSet"], "from_bits").call_with([
+            RustExpr::ArrayLit(
+                vec![
+                    RustExpr::num_lit(q0 as usize),
+                    RustExpr::num_lit(q1 as usize),
+                    RustExpr::num_lit(q2 as usize),
+                    RustExpr::num_lit(q3 as usize)
+                ]
+            ),
+        ])
     }
 }
 
@@ -1380,18 +1521,13 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             if let Some(ix) = tree.accept {
                 return (Vec::new(), Some(RustExpr::num_lit(ix)));
             } else {
-                return (
-                    vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)],
-                    None,
-                );
+                return (vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)], None);
             }
         }
 
         let bind = RustStmt::assign(
             "b",
-            RustExpr::local(ctxt.input_varname.clone())
-                .call_method("read_byte")
-                .wrap_try(),
+            RustExpr::local(ctxt.input_varname.clone()).call_method("read_byte").wrap_try()
         );
 
         if tree.branches.len() == 1 {
@@ -1404,21 +1540,16 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 let b_true: Vec<RustStmt> = implicate_return(expand_matchtree(branch, ctxt));
                 let b_false = {
                     if let Some(ix) = tree.accept {
-                        vec![RustStmt::Return(
-                            ReturnKind::Implicit,
-                            RustExpr::num_lit(ix),
-                        )]
+                        vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::num_lit(ix))]
                     } else {
                         vec![RustStmt::Return(ReturnKind::Keyword, RustExpr::NONE)]
                     }
                 };
                 return (
                     vec![bind],
-                    Some(RustExpr::Control(Box::new(RustControl::If(
-                        guard,
-                        b_true,
-                        Some(b_false),
-                    )))),
+                    Some(
+                        RustExpr::Control(Box::new(RustControl::If(guard, b_true, Some(b_false))))
+                    ),
                 );
             }
         }
@@ -1432,9 +1563,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                     unreachable!("unconditional descent with more than one branch");
                 }
                 ByteCriterion::MustBe(b) => {
-                    let lhs = MatchCaseLHS::Pattern(RustPattern::PrimLiteral(
-                        RustPrimLit::Numeric(b as usize),
-                    ));
+                    let lhs = MatchCaseLHS::Pattern(
+                        RustPattern::PrimLiteral(RustPrimLit::Numeric(b as usize))
+                    );
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
                     cases.push((lhs, rhs));
                 }
@@ -1442,7 +1573,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                     let (guard, _) = crit.as_predicate(RustExpr::local("tmp"));
                     let lhs = MatchCaseLHS::WithGuard(
                         RustPattern::CatchAll(Some(Label::from("tmp"))),
-                        guard,
+                        guard
                     );
                     let rhs = implicate_return(expand_matchtree(branch, ctxt));
                     cases.push((lhs, rhs));
@@ -1455,9 +1586,9 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 
     let b_lookahead = RustStmt::assign(
         "lookahead",
-        RustExpr::BorrowMut(Box::new(
-            RustExpr::local(ctxt.input_varname.clone()).call_method("clone"),
-        )),
+        RustExpr::BorrowMut(
+            Box::new(RustExpr::local(ctxt.input_varname.clone()).call_method("clone"))
+        )
     );
     let ll_context = ProdCtxt {
         input_varname: &Label::from("lookahead"),
@@ -1487,7 +1618,7 @@ enum CaseLogic<ExprT = Expr> {
 enum RepeatLogic<ExprT> {
     ContinueOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and continues if it is matched
     BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and breaks if it is matched
-    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),    // repeats a specific numnber of times
+    ExactCount(RustExpr, Box<CaseLogic<ExprT>>), // repeats a specific numnber of times
     ConditionTerminal(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'terminal element' is satisfied
     ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'complete sequence' is satisfied
 }
@@ -1498,10 +1629,7 @@ trait ToAst {
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> Self::AstElem;
 }
 
-impl<ExprT> ToAst for RepeatLogic<ExprT>
-where
-    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
-{
+impl<ExprT> ToAst for RepeatLogic<ExprT> where CaseLogic<ExprT>: ToAst<AstElem = RustBlock> {
     type AstElem = RustBlock;
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
@@ -1511,34 +1639,38 @@ where
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let tree_index_expr: RustExpr = embed_matchtree(ctree, ctxt).into();
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
                         Operator::Eq,
-                        RustExpr::num_lit(0usize),
+                        RustExpr::num_lit(0usize)
                     );
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("next_elem"),
+                            ])
                         ),
-                    ]
-                    .to_vec();
+                    ].to_vec();
                     let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_continue, Some(b_stop));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![bind_ix, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1548,34 +1680,38 @@ where
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let tree_index_expr: RustExpr = embed_matchtree(btree, ctxt).into();
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
                         Operator::Eq,
-                        RustExpr::num_lit(0usize),
+                        RustExpr::num_lit(0usize)
                     );
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("next_elem")]),
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("next_elem"),
+                            ])
                         ),
-                    ]
-                    .to_vec();
+                    ].to_vec();
                     let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![bind_ix, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![bind_ix, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1585,21 +1721,23 @@ where
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 // N non-loop blocks rather than 1 block representing an N-iteration loop
-                let body = vec![RustStmt::Expr(
-                    RustExpr::local("accum").call_method_with("push", [elt_expr]),
-                )];
-                stmts.push(RustStmt::Control(RustControl::ForRange0(
-                    Label::from("_"),
-                    expr_n.clone(),
-                    body,
-                )));
+                let body = vec![
+                    RustStmt::Expr(RustExpr::local("accum").call_method_with("push", [elt_expr]))
+                ];
+                stmts.push(
+                    RustStmt::Control(
+                        RustControl::ForRange0(Label::from("_"), expr_n.clone(), body)
+                    )
+                );
 
                 (stmts, Some(RustExpr::local("accum")))
             }
@@ -1607,12 +1745,14 @@ where
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let cond = tpred
@@ -1621,22 +1761,26 @@ where
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("elem")))]);
                     let b_terminal = [
                         RustStmt::Expr(
-                            RustExpr::local("accum")
-                                .call_method_with("push", [RustExpr::local("elem")]),
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("elem"),
+                            ])
                         ),
                         RustStmt::Control(RustControl::Break),
-                    ]
-                    .to_vec();
-                    let b_else = [RustStmt::Expr(
-                        RustExpr::local("accum")
-                            .call_method_with("push", [RustExpr::local("elem")]),
-                    )]
-                    .to_vec();
+                    ].to_vec();
+                    let b_else = [
+                        RustStmt::Expr(
+                            RustExpr::local("accum").call_method_with("push", [
+                                RustExpr::local("elem"),
+                            ])
+                        ),
+                    ].to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, Some(b_else));
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![elt_bind, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![elt_bind, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1645,17 +1789,18 @@ where
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
-                    RustExpr::scoped(["Vec"], "new").call(),
-                ));
+                stmts.push(
+                    RustStmt::Let(
+                        Mut::Mutable,
+                        Label::from("accum"),
+                        None,
+                        RustExpr::scoped(["Vec"], "new").call()
+                    )
+                );
                 let ctrl = {
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let elt_push = RustStmt::Expr(
-                        RustExpr::local("accum")
-                            .call_method_with("push", [RustExpr::local("elem")]),
+                        RustExpr::local("accum").call_method_with("push", [RustExpr::local("elem")])
                     );
                     let cond = cpred
                         .clone()
@@ -1663,10 +1808,12 @@ where
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("accum")))]);
                     let b_terminal = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, None);
-                    RustStmt::Control(RustControl::While(
-                        RustExpr::TRUE,
-                        vec![elt_bind, elt_push, RustStmt::Control(escape_clause)],
-                    ))
+                    RustStmt::Control(
+                        RustControl::While(
+                            RustExpr::TRUE,
+                            vec![elt_bind, elt_push, RustStmt::Control(escape_clause)]
+                        )
+                    )
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
@@ -1688,18 +1835,12 @@ enum SequentialLogic<ExprT> {
     },
 }
 
-impl<ExprT> ToAst for SequentialLogic<ExprT>
-where
-    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
-{
+impl<ExprT> ToAst for SequentialLogic<ExprT> where CaseLogic<ExprT>: ToAst<AstElem = RustBlock> {
     type AstElem = RustBlock;
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            SequentialLogic::AccumTuple {
-                constructor,
-                elements,
-            } => {
+            SequentialLogic::AccumTuple { constructor, elements } => {
                 if elements.is_empty() {
                     return (Vec::new(), Some(RustExpr::UNIT));
                 }
@@ -1712,10 +1853,9 @@ where
                     names.push(varname.clone().into());
                     let (mut preamble, o_val) = elt_cl.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        body.push(RustStmt::assign(
-                            varname,
-                            RustExpr::BlockScope(preamble, Box::new(val)),
-                        ));
+                        body.push(
+                            RustStmt::assign(varname, RustExpr::BlockScope(preamble, Box::new(val)))
+                        );
                     } else {
                         // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of elt_cl)
                         body.append(&mut preamble);
@@ -1727,23 +1867,16 @@ where
                     (
                         body,
                         Some(
-                            RustExpr::local(con.clone())
-                                .call_with(names.into_iter().map(RustExpr::local)),
+                            RustExpr::local(con.clone()).call_with(
+                                names.into_iter().map(RustExpr::local)
+                            )
                         ),
                     )
                 } else {
-                    (
-                        body,
-                        Some(RustExpr::Tuple(
-                            names.into_iter().map(RustExpr::local).collect(),
-                        )),
-                    )
+                    (body, Some(RustExpr::Tuple(names.into_iter().map(RustExpr::local).collect())))
                 }
             }
-            SequentialLogic::AccumRecord {
-                constructor,
-                fields,
-            } => {
+            SequentialLogic::AccumRecord { constructor, fields } => {
                 if fields.is_empty() {
                     unreachable!(
                         "SequentialLogic::AccumRecord has no fields, which is not an expected case"
@@ -1758,10 +1891,9 @@ where
                     names.push(varname.clone());
                     let (mut preamble, o_val) = fld_cl.to_ast(ctxt);
                     if let Some(val) = o_val {
-                        body.push(RustStmt::assign(
-                            varname,
-                            RustExpr::BlockScope(preamble, Box::new(val)),
-                        ));
+                        body.push(
+                            RustStmt::assign(varname, RustExpr::BlockScope(preamble, Box::new(val)))
+                        );
                     } else {
                         // FIXME - the logic here may be incorrect (we reach this branch if there is an unconditional 'return None' in the expansion of fld_cl)
                         body.append(&mut preamble);
@@ -1770,10 +1902,15 @@ where
 
                 (
                     body,
-                    Some(RustExpr::Struct(
-                        constructor.clone().into(),
-                        names.into_iter().map(|l| (l, None)).collect(),
-                    )),
+                    Some(
+                        RustExpr::Struct(
+                            constructor.clone().into(),
+                            names
+                                .into_iter()
+                                .map(|l| (l, None))
+                                .collect()
+                        )
+                    ),
                 )
             }
         }
@@ -1787,10 +1924,7 @@ enum OtherLogic<ExprT> {
     ExprMatch(RustExpr, Vec<(MatchCaseLHS, CaseLogic<ExprT>)>),
 }
 
-impl<ExprT> ToAst for OtherLogic<ExprT>
-where
-    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
-{
+impl<ExprT> ToAst for OtherLogic<ExprT> where CaseLogic<ExprT>: ToAst<AstElem = RustBlock> {
     type AstElem = RustBlock;
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
@@ -1808,10 +1942,9 @@ where
                     ));
                 }
                 let bind = RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt));
-                let ret = RustExpr::Control(Box::new(RustControl::Match(
-                    RustExpr::local("tree_index"),
-                    branches,
-                )));
+                let ret = RustExpr::Control(
+                    Box::new(RustControl::Match(RustExpr::local("tree_index"), branches))
+                );
                 (vec![bind], Some(ret))
             }
             OtherLogic::ExprMatch(expr, cases) => {
@@ -1850,8 +1983,9 @@ impl<ExprT> ParallelLogic<ExprT> {
                 (
                     Vec::new(),
                     Some(
-                        RustExpr::local("unimplemented!")
-                            .call_with([RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)")]),
+                        RustExpr::local("unimplemented!").call_with([
+                            RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)"),
+                        ])
                     ),
                 )
             }
@@ -1879,10 +2013,7 @@ enum DerivedLogic<ExprT> {
     Let(Label, RustExpr, Box<CaseLogic<ExprT>>),
 }
 
-impl<ExprT> ToAst for DerivedLogic<ExprT>
-where
-    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
-{
+impl<ExprT> ToAst for DerivedLogic<ExprT> where CaseLogic<ExprT>: ToAst<AstElem = RustBlock> {
     type AstElem = RustBlock;
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
@@ -1892,24 +2023,19 @@ where
                 (
                     vec![assign_inner],
                     Some(
-                        RustExpr::local(Label::from(constr.clone()))
-                            .call_with([RustExpr::local("inner")]),
+                        RustExpr::local(Label::from(constr.clone())).call_with([
+                            RustExpr::local("inner"),
+                        ])
                     ),
                 )
             }
             DerivedLogic::UnitVariantOf(constr, inner) => {
                 let assign_inner = RustStmt::assign("_", RustExpr::from(inner.to_ast(ctxt)));
-                (
-                    vec![assign_inner],
-                    Some(RustExpr::local(Label::from(constr.clone()))),
-                )
+                (vec![assign_inner], Some(RustExpr::local(Label::from(constr.clone()))))
             }
             DerivedLogic::MapOf(f, inner) => {
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
-                (
-                    vec![assign_inner],
-                    Some(f.clone().call_with([RustExpr::local("inner")])),
-                )
+                (vec![assign_inner], Some(f.clone().call_with([RustExpr::local("inner")])))
             }
             DerivedLogic::Let(name, expr, inner) => {
                 let mut stmts = Vec::new();
@@ -1925,18 +2051,21 @@ where
 pub fn print_generated_code(module: &FormatModule, top_format: &Format) {
     let mut items = Vec::new();
 
-    let Generator { sourcemap, .. } = Generator::compile(module, top_format);
-    let mut tdefs = Vec::from_iter(sourcemap.adhoc_types.iter());
-    tdefs.sort_by_key(|((ix, _), _)| *ix);
-    for ((_, lab), tdef) in tdefs.into_iter() {
-        let it = RustItem::from_decl(RustDecl::TypeDef(lab.clone(), tdef.clone()));
+    let Generator { sourcemap, elaborator } = Generator::compile(module, top_format);
+    // let mut tdefs = Vec::from_iter(sourcemap.adhoc_types.iter());
+    // tdefs.sort_by_key(|((ix, _), _)| *ix);
+    //     for ((_, lab), tdef) in tdefs.into_iter() {
+    //         let it = RustItem::from_decl(RustDecl::TypeDef(lab.clone(), tdef.clone()));
+    //         items.push(it);
+    //     }
+    let tdefs = Vec::from_iter(elaborator.codegen.defined_types.iter());
+    for (ix, tdef) in tdefs.into_iter().enumerate() {
+        let it = RustItem::from_decl(RustDecl::TypeDef(IxLabel::from(ix).into(), tdef.clone()));
         items.push(it);
     }
 
     for decfn in sourcemap.decoder_skels.iter() {
-        items.push(RustItem::from_decl(RustDecl::Function(
-            decfn.to_ast(ProdCtxt::default()),
-        )));
+        items.push(RustItem::from_decl(RustDecl::Function(decfn.to_ast(ProdCtxt::default()))));
     }
 
     let mut content = RustProgram::from_iter(items);
@@ -1945,7 +2074,8 @@ pub fn print_generated_code(module: &FormatModule, top_format: &Format) {
         uses: RustImportItems::Wildcard,
     });
 
-    let extra = r#"
+    let extra =
+        r#"
 #[test]
 fn test_decoder_27() {
     // PNG signature
@@ -1983,7 +2113,8 @@ pub fn print_program(program: &Program) {
         uses: RustImportItems::Wildcard,
     });
 
-    let extra = r#"
+    let extra =
+        r#"
 #[test]
 fn test_decoder_27() {
     // PNG signature
@@ -2000,14 +2131,11 @@ fn test_decoder_27() {
 #[derive(Clone, Debug)]
 pub struct DecoderFn<ExprT>(IxLabel, CaseLogic<ExprT>, RustType);
 
-impl<ExprT> ToAst for DecoderFn<ExprT>
-where
-    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
-{
+impl<ExprT> ToAst for DecoderFn<ExprT> where CaseLogic<ExprT>: ToAst<AstElem = RustBlock> {
     type AstElem = RustFn;
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
-        let name = Label::from(format!("Decoder{}", Label::from(self.0)));
+        let name = Label::from(format!("Decoder{}", self.0.to_usize()));
         let params = {
             let mut tmp = DefParams::new();
             tmp.push_lifetime("'input");
@@ -2028,7 +2156,7 @@ where
                         RustType::borrow_of(
                             None,
                             Mut::Mutable,
-                            RustType::verbatim("ParseCtxt", Some(params)),
+                            RustType::verbatim("ParseCtxt", Some(params))
                         )
                     };
                     (name, ty)
@@ -2044,10 +2172,11 @@ where
         let (stmts, ret) = self.1.to_ast(ctxt);
         let body = stmts
             .into_iter()
-            .chain(std::iter::once(RustStmt::Return(
-                ReturnKind::Implicit,
-                RustExpr::some(ret.unwrap()),
-            )))
+            .chain(
+                std::iter::once(
+                    RustStmt::Return(ReturnKind::Implicit, RustExpr::some(ret.unwrap()))
+                )
+            )
             .collect();
         RustFn::new(name, Some(params), sig, body)
     }
@@ -2144,10 +2273,8 @@ impl<'a> Generator<'a> {
         let prog = GTCompiler::compile_program(module, &top).expect("failed to compile program");
         for (ix, (dec, t)) in prog.decoders.iter().enumerate() {
             match t {
-                GenType::Def((ix, label), def) => gen
-                    .sourcemap
-                    .adhoc_types
-                    .push(((*ix, label.clone()), def.clone())),
+                GenType::Def((ix, label), def) =>
+                    gen.sourcemap.adhoc_types.push(((*ix, label.clone()), def.clone())),
                 _ => (),
             }
             let dec_fn = {
@@ -2263,7 +2390,7 @@ impl<'a> Elaborator<'a> {
         &mut self,
         branches: &[Format],
         dyns: &TypedDynScope<'_>,
-        is_det: bool,
+        is_det: bool
     ) -> GTFormat {
         let index = self.get_and_increment_index();
         let gt = self.get_gt_from_index(index);
@@ -2477,11 +2604,9 @@ impl<'a> Elaborator<'a> {
             Format::Dynamic(lbl, dynf, inner) => {
                 let index = self.get_and_increment_index();
                 let t_dynf = self.elaborate_dynamic_format(dynf);
-                let newdyns = TypedDynScope::Binding(TypedDynBinding::new(
-                    dyns,
-                    lbl,
-                    Rc::new(t_dynf.clone()),
-                ));
+                let newdyns = TypedDynScope::Binding(
+                    TypedDynBinding::new(dyns, lbl, Rc::new(t_dynf.clone()))
+                );
                 let t_inner = self.elaborate_format(inner, &newdyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(t_inner))
@@ -2499,9 +2624,7 @@ impl<'a> Elaborator<'a> {
 
     fn get_gt_from_index(&mut self, index: usize) -> GenType {
         let uvar = UVar::new(index);
-        let Some(vt) = self.tc.reify(uvar.into()) else {
-            unreachable!("unable to reify {uvar}")
-        };
+        let Some(vt) = self.tc.reify(uvar.into()) else { unreachable!("unable to reify {uvar}") };
         self.codegen.lift_type(&vt)
     }
 
@@ -2526,8 +2649,12 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Tuple(gt, t_elts)
             }
+            Expr::TupleProj(e, ix) => {
+                let t_e = self.elaborate_expr(e);
+                let gt = self.get_gt_from_index(index);
+                GTExpr::TupleProj(gt, Box::new(t_e), *ix)
+            }
             Expr::Record(flds) => {
-                // FIXME - integrate a multiscope (new) at this layer
                 let mut t_flds = Vec::with_capacity(flds.len());
                 for (lbl, fld) in flds {
                     let t_fld = self.elaborate_expr(fld);
@@ -2548,16 +2675,36 @@ impl<'a> Elaborator<'a> {
                 }
                 GTExpr::Record(gt, t_flds)
             }
-            Expr::TupleProj(e, ix) => {
-                let t_e = self.elaborate_expr(e);
+            Expr::Seq(elts) => {
+                let mut t_elts = Vec::with_capacity(elts.len());
+                self.increment_index();
+                for elt in elts {
+                    let t_elt = self.elaborate_expr(elt);
+                    t_elts.push(t_elt);
+                }
                 let gt = self.get_gt_from_index(index);
-                GTExpr::TupleProj(gt, Box::new(t_e), *ix)
+                GTExpr::Seq(gt, t_elts)
             }
             Expr::RecordProj(e, fld) => {
                 let t_e = self.elaborate_expr(e);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::RecordProj(gt, Box::new(t_e), fld.clone())
             }
+            Expr::Match(head, branches) => {
+                let t_head = self.elaborate_expr(head);
+                let mut t_branches = Vec::with_capacity(branches.len());
+                for (pat, rhs) in branches {
+                    let t_pat = self.elaborate_pattern(pat);
+                    let t_rhs = self.elaborate_expr(rhs);
+                    t_branches.push((t_pat, t_rhs));
+                }
+                let gt = self.get_gt_from_index(index);
+                GTExpr::Match(gt, Box::new(t_head), t_branches)
+            }
+            Expr::Lambda(..) =>
+                unreachable!(
+                    "Cannot elaborate Expr::Lambda in neutral (i.e. not lambda-aware) context"
+                ),
             Expr::Variant(lbl, inner) => {
                 let t_inner = self.elaborate_expr(inner);
                 let gt = self.get_gt_from_index(index);
@@ -2575,29 +2722,6 @@ impl<'a> Elaborator<'a> {
                 }
                 GTExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
             }
-            Expr::Seq(elts) => {
-                let mut t_elts = Vec::with_capacity(elts.len());
-                for elt in elts {
-                    let t_elt = self.elaborate_expr(elt);
-                    t_elts.push(t_elt);
-                }
-                let gt = self.get_gt_from_index(index);
-                GTExpr::Seq(gt, t_elts)
-            }
-            Expr::Match(head, branches) => {
-                let t_head = self.elaborate_expr(head);
-                let mut t_branches = Vec::with_capacity(branches.len());
-                for (pat, rhs) in branches {
-                    let t_pat = self.elaborate_pattern(pat);
-                    let t_rhs = self.elaborate_expr(rhs);
-                    t_branches.push((t_pat, t_rhs));
-                }
-                let gt = self.get_gt_from_index(index);
-                GTExpr::Match(gt, Box::new(t_head), t_branches)
-            }
-            Expr::Lambda(..) => unreachable!(
-                "Cannot elaborate Expr::Lambda in neutral (i.e. not lambda-aware) context"
-            ),
             Expr::IntRel(rel, x, y) => {
                 let t_x = self.elaborate_expr(x);
                 let t_y = self.elaborate_expr(y);
@@ -2666,8 +2790,11 @@ impl<'a> Elaborator<'a> {
                 GTExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
             Expr::FlatMap(lambda, seq) => {
-                let t_seq = self.elaborate_expr(seq);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
+
+                let t_seq = self.elaborate_expr(seq);
+                self.increment_index();
+
                 let gt = self.get_gt_from_index(index);
                 GTExpr::FlatMap(gt, Box::new(t_lambda), Box::new(t_seq))
             }
@@ -2688,7 +2815,7 @@ impl<'a> Elaborator<'a> {
                     Box::new(t_lambda),
                     Box::new(t_acc),
                     _acc_vt.clone(),
-                    Box::new(t_seq),
+                    Box::new(t_seq)
                 )
             }
             Expr::Dup(count, x) => {
@@ -2763,7 +2890,7 @@ impl<'a> TypedDynBinding<'a> {
     fn new(
         parent: &'a TypedDynScope<'a>,
         label: &'a str,
-        t_dynf: Rc<TypedDynFormat<GenType>>,
+        t_dynf: Rc<TypedDynFormat<GenType>>
     ) -> Self {
         Self {
             parent,
@@ -2786,7 +2913,7 @@ impl<'a> TypedDynScope<'a> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::{typecheck::Ctxt, FormatRef};
+    use crate::{ typecheck::Ctxt, FormatRef };
 
     use super::*;
 
@@ -2814,11 +2941,13 @@ mod tests {
         assert_eq!(
             tv_pop,
             tc_pop,
-            "failed population check {} ({} TC vs {} TV) on {:?}",
+            "failed population check {} ({} TC vs {} TV)", // on {:?}\n{}\n{}",
             label.unwrap_or_default(),
             tc_pop,
-            tv_pop,
-            dec_f
+            tv_pop
+            // dec_f,
+            // serde_json::ser::to_string(&re_f).unwrap(),
+            // serde_json::ser::to_string(&f).unwrap()
         );
     }
 
@@ -2836,28 +2965,32 @@ mod tests {
             ("test.fail", Format::Fail),
             ("test.eoi", Format::EndOfInput),
             ("test.align64", Format::Align(64)),
-            ("test.any_byte", Format::Byte(ByteSet::full())),
+            ("test.any_byte", Format::Byte(ByteSet::full()))
         ];
         run_popcheck(&formats);
     }
 
     #[test]
     fn test_popcheck_record_simple() {
-        let f = Format::Record(vec![
-            ("any_byte".into(), Format::Byte(ByteSet::full())),
-            ("align64".into(), Format::Align(64)),
-            ("eoi".into(), Format::EndOfInput),
-        ]);
+        let f = Format::Record(
+            vec![
+                ("any_byte".into(), Format::Byte(ByteSet::full())),
+                ("align64".into(), Format::Align(64)),
+                ("eoi".into(), Format::EndOfInput)
+            ]
+        );
 
         run_popcheck(&[("record_simple", f)]);
     }
 
     #[test]
     fn test_popcheck_adt_simple() {
-        let f = Format::Union(vec![
-            Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full()))),
-            Format::Variant("none".into(), Box::new(Format::EMPTY)),
-        ]);
+        let f = Format::Union(
+            vec![
+                Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full()))),
+                Format::Variant("none".into(), Box::new(Format::EMPTY))
+            ]
+        );
 
         run_popcheck(&[("adt_simple", f)]);
     }
@@ -2930,8 +3063,18 @@ mod tests {
                 self.ascii_octal_digit.call()
             }
 
-            pub const ASCII_DECIMAL_DIGIT: [u8; 10] =
-                [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
+            pub const ASCII_DECIMAL_DIGIT: [u8; 10] = [
+                b'0',
+                b'1',
+                b'2',
+                b'3',
+                b'4',
+                b'5',
+                b'6',
+                b'7',
+                b'8',
+                b'9',
+            ];
 
             #[allow(dead_code)]
             pub fn ascii_decimal_digit(&self) -> Format {
@@ -2939,18 +3082,66 @@ mod tests {
             }
 
             pub const ASCII_HEX_LOWER: [u8; 16] = [
-                b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd',
-                b'e', b'f',
+                b'0',
+                b'1',
+                b'2',
+                b'3',
+                b'4',
+                b'5',
+                b'6',
+                b'7',
+                b'8',
+                b'9',
+                b'a',
+                b'b',
+                b'c',
+                b'd',
+                b'e',
+                b'f',
             ];
 
             pub const ASCII_HEX_UPPER: [u8; 16] = [
-                b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D',
-                b'E', b'F',
+                b'0',
+                b'1',
+                b'2',
+                b'3',
+                b'4',
+                b'5',
+                b'6',
+                b'7',
+                b'8',
+                b'9',
+                b'A',
+                b'B',
+                b'C',
+                b'D',
+                b'E',
+                b'F',
             ];
 
             pub const ASCII_HEX_ANY: [u8; 22] = [
-                b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D',
-                b'E', b'F', b'a', b'b', b'c', b'd', b'e', b'f',
+                b'0',
+                b'1',
+                b'2',
+                b'3',
+                b'4',
+                b'5',
+                b'6',
+                b'7',
+                b'8',
+                b'9',
+                b'A',
+                b'B',
+                b'C',
+                b'D',
+                b'E',
+                b'F',
+                b'a',
+                b'b',
+                b'c',
+                b'd',
+                b'e',
+                b'f',
             ];
 
             #[allow(dead_code)]
@@ -2974,34 +3165,28 @@ mod tests {
 
             let u16be = module.define_format(
                 "base.u16be",
-                map(
-                    tuple([u8.call(), u8.call()]),
-                    lambda("x", Expr::U16Be(Box::new(var("x")))),
-                ),
+                map(tuple([u8.call(), u8.call()]), lambda("x", Expr::U16Be(Box::new(var("x")))))
             );
 
             let u16le = module.define_format(
                 "base.u16le",
-                map(
-                    tuple([u8.call(), u8.call()]),
-                    lambda("x", Expr::U16Le(Box::new(var("x")))),
-                ),
+                map(tuple([u8.call(), u8.call()]), lambda("x", Expr::U16Le(Box::new(var("x")))))
             );
 
             let u32be = module.define_format(
                 "base.u32be",
                 map(
                     tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
-                    lambda("x", Expr::U32Be(Box::new(var("x")))),
-                ),
+                    lambda("x", Expr::U32Be(Box::new(var("x"))))
+                )
             );
 
             let u32le = module.define_format(
                 "base.u32le",
                 map(
                     tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
-                    lambda("x", Expr::U32Le(Box::new(var("x")))),
-                ),
+                    lambda("x", Expr::U32Le(Box::new(var("x"))))
+                )
             );
 
             let u64be = module.define_format(
@@ -3017,8 +3202,8 @@ mod tests {
                         u8.call(),
                         u8.call(),
                     ]),
-                    lambda("x", Expr::U64Be(Box::new(var("x")))),
-                ),
+                    lambda("x", Expr::U64Be(Box::new(var("x"))))
+                )
             );
 
             let u64le = module.define_format(
@@ -3034,8 +3219,8 @@ mod tests {
                         u8.call(),
                         u8.call(),
                     ]),
-                    lambda("x", Expr::U64Le(Box::new(var("x")))),
-                ),
+                    lambda("x", Expr::U64Le(Box::new(var("x"))))
+                )
             );
 
             let ascii_char = module.define_format("base.ascii-char", Format::Byte(ByteSet::full()));
@@ -3044,35 +3229,40 @@ mod tests {
             bs.insert(b'\t');
             bs.insert(b'\n');
             bs.insert(b'\r');
-            let ascii_char_strict =
-                module.define_format("base.ascii-char.strict", Format::Byte(bs));
+            let ascii_char_strict = module.define_format(
+                "base.ascii-char.strict",
+                Format::Byte(bs)
+            );
 
             let asciiz_string = module.define_format(
                 "base.asciiz-string",
-                record([("string", repeat(not_byte(0x00))), ("null", is_byte(0x00))]),
+                record([
+                    ("string", repeat(not_byte(0x00))),
+                    ("null", is_byte(0x00)),
+                ])
             );
 
             let ascii_octal_digit = module.define_format(
                 "base.ascii-char.octal",
-                Format::Byte(ByteSet::from(BaseModule::ASCII_OCTAL_DIGIT)),
+                Format::Byte(ByteSet::from(BaseModule::ASCII_OCTAL_DIGIT))
             );
 
             let ascii_decimal_digit = module.define_format(
                 "base.ascii-char.decimal",
-                Format::Byte(ByteSet::from(BaseModule::ASCII_DECIMAL_DIGIT)),
+                Format::Byte(ByteSet::from(BaseModule::ASCII_DECIMAL_DIGIT))
             );
 
             let ascii_hex_lower = module.define_format(
                 "base.ascii-char.hex.lower",
-                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_LOWER)),
+                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_LOWER))
             );
             let ascii_hex_upper = module.define_format(
                 "base.ascii-char.hex.upper",
-                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_UPPER)),
+                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_UPPER))
             );
             let ascii_hex_any = module.define_format(
                 "base.ascii-char.hex.any",
-                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_ANY)),
+                Format::Byte(ByteSet::from(BaseModule::ASCII_HEX_ANY))
             );
 
             BaseModule {
@@ -3112,7 +3302,7 @@ mod tests {
             if n > 1 {
                 bit_or(
                     shl_u8(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
-                    bits_value_u8(name, n - 1),
+                    bits_value_u8(name, n - 1)
                 )
             } else {
                 tuple_proj(var(name), 0)
@@ -3123,7 +3313,7 @@ mod tests {
             if n > 1 {
                 bit_or(
                     shl_u16(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
-                    bits_value_u16(name, n - 1),
+                    bits_value_u16(name, n - 1)
                 )
             } else {
                 as_u16(tuple_proj(var(name), 0))
@@ -3199,8 +3389,8 @@ mod tests {
                     (Pattern::U8(26), distance_record0(8193, base, 12)),
                     (Pattern::U8(27), distance_record0(12289, base, 12)),
                     (Pattern::U8(28), distance_record0(16385, base, 13)),
-                    (Pattern::U8(29), distance_record0(24577, base, 13)),
-                ],
+                    (Pattern::U8(29), distance_record0(24577, base, 13))
+                ]
             )
         }
 
@@ -3209,15 +3399,9 @@ mod tests {
                 ("length-extra-bits", bits8(extra_bits, base)),
                 (
                     "length",
-                    Format::Compute(add(
-                        Expr::U16(start as u16),
-                        as_u16(var("length-extra-bits")),
-                    )),
+                    Format::Compute(add(Expr::U16(start as u16), as_u16(var("length-extra-bits")))),
                 ),
-                (
-                    "distance-code",
-                    Format::Apply("distance-alphabet-format".into()),
-                ),
+                ("distance-code", Format::Apply("distance-alphabet-format".into())),
                 ("distance-record", distance_record(base)),
             ])
         }
@@ -3227,10 +3411,7 @@ mod tests {
                 ("length-extra-bits", bits8(extra_bits, base)),
                 (
                     "length",
-                    Format::Compute(add(
-                        Expr::U16(start as u16),
-                        as_u16(var("length-extra-bits")),
-                    )),
+                    Format::Compute(add(Expr::U16(start as u16), as_u16(var("length-extra-bits")))),
                 ),
                 ("distance-code", bits8(5, base)),
                 ("distance-record", distance_record(base)),
@@ -3242,17 +3423,26 @@ mod tests {
                 record_proj(var("x"), "extra"),
                 vec![(
                     Pattern::variant("some", Pattern::binding("rec")),
-                    Expr::Seq(vec![variant(
-                        "reference",
-                        Expr::Record(vec![
-                            ("length".into(), record_proj(var("rec"), "length")),
-                            (
-                                "distance".into(),
-                                record_proj(record_proj(var("rec"), "distance-record"), "distance"),
-                            ),
-                        ]),
-                    )]),
-                )],
+                    Expr::Seq(
+                        vec![
+                            variant(
+                                "reference",
+                                Expr::Record(
+                                    vec![
+                                        ("length".into(), record_proj(var("rec"), "length")),
+                                        (
+                                            "distance".into(),
+                                            record_proj(
+                                                record_proj(var("rec"), "distance-record"),
+                                                "distance"
+                                            ),
+                                        )
+                                    ]
+                                )
+                            )
+                        ]
+                    ),
+                )]
             )
         }
 
@@ -3291,837 +3481,839 @@ mod tests {
                     ("bytes", repeat_count(var("len"), bits8(8, base))),
                     (
                         "codes-values",
-                        Format::Compute(flat_map(
-                            lambda("x", Expr::Seq(vec![variant("literal", var("x"))])),
-                            var("bytes"),
-                        )),
+                        Format::Compute(
+                            flat_map(
+                                lambda("x", Expr::Seq(vec![variant("literal", var("x"))])),
+                                var("bytes")
+                            )
+                        ),
                     ),
                 ]),
             ));
 
-            // ret.push((
-            //     "deflate.fixed_huffman",
-            //     record([
-            //         (
-            //             "codes",
-            //             Format::Dynamic(
-            //                 "format".into(),
-            //                 DynFormat::Huffman(fixed_code_lengths(), None),
-            //                 Box::new(
-            //                     repeat_until_last(
-            //                         lambda(
-            //                             "x",
-            //                             expr_eq(
-            //                                 as_u16(record_proj(var("x"), "code")),
-            //                                 Expr::U16(256)
-            //                             )
-            //                         ),
-            //                         record([
-            //                             ("code", Format::Apply("format".into())),
-            //                             (
-            //                                 "extra",
-            //                                 match_variant(
-            //                                     var("code"),
-            //                                     vec![
-            //                                         (
-            //                                             Pattern::U16(257),
-            //                                             "some",
-            //                                             length_record_fixed(3, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(258),
-            //                                             "some",
-            //                                             length_record_fixed(4, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(259),
-            //                                             "some",
-            //                                             length_record_fixed(5, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(260),
-            //                                             "some",
-            //                                             length_record_fixed(6, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(261),
-            //                                             "some",
-            //                                             length_record_fixed(7, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(262),
-            //                                             "some",
-            //                                             length_record_fixed(8, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(263),
-            //                                             "some",
-            //                                             length_record_fixed(9, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(264),
-            //                                             "some",
-            //                                             length_record_fixed(10, base, 0),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(265),
-            //                                             "some",
-            //                                             length_record_fixed(11, base, 1),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(266),
-            //                                             "some",
-            //                                             length_record_fixed(13, base, 1),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(267),
-            //                                             "some",
-            //                                             length_record_fixed(15, base, 1),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(268),
-            //                                             "some",
-            //                                             length_record_fixed(17, base, 1),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(269),
-            //                                             "some",
-            //                                             length_record_fixed(19, base, 2),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(270),
-            //                                             "some",
-            //                                             length_record_fixed(23, base, 2),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(271),
-            //                                             "some",
-            //                                             length_record_fixed(27, base, 2),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(272),
-            //                                             "some",
-            //                                             length_record_fixed(31, base, 2),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(273),
-            //                                             "some",
-            //                                             length_record_fixed(35, base, 3),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(274),
-            //                                             "some",
-            //                                             length_record_fixed(43, base, 3),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(275),
-            //                                             "some",
-            //                                             length_record_fixed(51, base, 3),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(276),
-            //                                             "some",
-            //                                             length_record_fixed(59, base, 3),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(277),
-            //                                             "some",
-            //                                             length_record_fixed(67, base, 4),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(278),
-            //                                             "some",
-            //                                             length_record_fixed(83, base, 4),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(279),
-            //                                             "some",
-            //                                             length_record_fixed(99, base, 4),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(280),
-            //                                             "some",
-            //                                             length_record_fixed(115, base, 4),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(281),
-            //                                             "some",
-            //                                             length_record_fixed(131, base, 5),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(282),
-            //                                             "some",
-            //                                             length_record_fixed(163, base, 5),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(283),
-            //                                             "some",
-            //                                             length_record_fixed(195, base, 5),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(284),
-            //                                             "some",
-            //                                             length_record_fixed(227, base, 5),
-            //                                         ),
-            //                                         (
-            //                                             Pattern::U16(285),
-            //                                             "some",
-            //                                             length_record_fixed(258, base, 0),
-            //                                         ),
-            //                                         (Pattern::Wildcard, "none", Format::EMPTY)
-            //                                     ]
-            //                                 ),
-            //                             ),
-            //                         ])
-            //                     )
-            //                 )
-            //             ),
-            //         ),
-            //         (
-            //             "codes-values",
-            //             Format::Compute(
-            //                 flat_map(
-            //                     lambda(
-            //                         "x",
-            //                         expr_match(
-            //                             record_proj(var("x"), "code"),
-            //                             vec![
-            //                                 (Pattern::U16(256), Expr::Seq(vec![])),
-            //                                 (Pattern::U16(257), reference_record()),
-            //                                 (Pattern::U16(258), reference_record()),
-            //                                 (Pattern::U16(259), reference_record()),
-            //                                 (Pattern::U16(260), reference_record()),
-            //                                 (Pattern::U16(261), reference_record()),
-            //                                 (Pattern::U16(262), reference_record()),
-            //                                 (Pattern::U16(263), reference_record()),
-            //                                 (Pattern::U16(264), reference_record()),
-            //                                 (Pattern::U16(265), reference_record()),
-            //                                 (Pattern::U16(266), reference_record()),
-            //                                 (Pattern::U16(267), reference_record()),
-            //                                 (Pattern::U16(268), reference_record()),
-            //                                 (Pattern::U16(269), reference_record()),
-            //                                 (Pattern::U16(270), reference_record()),
-            //                                 (Pattern::U16(271), reference_record()),
-            //                                 (Pattern::U16(272), reference_record()),
-            //                                 (Pattern::U16(273), reference_record()),
-            //                                 (Pattern::U16(274), reference_record()),
-            //                                 (Pattern::U16(275), reference_record()),
-            //                                 (Pattern::U16(276), reference_record()),
-            //                                 (Pattern::U16(277), reference_record()),
-            //                                 (Pattern::U16(278), reference_record()),
-            //                                 (Pattern::U16(279), reference_record()),
-            //                                 (Pattern::U16(280), reference_record()),
-            //                                 (Pattern::U16(281), reference_record()),
-            //                                 (Pattern::U16(282), reference_record()),
-            //                                 (Pattern::U16(283), reference_record()),
-            //                                 (Pattern::U16(284), reference_record()),
-            //                                 (Pattern::U16(285), reference_record()),
-            //                                 (
-            //                                     Pattern::Wildcard,
-            //                                     Expr::Seq(
-            //                                         vec![
-            //                                             variant(
-            //                                                 "literal",
-            //                                                 as_u8(record_proj(var("x"), "code"))
-            //                                             )
-            //                                         ]
-            //                                     ),
-            //                                 )
-            //                             ]
-            //                         )
-            //                     ),
-            //                     var("codes")
-            //                 )
-            //             ),
-            //         ),
-            //     ])
-            // ));
+            ret.push((
+                "deflate.fixed_huffman",
+                record([
+                    (
+                        "codes",
+                        Format::Dynamic(
+                            "format".into(),
+                            DynFormat::Huffman(fixed_code_lengths(), None),
+                            Box::new(
+                                repeat_until_last(
+                                    lambda(
+                                        "x",
+                                        expr_eq(
+                                            as_u16(record_proj(var("x"), "code")),
+                                            Expr::U16(256)
+                                        )
+                                    ),
+                                    record([
+                                        ("code", Format::Apply("format".into())),
+                                        (
+                                            "extra",
+                                            match_variant(
+                                                var("code"),
+                                                vec![
+                                                    (
+                                                        Pattern::U16(257),
+                                                        "some",
+                                                        length_record_fixed(3, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(258),
+                                                        "some",
+                                                        length_record_fixed(4, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(259),
+                                                        "some",
+                                                        length_record_fixed(5, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(260),
+                                                        "some",
+                                                        length_record_fixed(6, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(261),
+                                                        "some",
+                                                        length_record_fixed(7, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(262),
+                                                        "some",
+                                                        length_record_fixed(8, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(263),
+                                                        "some",
+                                                        length_record_fixed(9, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(264),
+                                                        "some",
+                                                        length_record_fixed(10, base, 0),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(265),
+                                                        "some",
+                                                        length_record_fixed(11, base, 1),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(266),
+                                                        "some",
+                                                        length_record_fixed(13, base, 1),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(267),
+                                                        "some",
+                                                        length_record_fixed(15, base, 1),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(268),
+                                                        "some",
+                                                        length_record_fixed(17, base, 1),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(269),
+                                                        "some",
+                                                        length_record_fixed(19, base, 2),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(270),
+                                                        "some",
+                                                        length_record_fixed(23, base, 2),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(271),
+                                                        "some",
+                                                        length_record_fixed(27, base, 2),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(272),
+                                                        "some",
+                                                        length_record_fixed(31, base, 2),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(273),
+                                                        "some",
+                                                        length_record_fixed(35, base, 3),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(274),
+                                                        "some",
+                                                        length_record_fixed(43, base, 3),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(275),
+                                                        "some",
+                                                        length_record_fixed(51, base, 3),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(276),
+                                                        "some",
+                                                        length_record_fixed(59, base, 3),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(277),
+                                                        "some",
+                                                        length_record_fixed(67, base, 4),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(278),
+                                                        "some",
+                                                        length_record_fixed(83, base, 4),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(279),
+                                                        "some",
+                                                        length_record_fixed(99, base, 4),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(280),
+                                                        "some",
+                                                        length_record_fixed(115, base, 4),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(281),
+                                                        "some",
+                                                        length_record_fixed(131, base, 5),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(282),
+                                                        "some",
+                                                        length_record_fixed(163, base, 5),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(283),
+                                                        "some",
+                                                        length_record_fixed(195, base, 5),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(284),
+                                                        "some",
+                                                        length_record_fixed(227, base, 5),
+                                                    ),
+                                                    (
+                                                        Pattern::U16(285),
+                                                        "some",
+                                                        length_record_fixed(258, base, 0),
+                                                    ),
+                                                    (Pattern::Wildcard, "none", Format::EMPTY)
+                                                ]
+                                            ),
+                                        ),
+                                    ])
+                                )
+                            )
+                        ),
+                    ),
+                    (
+                        "codes-values",
+                        Format::Compute(
+                            flat_map(
+                                lambda(
+                                    "x",
+                                    expr_match(
+                                        record_proj(var("x"), "code"),
+                                        vec![
+                                            (Pattern::U16(256), Expr::Seq(vec![])),
+                                            (Pattern::U16(257), reference_record()),
+                                            (Pattern::U16(258), reference_record()),
+                                            (Pattern::U16(259), reference_record()),
+                                            (Pattern::U16(260), reference_record()),
+                                            (Pattern::U16(261), reference_record()),
+                                            (Pattern::U16(262), reference_record()),
+                                            (Pattern::U16(263), reference_record()),
+                                            (Pattern::U16(264), reference_record()),
+                                            (Pattern::U16(265), reference_record()),
+                                            (Pattern::U16(266), reference_record()),
+                                            (Pattern::U16(267), reference_record()),
+                                            (Pattern::U16(268), reference_record()),
+                                            (Pattern::U16(269), reference_record()),
+                                            (Pattern::U16(270), reference_record()),
+                                            (Pattern::U16(271), reference_record()),
+                                            (Pattern::U16(272), reference_record()),
+                                            (Pattern::U16(273), reference_record()),
+                                            (Pattern::U16(274), reference_record()),
+                                            (Pattern::U16(275), reference_record()),
+                                            (Pattern::U16(276), reference_record()),
+                                            (Pattern::U16(277), reference_record()),
+                                            (Pattern::U16(278), reference_record()),
+                                            (Pattern::U16(279), reference_record()),
+                                            (Pattern::U16(280), reference_record()),
+                                            (Pattern::U16(281), reference_record()),
+                                            (Pattern::U16(282), reference_record()),
+                                            (Pattern::U16(283), reference_record()),
+                                            (Pattern::U16(284), reference_record()),
+                                            (Pattern::U16(285), reference_record()),
+                                            (
+                                                Pattern::Wildcard,
+                                                Expr::Seq(
+                                                    vec![
+                                                        variant(
+                                                            "literal",
+                                                            as_u8(record_proj(var("x"), "code"))
+                                                        )
+                                                    ]
+                                                ),
+                                            )
+                                        ]
+                                    )
+                                ),
+                                var("codes")
+                            )
+                        ),
+                    ),
+                ]),
+            ));
 
-            // ret.push((
-            //     "deflate.dynamic_huffman",
-            //     record([
-            //         ("hlit", bits5.clone()),
-            //         ("hdist", bits5.clone()),
-            //         ("hclen", bits4.clone()),
-            //         (
-            //             "code-length-alphabet-code-lengths",
-            //             repeat_count(add(var("hclen"), Expr::U8(4)), bits3.clone()),
-            //         ),
-            //         (
-            //             "literal-length-distance-alphabet-code-lengths",
-            //             Format::Dynamic(
-            //                 "code-length-alphabet-format".into(),
-            //                 DynFormat::Huffman(
-            //                     var("code-length-alphabet-code-lengths"),
-            //                     Some(
-            //                         Expr::Seq(
-            //                             vec![
-            //                                 Expr::U8(16),
-            //                                 Expr::U8(17),
-            //                                 Expr::U8(18),
-            //                                 Expr::U8(0),
-            //                                 Expr::U8(8),
-            //                                 Expr::U8(7),
-            //                                 Expr::U8(9),
-            //                                 Expr::U8(6),
-            //                                 Expr::U8(10),
-            //                                 Expr::U8(5),
-            //                                 Expr::U8(11),
-            //                                 Expr::U8(4),
-            //                                 Expr::U8(12),
-            //                                 Expr::U8(3),
-            //                                 Expr::U8(13),
-            //                                 Expr::U8(2),
-            //                                 Expr::U8(14),
-            //                                 Expr::U8(1),
-            //                                 Expr::U8(15)
-            //                             ]
-            //                         )
-            //                     )
-            //                 ),
-            //                 Box::new(
-            //                     repeat_until_seq(
-            //                         lambda(
-            //                             "y",
-            //                             expr_gte(
-            //                                 seq_length(
-            //                                     flat_map_accum(
-            //                                         lambda(
-            //                                             "x",
-            //                                             expr_match(
-            //                                                 as_u8(
-            //                                                     record_proj(
-            //                                                         tuple_proj(var("x"), 1),
-            //                                                         "code"
-            //                                                     )
-            //                                                 ),
-            //                                                 vec![
-            //                                                     (
-            //                                                         Pattern::U8(16),
-            //                                                         Expr::Tuple(
-            //                                                             vec![
-            //                                                                 tuple_proj(var("x"), 0),
-            //                                                                 dup(
-            //                                                                     as_u32(
-            //                                                                         add(
-            //                                                                             record_proj(
-            //                                                                                 tuple_proj(
-            //                                                                                     var(
-            //                                                                                         "x"
-            //                                                                                     ),
-            //                                                                                     1
-            //                                                                                 ),
-            //                                                                                 "extra"
-            //                                                                             ),
-            //                                                                             Expr::U8(3)
-            //                                                                         )
-            //                                                                     ),
-            //                                                                     expr_match(
-            //                                                                         tuple_proj(
-            //                                                                             var("x"),
-            //                                                                             0
-            //                                                                         ),
-            //                                                                         vec![(
-            //                                                                             Pattern::variant(
-            //                                                                                 "some",
-            //                                                                                 Pattern::binding(
-            //                                                                                     "y"
-            //                                                                                 )
-            //                                                                             ),
-            //                                                                             var("y"),
-            //                                                                         )]
-            //                                                                     )
-            //                                                                 )
-            //                                                             ]
-            //                                                         ),
-            //                                                     ),
-            //                                                     (
-            //                                                         Pattern::U8(17),
-            //                                                         Expr::Tuple(
-            //                                                             vec![
-            //                                                                 tuple_proj(var("x"), 0),
-            //                                                                 dup(
-            //                                                                     as_u32(
-            //                                                                         add(
-            //                                                                             record_proj(
-            //                                                                                 tuple_proj(
-            //                                                                                     var(
-            //                                                                                         "x"
-            //                                                                                     ),
-            //                                                                                     1
-            //                                                                                 ),
-            //                                                                                 "extra"
-            //                                                                             ),
-            //                                                                             Expr::U8(3)
-            //                                                                         )
-            //                                                                     ),
-            //                                                                     Expr::U8(0)
-            //                                                                 )
-            //                                                             ]
-            //                                                         ),
-            //                                                     ),
-            //                                                     (
-            //                                                         Pattern::U8(18),
-            //                                                         Expr::Tuple(
-            //                                                             vec![
-            //                                                                 tuple_proj(var("x"), 0),
-            //                                                                 dup(
-            //                                                                     as_u32(
-            //                                                                         add(
-            //                                                                             record_proj(
-            //                                                                                 tuple_proj(
-            //                                                                                     var(
-            //                                                                                         "x"
-            //                                                                                     ),
-            //                                                                                     1
-            //                                                                                 ),
-            //                                                                                 "extra"
-            //                                                                             ),
-            //                                                                             Expr::U8(11)
-            //                                                                         )
-            //                                                                     ),
-            //                                                                     Expr::U8(0)
-            //                                                                 )
-            //                                                             ]
-            //                                                         ),
-            //                                                     ),
-            //                                                     (
-            //                                                         Pattern::binding("v"),
-            //                                                         Expr::Tuple(
-            //                                                             vec![
-            //                                                                 variant(
-            //                                                                     "some",
-            //                                                                     var("v")
-            //                                                                 ),
-            //                                                                 Expr::Seq(
-            //                                                                     vec![var("v")]
-            //                                                                 )
-            //                                                             ]
-            //                                                         ),
-            //                                                     )
-            //                                                 ]
-            //                                             )
-            //                                         ),
-            //                                         variant("none", Expr::UNIT),
-            //                                         ValueType::Union(
-            //                                             BTreeMap::from([
-            //                                                 (
-            //                                                     "none".into(),
-            //                                                     ValueType::Tuple(vec![]),
-            //                                                 ),
-            //                                                 (
-            //                                                     "some".into(),
-            //                                                     ValueType::Base(BaseType::U8),
-            //                                                 ),
-            //                                             ])
-            //                                         ),
-            //                                         var("y")
-            //                                     )
-            //                                 ),
-            //                                 add(
-            //                                     as_u32(add(var("hlit"), var("hdist"))),
-            //                                     Expr::U32(258)
-            //                                 )
-            //                             )
-            //                         ),
-            //                         record([
-            //                             (
-            //                                 "code",
-            //                                 Format::Apply("code-length-alphabet-format".into()),
-            //                             ),
-            //                             (
-            //                                 "extra",
-            //                                 Format::Match(
-            //                                     as_u8(var("code")),
-            //                                     vec![
-            //                                         (Pattern::U8(16), bits2.clone()),
-            //                                         (Pattern::U8(17), bits3.clone()),
-            //                                         (Pattern::U8(18), bits7.clone()),
-            //                                         (
-            //                                             Pattern::Wildcard,
-            //                                             Format::Compute(Expr::U8(0)),
-            //                                         )
-            //                                     ]
-            //                                 ),
-            //                             ),
-            //                         ])
-            //                     )
-            //                 )
-            //             ),
-            //         ),
-            //         (
-            //             "literal-length-distance-alphabet-code-lengths-value",
-            //             Format::Compute(
-            //                 flat_map_accum(
-            //                     lambda(
-            //                         "x",
-            //                         expr_match(
-            //                             as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
-            //                             vec![
-            //                                 (
-            //                                     Pattern::U8(16),
-            //                                     Expr::Tuple(
-            //                                         vec![
-            //                                             tuple_proj(var("x"), 0),
-            //                                             dup(
-            //                                                 as_u32(
-            //                                                     add(
-            //                                                         record_proj(
-            //                                                             tuple_proj(var("x"), 1),
-            //                                                             "extra"
-            //                                                         ),
-            //                                                         Expr::U8(3)
-            //                                                     )
-            //                                                 ),
-            //                                                 expr_match(
-            //                                                     tuple_proj(var("x"), 0),
-            //                                                     vec![(
-            //                                                         Pattern::variant(
-            //                                                             "some",
-            //                                                             Pattern::binding("y")
-            //                                                         ),
-            //                                                         var("y"),
-            //                                                     )]
-            //                                                 )
-            //                                             )
-            //                                         ]
-            //                                     ),
-            //                                 ),
-            //                                 (
-            //                                     Pattern::U8(17),
-            //                                     Expr::Tuple(
-            //                                         vec![
-            //                                             tuple_proj(var("x"), 0),
-            //                                             dup(
-            //                                                 as_u32(
-            //                                                     add(
-            //                                                         record_proj(
-            //                                                             tuple_proj(var("x"), 1),
-            //                                                             "extra"
-            //                                                         ),
-            //                                                         Expr::U8(3)
-            //                                                     )
-            //                                                 ),
-            //                                                 Expr::U8(0)
-            //                                             )
-            //                                         ]
-            //                                     ),
-            //                                 ),
-            //                                 (
-            //                                     Pattern::U8(18),
-            //                                     Expr::Tuple(
-            //                                         vec![
-            //                                             tuple_proj(var("x"), 0),
-            //                                             dup(
-            //                                                 as_u32(
-            //                                                     add(
-            //                                                         record_proj(
-            //                                                             tuple_proj(var("x"), 1),
-            //                                                             "extra"
-            //                                                         ),
-            //                                                         Expr::U8(11)
-            //                                                     )
-            //                                                 ),
-            //                                                 Expr::U8(0)
-            //                                             )
-            //                                         ]
-            //                                     ),
-            //                                 ),
-            //                                 (
-            //                                     Pattern::binding("v"),
-            //                                     Expr::Tuple(
-            //                                         vec![
-            //                                             variant("some", var("v")),
-            //                                             Expr::Seq(vec![var("v")])
-            //                                         ]
-            //                                     ),
-            //                                 )
-            //                             ]
-            //                         )
-            //                     ),
-            //                     variant("none", Expr::UNIT),
-            //                     ValueType::Union(
-            //                         BTreeMap::from([
-            //                             ("none".into(), ValueType::Tuple(vec![])),
-            //                             ("some".into(), ValueType::Base(BaseType::U8)),
-            //                         ])
-            //                     ),
-            //                     var("literal-length-distance-alphabet-code-lengths")
-            //                 )
-            //             ),
-            //         ),
-            //         (
-            //             "literal-length-alphabet-code-lengths-value",
-            //             Format::Compute(
-            //                 sub_seq(
-            //                     var("literal-length-distance-alphabet-code-lengths-value"),
-            //                     Expr::U32(0),
-            //                     add(as_u32(var("hlit")), Expr::U32(257))
-            //                 )
-            //             ),
-            //         ),
-            //         (
-            //             "distance-alphabet-code-lengths-value",
-            //             Format::Compute(
-            //                 sub_seq(
-            //                     var("literal-length-distance-alphabet-code-lengths-value"),
-            //                     add(as_u32(var("hlit")), Expr::U32(257)),
-            //                     add(as_u32(var("hdist")), Expr::U32(1))
-            //                 )
-            //             ),
-            //         ),
-            //         (
-            //             "codes",
-            //             Format::Dynamic(
-            //                 "distance-alphabet-format".into(),
-            //                 DynFormat::Huffman(var("distance-alphabet-code-lengths-value"), None),
-            //                 Box::new(
-            //                     Format::Dynamic(
-            //                         "literal-length-alphabet-format".into(),
-            //                         DynFormat::Huffman(
-            //                             var("literal-length-alphabet-code-lengths-value"),
-            //                             None
-            //                         ),
-            //                         Box::new(
-            //                             repeat_until_last(
-            //                                 lambda(
-            //                                     "x",
-            //                                     expr_eq(
-            //                                         as_u16(record_proj(var("x"), "code")),
-            //                                         Expr::U16(256)
-            //                                     )
-            //                                 ),
-            //                                 record([
-            //                                     (
-            //                                         "code",
-            //                                         Format::Apply(
-            //                                             "literal-length-alphabet-format".into()
-            //                                         ),
-            //                                     ),
-            //                                     (
-            //                                         "extra",
-            //                                         match_variant(
-            //                                             var("code"),
-            //                                             vec![
-            //                                                 (
-            //                                                     Pattern::U16(257),
-            //                                                     "some",
-            //                                                     length_record(3, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(258),
-            //                                                     "some",
-            //                                                     length_record(4, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(259),
-            //                                                     "some",
-            //                                                     length_record(5, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(260),
-            //                                                     "some",
-            //                                                     length_record(6, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(261),
-            //                                                     "some",
-            //                                                     length_record(7, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(262),
-            //                                                     "some",
-            //                                                     length_record(8, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(263),
-            //                                                     "some",
-            //                                                     length_record(9, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(264),
-            //                                                     "some",
-            //                                                     length_record(10, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(265),
-            //                                                     "some",
-            //                                                     length_record(11, base, 1),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(266),
-            //                                                     "some",
-            //                                                     length_record(13, base, 1),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(267),
-            //                                                     "some",
-            //                                                     length_record(15, base, 1),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(268),
-            //                                                     "some",
-            //                                                     length_record(17, base, 1),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(269),
-            //                                                     "some",
-            //                                                     length_record(19, base, 2),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(270),
-            //                                                     "some",
-            //                                                     length_record(23, base, 2),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(271),
-            //                                                     "some",
-            //                                                     length_record(27, base, 2),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(272),
-            //                                                     "some",
-            //                                                     length_record(31, base, 2),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(273),
-            //                                                     "some",
-            //                                                     length_record(35, base, 3),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(274),
-            //                                                     "some",
-            //                                                     length_record(43, base, 3),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(275),
-            //                                                     "some",
-            //                                                     length_record(51, base, 3),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(276),
-            //                                                     "some",
-            //                                                     length_record(59, base, 3),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(277),
-            //                                                     "some",
-            //                                                     length_record(67, base, 4),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(278),
-            //                                                     "some",
-            //                                                     length_record(83, base, 4),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(279),
-            //                                                     "some",
-            //                                                     length_record(99, base, 4),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(280),
-            //                                                     "some",
-            //                                                     length_record(115, base, 4),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(281),
-            //                                                     "some",
-            //                                                     length_record(131, base, 5),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(282),
-            //                                                     "some",
-            //                                                     length_record(163, base, 5),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(283),
-            //                                                     "some",
-            //                                                     length_record(195, base, 5),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(284),
-            //                                                     "some",
-            //                                                     length_record(227, base, 5),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::U16(285),
-            //                                                     "some",
-            //                                                     length_record(258, base, 0),
-            //                                                 ),
-            //                                                 (
-            //                                                     Pattern::Wildcard,
-            //                                                     "none",
-            //                                                     Format::EMPTY,
-            //                                                 )
-            //                                             ]
-            //                                         ),
-            //                                     ),
-            //                                 ])
-            //                             )
-            //                         )
-            //                     )
-            //                 )
-            //             ),
-            //         ),
-            //         (
-            //             "codes-values",
-            //             Format::Compute(
-            //                 flat_map(
-            //                     lambda(
-            //                         "x",
-            //                         expr_match(
-            //                             record_proj(var("x"), "code"),
-            //                             vec![
-            //                                 (Pattern::U16(256), Expr::Seq(vec![])),
-            //                                 (Pattern::U16(257), reference_record()),
-            //                                 (Pattern::U16(258), reference_record()),
-            //                                 (Pattern::U16(259), reference_record()),
-            //                                 (Pattern::U16(260), reference_record()),
-            //                                 (Pattern::U16(261), reference_record()),
-            //                                 (Pattern::U16(262), reference_record()),
-            //                                 (Pattern::U16(263), reference_record()),
-            //                                 (Pattern::U16(264), reference_record()),
-            //                                 (Pattern::U16(265), reference_record()),
-            //                                 (Pattern::U16(266), reference_record()),
-            //                                 (Pattern::U16(267), reference_record()),
-            //                                 (Pattern::U16(268), reference_record()),
-            //                                 (Pattern::U16(269), reference_record()),
-            //                                 (Pattern::U16(270), reference_record()),
-            //                                 (Pattern::U16(271), reference_record()),
-            //                                 (Pattern::U16(272), reference_record()),
-            //                                 (Pattern::U16(273), reference_record()),
-            //                                 (Pattern::U16(274), reference_record()),
-            //                                 (Pattern::U16(275), reference_record()),
-            //                                 (Pattern::U16(276), reference_record()),
-            //                                 (Pattern::U16(277), reference_record()),
-            //                                 (Pattern::U16(278), reference_record()),
-            //                                 (Pattern::U16(279), reference_record()),
-            //                                 (Pattern::U16(280), reference_record()),
-            //                                 (Pattern::U16(281), reference_record()),
-            //                                 (Pattern::U16(282), reference_record()),
-            //                                 (Pattern::U16(283), reference_record()),
-            //                                 (Pattern::U16(284), reference_record()),
-            //                                 (Pattern::U16(285), reference_record()),
-            //                                 (
-            //                                     Pattern::Wildcard,
-            //                                     Expr::Seq(
-            //                                         vec![
-            //                                             variant(
-            //                                                 "literal",
-            //                                                 as_u8(record_proj(var("x"), "code"))
-            //                                             )
-            //                                         ]
-            //                                     ),
-            //                                 )
-            //                             ]
-            //                         )
-            //                     ),
-            //                     var("codes")
-            //                 )
-            //             ),
-            //         ),
-            //     ])
-            // ));
+            ret.push((
+                "deflate.dynamic_huffman",
+                record([
+                    ("hlit", bits5.clone()),
+                    ("hdist", bits5.clone()),
+                    ("hclen", bits4.clone()),
+                    (
+                        "code-length-alphabet-code-lengths",
+                        repeat_count(add(var("hclen"), Expr::U8(4)), bits3.clone()),
+                    ),
+                    (
+                        "literal-length-distance-alphabet-code-lengths",
+                        Format::Dynamic(
+                            "code-length-alphabet-format".into(),
+                            DynFormat::Huffman(
+                                var("code-length-alphabet-code-lengths"),
+                                Some(
+                                    Expr::Seq(
+                                        vec![
+                                            Expr::U8(16),
+                                            Expr::U8(17),
+                                            Expr::U8(18),
+                                            Expr::U8(0),
+                                            Expr::U8(8),
+                                            Expr::U8(7),
+                                            Expr::U8(9),
+                                            Expr::U8(6),
+                                            Expr::U8(10),
+                                            Expr::U8(5),
+                                            Expr::U8(11),
+                                            Expr::U8(4),
+                                            Expr::U8(12),
+                                            Expr::U8(3),
+                                            Expr::U8(13),
+                                            Expr::U8(2),
+                                            Expr::U8(14),
+                                            Expr::U8(1),
+                                            Expr::U8(15)
+                                        ]
+                                    )
+                                )
+                            ),
+                            Box::new(
+                                repeat_until_seq(
+                                    lambda(
+                                        "y",
+                                        expr_gte(
+                                            seq_length(
+                                                flat_map_accum(
+                                                    lambda(
+                                                        "x",
+                                                        expr_match(
+                                                            as_u8(
+                                                                record_proj(
+                                                                    tuple_proj(var("x"), 1),
+                                                                    "code"
+                                                                )
+                                                            ),
+                                                            vec![
+                                                                (
+                                                                    Pattern::U8(16),
+                                                                    Expr::Tuple(
+                                                                        vec![
+                                                                            tuple_proj(var("x"), 0),
+                                                                            dup(
+                                                                                as_u32(
+                                                                                    add(
+                                                                                        record_proj(
+                                                                                            tuple_proj(
+                                                                                                var(
+                                                                                                    "x"
+                                                                                                ),
+                                                                                                1
+                                                                                            ),
+                                                                                            "extra"
+                                                                                        ),
+                                                                                        Expr::U8(3)
+                                                                                    )
+                                                                                ),
+                                                                                expr_match(
+                                                                                    tuple_proj(
+                                                                                        var("x"),
+                                                                                        0
+                                                                                    ),
+                                                                                    vec![(
+                                                                                        Pattern::variant(
+                                                                                            "some",
+                                                                                            Pattern::binding(
+                                                                                                "y"
+                                                                                            )
+                                                                                        ),
+                                                                                        var("y"),
+                                                                                    )]
+                                                                                )
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                ),
+                                                                (
+                                                                    Pattern::U8(17),
+                                                                    Expr::Tuple(
+                                                                        vec![
+                                                                            tuple_proj(var("x"), 0),
+                                                                            dup(
+                                                                                as_u32(
+                                                                                    add(
+                                                                                        record_proj(
+                                                                                            tuple_proj(
+                                                                                                var(
+                                                                                                    "x"
+                                                                                                ),
+                                                                                                1
+                                                                                            ),
+                                                                                            "extra"
+                                                                                        ),
+                                                                                        Expr::U8(3)
+                                                                                    )
+                                                                                ),
+                                                                                Expr::U8(0)
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                ),
+                                                                (
+                                                                    Pattern::U8(18),
+                                                                    Expr::Tuple(
+                                                                        vec![
+                                                                            tuple_proj(var("x"), 0),
+                                                                            dup(
+                                                                                as_u32(
+                                                                                    add(
+                                                                                        record_proj(
+                                                                                            tuple_proj(
+                                                                                                var(
+                                                                                                    "x"
+                                                                                                ),
+                                                                                                1
+                                                                                            ),
+                                                                                            "extra"
+                                                                                        ),
+                                                                                        Expr::U8(11)
+                                                                                    )
+                                                                                ),
+                                                                                Expr::U8(0)
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                ),
+                                                                (
+                                                                    Pattern::binding("v"),
+                                                                    Expr::Tuple(
+                                                                        vec![
+                                                                            variant(
+                                                                                "some",
+                                                                                var("v")
+                                                                            ),
+                                                                            Expr::Seq(
+                                                                                vec![var("v")]
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                )
+                                                            ]
+                                                        )
+                                                    ),
+                                                    variant("none", Expr::UNIT),
+                                                    ValueType::Union(
+                                                        BTreeMap::from([
+                                                            (
+                                                                "none".into(),
+                                                                ValueType::Tuple(vec![]),
+                                                            ),
+                                                            (
+                                                                "some".into(),
+                                                                ValueType::Base(BaseType::U8),
+                                                            ),
+                                                        ])
+                                                    ),
+                                                    var("y")
+                                                )
+                                            ),
+                                            add(
+                                                as_u32(add(var("hlit"), var("hdist"))),
+                                                Expr::U32(258)
+                                            )
+                                        )
+                                    ),
+                                    record([
+                                        (
+                                            "code",
+                                            Format::Apply("code-length-alphabet-format".into()),
+                                        ),
+                                        (
+                                            "extra",
+                                            Format::Match(
+                                                as_u8(var("code")),
+                                                vec![
+                                                    (Pattern::U8(16), bits2.clone()),
+                                                    (Pattern::U8(17), bits3.clone()),
+                                                    (Pattern::U8(18), bits7.clone()),
+                                                    (
+                                                        Pattern::Wildcard,
+                                                        Format::Compute(Expr::U8(0)),
+                                                    )
+                                                ]
+                                            ),
+                                        ),
+                                    ])
+                                )
+                            )
+                        ),
+                    ),
+                    (
+                        "literal-length-distance-alphabet-code-lengths-value",
+                        Format::Compute(
+                            flat_map_accum(
+                                lambda(
+                                    "x",
+                                    expr_match(
+                                        as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
+                                        vec![
+                                            (
+                                                Pattern::U8(16),
+                                                Expr::Tuple(
+                                                    vec![
+                                                        tuple_proj(var("x"), 0),
+                                                        dup(
+                                                            as_u32(
+                                                                add(
+                                                                    record_proj(
+                                                                        tuple_proj(var("x"), 1),
+                                                                        "extra"
+                                                                    ),
+                                                                    Expr::U8(3)
+                                                                )
+                                                            ),
+                                                            expr_match(
+                                                                tuple_proj(var("x"), 0),
+                                                                vec![(
+                                                                    Pattern::variant(
+                                                                        "some",
+                                                                        Pattern::binding("y")
+                                                                    ),
+                                                                    var("y"),
+                                                                )]
+                                                            )
+                                                        )
+                                                    ]
+                                                ),
+                                            ),
+                                            (
+                                                Pattern::U8(17),
+                                                Expr::Tuple(
+                                                    vec![
+                                                        tuple_proj(var("x"), 0),
+                                                        dup(
+                                                            as_u32(
+                                                                add(
+                                                                    record_proj(
+                                                                        tuple_proj(var("x"), 1),
+                                                                        "extra"
+                                                                    ),
+                                                                    Expr::U8(3)
+                                                                )
+                                                            ),
+                                                            Expr::U8(0)
+                                                        )
+                                                    ]
+                                                ),
+                                            ),
+                                            (
+                                                Pattern::U8(18),
+                                                Expr::Tuple(
+                                                    vec![
+                                                        tuple_proj(var("x"), 0),
+                                                        dup(
+                                                            as_u32(
+                                                                add(
+                                                                    record_proj(
+                                                                        tuple_proj(var("x"), 1),
+                                                                        "extra"
+                                                                    ),
+                                                                    Expr::U8(11)
+                                                                )
+                                                            ),
+                                                            Expr::U8(0)
+                                                        )
+                                                    ]
+                                                ),
+                                            ),
+                                            (
+                                                Pattern::binding("v"),
+                                                Expr::Tuple(
+                                                    vec![
+                                                        variant("some", var("v")),
+                                                        Expr::Seq(vec![var("v")])
+                                                    ]
+                                                ),
+                                            )
+                                        ]
+                                    )
+                                ),
+                                variant("none", Expr::UNIT),
+                                ValueType::Union(
+                                    BTreeMap::from([
+                                        ("none".into(), ValueType::Tuple(vec![])),
+                                        ("some".into(), ValueType::Base(BaseType::U8)),
+                                    ])
+                                ),
+                                var("literal-length-distance-alphabet-code-lengths")
+                            )
+                        ),
+                    ),
+                    (
+                        "literal-length-alphabet-code-lengths-value",
+                        Format::Compute(
+                            sub_seq(
+                                var("literal-length-distance-alphabet-code-lengths-value"),
+                                Expr::U32(0),
+                                add(as_u32(var("hlit")), Expr::U32(257))
+                            )
+                        ),
+                    ),
+                    (
+                        "distance-alphabet-code-lengths-value",
+                        Format::Compute(
+                            sub_seq(
+                                var("literal-length-distance-alphabet-code-lengths-value"),
+                                add(as_u32(var("hlit")), Expr::U32(257)),
+                                add(as_u32(var("hdist")), Expr::U32(1))
+                            )
+                        ),
+                    ),
+                    (
+                        "codes",
+                        Format::Dynamic(
+                            "distance-alphabet-format".into(),
+                            DynFormat::Huffman(var("distance-alphabet-code-lengths-value"), None),
+                            Box::new(
+                                Format::Dynamic(
+                                    "literal-length-alphabet-format".into(),
+                                    DynFormat::Huffman(
+                                        var("literal-length-alphabet-code-lengths-value"),
+                                        None
+                                    ),
+                                    Box::new(
+                                        repeat_until_last(
+                                            lambda(
+                                                "x",
+                                                expr_eq(
+                                                    as_u16(record_proj(var("x"), "code")),
+                                                    Expr::U16(256)
+                                                )
+                                            ),
+                                            record([
+                                                (
+                                                    "code",
+                                                    Format::Apply(
+                                                        "literal-length-alphabet-format".into()
+                                                    ),
+                                                ),
+                                                (
+                                                    "extra",
+                                                    match_variant(
+                                                        var("code"),
+                                                        vec![
+                                                            (
+                                                                Pattern::U16(257),
+                                                                "some",
+                                                                length_record(3, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(258),
+                                                                "some",
+                                                                length_record(4, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(259),
+                                                                "some",
+                                                                length_record(5, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(260),
+                                                                "some",
+                                                                length_record(6, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(261),
+                                                                "some",
+                                                                length_record(7, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(262),
+                                                                "some",
+                                                                length_record(8, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(263),
+                                                                "some",
+                                                                length_record(9, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(264),
+                                                                "some",
+                                                                length_record(10, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(265),
+                                                                "some",
+                                                                length_record(11, base, 1),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(266),
+                                                                "some",
+                                                                length_record(13, base, 1),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(267),
+                                                                "some",
+                                                                length_record(15, base, 1),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(268),
+                                                                "some",
+                                                                length_record(17, base, 1),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(269),
+                                                                "some",
+                                                                length_record(19, base, 2),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(270),
+                                                                "some",
+                                                                length_record(23, base, 2),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(271),
+                                                                "some",
+                                                                length_record(27, base, 2),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(272),
+                                                                "some",
+                                                                length_record(31, base, 2),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(273),
+                                                                "some",
+                                                                length_record(35, base, 3),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(274),
+                                                                "some",
+                                                                length_record(43, base, 3),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(275),
+                                                                "some",
+                                                                length_record(51, base, 3),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(276),
+                                                                "some",
+                                                                length_record(59, base, 3),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(277),
+                                                                "some",
+                                                                length_record(67, base, 4),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(278),
+                                                                "some",
+                                                                length_record(83, base, 4),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(279),
+                                                                "some",
+                                                                length_record(99, base, 4),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(280),
+                                                                "some",
+                                                                length_record(115, base, 4),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(281),
+                                                                "some",
+                                                                length_record(131, base, 5),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(282),
+                                                                "some",
+                                                                length_record(163, base, 5),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(283),
+                                                                "some",
+                                                                length_record(195, base, 5),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(284),
+                                                                "some",
+                                                                length_record(227, base, 5),
+                                                            ),
+                                                            (
+                                                                Pattern::U16(285),
+                                                                "some",
+                                                                length_record(258, base, 0),
+                                                            ),
+                                                            (
+                                                                Pattern::Wildcard,
+                                                                "none",
+                                                                Format::EMPTY,
+                                                            )
+                                                        ]
+                                                    ),
+                                                ),
+                                            ])
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                    ),
+                    (
+                        "codes-values",
+                        Format::Compute(
+                            flat_map(
+                                lambda(
+                                    "x",
+                                    expr_match(
+                                        record_proj(var("x"), "code"),
+                                        vec![
+                                            (Pattern::U16(256), Expr::Seq(vec![])),
+                                            (Pattern::U16(257), reference_record()),
+                                            (Pattern::U16(258), reference_record()),
+                                            (Pattern::U16(259), reference_record()),
+                                            (Pattern::U16(260), reference_record()),
+                                            (Pattern::U16(261), reference_record()),
+                                            (Pattern::U16(262), reference_record()),
+                                            (Pattern::U16(263), reference_record()),
+                                            (Pattern::U16(264), reference_record()),
+                                            (Pattern::U16(265), reference_record()),
+                                            (Pattern::U16(266), reference_record()),
+                                            (Pattern::U16(267), reference_record()),
+                                            (Pattern::U16(268), reference_record()),
+                                            (Pattern::U16(269), reference_record()),
+                                            (Pattern::U16(270), reference_record()),
+                                            (Pattern::U16(271), reference_record()),
+                                            (Pattern::U16(272), reference_record()),
+                                            (Pattern::U16(273), reference_record()),
+                                            (Pattern::U16(274), reference_record()),
+                                            (Pattern::U16(275), reference_record()),
+                                            (Pattern::U16(276), reference_record()),
+                                            (Pattern::U16(277), reference_record()),
+                                            (Pattern::U16(278), reference_record()),
+                                            (Pattern::U16(279), reference_record()),
+                                            (Pattern::U16(280), reference_record()),
+                                            (Pattern::U16(281), reference_record()),
+                                            (Pattern::U16(282), reference_record()),
+                                            (Pattern::U16(283), reference_record()),
+                                            (Pattern::U16(284), reference_record()),
+                                            (Pattern::U16(285), reference_record()),
+                                            (
+                                                Pattern::Wildcard,
+                                                Expr::Seq(
+                                                    vec![
+                                                        variant(
+                                                            "literal",
+                                                            as_u8(record_proj(var("x"), "code"))
+                                                        )
+                                                    ]
+                                                ),
+                                            )
+                                        ]
+                                    )
+                                ),
+                                var("codes")
+                            )
+                        ),
+                    ),
+                ]),
+            ));
             ret
         }
         let mut module = FormatModule::new();
@@ -4148,11 +4340,13 @@ mod tests {
     fn test_popcheck_compute_simple() {
         let x = Format::Byte(ByteSet::full());
         let fx = Format::Compute(Expr::Var("x".into()));
-        let gx = Format::Compute(Expr::Arith(
-            Arith::Add,
-            Box::new(Expr::Var("x".into())),
-            Box::new(Expr::Var("x".into())),
-        ));
+        let gx = Format::Compute(
+            Expr::Arith(
+                Arith::Add,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Var("x".into()))
+            )
+        );
 
         let f = Format::Record(vec![("x".into(), x), ("fx".into(), fx), ("gx".into(), gx)]);
         run_popcheck(&[("test.compute_simple", f)]);
@@ -4162,33 +4356,37 @@ mod tests {
     fn test_popcheck_compute_complex() {
         let is_null = Expr::Lambda(
             "x".into(),
-            Box::new(Expr::IntRel(
-                IntRel::Eq,
-                Box::new(Expr::U8(0)),
-                Box::new(Expr::Var("x".into())),
-            )),
+            Box::new(
+                Expr::IntRel(IntRel::Eq, Box::new(Expr::U8(0)), Box::new(Expr::Var("x".into())))
+            )
         );
         let ixdup = Expr::Lambda(
             "acc_x".into(),
-            Box::new(Expr::Tuple(vec![
-                Expr::Arith(
-                    Arith::Add,
-                    Box::new(Expr::U32(1)),
-                    Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0)),
-                ),
-                Expr::Dup(
-                    Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0)),
-                    Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 1)),
-                ),
-            ])),
+            Box::new(
+                Expr::Tuple(
+                    vec![
+                        Expr::Arith(
+                            Arith::Add,
+                            Box::new(Expr::U32(1)),
+                            Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0))
+                        ),
+                        Expr::Dup(
+                            Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 0)),
+                            Box::new(Expr::TupleProj(Box::new(Expr::Var("acc_x".into())), 1))
+                        )
+                    ]
+                )
+            )
         );
         let xs = Format::RepeatUntilLast(is_null, Box::new(Format::Byte(ByteSet::full())));
-        let fxs = Format::Compute(Expr::FlatMapAccum(
-            Box::new(ixdup),
-            Box::new(Expr::U32(1)),
-            ValueType::Base(BaseType::U32),
-            Box::new(Expr::Var("xs".into())),
-        ));
+        let fxs = Format::Compute(
+            Expr::FlatMapAccum(
+                Box::new(ixdup),
+                Box::new(Expr::U32(1)),
+                ValueType::Base(BaseType::U32),
+                Box::new(Expr::Var("xs".into()))
+            )
+        );
 
         let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
         run_popcheck(&[("test.compute_complex", f)]);

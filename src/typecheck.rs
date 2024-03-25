@@ -1298,10 +1298,10 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
                 newvar
             }
-            &Expr::TupleProj(ref e_tup, ix) => {
+            Expr::TupleProj(e_tup, ix) => {
                 let newvar = self.get_new_uvar();
                 let v_tup = self.infer_var_expr(e_tup, scope)?;
-                self.unify_var_proj_index(v_tup, ix, newvar)?;
+                self.unify_var_proj_index(v_tup, *ix, newvar)?;
                 newvar
             }
             Expr::Record(fs) => {
@@ -1347,14 +1347,12 @@ impl TypeChecker {
             Expr::Lambda(_, _) => {
                 unreachable!("infer_utype_expr: cannot directly infer utype of lambda expression")
             }
-
             Expr::Variant(vname, inner) => {
                 let newvar = self.get_new_uvar();
                 let inner_t = self.infer_utype_expr(inner, scope)?;
                 self.add_uvar_variant(newvar, vname.clone(), inner_t)?;
                 newvar
             }
-
             Expr::Arith(_arith, x, y) => {
                 let zvar = self.get_new_uvar();
 
