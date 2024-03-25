@@ -41,3 +41,15 @@ pub fn u32le(input: (u8, u8, u8, u8)) -> u32 {
 pub fn u32be(input: (u8, u8, u8, u8)) -> u32 {
     u32::from_be_bytes([input.0, input.1, input.2, input.3])
 }
+
+pub fn u64le(input: (u8, u8, u8, u8, u8, u8, u8, u8)) -> u64 {
+    u64::from_le_bytes([
+        input.0, input.1, input.2, input.3, input.4, input.5, input.6, input.7,
+    ])
+}
+
+pub fn u64be(input: (u8, u8, u8, u8, u8, u8, u8, u8)) -> u64 {
+    u64::from_be_bytes([
+        input.0, input.1, input.2, input.3, input.4, input.5, input.6, input.7,
+    ])
+}

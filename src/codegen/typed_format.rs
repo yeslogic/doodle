@@ -327,6 +327,43 @@ impl<TypeRep> TypedExpr<TypeRep> {
     }
 }
 
+impl TypedExpr<GenType> {
+    pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
+        match self {
+            TypedExpr::Bool(_) => Some(Cow::Owned(GenType::from(PrimType::Bool))),
+            TypedExpr::AsU8(_) | TypedExpr::U8(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
+            TypedExpr::U16Le(_) | TypedExpr::U16Be(_) | TypedExpr::AsU16(_) | TypedExpr::U16(_) => {
+                Some(Cow::Owned(GenType::from(PrimType::U16)))
+            }
+            TypedExpr::U32Be(_)
+            | TypedExpr::U32Le(_)
+            | TypedExpr::AsU32(_)
+            | TypedExpr::U32(_)
+            | TypedExpr::SeqLength(_) => Some(Cow::Owned(GenType::from(PrimType::U32))),
+            TypedExpr::U64Be(_) | TypedExpr::U64Le(_) | TypedExpr::AsU64(_) | TypedExpr::U64(_) => {
+                Some(Cow::Owned(GenType::from(PrimType::U64)))
+            }
+            TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
+            TypedExpr::Lambda(..) => None,
+            TypedExpr::Var(gt, _)
+            | TypedExpr::Tuple(gt, _)
+            | TypedExpr::TupleProj(gt, _, _)
+            | TypedExpr::Record(gt, _)
+            | TypedExpr::RecordProj(gt, _, _)
+            | TypedExpr::Variant(gt, _, _)
+            | TypedExpr::Seq(gt, _)
+            | TypedExpr::Match(gt, _, _)
+            | TypedExpr::IntRel(gt, _, _, _)
+            | TypedExpr::Arith(gt, _, _, _)
+            | TypedExpr::SubSeq(gt, _, _, _)
+            | TypedExpr::FlatMap(gt, _, _)
+            | TypedExpr::FlatMapAccum(gt, _, _, _, _)
+            | TypedExpr::Dup(gt, _, _)
+            | TypedExpr::Inflate(gt, _) => Some(Cow::Borrowed(gt)),
+        }
+    }
+}
+
 // FIXME - same as TypedExpr, requirements of HashMap include Eq and Hash for this type
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypedPattern<TypeRep> {

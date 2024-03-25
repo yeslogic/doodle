@@ -28,6 +28,7 @@ impl fmt::Display for Symbol {
     }
 }
 
+// FIXME - add support for soft-newline (i.e. conditional line-break if no linebreak occurs before next printable character)
 #[derive(Clone, Default)]
 pub enum Fragment {
     #[default]

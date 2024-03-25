@@ -135,8 +135,14 @@ impl RustDecl {
                 .cat(rhs.to_fragment()),
             RustDecl::TypeDef(name, tdef) => {
                 let frag_key = Fragment::string(tdef.keyword_for());
-                Fragment::intervene(frag_key, Fragment::Char(' '), name.to_fragment())
-                    .intervene(Fragment::Char(' '), tdef.to_fragment())
+                let def = Fragment::intervene(frag_key, Fragment::Char(' '), name.to_fragment())
+                    .intervene(Fragment::Char(' '), tdef.to_fragment());
+                // FIXME - this is a hack to allow debug in adhoc-typed non-exhaustive matches
+                Fragment::intervene(
+                    Fragment::string("#[derive(Debug, Clone)]"),
+                    Fragment::Char('\n'),
+                    def,
+                )
             }
             RustDecl::Function(fdef) => fdef.to_fragment(),
         }
@@ -1065,7 +1071,7 @@ impl ToFragmentExt for RustExpr {
 
 impl ToFragment for RustExpr {
     fn to_fragment(&self) -> Fragment {
-        self.to_fragment_precedence(Precedence::Top)
+        self.to_fragment_precedence(Precedence::Atomic)
     }
 }
 
@@ -1102,6 +1108,31 @@ pub(crate) enum RustStmt {
     Expr(RustExpr),
     Return(ReturnKind, RustExpr), // bool: true for explicit return, false for implicit return
     Control(RustControl),
+    Comment(RustComment), // FIXME - figure out where else comments should be allowed in place of first-class productions, or use a different model
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustComment {
+    Empty, // placeholder for when a conditional comment is required by an unmet logical condition
+    Trailing(Label), // comment that can appear at the end of a line with preceding non-whitespace content
+    Line(Label),     // line comment appearing on its own line, without a newline character
+    Block(Label), // block-comment, possibly empty or one-line, with zero or more newline characters
+}
+
+impl ToFragment for RustComment {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustComment::Empty => Fragment::Empty,
+            RustComment::Trailing(cmt) => {
+                Fragment::cat(Fragment::string("// "), Fragment::String(cmt.clone()))
+            }
+            RustComment::Line(cmt) => {
+                Fragment::cat(Fragment::string("// "), Fragment::String(cmt.clone()))
+            }
+            RustComment::Block(cmt) => Fragment::String(cmt.clone())
+                .delimit(Fragment::string("/* "), Fragment::string(" */")),
+        }
+    }
 }
 
 impl RustStmt {
@@ -1141,6 +1172,7 @@ pub(crate) enum RustPattern {
     PrimLiteral(RustPrimLit),
     TupleLiteral(Vec<RustPattern>),
     ArrayLiteral(Vec<RustPattern>),
+    Fill,                                   // `..`
     CatchAll(Option<Label>),                // None <- `_`, Some("x") for `x`
     Variant(Constructor, Box<RustPattern>), // FIXME - need to attach enum scope
 }
@@ -1184,6 +1216,7 @@ impl ToFragment for RustPattern {
                             .delimit(Fragment::Char('('), Fragment::Char(')')),
                     )
             }
+            RustPattern::Fill => Fragment::String("..".into()),
             RustPattern::CatchAll(None) => Fragment::Char('_'),
             RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
         }
@@ -1259,6 +1292,7 @@ impl ToFragment for RustStmt {
                 expr.to_fragment().delimit(before, after)
             }
             Self::Control(ctrl) => ctrl.to_fragment(),
+            Self::Comment(cmt) => cmt.to_fragment(),
         }
     }
 }
