@@ -28,6 +28,7 @@ pub struct BaseModule {
 }
 
 #[rustfmt::skip]
+#[allow(dead_code)]
 impl BaseModule {
     pub fn bit(&self) -> Format { self.bit.call() }
     pub fn u8(&self) -> Format { self.u8.call() }
@@ -36,7 +37,6 @@ impl BaseModule {
     pub fn u32be(&self) -> Format { self.u32be.call() }
     pub fn u32le(&self) -> Format { self.u32le.call() }
     pub fn u64be(&self) -> Format { self.u64be.call() }
-    #[allow(dead_code)]
     pub fn u64le(&self) -> Format { self.u64le.call() }
     pub fn ascii_char(&self) -> Format { self.ascii_char.call() }
     pub fn ascii_char_strict(&self) -> Format { self.ascii_char_strict.call() }

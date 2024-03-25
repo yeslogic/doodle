@@ -1247,11 +1247,11 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    33 => { 0 }
+                    33 => 0,
 
-                    44 => { 0 }
+                    44 => 0,
 
-                    59 => { 1 }
+                    59 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -1264,7 +1264,12 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         accum
     };
     let trailer = { Decoder142(scope, input)? };
-    Some(Type19 { header, logical_screen, blocks, trailer })
+    Some(Type19 {
+        header,
+        logical_screen,
+        blocks,
+        trailer,
+    })
 }
 
 fn Decoder3<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type60> {
@@ -1304,15 +1309,15 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    98 => { 0 }
+                    98 => 0,
 
-                    112 => { 0 }
+                    112 => 0,
 
-                    80 => { 0 }
+                    80 => 0,
 
-                    116 => { 0 }
+                    116 => 0,
 
-                    73 => { 1 }
+                    73 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -1334,19 +1339,19 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                     73 => {
                         let b = lookahead.read_byte()?;
                         match b {
-                            69 => { 0 }
+                            69 => 0,
 
-                            68 => { 1 }
+                            68 => 1,
                         }
                     }
 
-                    98 => { 0 }
+                    98 => 0,
 
-                    112 => { 0 }
+                    112 => 0,
 
-                    80 => { 0 }
+                    80 => 0,
 
-                    116 => { 0 }
+                    116 => 0,
                 }
             };
             if matching_ix == 0 {
@@ -1365,15 +1370,15 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    98 => { 0 }
+                    98 => 0,
 
-                    112 => { 0 }
+                    112 => 0,
 
-                    80 => { 0 }
+                    80 => 0,
 
-                    116 => { 0 }
+                    116 => 0,
 
-                    73 => { 1 }
+                    73 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -1386,7 +1391,14 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         accum
     };
     let iend = { Decoder31(scope, input)? };
-    Some(Type161 { signature, ihdr, chunks, idat, more_chunks, iend })
+    Some(Type161 {
+        signature,
+        ihdr,
+        chunks,
+        idat,
+        more_chunks,
+        iend,
+    })
 }
 
 fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type165> {
@@ -1447,7 +1459,12 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
             }
         }
     };
-    Some(Type165 { tag, length, data, pad })
+    Some(Type165 {
+        tag,
+        length,
+        data,
+        pad,
+    })
 }
 
 fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type171> {
@@ -1458,9 +1475,9 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    0 => { 0 }
+                    0 => 0,
 
-                    tmp if tmp != 0 => { 1 }
+                    tmp if tmp != 0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -1514,7 +1531,11 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         }
         accum
     };
-    Some(Type171 { contents, __padding, __trailing })
+    Some(Type171 {
+        contents,
+        __padding,
+        __trailing,
+    })
 }
 
 fn Decoder8<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type172> {
@@ -1550,29 +1571,27 @@ fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             let lookahead = &mut input.clone();
             let b = lookahead.read_byte()?;
             match b {
-                tmp if
-                    ByteSet::from_bits([18446744073709551615, 18446744073709551615, 0, 0]).contains(
-                        tmp
-                    )
-                => {
+                tmp if ByteSet::from_bits([18446744073709551615, 18446744073709551615, 0, 0])
+                    .contains(tmp) =>
+                {
                     0
                 }
 
-                tmp if ByteSet::from_bits([0, 0, 0, 4294967292]).contains(tmp) => { 0 }
+                tmp if ByteSet::from_bits([0, 0, 0, 4294967292]).contains(tmp) => 0,
 
-                224 => { 0 }
+                224 => 0,
 
-                tmp if ByteSet::from_bits([0, 0, 0, 35175782154240]).contains(tmp) => { 0 }
+                tmp if ByteSet::from_bits([0, 0, 0, 35175782154240]).contains(tmp) => 0,
 
-                237 => { 0 }
+                237 => 0,
 
-                tmp if ByteSet::from_bits([0, 0, 0, 211106232532992]).contains(tmp) => { 0 }
+                tmp if ByteSet::from_bits([0, 0, 0, 211106232532992]).contains(tmp) => 0,
 
-                240 => { 0 }
+                240 => 0,
 
-                tmp if ByteSet::from_bits([0, 0, 0, 3940649673949184]).contains(tmp) => { 0 }
+                tmp if ByteSet::from_bits([0, 0, 0, 3940649673949184]).contains(tmp) => 0,
 
-                244 => { 0 }
+                244 => 0,
             }
         };
         if matching_ix == 0 {
@@ -1591,39 +1610,35 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             let lookahead = &mut input.clone();
             let b = lookahead.read_byte()?;
             match b {
-                tmp if
-                    ByteSet::from_bits([18446744073709551615, 18446744073709551615, 0, 0]).contains(
-                        tmp
-                    )
-                => {
+                tmp if ByteSet::from_bits([18446744073709551615, 18446744073709551615, 0, 0])
+                    .contains(tmp) =>
+                {
                     0
                 }
 
-                tmp if ByteSet::from_bits([0, 0, 0, 4294967292]).contains(tmp) => { 1 }
+                tmp if ByteSet::from_bits([0, 0, 0, 4294967292]).contains(tmp) => 1,
 
-                224 => { 2 }
+                224 => 2,
 
-                tmp if ByteSet::from_bits([0, 0, 0, 35175782154240]).contains(tmp) => { 2 }
+                tmp if ByteSet::from_bits([0, 0, 0, 35175782154240]).contains(tmp) => 2,
 
-                237 => { 2 }
+                237 => 2,
 
-                tmp if ByteSet::from_bits([0, 0, 0, 211106232532992]).contains(tmp) => { 2 }
+                tmp if ByteSet::from_bits([0, 0, 0, 211106232532992]).contains(tmp) => 2,
 
-                240 => { 3 }
+                240 => 3,
 
-                tmp if ByteSet::from_bits([0, 0, 0, 3940649673949184]).contains(tmp) => { 3 }
+                tmp if ByteSet::from_bits([0, 0, 0, 3940649673949184]).contains(tmp) => 3,
 
-                244 => { 3 }
+                244 => 3,
             }
         };
         match tree_index {
             0 => {
                 let inner = {
                     let b = input.read_byte()?;
-                    if
-                        ByteSet::from_bits([
-                            18446744073709551615, 18446744073709551615, 0, 0,
-                        ]).contains(b)
+                    if ByteSet::from_bits([18446744073709551615, 18446744073709551615, 0, 0])
+                        .contains(b)
                     {
                         b
                     } else {
@@ -1649,10 +1664,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     let field1 = { Decoder12(scope, input)? };
                     (field0, field1)
                 };
-                (|bytes| {
-                    match bytes {
-                        (x1, x0) => { ((x1 as u32) << 6) | (x0 as u32) }
-                    }
+                (|bytes| match bytes {
+                    (x1, x0) => ((x1 as u32) << 6) | (x0 as u32),
                 })(inner)
             }
 
@@ -1662,13 +1675,11 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut input.clone();
                         let b = lookahead.read_byte()?;
                         match b {
-                            224 => { 0 }
+                            224 => 0,
 
-                            tmp if ByteSet::from_bits([0, 0, 0, 35175782154240]).contains(tmp) => {
-                                1
-                            }
+                            tmp if ByteSet::from_bits([0, 0, 0, 35175782154240]).contains(tmp) => 1,
 
-                            237 => { 2 }
+                            237 => 2,
 
                             tmp if ByteSet::from_bits([0, 0, 0, 211106232532992]).contains(tmp) => {
                                 3
@@ -1691,10 +1702,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                             let field1 = {
                                 let inner = {
                                     let b = input.read_byte()?;
-                                    if
-                                        ByteSet::from_bits([
-                                            0, 0, 18446744069414584320, 0,
-                                        ]).contains(b)
+                                    if ByteSet::from_bits([0, 0, 18446744069414584320, 0])
+                                        .contains(b)
                                     {
                                         b
                                     } else {
@@ -1769,10 +1778,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         }
                     }
                 };
-                (|bytes| {
-                    match bytes {
-                        (x2, x1, x0) => { ((x2 as u32) << 12) | ((x1 as u32) << 6) | (x0 as u32) }
-                    }
+                (|bytes| match bytes {
+                    (x2, x1, x0) => ((x2 as u32) << 12) | ((x1 as u32) << 6) | (x0 as u32),
                 })(inner)
             }
 
@@ -1782,13 +1789,15 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut input.clone();
                         let b = lookahead.read_byte()?;
                         match b {
-                            240 => { 0 }
+                            240 => 0,
 
-                            tmp if ByteSet::from_bits([0, 0, 0, 3940649673949184]).contains(tmp) => {
+                            tmp if ByteSet::from_bits([0, 0, 0, 3940649673949184])
+                                .contains(tmp) =>
+                            {
                                 1
                             }
 
-                            244 => { 2 }
+                            244 => 2,
                         }
                     };
                     match tree_index {
@@ -1807,10 +1816,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                             let field1 = {
                                 let inner = {
                                     let b = input.read_byte()?;
-                                    if
-                                        ByteSet::from_bits([
-                                            0, 0, 18446744073709486080, 0,
-                                        ]).contains(b)
+                                    if ByteSet::from_bits([0, 0, 18446744073709486080, 0])
+                                        .contains(b)
                                     {
                                         b
                                     } else {
@@ -1871,14 +1878,9 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         }
                     }
                 };
-                (|bytes| {
-                    match bytes {
-                        (x3, x2, x1, x0) => {
-                            ((x3 as u32) << 18) |
-                                ((x2 as u32) << 12) |
-                                ((x1 as u32) << 6) |
-                                (x0 as u32)
-                        }
+                (|bytes| match bytes {
+                    (x3, x2, x1, x0) => {
+                        ((x3 as u32) << 18) | ((x2 as u32) << 12) | ((x1 as u32) << 6) | (x0 as u32)
                     }
                 })(inner)
             }
@@ -1906,7 +1908,7 @@ fn Decoder13<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             b
         } else {
             return None;
-        }
+        },
     )
 }
 
@@ -1925,7 +1927,11 @@ fn Decoder14<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         ()
     };
-    Some(Type170 { header, file, __padding })
+    Some(Type170 {
+        header,
+        file,
+        __padding,
+    })
 }
 
 fn Decoder15<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type169> {
@@ -1945,9 +1951,9 @@ fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    0 => { 0 }
+                    0 => 0,
 
-                    tmp if tmp != 0 => { 1 }
+                    tmp if tmp != 0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -2004,19 +2010,17 @@ fn Decoder18<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             b
         } else {
             return None;
-        }
+        },
     )
 }
 
 fn Decoder19<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = input.read_byte()?;
-    Some(
-        if ByteSet::from_bits([4294967297, 0, 0, 0]).contains(b) {
-            b
-        } else {
-            return None;
-        }
-    )
+    Some(if ByteSet::from_bits([4294967297, 0, 0, 0]).contains(b) {
+        b
+    } else {
+        return None;
+    })
 }
 
 fn Decoder20<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
@@ -2032,9 +2036,9 @@ fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -2092,9 +2096,9 @@ fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -2208,12 +2212,17 @@ fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             }
         }
     };
-    Some(Type163 { tag, length, data, pad })
+    Some(Type163 {
+        tag,
+        length,
+        data,
+        pad,
+    })
 }
 
 fn Decoder27<'input>(
     scope: &mut Scope,
-    input: &mut ParseCtxt<'input>
+    input: &mut ParseCtxt<'input>,
 ) -> Option<(u8, u8, u8, u8, u8, u8, u8, u8)> {
     let field0 = {
         let b = input.read_byte()?;
@@ -2279,7 +2288,9 @@ fn Decoder27<'input>(
             return None;
         }
     };
-    Some((field0, field1, field2, field3, field4, field5, field6, field7))
+    Some((
+        field0, field1, field2, field3, field4, field5, field6, field7,
+    ))
 }
 
 fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type145> {
@@ -2287,7 +2298,12 @@ fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let tag = { Decoder43(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type145 { length, tag, data, crc })
+    Some(Type145 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type158> {
@@ -2295,18 +2311,18 @@ fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let lookahead = &mut input.clone();
         let b = lookahead.read_byte()?;
         match b {
-            98 => { 0 }
+            98 => 0,
 
-            112 => { 1 }
+            112 => 1,
 
-            80 => { 2 }
+            80 => 2,
 
             116 => {
                 let b = lookahead.read_byte()?;
                 match b {
-                    73 => { 3 }
+                    73 => 3,
 
-                    82 => { 4 }
+                    82 => 4,
                 }
             }
         }
@@ -2344,7 +2360,12 @@ fn Decoder30<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let tag = { Decoder35(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type159 { length, tag, data, crc })
+    Some(Type159 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type160> {
@@ -2352,7 +2373,12 @@ fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let tag = { Decoder33(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type160 { length, tag, data, crc })
+    Some(Type160 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder32<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
@@ -2498,7 +2524,12 @@ fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type151 { length, tag, data, crc })
+    Some(Type151 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type153> {
@@ -2540,7 +2571,12 @@ fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type153 { length, tag, data, crc })
+    Some(Type153 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type146> {
@@ -2582,7 +2618,12 @@ fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type146 { length, tag, data, crc })
+    Some(Type146 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type155> {
@@ -2624,7 +2665,12 @@ fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type155 { length, tag, data, crc })
+    Some(Type155 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type157> {
@@ -2666,7 +2712,12 @@ fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
     let crc = { Decoder32(scope, input)? };
-    Some(Type157 { length, tag, data, crc })
+    Some(Type157 {
+        length,
+        tag,
+        data,
+        crc,
+    })
 }
 
 fn Decoder42<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
@@ -2738,18 +2789,23 @@ fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type142 { size_field, r#type, size, data })
+    Some(Type142 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
@@ -2770,7 +2826,9 @@ fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let field5 = { Decoder16(scope, input)? };
         let field6 = { Decoder16(scope, input)? };
         let field7 = { Decoder16(scope, input)? };
-        (field0, field1, field2, field3, field4, field5, field6, field7)
+        (
+            field0, field1, field2, field3, field4, field5, field6, field7,
+        )
     };
     Some((|x| u64be(x))(inner))
 }
@@ -2780,18 +2838,23 @@ fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type95 { size_field, r#type, size, data })
+    Some(Type95 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type140> {
@@ -2799,18 +2862,23 @@ fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type140 { size_field, r#type, size, data })
+    Some(Type140 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type136> {
@@ -2818,18 +2886,23 @@ fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type136 { size_field, r#type, size, data })
+    Some(Type136 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type138> {
@@ -2837,18 +2910,23 @@ fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type138 { size_field, r#type, size, data })
+    Some(Type138 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type103> {
@@ -2856,18 +2934,23 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type103 { size_field, r#type, size, data })
+    Some(Type103 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type130> {
@@ -2875,18 +2958,23 @@ fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type130 { size_field, r#type, size, data })
+    Some(Type130 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
@@ -2897,9 +2985,9 @@ fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -2934,18 +3022,23 @@ fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type128 { size_field, r#type, size, data })
+    Some(Type128 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
@@ -2953,18 +3046,23 @@ fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type65 { size_field, r#type, size, data })
+    Some(Type65 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type125> {
@@ -2972,18 +3070,23 @@ fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type125 { size_field, r#type, size, data })
+    Some(Type125 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type75> {
@@ -2991,18 +3094,23 @@ fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type75 { size_field, r#type, size, data })
+    Some(Type75 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type85> {
@@ -3010,18 +3118,23 @@ fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type85 { size_field, r#type, size, data })
+    Some(Type85 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type83> {
@@ -3029,18 +3142,23 @@ fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let r#type = { Decoder46(scope, input)? };
     let size = {
         match size_field {
-            0 => { 0 }
+            0 => 0,
 
             1 => {
                 let inner = Decoder47(scope, input)?;
                 (|x| x - 16)(inner)
             }
 
-            _ => { size_field - (8 as u64) }
+            _ => size_field - (8 as u64),
         }
     };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type83 { size_field, r#type, size, data })
+    Some(Type83 {
+        size_field,
+        r#type,
+        size,
+        data,
+    })
 }
 
 fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
@@ -3051,9 +3169,9 @@ fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -3091,9 +3209,9 @@ fn Decoder62<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -3131,9 +3249,9 @@ fn Decoder63<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -3171,9 +3289,9 @@ fn Decoder64<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -3211,9 +3329,9 @@ fn Decoder65<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -3271,9 +3389,9 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             if b == 255 {
                 let b = lookahead.read_byte()?;
                 match b {
-                    224 => { 0 }
+                    224 => 0,
 
-                    225 => { 1 }
+                    225 => 1,
                 }
             } else {
                 return None;
@@ -3300,73 +3418,73 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 if b == 255 {
                     let b = lookahead.read_byte()?;
                     match b {
-                        219 => { 0 }
+                        219 => 0,
 
-                        196 => { 0 }
+                        196 => 0,
 
-                        204 => { 0 }
+                        204 => 0,
 
-                        221 => { 0 }
+                        221 => 0,
 
-                        224 => { 0 }
+                        224 => 0,
 
-                        225 => { 0 }
+                        225 => 0,
 
-                        226 => { 0 }
+                        226 => 0,
 
-                        227 => { 0 }
+                        227 => 0,
 
-                        228 => { 0 }
+                        228 => 0,
 
-                        229 => { 0 }
+                        229 => 0,
 
-                        230 => { 0 }
+                        230 => 0,
 
-                        231 => { 0 }
+                        231 => 0,
 
-                        232 => { 0 }
+                        232 => 0,
 
-                        233 => { 0 }
+                        233 => 0,
 
-                        234 => { 0 }
+                        234 => 0,
 
-                        235 => { 0 }
+                        235 => 0,
 
-                        236 => { 0 }
+                        236 => 0,
 
-                        237 => { 0 }
+                        237 => 0,
 
-                        238 => { 0 }
+                        238 => 0,
 
-                        239 => { 0 }
+                        239 => 0,
 
-                        254 => { 0 }
+                        254 => 0,
 
-                        192 => { 1 }
+                        192 => 1,
 
-                        193 => { 1 }
+                        193 => 1,
 
-                        194 => { 1 }
+                        194 => 1,
 
-                        195 => { 1 }
+                        195 => 1,
 
-                        197 => { 1 }
+                        197 => 1,
 
-                        198 => { 1 }
+                        198 => 1,
 
-                        199 => { 1 }
+                        199 => 1,
 
-                        201 => { 1 }
+                        201 => 1,
 
-                        202 => { 1 }
+                        202 => 1,
 
-                        203 => { 1 }
+                        203 => 1,
 
-                        205 => { 1 }
+                        205 => 1,
 
-                        206 => { 1 }
+                        206 => 1,
 
-                        207 => { 1 }
+                        207 => 1,
                     }
                 } else {
                     return None;
@@ -3390,53 +3508,53 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             if b == 255 {
                 let b = lookahead.read_byte()?;
                 match b {
-                    220 => { 0 }
+                    220 => 0,
 
-                    217 => { 1 }
+                    217 => 1,
 
-                    218 => { 1 }
+                    218 => 1,
 
-                    219 => { 1 }
+                    219 => 1,
 
-                    196 => { 1 }
+                    196 => 1,
 
-                    204 => { 1 }
+                    204 => 1,
 
-                    221 => { 1 }
+                    221 => 1,
 
-                    224 => { 1 }
+                    224 => 1,
 
-                    225 => { 1 }
+                    225 => 1,
 
-                    226 => { 1 }
+                    226 => 1,
 
-                    227 => { 1 }
+                    227 => 1,
 
-                    228 => { 1 }
+                    228 => 1,
 
-                    229 => { 1 }
+                    229 => 1,
 
-                    230 => { 1 }
+                    230 => 1,
 
-                    231 => { 1 }
+                    231 => 1,
 
-                    232 => { 1 }
+                    232 => 1,
 
-                    233 => { 1 }
+                    233 => 1,
 
-                    234 => { 1 }
+                    234 => 1,
 
-                    235 => { 1 }
+                    235 => 1,
 
-                    236 => { 1 }
+                    236 => 1,
 
-                    237 => { 1 }
+                    237 => 1,
 
-                    238 => { 1 }
+                    238 => 1,
 
-                    239 => { 1 }
+                    239 => 1,
 
-                    254 => { 1 }
+                    254 => 1,
                 }
             } else {
                 return None;
@@ -3463,51 +3581,51 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 if b == 255 {
                     let b = lookahead.read_byte()?;
                     match b {
-                        218 => { 0 }
+                        218 => 0,
 
-                        219 => { 0 }
+                        219 => 0,
 
-                        196 => { 0 }
+                        196 => 0,
 
-                        204 => { 0 }
+                        204 => 0,
 
-                        221 => { 0 }
+                        221 => 0,
 
-                        224 => { 0 }
+                        224 => 0,
 
-                        225 => { 0 }
+                        225 => 0,
 
-                        226 => { 0 }
+                        226 => 0,
 
-                        227 => { 0 }
+                        227 => 0,
 
-                        228 => { 0 }
+                        228 => 0,
 
-                        229 => { 0 }
+                        229 => 0,
 
-                        230 => { 0 }
+                        230 => 0,
 
-                        231 => { 0 }
+                        231 => 0,
 
-                        232 => { 0 }
+                        232 => 0,
 
-                        233 => { 0 }
+                        233 => 0,
 
-                        234 => { 0 }
+                        234 => 0,
 
-                        235 => { 0 }
+                        235 => 0,
 
-                        236 => { 0 }
+                        236 => 0,
 
-                        237 => { 0 }
+                        237 => 0,
 
-                        238 => { 0 }
+                        238 => 0,
 
-                        239 => { 0 }
+                        239 => 0,
 
-                        254 => { 0 }
+                        254 => 0,
 
-                        217 => { 1 }
+                        217 => 1,
                     }
                 } else {
                     return None;
@@ -3522,7 +3640,14 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    Some(Type59 { initial_segment, segments, header, scan, dnl, scans })
+    Some(Type59 {
+        initial_segment,
+        segments,
+        header,
+        scan,
+        dnl,
+        scans,
+    })
 }
 
 fn Decoder68<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
@@ -3567,7 +3692,11 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type25 { marker, length, data })
+    Some(Type25 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type34> {
@@ -3592,7 +3721,11 @@ fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type34 { marker, length, data })
+    Some(Type34 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type45> {
@@ -3602,47 +3735,47 @@ fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         if b == 255 {
             let b = lookahead.read_byte()?;
             match b {
-                219 => { 0 }
+                219 => 0,
 
-                196 => { 1 }
+                196 => 1,
 
-                204 => { 2 }
+                204 => 2,
 
-                221 => { 3 }
+                221 => 3,
 
-                224 => { 4 }
+                224 => 4,
 
-                225 => { 5 }
+                225 => 5,
 
-                226 => { 6 }
+                226 => 6,
 
-                227 => { 7 }
+                227 => 7,
 
-                228 => { 8 }
+                228 => 8,
 
-                229 => { 9 }
+                229 => 9,
 
-                230 => { 10 }
+                230 => 10,
 
-                231 => { 11 }
+                231 => 11,
 
-                232 => { 12 }
+                232 => 12,
 
-                233 => { 13 }
+                233 => 13,
 
-                234 => { 14 }
+                234 => 14,
 
-                235 => { 15 }
+                235 => 15,
 
-                236 => { 16 }
+                236 => 16,
 
-                237 => { 17 }
+                237 => 17,
 
-                238 => { 18 }
+                238 => 18,
 
-                239 => { 19 }
+                239 => 19,
 
-                254 => { 20 }
+                254 => 20,
             }
         } else {
             return None;
@@ -3763,31 +3896,31 @@ fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         if b == 255 {
             let b = lookahead.read_byte()?;
             match b {
-                192 => { 0 }
+                192 => 0,
 
-                193 => { 1 }
+                193 => 1,
 
-                194 => { 2 }
+                194 => 2,
 
-                195 => { 3 }
+                195 => 3,
 
-                197 => { 4 }
+                197 => 4,
 
-                198 => { 5 }
+                198 => 5,
 
-                199 => { 6 }
+                199 => 6,
 
-                201 => { 7 }
+                201 => 7,
 
-                202 => { 8 }
+                202 => 8,
 
-                203 => { 9 }
+                203 => 9,
 
-                205 => { 10 }
+                205 => 10,
 
-                206 => { 11 }
+                206 => 11,
 
-                207 => { 12 }
+                207 => 12,
             }
         } else {
             return None;
@@ -3871,49 +4004,49 @@ fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 if b == 255 {
                     let b = lookahead.read_byte()?;
                     match b {
-                        219 => { 0 }
+                        219 => 0,
 
-                        196 => { 0 }
+                        196 => 0,
 
-                        204 => { 0 }
+                        204 => 0,
 
-                        221 => { 0 }
+                        221 => 0,
 
-                        224 => { 0 }
+                        224 => 0,
 
-                        225 => { 0 }
+                        225 => 0,
 
-                        226 => { 0 }
+                        226 => 0,
 
-                        227 => { 0 }
+                        227 => 0,
 
-                        228 => { 0 }
+                        228 => 0,
 
-                        229 => { 0 }
+                        229 => 0,
 
-                        230 => { 0 }
+                        230 => 0,
 
-                        231 => { 0 }
+                        231 => 0,
 
-                        232 => { 0 }
+                        232 => 0,
 
-                        233 => { 0 }
+                        233 => 0,
 
-                        234 => { 0 }
+                        234 => 0,
 
-                        235 => { 0 }
+                        235 => 0,
 
-                        236 => { 0 }
+                        236 => 0,
 
-                        237 => { 0 }
+                        237 => 0,
 
-                        238 => { 0 }
+                        238 => 0,
 
-                        239 => { 0 }
+                        239 => 0,
 
-                        254 => { 0 }
+                        254 => 0,
 
-                        218 => { 1 }
+                        218 => 1,
                     }
                 } else {
                     return None;
@@ -3930,7 +4063,11 @@ fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let sos = { Decoder76(scope, input)? };
     let data = { Decoder90(scope, input)? };
-    Some(Type55 { segments, sos, data })
+    Some(Type55 {
+        segments,
+        sos,
+        data,
+    })
 }
 
 fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
@@ -3955,7 +4092,11 @@ fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type57 { marker, length, data })
+    Some(Type57 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type55> {
@@ -3968,49 +4109,49 @@ fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 if b == 255 {
                     let b = lookahead.read_byte()?;
                     match b {
-                        219 => { 0 }
+                        219 => 0,
 
-                        196 => { 0 }
+                        196 => 0,
 
-                        204 => { 0 }
+                        204 => 0,
 
-                        221 => { 0 }
+                        221 => 0,
 
-                        224 => { 0 }
+                        224 => 0,
 
-                        225 => { 0 }
+                        225 => 0,
 
-                        226 => { 0 }
+                        226 => 0,
 
-                        227 => { 0 }
+                        227 => 0,
 
-                        228 => { 0 }
+                        228 => 0,
 
-                        229 => { 0 }
+                        229 => 0,
 
-                        230 => { 0 }
+                        230 => 0,
 
-                        231 => { 0 }
+                        231 => 0,
 
-                        232 => { 0 }
+                        232 => 0,
 
-                        233 => { 0 }
+                        233 => 0,
 
-                        234 => { 0 }
+                        234 => 0,
 
-                        235 => { 0 }
+                        235 => 0,
 
-                        236 => { 0 }
+                        236 => 0,
 
-                        237 => { 0 }
+                        237 => 0,
 
-                        238 => { 0 }
+                        238 => 0,
 
-                        239 => { 0 }
+                        239 => 0,
 
-                        254 => { 0 }
+                        254 => 0,
 
-                        218 => { 1 }
+                        218 => 1,
                     }
                 } else {
                     return None;
@@ -4027,7 +4168,11 @@ fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let sos = { Decoder76(scope, input)? };
     let data = { Decoder77(scope, input)? };
-    Some(Type55 { segments, sos, data })
+    Some(Type55 {
+        segments,
+        sos,
+        data,
+    })
 }
 
 fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type52> {
@@ -4052,7 +4197,11 @@ fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type52 { marker, length, data })
+    Some(Type52 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
@@ -4063,74 +4212,74 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 255 => { 0 }
+                    tmp if tmp != 255 => 0,
 
                     255 => {
                         let b = lookahead.read_byte()?;
                         match b {
-                            0 => { 0 }
+                            0 => 0,
 
-                            208 => { 0 }
+                            208 => 0,
 
-                            209 => { 0 }
+                            209 => 0,
 
-                            210 => { 0 }
+                            210 => 0,
 
-                            211 => { 0 }
+                            211 => 0,
 
-                            212 => { 0 }
+                            212 => 0,
 
-                            213 => { 0 }
+                            213 => 0,
 
-                            214 => { 0 }
+                            214 => 0,
 
-                            215 => { 0 }
+                            215 => 0,
 
-                            217 => { 1 }
+                            217 => 1,
 
-                            218 => { 1 }
+                            218 => 1,
 
-                            219 => { 1 }
+                            219 => 1,
 
-                            196 => { 1 }
+                            196 => 1,
 
-                            204 => { 1 }
+                            204 => 1,
 
-                            221 => { 1 }
+                            221 => 1,
 
-                            224 => { 1 }
+                            224 => 1,
 
-                            225 => { 1 }
+                            225 => 1,
 
-                            226 => { 1 }
+                            226 => 1,
 
-                            227 => { 1 }
+                            227 => 1,
 
-                            228 => { 1 }
+                            228 => 1,
 
-                            229 => { 1 }
+                            229 => 1,
 
-                            230 => { 1 }
+                            230 => 1,
 
-                            231 => { 1 }
+                            231 => 1,
 
-                            232 => { 1 }
+                            232 => 1,
 
-                            233 => { 1 }
+                            233 => 1,
 
-                            234 => { 1 }
+                            234 => 1,
 
-                            235 => { 1 }
+                            235 => 1,
 
-                            236 => { 1 }
+                            236 => 1,
 
-                            237 => { 1 }
+                            237 => 1,
 
-                            238 => { 1 }
+                            238 => 1,
 
-                            239 => { 1 }
+                            239 => 1,
 
-                            254 => { 1 }
+                            254 => 1,
                         }
                     }
                 }
@@ -4141,28 +4290,28 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut input.clone();
                         let b = lookahead.read_byte()?;
                         match b {
-                            tmp if tmp != 255 => { 0 }
+                            tmp if tmp != 255 => 0,
 
                             255 => {
                                 let b = lookahead.read_byte()?;
                                 match b {
-                                    0 => { 0 }
+                                    0 => 0,
 
-                                    208 => { 1 }
+                                    208 => 1,
 
-                                    209 => { 2 }
+                                    209 => 2,
 
-                                    210 => { 3 }
+                                    210 => 3,
 
-                                    211 => { 4 }
+                                    211 => 4,
 
-                                    212 => { 5 }
+                                    212 => 5,
 
-                                    213 => { 6 }
+                                    213 => 6,
 
-                                    214 => { 7 }
+                                    214 => 7,
 
-                                    215 => { 8 }
+                                    215 => 8,
                                 }
                             }
                         }
@@ -4224,30 +4373,31 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let scan_data_stream = {
         scan_data
             .into_iter()
-            .flat_map(|x| {
-                match x {
-                    Type53::mcu(v) => { [v].to_vec() }
+            .flat_map(|x| match x {
+                Type53::mcu(v) => [v].to_vec(),
 
-                    Type53::rst0(_) => { [].to_vec() }
+                Type53::rst0(_) => [].to_vec(),
 
-                    Type53::rst1(_) => { [].to_vec() }
+                Type53::rst1(_) => [].to_vec(),
 
-                    Type53::rst2(_) => { [].to_vec() }
+                Type53::rst2(_) => [].to_vec(),
 
-                    Type53::rst3(_) => { [].to_vec() }
+                Type53::rst3(_) => [].to_vec(),
 
-                    Type53::rst4(_) => { [].to_vec() }
+                Type53::rst4(_) => [].to_vec(),
 
-                    Type53::rst5(_) => { [].to_vec() }
+                Type53::rst5(_) => [].to_vec(),
 
-                    Type53::rst6(_) => { [].to_vec() }
+                Type53::rst6(_) => [].to_vec(),
 
-                    Type53::rst7(_) => { [].to_vec() }
-                }
+                Type53::rst7(_) => [].to_vec(),
             })
             .collect()
     };
-    Some(Type54 { scan_data, scan_data_stream })
+    Some(Type54 {
+        scan_data,
+        scan_data_stream,
+    })
 }
 
 fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
@@ -4255,9 +4405,9 @@ fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         let lookahead = &mut input.clone();
         let b = lookahead.read_byte()?;
         match b {
-            tmp if tmp != 255 => { 0 }
+            tmp if tmp != 255 => 0,
 
-            255 => { 1 }
+            255 => 1,
         }
     };
     Some(match tree_index {
@@ -4479,7 +4629,10 @@ fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
 fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type50> {
     let component_selector = { Decoder16(scope, input)? };
     let entropy_coding_table_ids = { Decoder16(scope, input)? };
-    Some(Type50 { component_selector, entropy_coding_table_ids })
+    Some(Type50 {
+        component_selector,
+        entropy_coding_table_ids,
+    })
 }
 
 fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
@@ -4495,76 +4648,76 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 255 => { 0 }
+                    tmp if tmp != 255 => 0,
 
                     255 => {
                         let b = lookahead.read_byte()?;
                         match b {
-                            0 => { 0 }
+                            0 => 0,
 
-                            208 => { 0 }
+                            208 => 0,
 
-                            209 => { 0 }
+                            209 => 0,
 
-                            210 => { 0 }
+                            210 => 0,
 
-                            211 => { 0 }
+                            211 => 0,
 
-                            212 => { 0 }
+                            212 => 0,
 
-                            213 => { 0 }
+                            213 => 0,
 
-                            214 => { 0 }
+                            214 => 0,
 
-                            215 => { 0 }
+                            215 => 0,
 
-                            220 => { 1 }
+                            220 => 1,
 
-                            217 => { 1 }
+                            217 => 1,
 
-                            218 => { 1 }
+                            218 => 1,
 
-                            219 => { 1 }
+                            219 => 1,
 
-                            196 => { 1 }
+                            196 => 1,
 
-                            204 => { 1 }
+                            204 => 1,
 
-                            221 => { 1 }
+                            221 => 1,
 
-                            224 => { 1 }
+                            224 => 1,
 
-                            225 => { 1 }
+                            225 => 1,
 
-                            226 => { 1 }
+                            226 => 1,
 
-                            227 => { 1 }
+                            227 => 1,
 
-                            228 => { 1 }
+                            228 => 1,
 
-                            229 => { 1 }
+                            229 => 1,
 
-                            230 => { 1 }
+                            230 => 1,
 
-                            231 => { 1 }
+                            231 => 1,
 
-                            232 => { 1 }
+                            232 => 1,
 
-                            233 => { 1 }
+                            233 => 1,
 
-                            234 => { 1 }
+                            234 => 1,
 
-                            235 => { 1 }
+                            235 => 1,
 
-                            236 => { 1 }
+                            236 => 1,
 
-                            237 => { 1 }
+                            237 => 1,
 
-                            238 => { 1 }
+                            238 => 1,
 
-                            239 => { 1 }
+                            239 => 1,
 
-                            254 => { 1 }
+                            254 => 1,
                         }
                     }
                 }
@@ -4575,28 +4728,28 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         let lookahead = &mut input.clone();
                         let b = lookahead.read_byte()?;
                         match b {
-                            tmp if tmp != 255 => { 0 }
+                            tmp if tmp != 255 => 0,
 
                             255 => {
                                 let b = lookahead.read_byte()?;
                                 match b {
-                                    0 => { 0 }
+                                    0 => 0,
 
-                                    208 => { 1 }
+                                    208 => 1,
 
-                                    209 => { 2 }
+                                    209 => 2,
 
-                                    210 => { 3 }
+                                    210 => 3,
 
-                                    211 => { 4 }
+                                    211 => 4,
 
-                                    212 => { 5 }
+                                    212 => 5,
 
-                                    213 => { 6 }
+                                    213 => 6,
 
-                                    214 => { 7 }
+                                    214 => 7,
 
-                                    215 => { 8 }
+                                    215 => 8,
                                 }
                             }
                         }
@@ -4658,30 +4811,31 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let scan_data_stream = {
         scan_data
             .into_iter()
-            .flat_map(|x| {
-                match x {
-                    Type53::mcu(v) => { [v].to_vec() }
+            .flat_map(|x| match x {
+                Type53::mcu(v) => [v].to_vec(),
 
-                    Type53::rst0(_) => { [].to_vec() }
+                Type53::rst0(_) => [].to_vec(),
 
-                    Type53::rst1(_) => { [].to_vec() }
+                Type53::rst1(_) => [].to_vec(),
 
-                    Type53::rst2(_) => { [].to_vec() }
+                Type53::rst2(_) => [].to_vec(),
 
-                    Type53::rst3(_) => { [].to_vec() }
+                Type53::rst3(_) => [].to_vec(),
 
-                    Type53::rst4(_) => { [].to_vec() }
+                Type53::rst4(_) => [].to_vec(),
 
-                    Type53::rst5(_) => { [].to_vec() }
+                Type53::rst5(_) => [].to_vec(),
 
-                    Type53::rst6(_) => { [].to_vec() }
+                Type53::rst6(_) => [].to_vec(),
 
-                    Type53::rst7(_) => { [].to_vec() }
-                }
+                Type53::rst7(_) => [].to_vec(),
             })
             .collect()
     };
-    Some(Type54 { scan_data, scan_data_stream })
+    Some(Type54 {
+        scan_data,
+        scan_data_stream,
+    })
 }
 
 fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4706,7 +4860,11 @@ fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4731,7 +4889,11 @@ fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4756,7 +4918,11 @@ fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4781,7 +4947,11 @@ fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4806,7 +4976,11 @@ fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4831,7 +5005,11 @@ fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4856,7 +5034,11 @@ fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4881,7 +5063,11 @@ fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4906,7 +5092,11 @@ fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4931,7 +5121,11 @@ fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4956,7 +5150,11 @@ fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -4981,7 +5179,11 @@ fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
@@ -5006,7 +5208,11 @@ fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type48 { marker, length, data })
+    Some(Type48 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder104<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type47> {
@@ -5034,7 +5240,11 @@ fn Decoder105<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let id = { Decoder16(scope, input)? };
     let sampling_factor = { Decoder16(scope, input)? };
     let quantization_table_id = { Decoder16(scope, input)? };
-    Some(Type46 { id, sampling_factor, quantization_table_id })
+    Some(Type46 {
+        id,
+        sampling_factor,
+        quantization_table_id,
+    })
 }
 
 fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type42> {
@@ -5059,7 +5269,11 @@ fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type42 { marker, length, data })
+    Some(Type42 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type40> {
@@ -5084,7 +5298,11 @@ fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type40 { marker, length, data })
+    Some(Type40 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type38> {
@@ -5109,7 +5327,11 @@ fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type38 { marker, length, data })
+    Some(Type38 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type44> {
@@ -5134,7 +5356,11 @@ fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type44 { marker, length, data })
+    Some(Type44 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5159,7 +5385,11 @@ fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5184,7 +5414,11 @@ fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5209,7 +5443,11 @@ fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5234,7 +5472,11 @@ fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5259,7 +5501,11 @@ fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5284,7 +5530,11 @@ fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5309,7 +5559,11 @@ fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder117<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5334,7 +5588,11 @@ fn Decoder117<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder118<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5359,7 +5617,11 @@ fn Decoder118<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder119<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5384,7 +5646,11 @@ fn Decoder119<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5409,7 +5675,11 @@ fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder121<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5434,7 +5704,11 @@ fn Decoder121<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5459,7 +5733,11 @@ fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder123<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5484,7 +5762,11 @@ fn Decoder123<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
@@ -5509,7 +5791,11 @@ fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let length = { Decoder42(scope, input)? };
     let data = { unimplemented!(r#"translate @ Decoder::Slice"#) };
-    Some(Type36 { marker, length, data })
+    Some(Type36 {
+        marker,
+        length,
+        data,
+    })
 }
 
 fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type43> {
@@ -5520,7 +5806,10 @@ fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type37> {
     let class_table_id = { Decoder16(scope, input)? };
     let value = { Decoder16(scope, input)? };
-    Some(Type37 { class_table_id, value })
+    Some(Type37 {
+        class_table_id,
+        value,
+    })
 }
 
 fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type39> {
@@ -5548,7 +5837,11 @@ fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    Some(Type39 { class_table_id, num_codes, values })
+    Some(Type39 {
+        class_table_id,
+        num_codes,
+        values,
+    })
 }
 
 fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
@@ -5569,7 +5862,10 @@ fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    Some(Type41 { precision_table_id, elements })
+    Some(Type41 {
+        precision_table_id,
+        elements,
+    })
 }
 
 fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type33> {
@@ -5581,10 +5877,8 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 Type32::exif(inner)
             }
 
-            [
-                104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111,
-                109, 47, 120, 97, 112, 47, 49, 46, 48, 47,
-            ] => {
+            [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] =>
+            {
                 let inner = Decoder132(scope, input)?;
                 Type32::xmp(inner)
             }
@@ -5621,9 +5915,9 @@ fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -5692,9 +5986,9 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             let lookahead = &mut input.clone();
             let b = lookahead.read_byte()?;
             match b {
-                73 => { 0 }
+                73 => 0,
 
-                77 => { 1 }
+                77 => 1,
             }
         };
         match tree_index {
@@ -5741,20 +6035,25 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let magic = {
         match byte_order {
-            Type26::le(_) => { Decoder134(scope, input)? }
+            Type26::le(_) => Decoder134(scope, input)?,
 
-            Type26::be(_) => { Decoder42(scope, input)? }
+            Type26::be(_) => Decoder42(scope, input)?,
         }
     };
     let offset = {
         match byte_order {
-            Type26::le(_) => { Decoder23(scope, input)? }
+            Type26::le(_) => Decoder23(scope, input)?,
 
-            Type26::be(_) => { Decoder32(scope, input)? }
+            Type26::be(_) => Decoder32(scope, input)?,
         }
     };
     let ifd = { unimplemented!(r#"translate @ Decoder::WithRelativeOffset"#) };
-    Some(Type29 { byte_order, magic, offset, ifd })
+    Some(Type29 {
+        byte_order,
+        magic,
+        offset,
+        ifd,
+    })
 }
 
 fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
@@ -5807,9 +6106,9 @@ fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -5938,7 +6237,10 @@ fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    Some(Type4 { descriptor, global_color_table })
+    Some(Type4 {
+        descriptor,
+        global_color_table,
+    })
 }
 
 fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type17> {
@@ -5949,17 +6251,17 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             33 => {
                 let b = lookahead.read_byte()?;
                 match b {
-                    249 => { 0 }
+                    249 => 0,
 
-                    1 => { 0 }
+                    1 => 0,
 
-                    255 => { 1 }
+                    255 => 1,
 
-                    254 => { 1 }
+                    254 => 1,
                 }
             }
 
-            44 => { 0 }
+            44 => 0,
         }
     };
     Some(match tree_index {
@@ -5996,13 +6298,13 @@ fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 33 => {
                     let b = lookahead.read_byte()?;
                     match b {
-                        249 => { 0 }
+                        249 => 0,
 
-                        1 => { 1 }
+                        1 => 1,
                     }
                 }
 
-                44 => { 1 }
+                44 => 1,
             }
         };
         match tree_index {
@@ -6018,7 +6320,10 @@ fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let graphic_rendering_block = { Decoder150(scope, input)? };
-    Some(Type13 { graphic_control_extension, graphic_rendering_block })
+    Some(Type13 {
+        graphic_control_extension,
+        graphic_rendering_block,
+    })
 }
 
 fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
@@ -6028,9 +6333,9 @@ fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         if b == 33 {
             let b = lookahead.read_byte()?;
             match b {
-                255 => { 0 }
+                255 => 0,
 
-                254 => { 1 }
+                254 => 1,
             }
         } else {
             return None;
@@ -6095,9 +6400,9 @@ fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -6145,9 +6450,9 @@ fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -6160,7 +6465,12 @@ fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         accum
     };
     let terminator = { Decoder148(scope, input)? };
-    Some(Type15 { separator, label, comment_data, terminator })
+    Some(Type15 {
+        separator,
+        label,
+        comment_data,
+        terminator,
+    })
 }
 
 fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
@@ -6184,13 +6494,11 @@ fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = input.read_byte()?;
-    Some(
-        if b == 0 {
-            b
-        } else {
-            return None;
-        }
-    )
+    Some(if b == 0 {
+        b
+    } else {
+        return None;
+    })
 }
 
 fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
@@ -6238,9 +6546,9 @@ fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         let lookahead = &mut input.clone();
         let b = lookahead.read_byte()?;
         match b {
-            44 => { 0 }
+            44 => 0,
 
-            33 => { 1 }
+            33 => 1,
         }
     };
     Some(match tree_index {
@@ -6278,7 +6586,11 @@ fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let data = { Decoder155(scope, input)? };
-    Some(Type11 { descriptor, local_color_table, data })
+    Some(Type11 {
+        descriptor,
+        local_color_table,
+        data,
+    })
 }
 
 fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
@@ -6321,9 +6633,9 @@ fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -6393,9 +6705,9 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 let lookahead = &mut input.clone();
                 let b = lookahead.read_byte()?;
                 match b {
-                    tmp if tmp != 0 => { 0 }
+                    tmp if tmp != 0 => 0,
 
-                    0 => { 1 }
+                    0 => 1,
                 }
             };
             if matching_ix == 0 {
@@ -6408,7 +6720,11 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         accum
     };
     let terminator = { Decoder148(scope, input)? };
-    Some(Type10 { lzw_min_code_size, image_data, terminator })
+    Some(Type10 {
+        lzw_min_code_size,
+        image_data,
+        terminator,
+    })
 }
 
 fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type1> {
@@ -6417,7 +6733,13 @@ fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let flags = { Decoder16(scope, input)? };
     let bg_color_index = { Decoder16(scope, input)? };
     let pixel_aspect_ratio = { Decoder16(scope, input)? };
-    Some(Type1 { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
+    Some(Type1 {
+        screen_width,
+        screen_height,
+        flags,
+        bg_color_index,
+        pixel_aspect_ratio,
+    })
 }
 
 #[test]
