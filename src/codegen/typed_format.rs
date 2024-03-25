@@ -432,8 +432,8 @@ mod __impls {
                 TypedExpr::U64Be(x) => Expr::U64Be(rebox(x)),
                 TypedExpr::U64Le(x) => Expr::U64Le(rebox(x)),
                 TypedExpr::SeqLength(x) => Expr::SeqLength(rebox(x)),
-                TypedExpr::SubSeq(_, start, len, seq) => {
-                    Expr::SubSeq(rebox(start), rebox(len), rebox(seq))
+                TypedExpr::SubSeq(_, seq, start, len) => {
+                    Expr::SubSeq(rebox(seq), rebox(start), rebox(len))
                 }
                 TypedExpr::FlatMap(_, lambda, seq) => Expr::FlatMap(rebox(lambda), rebox(seq)),
                 TypedExpr::FlatMapAccum(_, lambda, acc, vt, seq) => {
