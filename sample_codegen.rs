@@ -1,3 +1,4 @@
+
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 use doodle::prelude::*;
@@ -158,8 +159,12 @@ struct Type19 {
 
 #[derive(Debug, Clone)]
 struct Type20 {
-    ff: u8,
-    marker: u8,
+    magic: (u8, u8),
+    method: u8,
+    file_flags: u8,
+    timestamp: u32,
+    compression_flags: u8,
+    os_id: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -169,7 +174,147 @@ struct Type21 {
 }
 
 #[derive(Debug, Clone)]
-struct Type22 {
+enum Type22 {
+    no,
+    yes(Type21),
+}
+
+#[derive(Debug, Clone)]
+struct Type23 {
+    code: u16,
+    extra: u8,
+}
+
+#[derive(Debug, Clone)]
+struct Type24 {
+    distance_extra_bits: u16,
+    distance: u16,
+}
+
+#[derive(Debug, Clone)]
+struct Type25 {
+    length_extra_bits: u8,
+    length: u16,
+    distance_code: u16,
+    distance_record: Type24,
+}
+
+#[derive(Debug, Clone)]
+enum Type26 {
+    none,
+    some(Type25),
+}
+
+#[derive(Debug, Clone)]
+struct Type27 {
+    code: u16,
+    extra: Type26,
+}
+
+#[derive(Debug, Clone)]
+struct Type28 {
+    length: u16,
+    distance: u16,
+}
+
+#[derive(Debug, Clone)]
+enum Type29 {
+    literal(u8),
+    reference(Type28),
+}
+
+#[derive(Debug, Clone)]
+struct Type30 {
+    hlit: u8,
+    hdist: u8,
+    hclen: u8,
+    code_length_alphabet_code_lengths: Vec<u8>,
+    literal_length_distance_alphabet_code_lengths: Vec<Type23>,
+    literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
+    literal_length_alphabet_code_lengths_value: Vec<u8>,
+    distance_alphabet_code_lengths_value: Vec<u8>,
+    codes: Vec<Type27>,
+    codes_values: Vec<Type29>,
+}
+
+#[derive(Debug, Clone)]
+struct Type31 {
+    length_extra_bits: u8,
+    length: u16,
+    distance_code: u8,
+    distance_record: Type24,
+}
+
+#[derive(Debug, Clone)]
+enum Type32 {
+    none,
+    some(Type31),
+}
+
+#[derive(Debug, Clone)]
+struct Type33 {
+    code: u16,
+    extra: Type32,
+}
+
+#[derive(Debug, Clone)]
+struct Type34 {
+    codes: Vec<Type33>,
+    codes_values: Vec<Type29>,
+}
+
+#[derive(Debug, Clone)]
+struct Type35 {
+    align: (),
+    len: u16,
+    nlen: u16,
+    bytes: Vec<u8>,
+    codes_values: Vec<Type29>,
+}
+
+#[derive(Debug, Clone)]
+enum Type36 {
+    dynamic_huffman(Type30),
+    fixed_huffman(Type34),
+    uncompressed(Type35),
+}
+
+#[derive(Debug, Clone)]
+struct Type37 {
+    r#final: u8,
+    r#type: u8,
+    data: Type36,
+}
+
+#[derive(Debug, Clone)]
+struct Type38 {
+    blocks: Vec<Type37>,
+    codes: Vec<Type29>,
+    inflate: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+struct Type39 {
+    crc: u32,
+    length: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Type40 {
+    header: Type20,
+    fname: Type22,
+    data: Type38,
+    footer: Type39,
+}
+
+#[derive(Debug, Clone)]
+struct Type41 {
+    ff: u8,
+    marker: u8,
+}
+
+#[derive(Debug, Clone)]
+struct Type42 {
     version_major: u8,
     version_minor: u8,
     density_units: u8,
@@ -181,32 +326,32 @@ struct Type22 {
 }
 
 #[derive(Debug, Clone)]
-enum Type23 {
-    jfif(Type22),
+enum Type43 {
+    jfif(Type42),
     other(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type24 {
+struct Type44 {
     identifier: Type21,
-    data: Type23,
+    data: Type43,
 }
 
 #[derive(Debug, Clone)]
-struct Type25 {
-    marker: Type20,
+struct Type45 {
+    marker: Type41,
     length: u16,
-    data: Type24,
+    data: Type44,
 }
 
 #[derive(Debug, Clone)]
-enum Type26 {
+enum Type46 {
     be(u8, u8),
     le(u8, u8),
 }
 
 #[derive(Debug, Clone)]
-struct Type27 {
+struct Type47 {
     tag: u16,
     r#type: u16,
     length: u32,
@@ -214,274 +359,274 @@ struct Type27 {
 }
 
 #[derive(Debug, Clone)]
-struct Type28 {
+struct Type48 {
     num_fields: u16,
-    fields: Vec<Type27>,
+    fields: Vec<Type47>,
     next_ifd_offset: u32,
     next_ifd: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type29 {
-    byte_order: Type26,
+struct Type49 {
+    byte_order: Type46,
     magic: u16,
     offset: u32,
-    ifd: Type28,
+    ifd: Type48,
 }
 
 #[derive(Debug, Clone)]
-struct Type30 {
+struct Type50 {
     padding: u8,
-    exif: Type29,
+    exif: Type49,
 }
 
 #[derive(Debug, Clone)]
-struct Type31 {
+struct Type51 {
     xmp: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-enum Type32 {
-    exif(Type30),
+enum Type52 {
+    exif(Type50),
     other(Vec<u8>),
-    xmp(Type31),
+    xmp(Type51),
 }
 
 #[derive(Debug, Clone)]
-struct Type33 {
+struct Type53 {
     identifier: Type21,
-    data: Type32,
+    data: Type52,
 }
 
 #[derive(Debug, Clone)]
-struct Type34 {
-    marker: Type20,
+struct Type54 {
+    marker: Type41,
     length: u16,
-    data: Type33,
+    data: Type53,
 }
 
 #[derive(Debug, Clone)]
-enum Type35 {
-    app0(Type25),
-    app1(Type34),
+enum Type55 {
+    app0(Type45),
+    app1(Type54),
 }
 
 #[derive(Debug, Clone)]
-struct Type36 {
-    marker: Type20,
+struct Type56 {
+    marker: Type41,
     length: u16,
     data: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type37 {
+struct Type57 {
     class_table_id: u8,
     value: u8,
 }
 
 #[derive(Debug, Clone)]
-struct Type38 {
-    marker: Type20,
+struct Type58 {
+    marker: Type41,
     length: u16,
-    data: Type37,
+    data: Type57,
 }
 
 #[derive(Debug, Clone)]
-struct Type39 {
+struct Type59 {
     class_table_id: u8,
     num_codes: Vec<u8>,
     values: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type40 {
-    marker: Type20,
+struct Type60 {
+    marker: Type41,
     length: u16,
-    data: Type39,
+    data: Type59,
 }
 
 #[derive(Debug, Clone)]
-struct Type41 {
+struct Type61 {
     precision_table_id: u8,
     elements: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type42 {
-    marker: Type20,
+struct Type62 {
+    marker: Type41,
     length: u16,
-    data: Type41,
+    data: Type61,
 }
 
 #[derive(Debug, Clone)]
-struct Type43 {
+struct Type63 {
     restart_interval: u16,
 }
 
 #[derive(Debug, Clone)]
-struct Type44 {
-    marker: Type20,
+struct Type64 {
+    marker: Type41,
     length: u16,
-    data: Type43,
+    data: Type63,
 }
 
 #[derive(Debug, Clone)]
-enum Type45 {
-    app0(Type25),
-    app1(Type34),
-    app10(Type36),
-    app11(Type36),
-    app12(Type36),
-    app13(Type36),
-    app14(Type36),
-    app15(Type36),
-    app2(Type36),
-    app3(Type36),
-    app4(Type36),
-    app5(Type36),
-    app6(Type36),
-    app7(Type36),
-    app8(Type36),
-    app9(Type36),
-    com(Type36),
-    dac(Type38),
-    dht(Type40),
-    dqt(Type42),
-    dri(Type44),
+enum Type65 {
+    app0(Type45),
+    app1(Type54),
+    app10(Type56),
+    app11(Type56),
+    app12(Type56),
+    app13(Type56),
+    app14(Type56),
+    app15(Type56),
+    app2(Type56),
+    app3(Type56),
+    app4(Type56),
+    app5(Type56),
+    app6(Type56),
+    app7(Type56),
+    app8(Type56),
+    app9(Type56),
+    com(Type56),
+    dac(Type58),
+    dht(Type60),
+    dqt(Type62),
+    dri(Type64),
 }
 
 #[derive(Debug, Clone)]
-struct Type46 {
+struct Type66 {
     id: u8,
     sampling_factor: u8,
     quantization_table_id: u8,
 }
 
 #[derive(Debug, Clone)]
-struct Type47 {
+struct Type67 {
     sample_precision: u8,
     num_lines: u16,
     num_samples_per_line: u16,
     num_image_components: u8,
-    image_components: Vec<Type46>,
+    image_components: Vec<Type66>,
 }
 
 #[derive(Debug, Clone)]
-struct Type48 {
-    marker: Type20,
+struct Type68 {
+    marker: Type41,
     length: u16,
-    data: Type47,
+    data: Type67,
 }
 
 #[derive(Debug, Clone)]
-enum Type49 {
-    sof0(Type48),
-    sof1(Type48),
-    sof10(Type48),
-    sof11(Type48),
-    sof13(Type48),
-    sof14(Type48),
-    sof15(Type48),
-    sof2(Type48),
-    sof3(Type48),
-    sof5(Type48),
-    sof6(Type48),
-    sof7(Type48),
-    sof9(Type48),
+enum Type69 {
+    sof0(Type68),
+    sof1(Type68),
+    sof10(Type68),
+    sof11(Type68),
+    sof13(Type68),
+    sof14(Type68),
+    sof15(Type68),
+    sof2(Type68),
+    sof3(Type68),
+    sof5(Type68),
+    sof6(Type68),
+    sof7(Type68),
+    sof9(Type68),
 }
 
 #[derive(Debug, Clone)]
-struct Type50 {
+struct Type70 {
     component_selector: u8,
     entropy_coding_table_ids: u8,
 }
 
 #[derive(Debug, Clone)]
-struct Type51 {
+struct Type71 {
     num_image_components: u8,
-    image_components: Vec<Type50>,
+    image_components: Vec<Type70>,
     start_spectral_selection: u8,
     end_spectral_selection: u8,
     approximation_bit_position: u8,
 }
 
 #[derive(Debug, Clone)]
-struct Type52 {
-    marker: Type20,
+struct Type72 {
+    marker: Type41,
     length: u16,
-    data: Type51,
+    data: Type71,
 }
 
 #[derive(Debug, Clone)]
-enum Type53 {
+enum Type73 {
     mcu(u8),
-    rst0(Type20),
-    rst1(Type20),
-    rst2(Type20),
-    rst3(Type20),
-    rst4(Type20),
-    rst5(Type20),
-    rst6(Type20),
-    rst7(Type20),
+    rst0(Type41),
+    rst1(Type41),
+    rst2(Type41),
+    rst3(Type41),
+    rst4(Type41),
+    rst5(Type41),
+    rst6(Type41),
+    rst7(Type41),
 }
 
 #[derive(Debug, Clone)]
-struct Type54 {
-    scan_data: Vec<Type53>,
+struct Type74 {
+    scan_data: Vec<Type73>,
     scan_data_stream: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type55 {
-    segments: Vec<Type45>,
-    sos: Type52,
-    data: Type54,
+struct Type75 {
+    segments: Vec<Type65>,
+    sos: Type72,
+    data: Type74,
 }
 
 #[derive(Debug, Clone)]
-struct Type56 {
+struct Type76 {
     num_lines: u16,
 }
 
 #[derive(Debug, Clone)]
-struct Type57 {
-    marker: Type20,
+struct Type77 {
+    marker: Type41,
     length: u16,
-    data: Type56,
+    data: Type76,
 }
 
 #[derive(Debug, Clone)]
-enum Type58 {
+enum Type78 {
     none,
-    some(Type57),
+    some(Type77),
 }
 
 #[derive(Debug, Clone)]
-struct Type59 {
-    initial_segment: Type35,
-    segments: Vec<Type45>,
-    header: Type49,
-    scan: Type55,
-    dnl: Type58,
-    scans: Vec<Type55>,
+struct Type79 {
+    initial_segment: Type55,
+    segments: Vec<Type65>,
+    header: Type69,
+    scan: Type75,
+    dnl: Type78,
+    scans: Vec<Type75>,
 }
 
 #[derive(Debug, Clone)]
-struct Type60 {
-    soi: Type20,
-    frame: Type59,
-    eoi: Type20,
+struct Type80 {
+    soi: Type41,
+    frame: Type79,
+    eoi: Type41,
 }
 
 #[derive(Debug, Clone)]
-struct Type61 {
+struct Type81 {
     major_brand: (u8, u8, u8, u8),
     minor_version: u32,
     compatible_brands: Vec<(u8, u8, u8, u8)>,
 }
 
 #[derive(Debug, Clone)]
-struct Type62 {
+struct Type82 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -489,168 +634,16 @@ struct Type62 {
 }
 
 #[derive(Debug, Clone)]
-struct Type63 {
+struct Type83 {
     version: u8,
     flags: (u8, u8, u8),
     number_of_entries: u32,
-    data: Vec<Type62>,
-}
-
-#[derive(Debug, Clone)]
-enum Type64 {
-    dref(Type63),
-    unknown(Vec<u8>),
-}
-
-#[derive(Debug, Clone)]
-struct Type65 {
-    size_field: u32,
-    r#type: (u8, u8, u8, u8),
-    size: u64,
-    data: Type64,
-}
-
-#[derive(Debug, Clone)]
-struct Type66 {
-    version: u8,
-    flags: (u8, u8, u8),
-    predefined: u32,
-    handler_type: (u8, u8, u8, u8),
-    reserved: (u32, u32, u32),
-    name: Type21,
-}
-
-#[derive(Debug, Clone)]
-struct Type67 {
-    content_type: Type21,
-}
-
-#[derive(Debug, Clone)]
-struct Type68 {
-    item_uri_type: Type21,
-}
-
-#[derive(Debug, Clone)]
-enum Type69 {
-    mime(Type67),
-    unknown,
-    uri(Type68),
-}
-
-#[derive(Debug, Clone)]
-struct Type70 {
-    item_ID: u32,
-    item_protection_index: u16,
-    item_type: (u8, u8, u8, u8),
-    item_name: Type21,
-    extra_fields: Type69,
-}
-
-#[derive(Debug, Clone)]
-struct Type71 {
-    item_ID: u16,
-    item_protection_index: u16,
-    item_name: Type21,
-    content_type: Type21,
-    content_encoding: Type21,
-}
-
-#[derive(Debug, Clone)]
-enum Type72 {
-    no(Type70),
-    yes(Type71),
-}
-
-#[derive(Debug, Clone)]
-struct Type73 {
-    version: u8,
-    flags: (u8, u8, u8),
-    fields: Type72,
-}
-
-#[derive(Debug, Clone)]
-enum Type74 {
-    infe(Type73),
-    unknown(Vec<u8>),
-}
-
-#[derive(Debug, Clone)]
-struct Type75 {
-    size_field: u32,
-    r#type: (u8, u8, u8, u8),
-    size: u64,
-    data: Type74,
-}
-
-#[derive(Debug, Clone)]
-struct Type76 {
-    version: u8,
-    flags: (u8, u8, u8),
-    entry_count: u32,
-    item_info_entry: Vec<Type75>,
-}
-
-#[derive(Debug, Clone)]
-enum Type77 {
-    no,
-    yes(u16),
-}
-
-#[derive(Debug, Clone)]
-struct Type78 {
-    extent_index: u64,
-    extent_offset: u64,
-    extent_length: u64,
-}
-
-#[derive(Debug, Clone)]
-struct Type79 {
-    item_ID: u32,
-    construction_method: Type77,
-    data_reference_index: u16,
-    base_offset: u64,
-    extent_count: u16,
-    extents: Vec<Type78>,
-}
-
-#[derive(Debug, Clone)]
-struct Type80 {
-    version: u8,
-    flags: (u8, u8, u8),
-    offset_size_length_size: u8,
-    base_offset_size_index_size: u8,
-    offset_size: u8,
-    length_size: u8,
-    base_offset_size: u8,
-    index_size: u8,
-    item_count: u32,
-    items: Vec<Type79>,
-}
-
-#[derive(Debug, Clone)]
-struct Type81 {
-    type_indicator: u32,
-    locale_indicator: u32,
-    value: Vec<u8>,
-}
-
-#[derive(Debug, Clone)]
-enum Type82 {
-    data(Type81),
-    unknown(Vec<u8>),
-}
-
-#[derive(Debug, Clone)]
-struct Type83 {
-    size_field: u32,
-    r#type: (u8, u8, u8, u8),
-    size: u64,
-    data: Type82,
+    data: Vec<Type82>,
 }
 
 #[derive(Debug, Clone)]
 enum Type84 {
-    tool(Vec<Type83>),
+    dref(Type83),
     unknown(Vec<u8>),
 }
 
@@ -664,70 +657,65 @@ struct Type85 {
 
 #[derive(Debug, Clone)]
 struct Type86 {
-    from_item_ID: u32,
-    reference_count: u16,
-    to_item_ID: Vec<u32>,
+    version: u8,
+    flags: (u8, u8, u8),
+    predefined: u32,
+    handler_type: (u8, u8, u8, u8),
+    reserved: (u32, u32, u32),
+    name: Type21,
 }
 
 #[derive(Debug, Clone)]
 struct Type87 {
-    size_field: u32,
-    r#type: (u8, u8, u8, u8),
-    size: u64,
-    data: Type86,
+    content_type: Type21,
 }
 
 #[derive(Debug, Clone)]
 struct Type88 {
-    from_item_ID: u16,
-    reference_count: u16,
-    to_item_ID: Vec<u16>,
+    item_uri_type: Type21,
 }
 
 #[derive(Debug, Clone)]
-struct Type89 {
-    size_field: u32,
-    r#type: (u8, u8, u8, u8),
-    size: u64,
-    data: Type88,
+enum Type89 {
+    mime(Type87),
+    unknown,
+    uri(Type88),
 }
 
 #[derive(Debug, Clone)]
-enum Type90 {
-    large(Vec<Type87>),
-    small(Vec<Type89>),
+struct Type90 {
+    item_ID: u32,
+    item_protection_index: u16,
+    item_type: (u8, u8, u8, u8),
+    item_name: Type21,
+    extra_fields: Type89,
 }
 
 #[derive(Debug, Clone)]
 struct Type91 {
-    version: u8,
-    flags: (u8, u8, u8),
-    single_item_reference: Type90,
+    item_ID: u16,
+    item_protection_index: u16,
+    item_name: Type21,
+    content_type: Type21,
+    content_encoding: Type21,
 }
 
 #[derive(Debug, Clone)]
 enum Type92 {
-    no(u32),
-    yes(u16),
+    no(Type90),
+    yes(Type91),
 }
 
 #[derive(Debug, Clone)]
 struct Type93 {
     version: u8,
     flags: (u8, u8, u8),
-    item_ID: Type92,
+    fields: Type92,
 }
 
 #[derive(Debug, Clone)]
 enum Type94 {
-    dinf(Vec<Type65>),
-    hdlr(Type66),
-    idat(Vec<u8>),
-    iinf(Type76),
-    iloc(Type80),
-    ilst(Vec<Type85>),
-    iref(Type91),
-    pitm(Type93),
+    infe(Type93),
     unknown(Vec<u8>),
 }
 
@@ -741,58 +729,59 @@ struct Type95 {
 
 #[derive(Debug, Clone)]
 struct Type96 {
-    creation_time: u32,
-    modification_time: u32,
-    timescale: u32,
-    duration: u32,
+    version: u8,
+    flags: (u8, u8, u8),
+    entry_count: u32,
+    item_info_entry: Vec<Type95>,
 }
 
 #[derive(Debug, Clone)]
-struct Type97 {
-    creation_time: u64,
-    modification_time: u64,
-    timescale: u32,
-    duration: u64,
+enum Type97 {
+    no,
+    yes(u16),
 }
 
 #[derive(Debug, Clone)]
-enum Type98 {
-    version0(Type96),
-    version1(Type97),
+struct Type98 {
+    extent_index: u64,
+    extent_offset: u64,
+    extent_length: u64,
 }
 
 #[derive(Debug, Clone)]
 struct Type99 {
-    version: u8,
-    flags: (u8, u8, u8),
-    fields: Type98,
-    rate: u32,
-    volume: u16,
-    reserved1: u16,
-    reserved2: (u32, u32),
-    matrix: Vec<u32>,
-    pre_defined: Vec<u32>,
-    next_track_ID: u32,
+    item_ID: u32,
+    construction_method: Type97,
+    data_reference_index: u16,
+    base_offset: u64,
+    extent_count: u16,
+    extents: Vec<Type98>,
 }
 
 #[derive(Debug, Clone)]
 struct Type100 {
-    track_duration: u32,
-    media_time: u32,
-    media_rate: u32,
+    version: u8,
+    flags: (u8, u8, u8),
+    offset_size_length_size: u8,
+    base_offset_size_index_size: u8,
+    offset_size: u8,
+    length_size: u8,
+    base_offset_size: u8,
+    index_size: u8,
+    item_count: u32,
+    items: Vec<Type99>,
 }
 
 #[derive(Debug, Clone)]
 struct Type101 {
-    version: u8,
-    flags: (u8, u8, u8),
-    number_of_entries: u32,
-    edit_list_table: Vec<Type100>,
+    type_indicator: u32,
+    locale_indicator: u32,
+    value: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 enum Type102 {
-    elst(Type101),
+    data(Type101),
     unknown(Vec<u8>),
 }
 
@@ -805,7 +794,163 @@ struct Type103 {
 }
 
 #[derive(Debug, Clone)]
-struct Type104 {
+enum Type104 {
+    tool(Vec<Type103>),
+    unknown(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
+struct Type105 {
+    size_field: u32,
+    r#type: (u8, u8, u8, u8),
+    size: u64,
+    data: Type104,
+}
+
+#[derive(Debug, Clone)]
+struct Type106 {
+    from_item_ID: u32,
+    reference_count: u16,
+    to_item_ID: Vec<u32>,
+}
+
+#[derive(Debug, Clone)]
+struct Type107 {
+    size_field: u32,
+    r#type: (u8, u8, u8, u8),
+    size: u64,
+    data: Type106,
+}
+
+#[derive(Debug, Clone)]
+struct Type108 {
+    from_item_ID: u16,
+    reference_count: u16,
+    to_item_ID: Vec<u16>,
+}
+
+#[derive(Debug, Clone)]
+struct Type109 {
+    size_field: u32,
+    r#type: (u8, u8, u8, u8),
+    size: u64,
+    data: Type108,
+}
+
+#[derive(Debug, Clone)]
+enum Type110 {
+    large(Vec<Type107>),
+    small(Vec<Type109>),
+}
+
+#[derive(Debug, Clone)]
+struct Type111 {
+    version: u8,
+    flags: (u8, u8, u8),
+    single_item_reference: Type110,
+}
+
+#[derive(Debug, Clone)]
+enum Type112 {
+    no(u32),
+    yes(u16),
+}
+
+#[derive(Debug, Clone)]
+struct Type113 {
+    version: u8,
+    flags: (u8, u8, u8),
+    item_ID: Type112,
+}
+
+#[derive(Debug, Clone)]
+enum Type114 {
+    dinf(Vec<Type85>),
+    hdlr(Type86),
+    idat(Vec<u8>),
+    iinf(Type96),
+    iloc(Type100),
+    ilst(Vec<Type105>),
+    iref(Type111),
+    pitm(Type113),
+    unknown(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
+struct Type115 {
+    size_field: u32,
+    r#type: (u8, u8, u8, u8),
+    size: u64,
+    data: Type114,
+}
+
+#[derive(Debug, Clone)]
+struct Type116 {
+    creation_time: u32,
+    modification_time: u32,
+    timescale: u32,
+    duration: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Type117 {
+    creation_time: u64,
+    modification_time: u64,
+    timescale: u32,
+    duration: u64,
+}
+
+#[derive(Debug, Clone)]
+enum Type118 {
+    version0(Type116),
+    version1(Type117),
+}
+
+#[derive(Debug, Clone)]
+struct Type119 {
+    version: u8,
+    flags: (u8, u8, u8),
+    fields: Type118,
+    rate: u32,
+    volume: u16,
+    reserved1: u16,
+    reserved2: (u32, u32),
+    matrix: Vec<u32>,
+    pre_defined: Vec<u32>,
+    next_track_ID: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Type120 {
+    track_duration: u32,
+    media_time: u32,
+    media_rate: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Type121 {
+    version: u8,
+    flags: (u8, u8, u8),
+    number_of_entries: u32,
+    edit_list_table: Vec<Type120>,
+}
+
+#[derive(Debug, Clone)]
+enum Type122 {
+    elst(Type121),
+    unknown(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
+struct Type123 {
+    size_field: u32,
+    r#type: (u8, u8, u8, u8),
+    size: u64,
+    data: Type122,
+}
+
+#[derive(Debug, Clone)]
+struct Type124 {
     version: u8,
     flags: (u8, u8, u8),
     component_type: u32,
@@ -817,16 +962,16 @@ struct Type104 {
 }
 
 #[derive(Debug, Clone)]
-struct Type105 {
+struct Type125 {
     version: u8,
     flags: (u8, u8, u8),
-    fields: Type98,
+    fields: Type118,
     language: u16,
     pre_defined: u16,
 }
 
 #[derive(Debug, Clone)]
-struct Type106 {
+struct Type126 {
     version: u8,
     flags: (u8, u8, u8),
     balance: u16,
@@ -834,7 +979,7 @@ struct Type106 {
 }
 
 #[derive(Debug, Clone)]
-struct Type107 {
+struct Type127 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
@@ -842,59 +987,59 @@ struct Type107 {
 }
 
 #[derive(Debug, Clone)]
-struct Type108 {
+struct Type128 {
     sample_count: u32,
     sample_offset: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type109 {
+struct Type129 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
-    sample_entries: Vec<Type108>,
+    sample_entries: Vec<Type128>,
 }
 
 #[derive(Debug, Clone)]
-enum Type110 {
+enum Type130 {
     no,
     yes(u32),
 }
 
 #[derive(Debug, Clone)]
-struct Type111 {
+struct Type131 {
     sample_count: u32,
     group_description_index: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type112 {
+struct Type132 {
     version: u8,
     flags: (u8, u8, u8),
     grouping_type: u32,
-    grouping_type_parameter: Type110,
+    grouping_type_parameter: Type130,
     entry_count: u32,
-    sample_groups: Vec<Type111>,
+    sample_groups: Vec<Type131>,
 }
 
 #[derive(Debug, Clone)]
-struct Type113 {
+struct Type133 {
     description_length: u32,
     sample_group_entry: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type114 {
+struct Type134 {
     version: u8,
     flags: (u8, u8, u8),
     grouping_type: u32,
     default_length: u32,
     entry_count: u32,
-    sample_groups: Vec<Type113>,
+    sample_groups: Vec<Type133>,
 }
 
 #[derive(Debug, Clone)]
-struct Type115 {
+struct Type135 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
@@ -902,30 +1047,30 @@ struct Type115 {
 }
 
 #[derive(Debug, Clone)]
-struct Type116 {
+struct Type136 {
     first_chunk: u32,
     samples_per_chunk: u32,
     sample_description_index: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type117 {
+struct Type137 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
-    chunk_entries: Vec<Type116>,
+    chunk_entries: Vec<Type136>,
 }
 
 #[derive(Debug, Clone)]
-struct Type118 {
+struct Type138 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
-    sample_entries: Vec<Type62>,
+    sample_entries: Vec<Type82>,
 }
 
 #[derive(Debug, Clone)]
-struct Type119 {
+struct Type139 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
@@ -933,59 +1078,59 @@ struct Type119 {
 }
 
 #[derive(Debug, Clone)]
-enum Type120 {
+enum Type140 {
     no,
     yes(Vec<u32>),
 }
 
 #[derive(Debug, Clone)]
-struct Type121 {
+struct Type141 {
     version: u8,
     flags: (u8, u8, u8),
     sample_size: u32,
     sample_count: u32,
-    entry_size: Type120,
+    entry_size: Type140,
 }
 
 #[derive(Debug, Clone)]
-struct Type122 {
+struct Type142 {
     sample_count: u32,
     sample_delta: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type123 {
+struct Type143 {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
-    sample_entries: Vec<Type122>,
+    sample_entries: Vec<Type142>,
 }
 
 #[derive(Debug, Clone)]
-enum Type124 {
-    co64(Type107),
-    ctts(Type109),
-    sbgp(Type112),
-    sgpd(Type114),
-    stco(Type115),
-    stsc(Type117),
-    stsd(Type118),
-    stss(Type119),
-    stsz(Type121),
-    stts(Type123),
+enum Type144 {
+    co64(Type127),
+    ctts(Type129),
+    sbgp(Type132),
+    sgpd(Type134),
+    stco(Type135),
+    stsc(Type137),
+    stsd(Type138),
+    stss(Type139),
+    stsz(Type141),
+    stts(Type143),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type125 {
+struct Type145 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type124,
+    data: Type144,
 }
 
 #[derive(Debug, Clone)]
-struct Type126 {
+struct Type146 {
     version: u8,
     flags: (u8, u8, u8),
     graphicsmode: u16,
@@ -993,40 +1138,40 @@ struct Type126 {
 }
 
 #[derive(Debug, Clone)]
-enum Type127 {
-    dinf(Vec<Type65>),
-    smhd(Type106),
-    stbl(Vec<Type125>),
+enum Type147 {
+    dinf(Vec<Type85>),
+    smhd(Type126),
+    stbl(Vec<Type145>),
     unknown(Vec<u8>),
-    vmhd(Type126),
+    vmhd(Type146),
 }
 
 #[derive(Debug, Clone)]
-struct Type128 {
+struct Type148 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type127,
+    data: Type147,
 }
 
 #[derive(Debug, Clone)]
-enum Type129 {
-    hdlr(Type104),
-    mdhd(Type105),
-    minf(Vec<Type128>),
+enum Type149 {
+    hdlr(Type124),
+    mdhd(Type125),
+    minf(Vec<Type148>),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type130 {
+struct Type150 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type129,
+    data: Type149,
 }
 
 #[derive(Debug, Clone)]
-struct Type131 {
+struct Type151 {
     creation_time: u32,
     modification_time: u32,
     track_ID: u32,
@@ -1035,7 +1180,7 @@ struct Type131 {
 }
 
 #[derive(Debug, Clone)]
-struct Type132 {
+struct Type152 {
     creation_time: u64,
     modification_time: u64,
     track_ID: u32,
@@ -1044,16 +1189,16 @@ struct Type132 {
 }
 
 #[derive(Debug, Clone)]
-enum Type133 {
-    version0(Type131),
-    version1(Type132),
+enum Type153 {
+    version0(Type151),
+    version1(Type152),
 }
 
 #[derive(Debug, Clone)]
-struct Type134 {
+struct Type154 {
     version: u8,
     flags: (u8, u8, u8),
-    fields: Type133,
+    fields: Type153,
     reserved2: (u32, u32),
     layer: u16,
     alternate_group: u16,
@@ -1065,76 +1210,76 @@ struct Type134 {
 }
 
 #[derive(Debug, Clone)]
-enum Type135 {
-    edts(Vec<Type103>),
-    mdia(Vec<Type130>),
-    tkhd(Type134),
+enum Type155 {
+    edts(Vec<Type123>),
+    mdia(Vec<Type150>),
+    tkhd(Type154),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type136 {
+struct Type156 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type135,
+    data: Type155,
 }
 
 #[derive(Debug, Clone)]
-enum Type137 {
-    meta(u32, Vec<Type95>),
+enum Type157 {
+    meta(u32, Vec<Type115>),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type138 {
+struct Type158 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type137,
+    data: Type157,
 }
 
 #[derive(Debug, Clone)]
-enum Type139 {
-    mvhd(Type99),
-    trak(Vec<Type136>),
-    udta(Vec<Type138>),
+enum Type159 {
+    mvhd(Type119),
+    trak(Vec<Type156>),
+    udta(Vec<Type158>),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type140 {
+struct Type160 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type139,
+    data: Type159,
 }
 
 #[derive(Debug, Clone)]
-enum Type141 {
+enum Type161 {
     free,
-    ftyp(Type61),
+    ftyp(Type81),
     mdat,
-    meta(u32, Vec<Type95>),
-    moov(Vec<Type140>),
+    meta(u32, Vec<Type115>),
+    moov(Vec<Type160>),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct Type142 {
+struct Type162 {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
-    data: Type141,
+    data: Type161,
 }
 
 #[derive(Debug, Clone)]
-struct Type143 {
-    atoms: Vec<Type142>,
+struct Type163 {
+    atoms: Vec<Type162>,
 }
 
 #[derive(Debug, Clone)]
-struct Type144 {
+struct Type164 {
     width: u32,
     height: u32,
     bit_depth: u8,
@@ -1145,15 +1290,15 @@ struct Type144 {
 }
 
 #[derive(Debug, Clone)]
-struct Type145 {
+struct Type165 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Type144,
+    data: Type164,
     crc: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type146 {
+struct Type166 {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: Vec<Type2>,
@@ -1161,56 +1306,56 @@ struct Type146 {
 }
 
 #[derive(Debug, Clone)]
-struct Type147 {
+struct Type167 {
     greyscale: u16,
 }
 
 #[derive(Debug, Clone)]
-struct Type148 {
+struct Type168 {
     red: u16,
     green: u16,
     blue: u16,
 }
 
 #[derive(Debug, Clone)]
-struct Type149 {
+struct Type169 {
     palette_index: u8,
 }
 
 #[derive(Debug, Clone)]
-enum Type150 {
-    color_type_0(Type147),
-    color_type_2(Type148),
-    color_type_3(Type149),
-    color_type_4(Type147),
-    color_type_6(Type148),
+enum Type170 {
+    color_type_0(Type167),
+    color_type_2(Type168),
+    color_type_3(Type169),
+    color_type_4(Type167),
+    color_type_6(Type168),
 }
 
 #[derive(Debug, Clone)]
-struct Type151 {
+struct Type171 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Type150,
+    data: Type170,
     crc: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type152 {
+struct Type172 {
     pixels_per_unit_x: u32,
     pixels_per_unit_y: u32,
     unit_specifier: u8,
 }
 
 #[derive(Debug, Clone)]
-struct Type153 {
+struct Type173 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Type152,
+    data: Type172,
     crc: u32,
 }
 
 #[derive(Debug, Clone)]
-struct Type154 {
+struct Type174 {
     year: u16,
     month: u8,
     day: u8,
@@ -1220,39 +1365,39 @@ struct Type154 {
 }
 
 #[derive(Debug, Clone)]
-struct Type155 {
+struct Type175 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Type154,
+    data: Type174,
     crc: u32,
 }
 
 #[derive(Debug, Clone)]
-enum Type156 {
-    color_type_0(Type147),
-    color_type_2(Type148),
-    color_type_3(Vec<Type149>),
+enum Type176 {
+    color_type_0(Type167),
+    color_type_2(Type168),
+    color_type_3(Vec<Type169>),
 }
 
 #[derive(Debug, Clone)]
-struct Type157 {
+struct Type177 {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Type156,
+    data: Type176,
     crc: u32,
 }
 
 #[derive(Debug, Clone)]
-enum Type158 {
-    PLTE(Type146),
-    bKGD(Type151),
-    pHYs(Type153),
-    tIME(Type155),
-    tRNS(Type157),
+enum Type178 {
+    PLTE(Type166),
+    bKGD(Type171),
+    pHYs(Type173),
+    tIME(Type175),
+    tRNS(Type177),
 }
 
 #[derive(Debug, Clone)]
-struct Type159 {
+struct Type179 {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: Vec<u8>,
@@ -1260,7 +1405,7 @@ struct Type159 {
 }
 
 #[derive(Debug, Clone)]
-struct Type160 {
+struct Type180 {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: (),
@@ -1268,116 +1413,123 @@ struct Type160 {
 }
 
 #[derive(Debug, Clone)]
-struct Type161 {
+struct Type181 {
     signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-    ihdr: Type145,
-    chunks: Vec<Type158>,
-    idat: Vec<Type159>,
-    more_chunks: Vec<Type158>,
-    iend: Type160,
+    ihdr: Type165,
+    chunks: Vec<Type178>,
+    idat: Vec<Type179>,
+    more_chunks: Vec<Type178>,
+    iend: Type180,
 }
 
 #[derive(Debug, Clone)]
-enum Type162 {
+enum Type182 {
     no(u8),
     yes,
 }
 
 #[derive(Debug, Clone)]
-struct Type163 {
+struct Type183 {
     tag: (u8, u8, u8, u8),
     length: u32,
     data: Vec<u8>,
-    pad: Type162,
+    pad: Type182,
 }
 
 #[derive(Debug, Clone)]
-struct Type164 {
+struct Type184 {
     tag: (u8, u8, u8, u8),
-    chunks: Vec<Type163>,
+    chunks: Vec<Type183>,
 }
 
 #[derive(Debug, Clone)]
-struct Type165 {
+struct Type185 {
     tag: (u8, u8, u8, u8),
     length: u32,
-    data: Type164,
-    pad: Type162,
+    data: Type184,
+    pad: Type182,
 }
 
 #[derive(Debug, Clone)]
-struct Type166 {
+struct Type186 {
     string: Vec<u8>,
     __padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type167 {
+struct Type187 {
     string: Vec<u8>,
     __nul_or_wsp: u8,
     __padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type168 {
+struct Type188 {
     string: Vec<u8>,
     padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type169 {
-    name: Type166,
-    mode: Type167,
-    uid: Type167,
-    gid: Type167,
+struct Type189 {
+    name: Type186,
+    mode: Type187,
+    uid: Type187,
+    gid: Type187,
     size: u32,
-    mtime: Type167,
-    chksum: Type167,
+    mtime: Type187,
+    chksum: Type187,
     typeflag: u8,
-    linkname: Type166,
+    linkname: Type186,
     magic: (u8, u8, u8, u8, u8, u8),
     version: (u8, u8),
-    uname: Type168,
-    gname: Type168,
-    devmajor: Type167,
-    devminor: Type167,
-    prefix: Type166,
+    uname: Type188,
+    gname: Type188,
+    devmajor: Type187,
+    devminor: Type187,
+    prefix: Type186,
     pad: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type170 {
-    header: Type169,
+struct Type190 {
+    header: Type189,
     file: Vec<u8>,
     __padding: (),
 }
 
 #[derive(Debug, Clone)]
-struct Type171 {
-    contents: Vec<Type170>,
+struct Type191 {
+    contents: Vec<Type190>,
     __padding: Vec<u8>,
     __trailing: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-enum Type172 {
+enum Type192 {
     ascii(Vec<u8>),
     utf8(Vec<char>),
 }
 
 #[derive(Debug, Clone)]
-enum Type173 {
+enum Type193 {
     gif(Type19),
-    jpeg(Type60),
-    mpeg4(Type143),
-    png(Type161),
-    riff(Type165),
-    tar(Type171),
-    text(Type172),
+    gzip(Vec<Type40>),
+    jpeg(Type80),
+    mpeg4(Type163),
+    png(Type181),
+    riff(Type185),
+    tar(Type191),
+    text(Type192),
 }
 
 #[derive(Debug, Clone)]
-struct Type174 {
+enum Type194 {
+    none,
+    some(u8),
+}
+
+#[derive(Debug, Clone)]
+struct Type195 {
     oA: u8,
     o9: u8,
     o8: u8,
@@ -1394,16 +1546,16 @@ struct Type174 {
 }
 
 #[derive(Debug, Clone)]
-struct Type175 {
-    data: Type173,
+struct Type196 {
+    data: Type193,
     end: (),
 }
 
-fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type175> {
+fn Decoder0<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type196> {
     (Some((Decoder1(scope, input))?))
 }
 
-fn Decoder1<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type175> {
+fn Decoder1<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type196> {
     let data = { (unimplemented!(r#"ParallelLogic::Alts.to_ast(..)"#)) };
     let end = {
         if ((input.read_byte()).is_none()) {
@@ -1412,12 +1564,12 @@ fn Decoder1<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
             return None;
         }
     };
-    (Some(Type175 { data, end }))
+    (Some(Type196 { data, end }))
 }
 
 fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type19> {
-    let header = { (Decoder139(scope, input))? };
-    let logical_screen = { (Decoder140(scope, input))? };
+    let header = { (Decoder150(scope, input))? };
+    let logical_screen = { (Decoder151(scope, input))? };
     let blocks = {
         let mut accum = (Vec::new());
         while true {
@@ -1437,7 +1589,7 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder141(scope, input))?;
+                let next_elem = (Decoder152(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -1445,7 +1597,7 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         }
         accum
     };
-    let trailer = { (Decoder142(scope, input))? };
+    let trailer = { (Decoder153(scope, input))? };
     (Some(Type19 {
         header,
         logical_screen,
@@ -1454,14 +1606,63 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     }))
 }
 
-fn Decoder3<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type60> {
-    let soi = { (Decoder66(scope, input))? };
-    let frame = { (Decoder67(scope, input))? };
-    let eoi = { (Decoder68(scope, input))? };
-    (Some(Type60 { soi, frame, eoi }))
+fn Decoder3<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<Type40>> {
+    let mut accum = (Vec::new());
+    while true {
+        let matching_ix = {
+            let lookahead = &mut (input.clone());
+            let b = (lookahead.read_byte())?;
+            if (b == 31) {
+                1
+            } else {
+                0
+            }
+        };
+        if (matching_ix == 0) {
+            break;
+        } else {
+            let next_elem = {
+                let header = { (Decoder140(scope, input))? };
+                let fname = {
+                    match (header.file_flags & 8 != 0) {
+                        true => {
+                            let inner = (Decoder141(scope, input))?;
+                            (Type22::yes(inner))
+                        }
+
+                        false => {
+                            let _ = ();
+                            Type22::no
+                        }
+
+                        _other => {
+                            (unreachable!(r#"unexpected: {:?}"#, _other));
+                        }
+                    }
+                };
+                let data = { (unimplemented!(r#"translate @ Decoder::Bits"#)) };
+                let footer = { (Decoder143(scope, input))? };
+                Type40 {
+                    header,
+                    fname,
+                    data,
+                    footer,
+                }
+            };
+            (accum.push(next_elem));
+        }
+    }
+    (Some(accum))
 }
 
-fn Decoder4<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type143> {
+fn Decoder4<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type80> {
+    let soi = { (Decoder67(scope, input))? };
+    let frame = { (Decoder68(scope, input))? };
+    let eoi = { (Decoder69(scope, input))? };
+    (Some(Type80 { soi, frame, eoi }))
+}
+
+fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type163> {
     let atoms = {
         let mut accum = (Vec::new());
         while true {
@@ -1470,7 +1671,7 @@ fn Decoder4<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 0
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder45(scope, input))?;
+                let next_elem = (Decoder46(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -1478,12 +1679,12 @@ fn Decoder4<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         }
         accum
     };
-    (Some(Type143 { atoms }))
+    (Some(Type163 { atoms }))
 }
 
-fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type161> {
-    let signature = { (Decoder27(scope, input))? };
-    let ihdr = { (Decoder28(scope, input))? };
+fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type181> {
+    let signature = { (Decoder28(scope, input))? };
+    let ihdr = { (Decoder29(scope, input))? };
     let chunks = {
         let mut accum = (Vec::new());
         while true {
@@ -1507,7 +1708,7 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder29(scope, input))?;
+                let next_elem = (Decoder30(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -1551,7 +1752,7 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
             if (matching_ix == 0) {
                 break;
             } else {
-                let next_elem = (Decoder30(scope, input))?;
+                let next_elem = (Decoder31(scope, input))?;
                 (accum.push(next_elem));
             }
         }
@@ -1580,7 +1781,7 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder29(scope, input))?;
+                let next_elem = (Decoder30(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -1588,8 +1789,8 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         }
         accum
     };
-    let iend = { (Decoder31(scope, input))? };
-    (Some(Type161 {
+    let iend = { (Decoder32(scope, input))? };
+    (Some(Type181 {
         signature,
         ihdr,
         chunks,
@@ -1599,7 +1800,7 @@ fn Decoder5<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     }))
 }
 
-fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type165> {
+fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type185> {
     let tag = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -1635,13 +1836,13 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         };
         (field0, field1, field2, field3)
     };
-    let length = { (Decoder23(scope, input))? };
+    let length = { (Decoder24(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
     let pad = {
         match (length % 2 == 0) {
             true => {
                 let _ = ();
-                Type162::yes
+                Type182::yes
             }
 
             false => {
@@ -1653,7 +1854,7 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                         return None;
                     }
                 };
-                (Type162::no(inner))
+                (Type182::no(inner))
             }
 
             _other => {
@@ -1661,7 +1862,7 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
             }
         }
     };
-    (Some(Type165 {
+    (Some(Type185 {
         tag,
         length,
         data,
@@ -1669,7 +1870,7 @@ fn Decoder6<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
     }))
 }
 
-fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type171> {
+fn Decoder8<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type191> {
     let contents = {
         let mut accum = (Vec::new());
         while true {
@@ -1689,7 +1890,7 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
             if (matching_ix == 0) {
                 break;
             } else {
-                let next_elem = (Decoder14(scope, input))?;
+                let next_elem = (Decoder15(scope, input))?;
                 (accum.push(next_elem));
             }
         }
@@ -1737,18 +1938,18 @@ fn Decoder7<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         }
         accum
     };
-    (Some(Type171 {
+    (Some(Type191 {
         contents,
         __padding,
         __trailing,
     }))
 }
 
-fn Decoder8<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type172> {
+fn Decoder9<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type192> {
     (Some((unimplemented!(r#"ParallelLogic::Alts.to_ast(..)"#))))
 }
 
-fn Decoder9<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<u8>> {
+fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<u8>> {
     let mut accum = (Vec::new());
     while true {
         let matching_ix = {
@@ -1765,14 +1966,14 @@ fn Decoder9<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         if (matching_ix == 0) {
             break;
         } else {
-            let next_elem = (Decoder13(scope, input))?;
+            let next_elem = (Decoder14(scope, input))?;
             (accum.push(next_elem));
         }
     }
     (Some(accum))
 }
 
-fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<char>> {
+fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<char>> {
     let mut accum = (Vec::new());
     while true {
         let matching_ix = {
@@ -1812,7 +2013,7 @@ fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             }
         };
         if (matching_ix == 0) {
-            let next_elem = (Decoder11(scope, input))?;
+            let next_elem = (Decoder12(scope, input))?;
             (accum.push(next_elem));
         } else {
             break;
@@ -1821,7 +2022,7 @@ fn Decoder10<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(accum))
 }
 
-fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<char> {
+fn Decoder12<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<char> {
     let inner = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -1887,7 +2088,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         };
                         ((|raw| raw & 31)(inner))
                     };
-                    let field1 = { (Decoder12(scope, input))? };
+                    let field1 = { (Decoder13(scope, input))? };
                     (field0, field1)
                 };
                 ((|bytes| match bytes {
@@ -1952,7 +2153,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 63)(inner))
                             };
-                            let field2 = { (Decoder12(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
                             (field0, field1, field2)
                         }
 
@@ -1969,8 +2170,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 15)(inner))
                             };
-                            let field1 = { (Decoder12(scope, input))? };
-                            let field2 = { (Decoder12(scope, input))? };
+                            let field1 = { (Decoder13(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
                             (field0, field1, field2)
                         }
 
@@ -1997,7 +2198,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 63)(inner))
                             };
-                            let field2 = { (Decoder12(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
                             (field0, field1, field2)
                         }
 
@@ -2015,8 +2216,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 15)(inner))
                             };
-                            let field1 = { (Decoder12(scope, input))? };
-                            let field2 = { (Decoder12(scope, input))? };
+                            let field1 = { (Decoder13(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
                             (field0, field1, field2)
                         }
 
@@ -2081,8 +2282,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 63)(inner))
                             };
-                            let field2 = { (Decoder12(scope, input))? };
-                            let field3 = { (Decoder12(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
+                            let field3 = { (Decoder13(scope, input))? };
                             (field0, field1, field2, field3)
                         }
 
@@ -2100,9 +2301,9 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 7)(inner))
                             };
-                            let field1 = { (Decoder12(scope, input))? };
-                            let field2 = { (Decoder12(scope, input))? };
-                            let field3 = { (Decoder12(scope, input))? };
+                            let field1 = { (Decoder13(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
+                            let field3 = { (Decoder13(scope, input))? };
                             (field0, field1, field2, field3)
                         }
 
@@ -2129,8 +2330,8 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                                 };
                                 ((|raw| raw & 63)(inner))
                             };
-                            let field2 = { (Decoder12(scope, input))? };
-                            let field3 = { (Decoder12(scope, input))? };
+                            let field2 = { (Decoder13(scope, input))? };
+                            let field3 = { (Decoder13(scope, input))? };
                             (field0, field1, field2, field3)
                         }
 
@@ -2158,7 +2359,7 @@ fn Decoder11<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(((|codepoint| (char::from_u32(codepoint)).unwrap())(inner))))
 }
 
-fn Decoder12<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder13<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let inner = {
         let b = (input.read_byte())?;
         if ((ByteSet::from_bits([0, 0, 18446744073709551615, 0])).contains(b)) {
@@ -2170,7 +2371,7 @@ fn Decoder12<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(((|raw| raw & 63)(inner))))
 }
 
-fn Decoder13<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder14<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(
         if ((ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0])).contains(b)) {
@@ -2181,12 +2382,12 @@ fn Decoder13<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     ))
 }
 
-fn Decoder14<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type170> {
-    let header = { (Decoder15(scope, input))? };
+fn Decoder15<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type190> {
+    let header = { (Decoder16(scope, input))? };
     let file = {
         let mut accum = (Vec::new());
         for _ in 0..header.size {
-            (accum.push((Decoder16(scope, input))?));
+            (accum.push((Decoder17(scope, input))?));
         }
         accum
     };
@@ -2196,23 +2397,23 @@ fn Decoder14<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         ()
     };
-    (Some(Type170 {
+    (Some(Type190 {
         header,
         file,
         __padding,
     }))
 }
 
-fn Decoder15<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type169> {
+fn Decoder16<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type189> {
     (Some((unimplemented!(r#"translate @ Decoder::Slice"#))))
 }
 
-fn Decoder16<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(b))
 }
 
-fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type166> {
+fn Decoder18<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type186> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -2273,10 +2474,10 @@ fn Decoder17<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    (Some(Type166 { string, __padding }))
+    (Some(Type186 { string, __padding }))
 }
 
-fn Decoder18<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder19<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(
         if ((ByteSet::from_bits([71776119061217280, 0, 0, 0])).contains(b)) {
@@ -2287,7 +2488,7 @@ fn Decoder18<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     ))
 }
 
-fn Decoder19<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder20<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(
         if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(b)) {
@@ -2298,12 +2499,12 @@ fn Decoder19<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     ))
 }
 
-fn Decoder20<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(b))
 }
 
-fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type166> {
+fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type186> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -2364,10 +2565,10 @@ fn Decoder21<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    (Some(Type166 { string, __padding }))
+    (Some(Type186 { string, __padding }))
 }
 
-fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type168> {
+fn Decoder23<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type188> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -2428,22 +2629,22 @@ fn Decoder22<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    (Some(Type168 { string, padding }))
+    (Some(Type188 { string, padding }))
 }
 
-fn Decoder23<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
+fn Decoder24<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
     let inner = {
-        let field0 = { (Decoder16(scope, input))? };
-        let field1 = { (Decoder16(scope, input))? };
-        let field2 = { (Decoder16(scope, input))? };
-        let field3 = { (Decoder16(scope, input))? };
+        let field0 = { (Decoder17(scope, input))? };
+        let field1 = { (Decoder17(scope, input))? };
+        let field2 = { (Decoder17(scope, input))? };
+        let field3 = { (Decoder17(scope, input))? };
         (field0, field1, field2, field3)
     };
     (Some(((|x| u32le(x))(inner))))
 }
 
-fn Decoder24<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type164> {
-    let tag = { (Decoder25(scope, input))? };
+fn Decoder25<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type184> {
+    let tag = { (Decoder26(scope, input))? };
     let chunks = {
         let mut accum = (Vec::new());
         while true {
@@ -2452,7 +2653,7 @@ fn Decoder24<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 0
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder26(scope, input))?;
+                let next_elem = (Decoder27(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -2460,26 +2661,26 @@ fn Decoder24<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    (Some(Type164 { tag, chunks }))
+    (Some(Type184 { tag, chunks }))
 }
 
-fn Decoder25<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
-    let field0 = { (Decoder20(scope, input))? };
-    let field1 = { (Decoder20(scope, input))? };
-    let field2 = { (Decoder20(scope, input))? };
-    let field3 = { (Decoder20(scope, input))? };
+fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
+    let field0 = { (Decoder21(scope, input))? };
+    let field1 = { (Decoder21(scope, input))? };
+    let field2 = { (Decoder21(scope, input))? };
+    let field3 = { (Decoder21(scope, input))? };
     (Some((field0, field1, field2, field3)))
 }
 
-fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type163> {
-    let tag = { (Decoder25(scope, input))? };
-    let length = { (Decoder23(scope, input))? };
+fn Decoder27<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type183> {
+    let tag = { (Decoder26(scope, input))? };
+    let length = { (Decoder24(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
     let pad = {
         match (length % 2 == 0) {
             true => {
                 let _ = ();
-                Type162::yes
+                Type182::yes
             }
 
             false => {
@@ -2491,7 +2692,7 @@ fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                         return None;
                     }
                 };
-                (Type162::no(inner))
+                (Type182::no(inner))
             }
 
             _other => {
@@ -2499,7 +2700,7 @@ fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             }
         }
     };
-    (Some(Type163 {
+    (Some(Type183 {
         tag,
         length,
         data,
@@ -2507,7 +2708,7 @@ fn Decoder26<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder27<'input>(
+fn Decoder28<'input>(
     scope: &mut Scope,
     input: &mut ParseCtxt<'input>,
 ) -> Option<(u8, u8, u8, u8, u8, u8, u8, u8)> {
@@ -2580,12 +2781,12 @@ fn Decoder27<'input>(
     )))
 }
 
-fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type145> {
-    let length = { (Decoder32(scope, input))? };
-    let tag = { (Decoder43(scope, input))? };
+fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type165> {
+    let length = { (Decoder33(scope, input))? };
+    let tag = { (Decoder44(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type145 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type165 {
         length,
         tag,
         data,
@@ -2593,7 +2794,7 @@ fn Decoder28<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type158> {
+fn Decoder30<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type178> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -2624,28 +2825,28 @@ fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder37(scope, input))?;
-            (Type158::bKGD(inner))
+            let inner = (Decoder38(scope, input))?;
+            (Type178::bKGD(inner))
         }
 
         1 => {
-            let inner = (Decoder38(scope, input))?;
-            (Type158::pHYs(inner))
+            let inner = (Decoder39(scope, input))?;
+            (Type178::pHYs(inner))
         }
 
         2 => {
-            let inner = (Decoder39(scope, input))?;
-            (Type158::PLTE(inner))
+            let inner = (Decoder40(scope, input))?;
+            (Type178::PLTE(inner))
         }
 
         3 => {
-            let inner = (Decoder40(scope, input))?;
-            (Type158::tIME(inner))
+            let inner = (Decoder41(scope, input))?;
+            (Type178::tIME(inner))
         }
 
         4 => {
-            let inner = (Decoder41(scope, input))?;
-            (Type158::tRNS(inner))
+            let inner = (Decoder42(scope, input))?;
+            (Type178::tRNS(inner))
         }
 
         _other => {
@@ -2654,12 +2855,12 @@ fn Decoder29<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder30<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type159> {
-    let length = { (Decoder32(scope, input))? };
-    let tag = { (Decoder35(scope, input))? };
+fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type179> {
+    let length = { (Decoder33(scope, input))? };
+    let tag = { (Decoder36(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type159 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type179 {
         length,
         tag,
         data,
@@ -2667,12 +2868,12 @@ fn Decoder30<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type160> {
-    let length = { (Decoder32(scope, input))? };
-    let tag = { (Decoder33(scope, input))? };
+fn Decoder32<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type180> {
+    let length = { (Decoder33(scope, input))? };
+    let tag = { (Decoder34(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type160 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type180 {
         length,
         tag,
         data,
@@ -2680,18 +2881,18 @@ fn Decoder31<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder32<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
+fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u32> {
     let inner = {
-        let field0 = { (Decoder16(scope, input))? };
-        let field1 = { (Decoder16(scope, input))? };
-        let field2 = { (Decoder16(scope, input))? };
-        let field3 = { (Decoder16(scope, input))? };
+        let field0 = { (Decoder17(scope, input))? };
+        let field1 = { (Decoder17(scope, input))? };
+        let field2 = { (Decoder17(scope, input))? };
+        let field3 = { (Decoder17(scope, input))? };
         (field0, field1, field2, field3)
     };
     (Some(((|x| u32be(x))(inner))))
 }
 
-fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
+fn Decoder34<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
     let field0 = {
         let b = (input.read_byte())?;
         if (b == 73) {
@@ -2727,11 +2928,11 @@ fn Decoder33<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some((field0, field1, field2, field3)))
 }
 
-fn Decoder34<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<()> {
+fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<()> {
     (Some(()))
 }
 
-fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
+fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
     let field0 = {
         let b = (input.read_byte())?;
         if (b == 73) {
@@ -2767,7 +2968,7 @@ fn Decoder35<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some((field0, field1, field2, field3)))
 }
 
-fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<u8>> {
+fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Vec<u8>> {
     let mut accum = (Vec::new());
     while true {
         let matching_ix = {
@@ -2775,7 +2976,7 @@ fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             0
         };
         if (matching_ix == 0) {
-            let next_elem = (Decoder16(scope, input))?;
+            let next_elem = (Decoder17(scope, input))?;
             (accum.push(next_elem));
         } else {
             break;
@@ -2784,8 +2985,8 @@ fn Decoder36<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(accum))
 }
 
-fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type151> {
-    let length = { (Decoder32(scope, input))? };
+fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type171> {
+    let length = { (Decoder33(scope, input))? };
     let tag = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -2822,8 +3023,8 @@ fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         (field0, field1, field2, field3)
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type151 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type171 {
         length,
         tag,
         data,
@@ -2831,8 +3032,8 @@ fn Decoder37<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type153> {
-    let length = { (Decoder32(scope, input))? };
+fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type173> {
+    let length = { (Decoder33(scope, input))? };
     let tag = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -2869,8 +3070,8 @@ fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         (field0, field1, field2, field3)
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type153 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type173 {
         length,
         tag,
         data,
@@ -2878,8 +3079,8 @@ fn Decoder38<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type146> {
-    let length = { (Decoder32(scope, input))? };
+fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type166> {
+    let length = { (Decoder33(scope, input))? };
     let tag = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -2916,8 +3117,8 @@ fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         (field0, field1, field2, field3)
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type146 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type166 {
         length,
         tag,
         data,
@@ -2925,8 +3126,8 @@ fn Decoder39<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type155> {
-    let length = { (Decoder32(scope, input))? };
+fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type175> {
+    let length = { (Decoder33(scope, input))? };
     let tag = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -2963,8 +3164,8 @@ fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         (field0, field1, field2, field3)
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type155 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type175 {
         length,
         tag,
         data,
@@ -2972,8 +3173,8 @@ fn Decoder40<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type157> {
-    let length = { (Decoder32(scope, input))? };
+fn Decoder42<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type177> {
+    let length = { (Decoder33(scope, input))? };
     let tag = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -3010,8 +3211,8 @@ fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         (field0, field1, field2, field3)
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    let crc = { (Decoder32(scope, input))? };
-    (Some(Type157 {
+    let crc = { (Decoder33(scope, input))? };
+    (Some(Type177 {
         length,
         tag,
         data,
@@ -3019,16 +3220,16 @@ fn Decoder41<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder42<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
+fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
     let inner = {
-        let field0 = { (Decoder16(scope, input))? };
-        let field1 = { (Decoder16(scope, input))? };
+        let field0 = { (Decoder17(scope, input))? };
+        let field1 = { (Decoder17(scope, input))? };
         (field0, field1)
     };
     (Some(((|x| u16be(x))(inner))))
 }
 
-fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
+fn Decoder44<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
     let field0 = {
         let b = (input.read_byte())?;
         if (b == 73) {
@@ -3064,15 +3265,15 @@ fn Decoder43<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some((field0, field1, field2, field3)))
 }
 
-fn Decoder44<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type144> {
-    let width = { (Decoder32(scope, input))? };
-    let height = { (Decoder32(scope, input))? };
-    let bit_depth = { (Decoder16(scope, input))? };
-    let color_type = { (Decoder16(scope, input))? };
-    let compression_method = { (Decoder16(scope, input))? };
-    let filter_method = { (Decoder16(scope, input))? };
-    let interlace_method = { (Decoder16(scope, input))? };
-    (Some(Type144 {
+fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type164> {
+    let width = { (Decoder33(scope, input))? };
+    let height = { (Decoder33(scope, input))? };
+    let bit_depth = { (Decoder17(scope, input))? };
+    let color_type = { (Decoder17(scope, input))? };
+    let compression_method = { (Decoder17(scope, input))? };
+    let filter_method = { (Decoder17(scope, input))? };
+    let interlace_method = { (Decoder17(scope, input))? };
+    (Some(Type164 {
         width,
         height,
         bit_depth,
@@ -3083,15 +3284,15 @@ fn Decoder44<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type142> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type162> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3103,7 +3304,7 @@ fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type142 {
+    (Some(Type162 {
         size_field,
         r#type,
         size,
@@ -3111,24 +3312,24 @@ fn Decoder45<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder46<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
-    let field0 = { (Decoder20(scope, input))? };
-    let field1 = { (Decoder20(scope, input))? };
-    let field2 = { (Decoder20(scope, input))? };
-    let field3 = { (Decoder20(scope, input))? };
+fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<(u8, u8, u8, u8)> {
+    let field0 = { (Decoder21(scope, input))? };
+    let field1 = { (Decoder21(scope, input))? };
+    let field2 = { (Decoder21(scope, input))? };
+    let field3 = { (Decoder21(scope, input))? };
     (Some((field0, field1, field2, field3)))
 }
 
-fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u64> {
+fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u64> {
     let inner = {
-        let field0 = { (Decoder16(scope, input))? };
-        let field1 = { (Decoder16(scope, input))? };
-        let field2 = { (Decoder16(scope, input))? };
-        let field3 = { (Decoder16(scope, input))? };
-        let field4 = { (Decoder16(scope, input))? };
-        let field5 = { (Decoder16(scope, input))? };
-        let field6 = { (Decoder16(scope, input))? };
-        let field7 = { (Decoder16(scope, input))? };
+        let field0 = { (Decoder17(scope, input))? };
+        let field1 = { (Decoder17(scope, input))? };
+        let field2 = { (Decoder17(scope, input))? };
+        let field3 = { (Decoder17(scope, input))? };
+        let field4 = { (Decoder17(scope, input))? };
+        let field5 = { (Decoder17(scope, input))? };
+        let field6 = { (Decoder17(scope, input))? };
+        let field7 = { (Decoder17(scope, input))? };
         (
             field0, field1, field2, field3, field4, field5, field6, field7,
         )
@@ -3136,15 +3337,15 @@ fn Decoder47<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(((|x| u64be(x))(inner))))
 }
 
-fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type115> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3156,7 +3357,7 @@ fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type95 {
+    (Some(Type115 {
         size_field,
         r#type,
         size,
@@ -3164,15 +3365,15 @@ fn Decoder48<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type140> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type160> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3184,7 +3385,7 @@ fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type140 {
+    (Some(Type160 {
         size_field,
         r#type,
         size,
@@ -3192,15 +3393,15 @@ fn Decoder49<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type136> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type156> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3212,7 +3413,7 @@ fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type136 {
+    (Some(Type156 {
         size_field,
         r#type,
         size,
@@ -3220,15 +3421,15 @@ fn Decoder50<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type138> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type158> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3240,7 +3441,7 @@ fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type138 {
+    (Some(Type158 {
         size_field,
         r#type,
         size,
@@ -3248,15 +3449,15 @@ fn Decoder51<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type103> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type123> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3268,7 +3469,7 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type103 {
+    (Some(Type123 {
         size_field,
         r#type,
         size,
@@ -3276,15 +3477,15 @@ fn Decoder52<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type130> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type150> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3296,7 +3497,7 @@ fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type130 {
+    (Some(Type150 {
         size_field,
         r#type,
         size,
@@ -3304,7 +3505,7 @@ fn Decoder53<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -3348,15 +3549,15 @@ fn Decoder54<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(Type21 { string, null }))
 }
 
-fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type128> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type148> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3368,7 +3569,7 @@ fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type128 {
+    (Some(Type148 {
         size_field,
         r#type,
         size,
@@ -3376,99 +3577,15 @@ fn Decoder55<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder56<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type85> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
-                ((|x| x - 16)(inner))
-            }
-
-            _ => ((size_field - 8) as u64),
-
-            _other => {
-                (unreachable!(r#"unexpected: {:?}"#, _other));
-            }
-        }
-    };
-    let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type65 {
-        size_field,
-        r#type,
-        size,
-        data,
-    }))
-}
-
-fn Decoder57<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type125> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
-    let size = {
-        match size_field {
-            0 => 0,
-
-            1 => {
-                let inner = (Decoder47(scope, input))?;
-                ((|x| x - 16)(inner))
-            }
-
-            _ => ((size_field - 8) as u64),
-
-            _other => {
-                (unreachable!(r#"unexpected: {:?}"#, _other));
-            }
-        }
-    };
-    let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type125 {
-        size_field,
-        r#type,
-        size,
-        data,
-    }))
-}
-
-fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type75> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
-    let size = {
-        match size_field {
-            0 => 0,
-
-            1 => {
-                let inner = (Decoder47(scope, input))?;
-                ((|x| x - 16)(inner))
-            }
-
-            _ => ((size_field - 8) as u64),
-
-            _other => {
-                (unreachable!(r#"unexpected: {:?}"#, _other));
-            }
-        }
-    };
-    let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type75 {
-        size_field,
-        r#type,
-        size,
-        data,
-    }))
-}
-
-fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type85> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
-    let size = {
-        match size_field {
-            0 => 0,
-
-            1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3488,15 +3605,15 @@ fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type83> {
-    let size_field = { (Decoder32(scope, input))? };
-    let r#type = { (Decoder46(scope, input))? };
+fn Decoder58<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type145> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
     let size = {
         match size_field {
             0 => 0,
 
             1 => {
-                let inner = (Decoder47(scope, input))?;
+                let inner = (Decoder48(scope, input))?;
                 ((|x| x - 16)(inner))
             }
 
@@ -3508,7 +3625,7 @@ fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
     };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type83 {
+    (Some(Type145 {
         size_field,
         r#type,
         size,
@@ -3516,48 +3633,88 @@ fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
-    let string = {
-        let mut accum = (Vec::new());
-        while true {
-            let matching_ix = {
-                let lookahead = &mut (input.clone());
-                let b = (lookahead.read_byte())?;
-                match b {
-                    tmp if (tmp != 0) => 0,
+fn Decoder59<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type95> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
+    let size = {
+        match size_field {
+            0 => 0,
 
-                    0 => 1,
+            1 => {
+                let inner = (Decoder48(scope, input))?;
+                ((|x| x - 16)(inner))
+            }
 
-                    _other => {
-                        (unreachable!(r#"unexpected: {:?}"#, _other));
-                    }
-                }
-            };
-            if (matching_ix == 0) {
-                let next_elem = {
-                    let b = (input.read_byte())?;
-                    if (b != 0) {
-                        b
-                    } else {
-                        return None;
-                    }
-                };
-                (accum.push(next_elem));
-            } else {
-                break;
+            _ => ((size_field - 8) as u64),
+
+            _other => {
+                (unreachable!(r#"unexpected: {:?}"#, _other));
             }
         }
-        accum
     };
-    let null = {
-        let b = (input.read_byte())?;
-        if (b == 0) {
-            b
-        } else {
-            return None;
+    let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
+    (Some(Type95 {
+        size_field,
+        r#type,
+        size,
+        data,
+    }))
+}
+
+fn Decoder60<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type105> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
+    let size = {
+        match size_field {
+            0 => 0,
+
+            1 => {
+                let inner = (Decoder48(scope, input))?;
+                ((|x| x - 16)(inner))
+            }
+
+            _ => ((size_field - 8) as u64),
+
+            _other => {
+                (unreachable!(r#"unexpected: {:?}"#, _other));
+            }
         }
     };
-    (Some(Type21 { string, null }))
+    let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
+    (Some(Type105 {
+        size_field,
+        r#type,
+        size,
+        data,
+    }))
+}
+
+fn Decoder61<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type103> {
+    let size_field = { (Decoder33(scope, input))? };
+    let r#type = { (Decoder47(scope, input))? };
+    let size = {
+        match size_field {
+            0 => 0,
+
+            1 => {
+                let inner = (Decoder48(scope, input))?;
+                ((|x| x - 16)(inner))
+            }
+
+            _ => ((size_field - 8) as u64),
+
+            _other => {
+                (unreachable!(r#"unexpected: {:?}"#, _other));
+            }
+        }
+    };
+    let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
+    (Some(Type103 {
+        size_field,
+        r#type,
+        size,
+        data,
+    }))
 }
 
 fn Decoder62<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
@@ -3736,7 +3893,51 @@ fn Decoder65<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     (Some(Type21 { string, null }))
 }
 
-fn Decoder66<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder66<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+    let string = {
+        let mut accum = (Vec::new());
+        while true {
+            let matching_ix = {
+                let lookahead = &mut (input.clone());
+                let b = (lookahead.read_byte())?;
+                match b {
+                    tmp if (tmp != 0) => 0,
+
+                    0 => 1,
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                }
+            };
+            if (matching_ix == 0) {
+                let next_elem = {
+                    let b = (input.read_byte())?;
+                    if (b != 0) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                (accum.push(next_elem));
+            } else {
+                break;
+            }
+        }
+        accum
+    };
+    let null = {
+        let b = (input.read_byte())?;
+        if (b == 0) {
+            b
+        } else {
+            return None;
+        }
+    };
+    (Some(Type21 { string, null }))
+}
+
+fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -3753,10 +3954,10 @@ fn Decoder66<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type59> {
+fn Decoder68<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type79> {
     let initial_segment = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -3778,13 +3979,13 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         };
         match tree_index {
             0 => {
-                let inner = (Decoder69(scope, input))?;
-                (Type35::app0(inner))
+                let inner = (Decoder70(scope, input))?;
+                (Type55::app0(inner))
             }
 
             1 => {
-                let inner = (Decoder70(scope, input))?;
-                (Type35::app1(inner))
+                let inner = (Decoder71(scope, input))?;
+                (Type55::app1(inner))
             }
 
             _other => {
@@ -3878,7 +4079,7 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder71(scope, input))?;
+                let next_elem = (Decoder72(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -3886,8 +4087,8 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    let header = { (Decoder72(scope, input))? };
-    let scan = { (Decoder73(scope, input))? };
+    let header = { (Decoder73(scope, input))? };
+    let scan = { (Decoder74(scope, input))? };
     let dnl = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -3953,13 +4154,13 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         };
         match tree_index {
             0 => {
-                let inner = (Decoder74(scope, input))?;
-                (Type58::some(inner))
+                let inner = (Decoder75(scope, input))?;
+                (Type78::some(inner))
             }
 
             1 => {
                 let _ = ();
-                Type58::none
+                Type78::none
             }
 
             _other => {
@@ -4031,7 +4232,7 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder75(scope, input))?;
+                let next_elem = (Decoder76(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -4039,7 +4240,7 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    (Some(Type59 {
+    (Some(Type79 {
         initial_segment,
         segments,
         header,
@@ -4049,7 +4250,7 @@ fn Decoder67<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder68<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -4066,10 +4267,10 @@ fn Decoder68<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type25> {
+fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type45> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4087,18 +4288,18 @@ fn Decoder69<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type25 {
+    (Some(Type45 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type34> {
+fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4116,18 +4317,18 @@ fn Decoder70<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type34 {
+    (Some(Type54 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type45> {
+fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type65> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -4186,108 +4387,108 @@ fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder106(scope, input))?;
-            (Type45::dqt(inner))
+            let inner = (Decoder107(scope, input))?;
+            (Type65::dqt(inner))
         }
 
         1 => {
-            let inner = (Decoder107(scope, input))?;
-            (Type45::dht(inner))
+            let inner = (Decoder108(scope, input))?;
+            (Type65::dht(inner))
         }
 
         2 => {
-            let inner = (Decoder108(scope, input))?;
-            (Type45::dac(inner))
+            let inner = (Decoder109(scope, input))?;
+            (Type65::dac(inner))
         }
 
         3 => {
-            let inner = (Decoder109(scope, input))?;
-            (Type45::dri(inner))
+            let inner = (Decoder110(scope, input))?;
+            (Type65::dri(inner))
         }
 
         4 => {
-            let inner = (Decoder69(scope, input))?;
-            (Type45::app0(inner))
+            let inner = (Decoder70(scope, input))?;
+            (Type65::app0(inner))
         }
 
         5 => {
-            let inner = (Decoder70(scope, input))?;
-            (Type45::app1(inner))
+            let inner = (Decoder71(scope, input))?;
+            (Type65::app1(inner))
         }
 
         6 => {
-            let inner = (Decoder110(scope, input))?;
-            (Type45::app2(inner))
+            let inner = (Decoder111(scope, input))?;
+            (Type65::app2(inner))
         }
 
         7 => {
-            let inner = (Decoder111(scope, input))?;
-            (Type45::app3(inner))
+            let inner = (Decoder112(scope, input))?;
+            (Type65::app3(inner))
         }
 
         8 => {
-            let inner = (Decoder112(scope, input))?;
-            (Type45::app4(inner))
+            let inner = (Decoder113(scope, input))?;
+            (Type65::app4(inner))
         }
 
         9 => {
-            let inner = (Decoder113(scope, input))?;
-            (Type45::app5(inner))
+            let inner = (Decoder114(scope, input))?;
+            (Type65::app5(inner))
         }
 
         10 => {
-            let inner = (Decoder114(scope, input))?;
-            (Type45::app6(inner))
+            let inner = (Decoder115(scope, input))?;
+            (Type65::app6(inner))
         }
 
         11 => {
-            let inner = (Decoder115(scope, input))?;
-            (Type45::app7(inner))
+            let inner = (Decoder116(scope, input))?;
+            (Type65::app7(inner))
         }
 
         12 => {
-            let inner = (Decoder116(scope, input))?;
-            (Type45::app8(inner))
+            let inner = (Decoder117(scope, input))?;
+            (Type65::app8(inner))
         }
 
         13 => {
-            let inner = (Decoder117(scope, input))?;
-            (Type45::app9(inner))
+            let inner = (Decoder118(scope, input))?;
+            (Type65::app9(inner))
         }
 
         14 => {
-            let inner = (Decoder118(scope, input))?;
-            (Type45::app10(inner))
+            let inner = (Decoder119(scope, input))?;
+            (Type65::app10(inner))
         }
 
         15 => {
-            let inner = (Decoder119(scope, input))?;
-            (Type45::app11(inner))
+            let inner = (Decoder120(scope, input))?;
+            (Type65::app11(inner))
         }
 
         16 => {
-            let inner = (Decoder120(scope, input))?;
-            (Type45::app12(inner))
+            let inner = (Decoder121(scope, input))?;
+            (Type65::app12(inner))
         }
 
         17 => {
-            let inner = (Decoder121(scope, input))?;
-            (Type45::app13(inner))
+            let inner = (Decoder122(scope, input))?;
+            (Type65::app13(inner))
         }
 
         18 => {
-            let inner = (Decoder122(scope, input))?;
-            (Type45::app14(inner))
+            let inner = (Decoder123(scope, input))?;
+            (Type65::app14(inner))
         }
 
         19 => {
-            let inner = (Decoder123(scope, input))?;
-            (Type45::app15(inner))
+            let inner = (Decoder124(scope, input))?;
+            (Type65::app15(inner))
         }
 
         20 => {
-            let inner = (Decoder124(scope, input))?;
-            (Type45::com(inner))
+            let inner = (Decoder125(scope, input))?;
+            (Type65::com(inner))
         }
 
         _other => {
@@ -4296,7 +4497,7 @@ fn Decoder71<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type49> {
+fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type69> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -4339,68 +4540,68 @@ fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder91(scope, input))?;
-            (Type49::sof0(inner))
+            let inner = (Decoder92(scope, input))?;
+            (Type69::sof0(inner))
         }
 
         1 => {
-            let inner = (Decoder92(scope, input))?;
-            (Type49::sof1(inner))
+            let inner = (Decoder93(scope, input))?;
+            (Type69::sof1(inner))
         }
 
         2 => {
-            let inner = (Decoder93(scope, input))?;
-            (Type49::sof2(inner))
+            let inner = (Decoder94(scope, input))?;
+            (Type69::sof2(inner))
         }
 
         3 => {
-            let inner = (Decoder94(scope, input))?;
-            (Type49::sof3(inner))
+            let inner = (Decoder95(scope, input))?;
+            (Type69::sof3(inner))
         }
 
         4 => {
-            let inner = (Decoder95(scope, input))?;
-            (Type49::sof5(inner))
+            let inner = (Decoder96(scope, input))?;
+            (Type69::sof5(inner))
         }
 
         5 => {
-            let inner = (Decoder96(scope, input))?;
-            (Type49::sof6(inner))
+            let inner = (Decoder97(scope, input))?;
+            (Type69::sof6(inner))
         }
 
         6 => {
-            let inner = (Decoder97(scope, input))?;
-            (Type49::sof7(inner))
+            let inner = (Decoder98(scope, input))?;
+            (Type69::sof7(inner))
         }
 
         7 => {
-            let inner = (Decoder98(scope, input))?;
-            (Type49::sof9(inner))
+            let inner = (Decoder99(scope, input))?;
+            (Type69::sof9(inner))
         }
 
         8 => {
-            let inner = (Decoder99(scope, input))?;
-            (Type49::sof10(inner))
+            let inner = (Decoder100(scope, input))?;
+            (Type69::sof10(inner))
         }
 
         9 => {
-            let inner = (Decoder100(scope, input))?;
-            (Type49::sof11(inner))
+            let inner = (Decoder101(scope, input))?;
+            (Type69::sof11(inner))
         }
 
         10 => {
-            let inner = (Decoder101(scope, input))?;
-            (Type49::sof13(inner))
+            let inner = (Decoder102(scope, input))?;
+            (Type69::sof13(inner))
         }
 
         11 => {
-            let inner = (Decoder102(scope, input))?;
-            (Type49::sof14(inner))
+            let inner = (Decoder103(scope, input))?;
+            (Type69::sof14(inner))
         }
 
         12 => {
-            let inner = (Decoder103(scope, input))?;
-            (Type49::sof15(inner))
+            let inner = (Decoder104(scope, input))?;
+            (Type69::sof15(inner))
         }
 
         _other => {
@@ -4409,7 +4610,7 @@ fn Decoder72<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type55> {
+fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type75> {
     let segments = {
         let mut accum = (Vec::new());
         while true {
@@ -4472,7 +4673,7 @@ fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder71(scope, input))?;
+                let next_elem = (Decoder72(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -4480,16 +4681,16 @@ fn Decoder73<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    let sos = { (Decoder76(scope, input))? };
-    let data = { (Decoder90(scope, input))? };
-    (Some(Type55 {
+    let sos = { (Decoder77(scope, input))? };
+    let data = { (Decoder91(scope, input))? };
+    (Some(Type75 {
         segments,
         sos,
         data,
     }))
 }
 
-fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
+fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type77> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4507,18 +4708,18 @@ fn Decoder74<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type57 {
+    (Some(Type77 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type55> {
+fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type75> {
     let segments = {
         let mut accum = (Vec::new());
         while true {
@@ -4581,7 +4782,7 @@ fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder71(scope, input))?;
+                let next_elem = (Decoder72(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -4589,16 +4790,16 @@ fn Decoder75<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         }
         accum
     };
-    let sos = { (Decoder76(scope, input))? };
-    let data = { (Decoder77(scope, input))? };
-    (Some(Type55 {
+    let sos = { (Decoder77(scope, input))? };
+    let data = { (Decoder78(scope, input))? };
+    (Some(Type75 {
         segments,
         sos,
         data,
     }))
 }
 
-fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type52> {
+fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type72> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -4616,18 +4817,18 @@ fn Decoder76<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type52 {
+    (Some(Type72 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
+fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type74> {
     let scan_data = {
         let mut accum = (Vec::new());
         while true {
@@ -4757,48 +4958,48 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     };
                     match tree_index {
                         0 => {
-                            let inner = (Decoder78(scope, input))?;
-                            (Type53::mcu(inner))
+                            let inner = (Decoder79(scope, input))?;
+                            (Type73::mcu(inner))
                         }
 
                         1 => {
-                            let inner = (Decoder79(scope, input))?;
-                            (Type53::rst0(inner))
+                            let inner = (Decoder80(scope, input))?;
+                            (Type73::rst0(inner))
                         }
 
                         2 => {
-                            let inner = (Decoder80(scope, input))?;
-                            (Type53::rst1(inner))
+                            let inner = (Decoder81(scope, input))?;
+                            (Type73::rst1(inner))
                         }
 
                         3 => {
-                            let inner = (Decoder81(scope, input))?;
-                            (Type53::rst2(inner))
+                            let inner = (Decoder82(scope, input))?;
+                            (Type73::rst2(inner))
                         }
 
                         4 => {
-                            let inner = (Decoder82(scope, input))?;
-                            (Type53::rst3(inner))
+                            let inner = (Decoder83(scope, input))?;
+                            (Type73::rst3(inner))
                         }
 
                         5 => {
-                            let inner = (Decoder83(scope, input))?;
-                            (Type53::rst4(inner))
+                            let inner = (Decoder84(scope, input))?;
+                            (Type73::rst4(inner))
                         }
 
                         6 => {
-                            let inner = (Decoder84(scope, input))?;
-                            (Type53::rst5(inner))
+                            let inner = (Decoder85(scope, input))?;
+                            (Type73::rst5(inner))
                         }
 
                         7 => {
-                            let inner = (Decoder85(scope, input))?;
-                            (Type53::rst6(inner))
+                            let inner = (Decoder86(scope, input))?;
+                            (Type73::rst6(inner))
                         }
 
                         8 => {
-                            let inner = (Decoder86(scope, input))?;
-                            (Type53::rst7(inner))
+                            let inner = (Decoder87(scope, input))?;
+                            (Type73::rst7(inner))
                         }
 
                         _other => {
@@ -4816,23 +5017,23 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let scan_data_stream = {
         ((((scan_data.clone()).into_iter()).flat_map(
             (|x| match x {
-                Type53::mcu(v) => ([v].to_vec()),
+                Type73::mcu(v) => ([v].to_vec()),
 
-                Type53::rst0(..) => ([].to_vec()),
+                Type73::rst0(..) => ([].to_vec()),
 
-                Type53::rst1(..) => ([].to_vec()),
+                Type73::rst1(..) => ([].to_vec()),
 
-                Type53::rst2(..) => ([].to_vec()),
+                Type73::rst2(..) => ([].to_vec()),
 
-                Type53::rst3(..) => ([].to_vec()),
+                Type73::rst3(..) => ([].to_vec()),
 
-                Type53::rst4(..) => ([].to_vec()),
+                Type73::rst4(..) => ([].to_vec()),
 
-                Type53::rst5(..) => ([].to_vec()),
+                Type73::rst5(..) => ([].to_vec()),
 
-                Type53::rst6(..) => ([].to_vec()),
+                Type73::rst6(..) => ([].to_vec()),
 
-                Type53::rst7(..) => ([].to_vec()),
+                Type73::rst7(..) => ([].to_vec()),
 
                 _other => {
                     (unreachable!(r#"unexpected: {:?}"#, _other));
@@ -4841,13 +5042,13 @@ fn Decoder77<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         ))
         .collect())
     };
-    (Some(Type54 {
+    (Some(Type74 {
         scan_data,
         scan_data_stream,
     }))
 }
 
-fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder79<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -4900,7 +5101,7 @@ fn Decoder78<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder79<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder80<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -4917,10 +5118,10 @@ fn Decoder79<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder80<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder81<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -4937,10 +5138,10 @@ fn Decoder80<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder81<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder82<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -4957,10 +5158,10 @@ fn Decoder81<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder82<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder83<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -4977,10 +5178,10 @@ fn Decoder82<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder83<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder84<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -4997,10 +5198,10 @@ fn Decoder83<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder84<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -5017,10 +5218,10 @@ fn Decoder84<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -5037,10 +5238,10 @@ fn Decoder85<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
     let ff = {
         let b = (input.read_byte())?;
         if (b == 255) {
@@ -5057,22 +5258,22 @@ fn Decoder86<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
             return None;
         }
     };
-    (Some(Type20 { ff, marker }))
+    (Some(Type41 { ff, marker }))
 }
 
-fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type51> {
-    let num_image_components = { (Decoder16(scope, input))? };
+fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type71> {
+    let num_image_components = { (Decoder17(scope, input))? };
     let image_components = {
         let mut accum = (Vec::new());
         for _ in 0..num_image_components {
-            (accum.push((Decoder88(scope, input))?));
+            (accum.push((Decoder89(scope, input))?));
         }
         accum
     };
-    let start_spectral_selection = { (Decoder16(scope, input))? };
-    let end_spectral_selection = { (Decoder16(scope, input))? };
-    let approximation_bit_position = { (Decoder16(scope, input))? };
-    (Some(Type51 {
+    let start_spectral_selection = { (Decoder17(scope, input))? };
+    let end_spectral_selection = { (Decoder17(scope, input))? };
+    let approximation_bit_position = { (Decoder17(scope, input))? };
+    (Some(Type71 {
         num_image_components,
         image_components,
         start_spectral_selection,
@@ -5081,21 +5282,21 @@ fn Decoder87<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     }))
 }
 
-fn Decoder88<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type50> {
-    let component_selector = { (Decoder16(scope, input))? };
-    let entropy_coding_table_ids = { (Decoder16(scope, input))? };
-    (Some(Type50 {
+fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type70> {
+    let component_selector = { (Decoder17(scope, input))? };
+    let entropy_coding_table_ids = { (Decoder17(scope, input))? };
+    (Some(Type70 {
         component_selector,
         entropy_coding_table_ids,
     }))
 }
 
-fn Decoder89<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
-    let num_lines = { (Decoder42(scope, input))? };
-    (Some(Type56 { num_lines }))
+fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type76> {
+    let num_lines = { (Decoder43(scope, input))? };
+    (Some(Type76 { num_lines }))
 }
 
-fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type54> {
+fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type74> {
     let scan_data = {
         let mut accum = (Vec::new());
         while true {
@@ -5227,48 +5428,48 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                     };
                     match tree_index {
                         0 => {
-                            let inner = (Decoder78(scope, input))?;
-                            (Type53::mcu(inner))
+                            let inner = (Decoder79(scope, input))?;
+                            (Type73::mcu(inner))
                         }
 
                         1 => {
-                            let inner = (Decoder79(scope, input))?;
-                            (Type53::rst0(inner))
+                            let inner = (Decoder80(scope, input))?;
+                            (Type73::rst0(inner))
                         }
 
                         2 => {
-                            let inner = (Decoder80(scope, input))?;
-                            (Type53::rst1(inner))
+                            let inner = (Decoder81(scope, input))?;
+                            (Type73::rst1(inner))
                         }
 
                         3 => {
-                            let inner = (Decoder81(scope, input))?;
-                            (Type53::rst2(inner))
+                            let inner = (Decoder82(scope, input))?;
+                            (Type73::rst2(inner))
                         }
 
                         4 => {
-                            let inner = (Decoder82(scope, input))?;
-                            (Type53::rst3(inner))
+                            let inner = (Decoder83(scope, input))?;
+                            (Type73::rst3(inner))
                         }
 
                         5 => {
-                            let inner = (Decoder83(scope, input))?;
-                            (Type53::rst4(inner))
+                            let inner = (Decoder84(scope, input))?;
+                            (Type73::rst4(inner))
                         }
 
                         6 => {
-                            let inner = (Decoder84(scope, input))?;
-                            (Type53::rst5(inner))
+                            let inner = (Decoder85(scope, input))?;
+                            (Type73::rst5(inner))
                         }
 
                         7 => {
-                            let inner = (Decoder85(scope, input))?;
-                            (Type53::rst6(inner))
+                            let inner = (Decoder86(scope, input))?;
+                            (Type73::rst6(inner))
                         }
 
                         8 => {
-                            let inner = (Decoder86(scope, input))?;
-                            (Type53::rst7(inner))
+                            let inner = (Decoder87(scope, input))?;
+                            (Type73::rst7(inner))
                         }
 
                         _other => {
@@ -5286,23 +5487,23 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
     let scan_data_stream = {
         ((((scan_data.clone()).into_iter()).flat_map(
             (|x| match x {
-                Type53::mcu(v) => ([v].to_vec()),
+                Type73::mcu(v) => ([v].to_vec()),
 
-                Type53::rst0(..) => ([].to_vec()),
+                Type73::rst0(..) => ([].to_vec()),
 
-                Type53::rst1(..) => ([].to_vec()),
+                Type73::rst1(..) => ([].to_vec()),
 
-                Type53::rst2(..) => ([].to_vec()),
+                Type73::rst2(..) => ([].to_vec()),
 
-                Type53::rst3(..) => ([].to_vec()),
+                Type73::rst3(..) => ([].to_vec()),
 
-                Type53::rst4(..) => ([].to_vec()),
+                Type73::rst4(..) => ([].to_vec()),
 
-                Type53::rst5(..) => ([].to_vec()),
+                Type73::rst5(..) => ([].to_vec()),
 
-                Type53::rst6(..) => ([].to_vec()),
+                Type73::rst6(..) => ([].to_vec()),
 
-                Type53::rst7(..) => ([].to_vec()),
+                Type73::rst7(..) => ([].to_vec()),
 
                 _other => {
                     (unreachable!(r#"unexpected: {:?}"#, _other));
@@ -5311,13 +5512,13 @@ fn Decoder90<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
         ))
         .collect())
     };
-    (Some(Type54 {
+    (Some(Type74 {
         scan_data,
         scan_data_stream,
     }))
 }
 
-fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5335,18 +5536,18 @@ fn Decoder91<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5364,18 +5565,18 @@ fn Decoder92<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5393,18 +5594,18 @@ fn Decoder93<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5422,18 +5623,18 @@ fn Decoder94<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5451,18 +5652,18 @@ fn Decoder95<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5480,18 +5681,18 @@ fn Decoder96<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5509,18 +5710,18 @@ fn Decoder97<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5538,18 +5739,18 @@ fn Decoder98<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5567,18 +5768,18 @@ fn Decoder99<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5596,18 +5797,18 @@ fn Decoder100<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5625,18 +5826,18 @@ fn Decoder101<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5654,18 +5855,18 @@ fn Decoder102<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type48> {
+fn Decoder104<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type68> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5683,30 +5884,30 @@ fn Decoder103<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type48 {
+    (Some(Type68 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder104<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type47> {
-    let sample_precision = { (Decoder16(scope, input))? };
-    let num_lines = { (Decoder42(scope, input))? };
-    let num_samples_per_line = { (Decoder42(scope, input))? };
-    let num_image_components = { (Decoder16(scope, input))? };
+fn Decoder105<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type67> {
+    let sample_precision = { (Decoder17(scope, input))? };
+    let num_lines = { (Decoder43(scope, input))? };
+    let num_samples_per_line = { (Decoder43(scope, input))? };
+    let num_image_components = { (Decoder17(scope, input))? };
     let image_components = {
         let mut accum = (Vec::new());
         for _ in 0..num_image_components {
-            (accum.push((Decoder105(scope, input))?));
+            (accum.push((Decoder106(scope, input))?));
         }
         accum
     };
-    (Some(Type47 {
+    (Some(Type67 {
         sample_precision,
         num_lines,
         num_samples_per_line,
@@ -5715,18 +5916,18 @@ fn Decoder104<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder105<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type46> {
-    let id = { (Decoder16(scope, input))? };
-    let sampling_factor = { (Decoder16(scope, input))? };
-    let quantization_table_id = { (Decoder16(scope, input))? };
-    (Some(Type46 {
+fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type66> {
+    let id = { (Decoder17(scope, input))? };
+    let sampling_factor = { (Decoder17(scope, input))? };
+    let quantization_table_id = { (Decoder17(scope, input))? };
+    (Some(Type66 {
         id,
         sampling_factor,
         quantization_table_id,
     }))
 }
 
-fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type42> {
+fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type62> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5744,18 +5945,18 @@ fn Decoder106<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type42 {
+    (Some(Type62 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type40> {
+fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type60> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5773,18 +5974,18 @@ fn Decoder107<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type40 {
+    (Some(Type60 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type38> {
+fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type58> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5802,18 +6003,18 @@ fn Decoder108<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type38 {
+    (Some(Type58 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type44> {
+fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type64> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5831,18 +6032,18 @@ fn Decoder109<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type44 {
+    (Some(Type64 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5860,18 +6061,18 @@ fn Decoder110<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5889,18 +6090,18 @@ fn Decoder111<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5918,18 +6119,18 @@ fn Decoder112<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5947,18 +6148,18 @@ fn Decoder113<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -5976,18 +6177,18 @@ fn Decoder114<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6005,18 +6206,18 @@ fn Decoder115<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder117<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6034,18 +6235,18 @@ fn Decoder116<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder117<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder118<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6063,18 +6264,18 @@ fn Decoder117<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder118<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder119<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6092,18 +6293,18 @@ fn Decoder118<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder119<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6121,18 +6322,18 @@ fn Decoder119<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder121<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6150,18 +6351,18 @@ fn Decoder120<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder121<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6179,18 +6380,18 @@ fn Decoder121<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder123<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6208,18 +6409,18 @@ fn Decoder122<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder123<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6237,18 +6438,18 @@ fn Decoder123<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type36> {
+fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type56> {
     let marker = {
         let ff = {
             let b = (input.read_byte())?;
@@ -6266,37 +6467,37 @@ fn Decoder124<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 return None;
             }
         };
-        Type20 { ff, marker }
+        Type41 { ff, marker }
     };
-    let length = { (Decoder42(scope, input))? };
+    let length = { (Decoder43(scope, input))? };
     let data = { (unimplemented!(r#"translate @ Decoder::Slice"#)) };
-    (Some(Type36 {
+    (Some(Type56 {
         marker,
         length,
         data,
     }))
 }
 
-fn Decoder125<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type43> {
-    let restart_interval = { (Decoder42(scope, input))? };
-    (Some(Type43 { restart_interval }))
+fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type63> {
+    let restart_interval = { (Decoder43(scope, input))? };
+    (Some(Type63 { restart_interval }))
 }
 
-fn Decoder126<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type37> {
-    let class_table_id = { (Decoder16(scope, input))? };
-    let value = { (Decoder16(scope, input))? };
-    (Some(Type37 {
+fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type57> {
+    let class_table_id = { (Decoder17(scope, input))? };
+    let value = { (Decoder17(scope, input))? };
+    (Some(Type57 {
         class_table_id,
         value,
     }))
 }
 
-fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type39> {
-    let class_table_id = { (Decoder16(scope, input))? };
+fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type59> {
+    let class_table_id = { (Decoder17(scope, input))? };
     let num_codes = {
         let mut accum = (Vec::new());
         for _ in 0..16 {
-            (accum.push((Decoder16(scope, input))?));
+            (accum.push((Decoder17(scope, input))?));
         }
         accum
     };
@@ -6308,7 +6509,7 @@ fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 0
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder16(scope, input))?;
+                let next_elem = (Decoder17(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -6316,15 +6517,15 @@ fn Decoder127<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type39 {
+    (Some(Type59 {
         class_table_id,
         num_codes,
         values,
     }))
 }
 
-fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type41> {
-    let precision_table_id = { (Decoder16(scope, input))? };
+fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type61> {
+    let precision_table_id = { (Decoder17(scope, input))? };
     let elements = {
         let mut accum = (Vec::new());
         while true {
@@ -6333,7 +6534,7 @@ fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 0
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder16(scope, input))?;
+                let next_elem = (Decoder17(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -6341,26 +6542,25 @@ fn Decoder128<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type41 {
+    (Some(Type61 {
         precision_table_id,
         elements,
     }))
 }
 
-fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type33> {
-    /* Sequential(AccumRecord { constructor: Simple("Type33"), fields: [("identifier", Simple(Invoke(130, []))), ("data", Other(ExprMatch(FunctionCall(FieldAccess(FieldAccess(Entity(Local("identifier")), ByName("string")), ByName("as_slice")), []), [(Pattern(ArrayLiteral([PrimLiteral(Numeric(69)), PrimLiteral(Numeric(120)), PrimLiteral(Numeric(105)), PrimLiteral(Numeric(102))])), Derived(VariantOf(Compound("Type32", "exif"), Simple(Invoke(131, []))))), (Pattern(ArrayLiteral([PrimLiteral(Numeric(104)), PrimLiteral(Numeric(116)), PrimLiteral(Numeric(116)), PrimLiteral(Numeric(112)), PrimLiteral(Numeric(58)), PrimLiteral(Numeric(47)), PrimLiteral(Numeric(47)), PrimLiteral(Numeric(110)), PrimLiteral(Numeric(115)), PrimLiteral(Numeric(46)), PrimLiteral(Numeric(97)), PrimLiteral(Numeric(100)), PrimLiteral(Numeric(111)), PrimLiteral(Numeric(98)), PrimLiteral(Numeric(101)), PrimLiteral(Numeric(46)), PrimLiteral(Numeric(99)), PrimLiteral(Numeric(111)), PrimLiteral(Numeric(109)), PrimLiteral(Numeric(47)), PrimLiteral(Numeric(120)), PrimLiteral(Numeric(97)), PrimLiteral(Numeric(112)), PrimLiteral(Numeric(47)), PrimLiteral(Numeric(49)), PrimLiteral(Numeric(46)), PrimLiteral(Numeric(48)), PrimLiteral(Numeric(47))])), Derived(VariantOf(Compound("Type32", "xmp"), Simple(Invoke(132, []))))), (Pattern(CatchAll(None)), Derived(VariantOf(Compound("Type32", "other"), Repeat(ContinueOnMatch(MatchTree { accept: Some(1), branches: [(!{}, MatchTree { accept: Some(0), branches: [] })] }, Simple(Invoke(16, [])))))))])))] }) */
-    let identifier = { (Decoder130(scope, input))? };
+fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type53> {
+    let identifier = { (Decoder131(scope, input))? };
     let data = {
         match (identifier.string.as_slice()) {
             [69, 120, 105, 102] => {
-                let inner = (Decoder131(scope, input))?;
-                (Type32::exif(inner))
+                let inner = (Decoder132(scope, input))?;
+                (Type52::exif(inner))
             }
 
             [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] =>
             {
-                let inner = (Decoder132(scope, input))?;
-                (Type32::xmp(inner))
+                let inner = (Decoder133(scope, input))?;
+                (Type52::xmp(inner))
             }
 
             _ => {
@@ -6372,7 +6572,7 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                             0
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder16(scope, input))?;
+                            let next_elem = (Decoder17(scope, input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -6380,7 +6580,7 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                     }
                     accum
                 };
-                (Type32::other(inner))
+                (Type52::other(inner))
             }
 
             _other => {
@@ -6388,10 +6588,10 @@ fn Decoder129<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    (Some(Type33 { identifier, data }))
+    (Some(Type53 { identifier, data }))
 }
 
-fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+fn Decoder131<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -6435,7 +6635,7 @@ fn Decoder130<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type21 { string, null }))
 }
 
-fn Decoder131<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type30> {
+fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type50> {
     let padding = {
         let b = (input.read_byte())?;
         if (b == 0) {
@@ -6444,11 +6644,11 @@ fn Decoder131<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             return None;
         }
     };
-    let exif = { (Decoder133(scope, input))? };
-    (Some(Type30 { padding, exif }))
+    let exif = { (Decoder134(scope, input))? };
+    (Some(Type50 { padding, exif }))
 }
 
-fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type31> {
+fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type51> {
     let xmp = {
         let mut accum = (Vec::new());
         while true {
@@ -6457,7 +6657,7 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 0
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder16(scope, input))?;
+                let next_elem = (Decoder17(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -6465,10 +6665,10 @@ fn Decoder132<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    (Some(Type31 { xmp }))
+    (Some(Type51 { xmp }))
 }
 
-fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type29> {
+fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type49> {
     let byte_order = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -6501,7 +6701,7 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                         return None;
                     }
                 };
-                (Type26::le(field0, field1))
+                (Type46::le(field0, field1))
             }
 
             1 => {
@@ -6521,7 +6721,7 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                         return None;
                     }
                 };
-                (Type26::be(field0, field1))
+                (Type46::be(field0, field1))
             }
 
             _other => {
@@ -6531,9 +6731,9 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let magic = {
         match byte_order {
-            Type26::le(..) => (Decoder134(scope, input))?,
+            Type46::le(..) => (Decoder135(scope, input))?,
 
-            Type26::be(..) => (Decoder42(scope, input))?,
+            Type46::be(..) => (Decoder43(scope, input))?,
 
             _other => {
                 (unreachable!(r#"unexpected: {:?}"#, _other));
@@ -6542,9 +6742,9 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     let offset = {
         match byte_order {
-            Type26::le(..) => (Decoder23(scope, input))?,
+            Type46::le(..) => (Decoder24(scope, input))?,
 
-            Type26::be(..) => (Decoder32(scope, input))?,
+            Type46::be(..) => (Decoder33(scope, input))?,
 
             _other => {
                 (unreachable!(r#"unexpected: {:?}"#, _other));
@@ -6552,7 +6752,7 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
     };
     let ifd = { (unimplemented!(r#"translate @ Decoder::WithRelativeOffset"#)) };
-    (Some(Type29 {
+    (Some(Type49 {
         byte_order,
         magic,
         offset,
@@ -6560,22 +6760,22 @@ fn Decoder133<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder134<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
+fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u16> {
     let inner = {
-        let field0 = { (Decoder16(scope, input))? };
-        let field1 = { (Decoder16(scope, input))? };
+        let field0 = { (Decoder17(scope, input))? };
+        let field1 = { (Decoder17(scope, input))? };
         (field0, field1)
     };
     (Some(((|x| u16le(x))(inner))))
 }
 
-fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type24> {
-    let identifier = { (Decoder136(scope, input))? };
+fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type44> {
+    let identifier = { (Decoder137(scope, input))? };
     let data = {
         match (identifier.string.as_slice()) {
             [74, 70, 73, 70] => {
-                let inner = (Decoder137(scope, input))?;
-                (Type23::jfif(inner))
+                let inner = (Decoder138(scope, input))?;
+                (Type43::jfif(inner))
             }
 
             _ => {
@@ -6587,7 +6787,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                             0
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder16(scope, input))?;
+                            let next_elem = (Decoder17(scope, input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -6595,7 +6795,7 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                     }
                     accum
                 };
-                (Type23::other(inner))
+                (Type43::other(inner))
             }
 
             _other => {
@@ -6603,10 +6803,10 @@ fn Decoder135<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    (Some(Type24 { identifier, data }))
+    (Some(Type44 { identifier, data }))
 }
 
-fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -6650,28 +6850,28 @@ fn Decoder136<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type21 { string, null }))
 }
 
-fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type22> {
-    let version_major = { (Decoder16(scope, input))? };
-    let version_minor = { (Decoder16(scope, input))? };
-    let density_units = { (Decoder16(scope, input))? };
-    let density_x = { (Decoder42(scope, input))? };
-    let density_y = { (Decoder42(scope, input))? };
-    let thumbnail_width = { (Decoder16(scope, input))? };
-    let thumbnail_height = { (Decoder16(scope, input))? };
+fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type42> {
+    let version_major = { (Decoder17(scope, input))? };
+    let version_minor = { (Decoder17(scope, input))? };
+    let density_units = { (Decoder17(scope, input))? };
+    let density_x = { (Decoder43(scope, input))? };
+    let density_y = { (Decoder43(scope, input))? };
+    let thumbnail_width = { (Decoder17(scope, input))? };
+    let thumbnail_height = { (Decoder17(scope, input))? };
     let thumbnail_pixels = {
         let mut accum = (Vec::new());
         for _ in 0..thumbnail_height {
             (accum.push({
                 let mut accum = (Vec::new());
                 for _ in 0..thumbnail_width {
-                    (accum.push((Decoder138(scope, input))?));
+                    (accum.push((Decoder139(scope, input))?));
                 }
                 accum
             }));
         }
         accum
     };
-    (Some(Type22 {
+    (Some(Type42 {
         version_major,
         version_minor,
         density_units,
@@ -6683,14 +6883,1284 @@ fn Decoder137<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder138<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type2> {
-    let r = { (Decoder16(scope, input))? };
-    let g = { (Decoder16(scope, input))? };
-    let b = { (Decoder16(scope, input))? };
+fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type2> {
+    let r = { (Decoder17(scope, input))? };
+    let g = { (Decoder17(scope, input))? };
+    let b = { (Decoder17(scope, input))? };
     (Some(Type2 { r, g, b }))
 }
 
-fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type0> {
+fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type20> {
+    let magic = {
+        let field0 = {
+            let b = (input.read_byte())?;
+            if (b == 31) {
+                b
+            } else {
+                return None;
+            }
+        };
+        let field1 = {
+            let b = (input.read_byte())?;
+            if (b == 139) {
+                b
+            } else {
+                return None;
+            }
+        };
+        (field0, field1)
+    };
+    let method = { (Decoder17(scope, input))? };
+    let file_flags = { (Decoder17(scope, input))? };
+    let timestamp = { (Decoder24(scope, input))? };
+    let compression_flags = { (Decoder17(scope, input))? };
+    let os_id = { (Decoder17(scope, input))? };
+    (Some(Type20 {
+        magic,
+        method,
+        file_flags,
+        timestamp,
+        compression_flags,
+        os_id,
+    }))
+}
+
+fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+    (Some((Decoder149(scope, input))?))
+}
+
+fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type38> {
+    let blocks = {
+        let mut accum = (Vec::new());
+        while true {
+            let elem = (Decoder144(scope, input))?;
+            if ((|x| x.r#final == 1)(&elem)) {
+                (accum.push(elem));
+                break;
+            } else {
+                (accum.push(elem));
+            }
+        }
+        accum
+    };
+    let codes = {
+        ((((blocks.clone()).into_iter()).flat_map(
+            (|x| match x.data {
+                Type36::uncompressed(y) => y.codes_values,
+
+                Type36::fixed_huffman(y) => y.codes_values,
+
+                Type36::dynamic_huffman(y) => y.codes_values,
+
+                _other => {
+                    (unreachable!(r#"unexpected: {:?}"#, _other));
+                }
+            }),
+        ))
+        .collect())
+    };
+    let inflate = { (unimplemented!(r#"embed_expr is not implemented for Expr::Inflate"#)) };
+    (Some(Type38 {
+        blocks,
+        codes,
+        inflate,
+    }))
+}
+
+fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type39> {
+    let crc = { (Decoder24(scope, input))? };
+    let length = { (Decoder24(scope, input))? };
+    (Some(Type39 { crc, length }))
+}
+
+fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type37> {
+    let r#final = { (Decoder145(scope, input))? };
+    let r#type = {
+        let inner = {
+            let field0 = { (Decoder145(scope, input))? };
+            let field1 = { (Decoder145(scope, input))? };
+            (field0, field1)
+        };
+        ((|bits| bits.1 << 1 | bits.0)(inner))
+    };
+    let data = {
+        match r#type {
+            0 => {
+                let inner = (Decoder146(scope, input))?;
+                (Type36::uncompressed(inner))
+            }
+
+            1 => {
+                let inner = (Decoder147(scope, input))?;
+                (Type36::fixed_huffman(inner))
+            }
+
+            2 => {
+                let inner = (Decoder148(scope, input))?;
+                (Type36::dynamic_huffman(inner))
+            }
+
+            _other => {
+                (unreachable!(r#"unexpected: {:?}"#, _other));
+            }
+        }
+    };
+    (Some(Type37 {
+        r#final,
+        r#type,
+        data,
+    }))
+}
+
+fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+    let b = (input.read_byte())?;
+    (Some(b))
+}
+
+fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type35> {
+    let align = {
+        while (input.offset() % 8 != 0) {
+            let _ = (input.read_byte())?;
+        }
+        ()
+    };
+    let len = {
+        let inner = {
+            let field0 = { (Decoder145(scope, input))? };
+            let field1 = { (Decoder145(scope, input))? };
+            let field2 = { (Decoder145(scope, input))? };
+            let field3 = { (Decoder145(scope, input))? };
+            let field4 = { (Decoder145(scope, input))? };
+            let field5 = { (Decoder145(scope, input))? };
+            let field6 = { (Decoder145(scope, input))? };
+            let field7 = { (Decoder145(scope, input))? };
+            let field8 = { (Decoder145(scope, input))? };
+            let field9 = { (Decoder145(scope, input))? };
+            let field10 = { (Decoder145(scope, input))? };
+            let field11 = { (Decoder145(scope, input))? };
+            let field12 = { (Decoder145(scope, input))? };
+            let field13 = { (Decoder145(scope, input))? };
+            let field14 = { (Decoder145(scope, input))? };
+            let field15 = { (Decoder145(scope, input))? };
+            (
+                field0, field1, field2, field3, field4, field5, field6, field7, field8, field9,
+                field10, field11, field12, field13, field14, field15,
+            )
+        };
+        ((|bits| {
+            (bits.15 as u16) << 15
+                | (bits.14 as u16) << 14
+                | (bits.13 as u16) << 13
+                | (bits.12 as u16) << 12
+                | (bits.11 as u16) << 11
+                | (bits.10 as u16) << 10
+                | (bits.9 as u16) << 9
+                | (bits.8 as u16) << 8
+                | (bits.7 as u16) << 7
+                | (bits.6 as u16) << 6
+                | (bits.5 as u16) << 5
+                | (bits.4 as u16) << 4
+                | (bits.3 as u16) << 3
+                | (bits.2 as u16) << 2
+                | (bits.1 as u16) << 1
+                | (bits.0 as u16)
+        })(inner))
+    };
+    let nlen = {
+        let inner = {
+            let field0 = { (Decoder145(scope, input))? };
+            let field1 = { (Decoder145(scope, input))? };
+            let field2 = { (Decoder145(scope, input))? };
+            let field3 = { (Decoder145(scope, input))? };
+            let field4 = { (Decoder145(scope, input))? };
+            let field5 = { (Decoder145(scope, input))? };
+            let field6 = { (Decoder145(scope, input))? };
+            let field7 = { (Decoder145(scope, input))? };
+            let field8 = { (Decoder145(scope, input))? };
+            let field9 = { (Decoder145(scope, input))? };
+            let field10 = { (Decoder145(scope, input))? };
+            let field11 = { (Decoder145(scope, input))? };
+            let field12 = { (Decoder145(scope, input))? };
+            let field13 = { (Decoder145(scope, input))? };
+            let field14 = { (Decoder145(scope, input))? };
+            let field15 = { (Decoder145(scope, input))? };
+            (
+                field0, field1, field2, field3, field4, field5, field6, field7, field8, field9,
+                field10, field11, field12, field13, field14, field15,
+            )
+        };
+        ((|bits| {
+            (bits.15 as u16) << 15
+                | (bits.14 as u16) << 14
+                | (bits.13 as u16) << 13
+                | (bits.12 as u16) << 12
+                | (bits.11 as u16) << 11
+                | (bits.10 as u16) << 10
+                | (bits.9 as u16) << 9
+                | (bits.8 as u16) << 8
+                | (bits.7 as u16) << 7
+                | (bits.6 as u16) << 6
+                | (bits.5 as u16) << 5
+                | (bits.4 as u16) << 4
+                | (bits.3 as u16) << 3
+                | (bits.2 as u16) << 2
+                | (bits.1 as u16) << 1
+                | (bits.0 as u16)
+        })(inner))
+    };
+    let bytes = {
+        let mut accum = (Vec::new());
+        for _ in 0..len {
+            (accum.push({
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7,
+                    )
+                };
+                ((|bits| {
+                    bits.7 << 7
+                        | bits.6 << 6
+                        | bits.5 << 5
+                        | bits.4 << 4
+                        | bits.3 << 3
+                        | bits.2 << 2
+                        | bits.1 << 1
+                        | bits.0
+                })(inner))
+            }));
+        }
+        accum
+    };
+    let codes_values = {
+        ((((bytes.clone()).into_iter()).flat_map((|x| [(Type29::literal(x))].to_vec()))).collect())
+    };
+    (Some(Type35 {
+        align,
+        len,
+        nlen,
+        bytes,
+        codes_values,
+    }))
+}
+
+fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type34> {
+    let codes = { (unimplemented!(r#"translate @ Decoder::Dynamic"#)) };
+    let codes_values = {
+        ((((codes.clone()).into_iter()).flat_map(
+            (|x| match x.code {
+                256 => ([].to_vec()),
+
+                257 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                258 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                259 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                260 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                261 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                262 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                263 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                264 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                265 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                266 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                267 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                268 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                269 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                270 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                271 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                272 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                273 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                274 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                275 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                276 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                277 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                278 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                279 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                280 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                281 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                282 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                283 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                284 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                285 => match x.extra {
+                    Type32::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                _ => ([(Type29::literal((x.code as u8)))].to_vec()),
+
+                _other => {
+                    (unreachable!(r#"unexpected: {:?}"#, _other));
+                }
+            }),
+        ))
+        .collect())
+    };
+    (Some(Type34 {
+        codes,
+        codes_values,
+    }))
+}
+
+fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type30> {
+    let hlit = {
+        let inner = {
+            let field0 = { (Decoder145(scope, input))? };
+            let field1 = { (Decoder145(scope, input))? };
+            let field2 = { (Decoder145(scope, input))? };
+            let field3 = { (Decoder145(scope, input))? };
+            let field4 = { (Decoder145(scope, input))? };
+            (field0, field1, field2, field3, field4)
+        };
+        ((|bits| bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
+    };
+    let hdist = {
+        let inner = {
+            let field0 = { (Decoder145(scope, input))? };
+            let field1 = { (Decoder145(scope, input))? };
+            let field2 = { (Decoder145(scope, input))? };
+            let field3 = { (Decoder145(scope, input))? };
+            let field4 = { (Decoder145(scope, input))? };
+            (field0, field1, field2, field3, field4)
+        };
+        ((|bits| bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
+    };
+    let hclen = {
+        let inner = {
+            let field0 = { (Decoder145(scope, input))? };
+            let field1 = { (Decoder145(scope, input))? };
+            let field2 = { (Decoder145(scope, input))? };
+            let field3 = { (Decoder145(scope, input))? };
+            (field0, field1, field2, field3)
+        };
+        ((|bits| bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
+    };
+    let code_length_alphabet_code_lengths = {
+        let mut accum = (Vec::new());
+        for _ in 0..(hclen + 4) {
+            (accum.push({
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    (field0, field1, field2)
+                };
+                ((|bits| bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
+            }));
+        }
+        accum
+    };
+    let literal_length_distance_alphabet_code_lengths =
+        { (unimplemented!(r#"translate @ Decoder::Dynamic"#)) };
+    let literal_length_distance_alphabet_code_lengths_value = {
+        ((((literal_length_distance_alphabet_code_lengths.clone()).into_iter()).fold(
+            {
+                ();
+                Type194::none
+            },
+            (|x| match (x.1.code as u8) {
+                16 => (
+                    x.0,
+                    (Vec::from_iter(
+                        ((std::iter::repeat(match x.0 {
+                            Type194::some(y) => y,
+
+                            _other => {
+                                (unreachable!(r#"unexpected: {:?}"#, _other));
+                            }
+                        }))
+                        .take(((x.1.extra + 3) as u32))),
+                    )),
+                ),
+
+                17 => (
+                    x.0,
+                    (Vec::from_iter(((std::iter::repeat(0)).take(((x.1.extra + 3) as u32))))),
+                ),
+
+                18 => (
+                    x.0,
+                    (Vec::from_iter(((std::iter::repeat(0)).take(((x.1.extra + 11) as u32))))),
+                ),
+
+                v => ((Type194::some(v)), ([v].to_vec())),
+
+                _other => {
+                    (unreachable!(r#"unexpected: {:?}"#, _other));
+                }
+            }),
+        ))
+        .collect())
+    };
+    let literal_length_alphabet_code_lengths_value = {
+        {
+            let ix = 0;
+            literal_length_distance_alphabet_code_lengths_value[ix..(ix + (hlit as u32) + 257)]
+        }
+    };
+    let distance_alphabet_code_lengths_value = {
+        {
+            let ix = ((hlit as u32) + 257);
+            literal_length_distance_alphabet_code_lengths_value[ix..(ix + (hdist as u32) + 1)]
+        }
+    };
+    let codes = { (unimplemented!(r#"translate @ Decoder::Dynamic"#)) };
+    let codes_values = {
+        ((((codes.clone()).into_iter()).flat_map(
+            (|x| match x.code {
+                256 => ([].to_vec()),
+
+                257 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                258 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                259 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                260 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                261 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                262 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                263 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                264 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                265 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                266 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                267 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                268 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                269 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                270 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                271 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                272 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                273 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                274 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                275 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                276 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                277 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                278 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                279 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                280 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                281 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                282 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                283 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                284 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                285 => match x.extra {
+                    Type26::some(rec) => {
+                        ([(Type29::reference(Type28 {
+                            length: rec.length,
+                            distance: rec.distance_record.distance,
+                        }))]
+                        .to_vec())
+                    }
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                },
+
+                _ => ([(Type29::literal((x.code as u8)))].to_vec()),
+
+                _other => {
+                    (unreachable!(r#"unexpected: {:?}"#, _other));
+                }
+            }),
+        ))
+        .collect())
+    };
+    (Some(Type30 {
+        hlit,
+        hdist,
+        hclen,
+        code_length_alphabet_code_lengths,
+        literal_length_distance_alphabet_code_lengths,
+        literal_length_distance_alphabet_code_lengths_value,
+        literal_length_alphabet_code_lengths_value,
+        distance_alphabet_code_lengths_value,
+        codes,
+        codes_values,
+    }))
+}
+
+fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+    let string = {
+        let mut accum = (Vec::new());
+        while true {
+            let matching_ix = {
+                let lookahead = &mut (input.clone());
+                let b = (lookahead.read_byte())?;
+                match b {
+                    tmp if (tmp != 0) => 0,
+
+                    0 => 1,
+
+                    _other => {
+                        (unreachable!(r#"unexpected: {:?}"#, _other));
+                    }
+                }
+            };
+            if (matching_ix == 0) {
+                let next_elem = {
+                    let b = (input.read_byte())?;
+                    if (b != 0) {
+                        b
+                    } else {
+                        return None;
+                    }
+                };
+                (accum.push(next_elem));
+            } else {
+                break;
+            }
+        }
+        accum
+    };
+    let null = {
+        let b = (input.read_byte())?;
+        if (b == 0) {
+            b
+        } else {
+            return None;
+        }
+    };
+    (Some(Type21 { string, null }))
+}
+
+fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type0> {
     let signature = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -6721,22 +8191,22 @@ fn Decoder139<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let version = {
         let mut accum = (Vec::new());
         for _ in 0..3 {
-            (accum.push((Decoder20(scope, input))?));
+            (accum.push((Decoder21(scope, input))?));
         }
         accum
     };
     (Some(Type0 { signature, version }))
 }
 
-fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type4> {
-    let descriptor = { (Decoder156(scope, input))? };
+fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type4> {
+    let descriptor = { (Decoder167(scope, input))? };
     let global_color_table = {
         match (descriptor.flags & 128 != 0) {
             true => {
                 let inner = {
                     let mut accum = (Vec::new());
                     for _ in 0..(2 << (descriptor.flags & 7)) {
-                        (accum.push((Decoder154(scope, input))?));
+                        (accum.push((Decoder165(scope, input))?));
                     }
                     accum
                 };
@@ -6759,7 +8229,7 @@ fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type17> {
+fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type17> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -6790,12 +8260,12 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder143(scope, input))?;
+            let inner = (Decoder154(scope, input))?;
             (Type17::graphic_block(inner))
         }
 
         1 => {
-            let inner = (Decoder144(scope, input))?;
+            let inner = (Decoder155(scope, input))?;
             (Type17::special_purpose_block(inner))
         }
 
@@ -6805,7 +8275,7 @@ fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type18> {
+fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type18> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 59) {
@@ -6817,7 +8287,7 @@ fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type18 { separator }))
 }
 
-fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
+fn Decoder154<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
     let graphic_control_extension = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -6845,7 +8315,7 @@ fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         };
         match tree_index {
             0 => {
-                let inner = (Decoder149(scope, input))?;
+                let inner = (Decoder160(scope, input))?;
                 (Type6::some(inner))
             }
 
@@ -6859,14 +8329,14 @@ fn Decoder143<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    let graphic_rendering_block = { (Decoder150(scope, input))? };
+    let graphic_rendering_block = { (Decoder161(scope, input))? };
     (Some(Type13 {
         graphic_control_extension,
         graphic_rendering_block,
     }))
 }
 
-fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
+fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -6887,12 +8357,12 @@ fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder145(scope, input))?;
+            let inner = (Decoder156(scope, input))?;
             (Type16::application_extension(inner))
         }
 
         1 => {
-            let inner = (Decoder146(scope, input))?;
+            let inner = (Decoder157(scope, input))?;
             (Type16::comment_extension(inner))
         }
 
@@ -6902,7 +8372,7 @@ fn Decoder144<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type14> {
+fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type14> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -6930,14 +8400,14 @@ fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let identifier = {
         let mut accum = (Vec::new());
         for _ in 0..8 {
-            (accum.push((Decoder16(scope, input))?));
+            (accum.push((Decoder17(scope, input))?));
         }
         accum
     };
     let authentication_code = {
         let mut accum = (Vec::new());
         for _ in 0..3 {
-            (accum.push((Decoder16(scope, input))?));
+            (accum.push((Decoder17(scope, input))?));
         }
         accum
     };
@@ -6958,7 +8428,7 @@ fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder147(scope, input))?;
+                let next_elem = (Decoder158(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -6966,7 +8436,7 @@ fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder148(scope, input))? };
+    let terminator = { (Decoder159(scope, input))? };
     (Some(Type14 {
         separator,
         label,
@@ -6978,7 +8448,7 @@ fn Decoder145<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type15> {
+fn Decoder157<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type15> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -7012,7 +8482,7 @@ fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder147(scope, input))?;
+                let next_elem = (Decoder158(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -7020,7 +8490,7 @@ fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder148(scope, input))? };
+    let terminator = { (Decoder159(scope, input))? };
     (Some(Type15 {
         separator,
         label,
@@ -7029,7 +8499,7 @@ fn Decoder146<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
+fn Decoder158<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
     let len_bytes = {
         let b = (input.read_byte())?;
         if (b != 0) {
@@ -7041,14 +8511,14 @@ fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let data = {
         let mut accum = (Vec::new());
         for _ in 0..len_bytes {
-            (accum.push((Decoder16(scope, input))?));
+            (accum.push((Decoder17(scope, input))?));
         }
         accum
     };
     (Some(Type7 { len_bytes, data }))
 }
 
-fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder159<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(if (b == 0) {
         b
@@ -7057,7 +8527,7 @@ fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
+fn Decoder160<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -7082,10 +8552,10 @@ fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             return None;
         }
     };
-    let flags = { (Decoder16(scope, input))? };
-    let delay_time = { (Decoder134(scope, input))? };
-    let transparent_color_index = { (Decoder16(scope, input))? };
-    let terminator = { (Decoder148(scope, input))? };
+    let flags = { (Decoder17(scope, input))? };
+    let delay_time = { (Decoder135(scope, input))? };
+    let transparent_color_index = { (Decoder17(scope, input))? };
+    let terminator = { (Decoder159(scope, input))? };
     (Some(Type5 {
         separator,
         label,
@@ -7097,7 +8567,7 @@ fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
+fn Decoder161<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -7113,12 +8583,12 @@ fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder151(scope, input))?;
+            let inner = (Decoder162(scope, input))?;
             (Type12::table_based_image(inner))
         }
 
         1 => {
-            let inner = (Decoder152(scope, input))?;
+            let inner = (Decoder163(scope, input))?;
             (Type12::plain_text_extension(inner))
         }
 
@@ -7128,15 +8598,15 @@ fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type11> {
-    let descriptor = { (Decoder153(scope, input))? };
+fn Decoder162<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type11> {
+    let descriptor = { (Decoder164(scope, input))? };
     let local_color_table = {
         match (descriptor.flags & 128 != 0) {
             true => {
                 let inner = {
                     let mut accum = (Vec::new());
                     for _ in 0..(2 << (descriptor.flags & 7)) {
-                        (accum.push((Decoder154(scope, input))?));
+                        (accum.push((Decoder165(scope, input))?));
                     }
                     accum
                 };
@@ -7153,7 +8623,7 @@ fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    let data = { (Decoder155(scope, input))? };
+    let data = { (Decoder166(scope, input))? };
     (Some(Type11 {
         descriptor,
         local_color_table,
@@ -7161,7 +8631,7 @@ fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
+fn Decoder163<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -7186,14 +8656,14 @@ fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             return None;
         }
     };
-    let text_grid_left_position = { (Decoder134(scope, input))? };
-    let text_grid_top_position = { (Decoder134(scope, input))? };
-    let text_grid_width = { (Decoder134(scope, input))? };
-    let text_grid_height = { (Decoder134(scope, input))? };
-    let character_cell_width = { (Decoder16(scope, input))? };
-    let character_cell_height = { (Decoder16(scope, input))? };
-    let text_foreground_color_index = { (Decoder16(scope, input))? };
-    let text_background_color_index = { (Decoder16(scope, input))? };
+    let text_grid_left_position = { (Decoder135(scope, input))? };
+    let text_grid_top_position = { (Decoder135(scope, input))? };
+    let text_grid_width = { (Decoder135(scope, input))? };
+    let text_grid_height = { (Decoder135(scope, input))? };
+    let character_cell_width = { (Decoder17(scope, input))? };
+    let character_cell_height = { (Decoder17(scope, input))? };
+    let text_foreground_color_index = { (Decoder17(scope, input))? };
+    let text_background_color_index = { (Decoder17(scope, input))? };
     let plain_text_data = {
         let mut accum = (Vec::new());
         while true {
@@ -7211,7 +8681,7 @@ fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder147(scope, input))?;
+                let next_elem = (Decoder158(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -7219,7 +8689,7 @@ fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder148(scope, input))? };
+    let terminator = { (Decoder159(scope, input))? };
     (Some(Type8 {
         separator,
         label,
@@ -7237,7 +8707,7 @@ fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
+fn Decoder164<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 44) {
@@ -7246,11 +8716,11 @@ fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             return None;
         }
     };
-    let image_left_position = { (Decoder134(scope, input))? };
-    let image_top_position = { (Decoder134(scope, input))? };
-    let image_width = { (Decoder134(scope, input))? };
-    let image_height = { (Decoder134(scope, input))? };
-    let flags = { (Decoder16(scope, input))? };
+    let image_left_position = { (Decoder135(scope, input))? };
+    let image_top_position = { (Decoder135(scope, input))? };
+    let image_width = { (Decoder135(scope, input))? };
+    let image_height = { (Decoder135(scope, input))? };
+    let flags = { (Decoder17(scope, input))? };
     (Some(Type9 {
         separator,
         image_left_position,
@@ -7261,15 +8731,15 @@ fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder154<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type2> {
-    let r = { (Decoder16(scope, input))? };
-    let g = { (Decoder16(scope, input))? };
-    let b = { (Decoder16(scope, input))? };
+fn Decoder165<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type2> {
+    let r = { (Decoder17(scope, input))? };
+    let g = { (Decoder17(scope, input))? };
+    let b = { (Decoder17(scope, input))? };
     (Some(Type2 { r, g, b }))
 }
 
-fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type10> {
-    let lzw_min_code_size = { (Decoder16(scope, input))? };
+fn Decoder166<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type10> {
+    let lzw_min_code_size = { (Decoder17(scope, input))? };
     let image_data = {
         let mut accum = (Vec::new());
         while true {
@@ -7287,7 +8757,7 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder147(scope, input))?;
+                let next_elem = (Decoder158(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -7295,7 +8765,7 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder148(scope, input))? };
+    let terminator = { (Decoder159(scope, input))? };
     (Some(Type10 {
         lzw_min_code_size,
         image_data,
@@ -7303,12 +8773,12 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type1> {
-    let screen_width = { (Decoder134(scope, input))? };
-    let screen_height = { (Decoder134(scope, input))? };
-    let flags = { (Decoder16(scope, input))? };
-    let bg_color_index = { (Decoder16(scope, input))? };
-    let pixel_aspect_ratio = { (Decoder16(scope, input))? };
+fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type1> {
+    let screen_width = { (Decoder135(scope, input))? };
+    let screen_height = { (Decoder135(scope, input))? };
+    let flags = { (Decoder17(scope, input))? };
+    let bg_color_index = { (Decoder17(scope, input))? };
+    let pixel_aspect_ratio = { (Decoder17(scope, input))? };
     (Some(Type1 {
         screen_width,
         screen_height,

@@ -1742,7 +1742,6 @@ where
                     let elt_bind = RustStmt::assign("elem", elt_expr);
                     let cond = tpred
                         .clone()
-                        .call()
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("elem")))]);
                     let b_terminal = [
                         RustStmt::Expr(
@@ -2811,12 +2810,16 @@ impl<'a> Elaborator<'a> {
             }
             Expr::SeqLength(seq) => {
                 let t_seq = self.elaborate_expr(seq);
+                // NOTE - for element type of sequence
+                self.increment_index();
                 GTExpr::SeqLength(Box::new(t_seq))
             }
             Expr::SubSeq(seq, start, length) => {
                 let t_seq = self.elaborate_expr(seq);
                 let t_start = self.elaborate_expr(start);
                 let t_length = self.elaborate_expr(length);
+                // NOTE - for element type of sequence
+                self.increment_index();
                 let gt = self.get_gt_from_index(index);
                 GTExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
