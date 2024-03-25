@@ -2030,12 +2030,6 @@ pub fn print_generated_code(module: &FormatModule, top_format: &Format) {
         sourcemap,
         elaborator,
     } = Generator::compile(module, top_format);
-    // let mut tdefs = Vec::from_iter(sourcemap.adhoc_types.iter());
-    // tdefs.sort_by_key(|((ix, _), _)| *ix);
-    //     for ((_, lab), tdef) in tdefs.into_iter() {
-    //         let it = RustItem::from_decl(RustDecl::TypeDef(lab.clone(), tdef.clone()));
-    //         items.push(it);
-    //     }
     let tdefs = Vec::from_iter(elaborator.codegen.defined_types.iter());
     for (ix, tdef) in tdefs.into_iter().enumerate() {
         let it = RustItem::from_decl(RustDecl::TypeDef(IxLabel::from(ix).into(), tdef.clone()));
@@ -2164,14 +2158,12 @@ where
 
 #[derive(Clone, Debug)]
 pub struct SourceMap<ExprT> {
-    adhoc_types: Vec<((usize, Label), RustTypeDef)>,
     decoder_skels: Vec<DecoderFn<ExprT>>,
 }
 
 impl<TypeRep> SourceMap<TypeRep> {
     pub const fn new() -> SourceMap<TypeRep> {
         SourceMap {
-            adhoc_types: Vec::new(),
             decoder_skels: Vec::new(),
         }
     }
@@ -2252,13 +2244,6 @@ impl<'a> Generator<'a> {
         // assert_eq!(elab.next_index, elab.tc.size());
         let prog = GTCompiler::compile_program(module, &top).expect("failed to compile program");
         for (ix, (dec, t)) in prog.decoders.iter().enumerate() {
-            match t {
-                GenType::Def((ix, label), def) => gen
-                    .sourcemap
-                    .adhoc_types
-                    .push(((*ix, label.clone()), def.clone())),
-                _ => (),
-            }
             let dec_fn = {
                 let cl = elab.codegen.translate_gt(dec);
                 DecoderFn(IxLabel::from(ix), cl, t.clone().to_rust_type())
