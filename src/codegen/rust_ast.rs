@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{cond_paren, IntransitiveOrd, Precedence, Relation};
-use crate::{BaseType, Label, ValueType};
+use crate::{BaseType, IntoLabel, Label, ValueType};
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub(crate) enum Visibility {
@@ -799,8 +799,62 @@ pub(crate) enum RustExpr {
     Operation(RustOp),
     BlockScope(Vec<RustStmt>, Box<RustExpr>), // scoped block with a final value as an implicit return
     Control(Box<RustControl>),                // for control blocks that return a value
-    Closure(Label, Option<RustType>, Box<RustExpr>), // only simple lambdas for now
+    Closure(RustClosure),                     // only simple lambdas for now
     Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RustClosure(Label, Option<RustType>, Box<RustExpr>);
+
+impl RustClosure {
+    /// Constructs a new closure with 'predicate' (ref) semantics.
+    pub fn new_predicate(
+        head: impl IntoLabel,
+        deref_t: Option<RustType>,
+        body: RustExpr,
+    ) -> RustClosure {
+        RustClosure(
+            head.into(),
+            deref_t.map(|ty| RustType::borrow_of(None, Mut::Immutable, ty)),
+            Box::new(body),
+        )
+    }
+
+    /// Constructs a new closure with 'transform' (value) semantics
+    pub fn new_transform(
+        head: impl IntoLabel,
+        value_t: Option<RustType>,
+        body: RustExpr,
+    ) -> RustClosure {
+        RustClosure(head.into(), value_t, Box::new(body))
+    }
+}
+
+impl ToFragment for RustClosure {
+    fn to_fragment(&self) -> Fragment {
+        self.to_fragment_precedence(Precedence::Atomic)
+    }
+}
+
+impl ToFragmentExt for RustClosure {
+    fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
+        match self {
+            RustClosure(lab, sig, body) => cond_paren(
+                lab.to_fragment()
+                    .intervene(
+                        Fragment::string(": "),
+                        Fragment::opt(sig.as_ref(), RustType::to_fragment),
+                    )
+                    .delimit(Fragment::Char('|'), Fragment::Char('|'))
+                    .intervene(
+                        Fragment::Char(' '),
+                        body.to_fragment_precedence(Precedence::ARROW),
+                    ),
+                prec,
+                Precedence::ARROW,
+            ),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1045,19 +1099,7 @@ impl ToFragmentExt for RustExpr {
                 ))))
             }
             RustExpr::Control(ctrl) => ctrl.to_fragment(),
-            RustExpr::Closure(lab, sig, body) => cond_paren(
-                (lab.to_fragment().intervene(
-                    Fragment::string(": "),
-                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
-                ))
-                .delimit(Fragment::Char('|'), Fragment::Char('|'))
-                .intervene(
-                    Fragment::Char(' '),
-                    body.to_fragment_precedence(Precedence::ARROW),
-                ),
-                prec,
-                Precedence::ARROW,
-            ),
+            RustExpr::Closure(cl) => cl.to_fragment(),
             RustExpr::Slice(expr, start, stop) => expr.to_fragment().cat(
                 start
                     .to_fragment()
