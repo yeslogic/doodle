@@ -1,4 +1,3 @@
-
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 use doodle::prelude::*;
@@ -55438,11 +55437,11 @@ fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 #[test]
 
-fn test_decoder_27() {
+fn test_decoder_28() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parse_ctxt = ParseCtxt::new(input);
     let mut scope = Scope::Empty;
-    let ret = Decoder27(&mut scope, &mut parse_ctxt);
+    let ret = Decoder28(&mut scope, &mut parse_ctxt);
     assert!(ret.is_some());
 }
