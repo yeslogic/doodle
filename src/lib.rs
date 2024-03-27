@@ -23,6 +23,7 @@ pub mod helper;
 pub mod output;
 mod precedence;
 pub mod prelude;
+pub mod parser;
 pub mod read;
 
 mod typecheck;
