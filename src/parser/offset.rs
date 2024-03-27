@@ -37,7 +37,7 @@ impl ByteOffset {
         matches!(self, Self::Bits(..))
     }
 
-    pub(crate) fn increment_assign(&mut self) {
+    pub(crate) fn increment_assign(&mut self) -> Self {
         self.increment_assign_by(1)
     }
 
@@ -48,11 +48,13 @@ impl ByteOffset {
         }
     }
 
-    pub(crate) fn increment_assign_by(&mut self, delta: usize) {
+    pub(crate) fn increment_assign_by(&mut self, delta: usize) -> Self {
+        let ret = *self;
         match self {
             ByteOffset::Bytes(n_bytes) => *n_bytes += delta,
             ByteOffset::Bits(n_bits) => *n_bits += delta,
         }
+        ret
     }
 
     pub(crate) fn enter_bits_mode(&mut self) -> AResult<()> {
@@ -123,21 +125,41 @@ impl BufferOffset {
         }
     }
 
+    pub(crate) fn get_current_offset(&self) -> ByteOffset {
+        self.current_offset
+    }
+
     pub(crate) fn can_increment(&self, delta: usize) -> bool {
         let lim = <Vec<ByteOffset> as CopyStack>::peek_or(&self.limits, self.max_offset);
         let after_increment = self.current_offset.increment_by(delta);
         !(after_increment > lim)
     }
 
-    pub(crate) fn try_increment(&mut self, delta: usize) -> AResult<()> {
+    /// Increments the current offset by `delta` if it is legal to do so, and returns the old offset.
+    ///
+    /// Instead returns `Err` if it is not legal to increment by `delta`.
+    ///
+    /// # Note
+    ///
+    /// The implicit unit of `delta` is whichever of 'bits' or 'bytes' is currently being processed.
+    /// In most cases this will be bytes, but within a `Format::Bits` context, delta will measure
+    /// bits within each byte.
+    pub(crate) fn try_increment(&mut self, delta: usize) -> AResult<ByteOffset> {
         let lim = <Vec<ByteOffset> as CopyStack>::peek_or(&self.limits, self.max_offset);
         let after_increment = self.current_offset.increment_by(delta);
         if !(after_increment > lim) {
-            self.current_offset.increment_assign_by(delta);
-            Ok(())
+            Ok(self.current_offset.increment_assign_by(delta))
         } else {
             Err(anyhow!("Cannot increment current offset {} by {} without violating limit {}", self.current_offset, delta, lim))
         }
+    }
+
+    pub(crate) fn enter_bits_mode(&mut self) -> AResult<()> {
+        self.current_offset.enter_bits_mode()
+    }
+
+    pub(crate) fn escape_bits_mode(&mut self) -> AResult<()> {
+        self.current_offset.escape_bits_mode()
     }
 
     pub(crate) fn push_limit(&mut self, limit: ByteOffset) -> AResult<()> {
@@ -159,6 +181,28 @@ impl BufferOffset {
             Err(anyhow!("No enforced limit to escape"))
         }
     }
+
+    pub(crate) fn set_checkpoint(&mut self, can_fail: bool) {
+        self.checkpoints.push(self.current_offset, can_fail);
+    }
+
+    pub(crate) fn return_checkpoint(&mut self) -> AResult<()> {
+        if let Some(offs) = self.checkpoints.pop_any() {
+            self.current_offset = offs;
+            Ok(())
+        } else {
+            Err(anyhow!("out of checkpoints to return to"))
+        }
+    }
+
+    pub(crate) fn recover_checkpoint(&mut self) -> AResult<()> {
+        if let Some(offs) = self.checkpoints.pop_marked() {
+            self.current_offset = offs;
+            Ok(())
+        } else {
+            Err(anyhow!("out of recovery-checkpoints to return to"))
+        }
+    }
 }
 
 pub(crate) struct PriorityStack<T> {
@@ -170,13 +214,17 @@ impl<T> PriorityStack<T> {
         Self { store: Vec::new() }
     }
 
+    pub(crate) fn push(&mut self, value: T, marked: bool) {
+        self.store.push((value, marked))
+    }
+
     pub(crate) fn pop_any(&mut self) -> Option<T> {
         let (ret, _) = self.store.pop()?;
         Some(ret)
     }
 
     pub(crate) fn pop_marked(&mut self) -> Option<T> {
-        while let (ret, is_marked) = self.store.pop()? {
+        while let Some((ret, is_marked)) = self.store.pop() {
             if is_marked {
                 return Some(ret);
             }
