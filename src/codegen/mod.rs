@@ -1597,12 +1597,12 @@ pub fn print_generated_code(module: &FormatModule, top_format: &Format) {
     let extra = r#"
 #[test]
 
-fn test_decoder_27() {
+fn test_decoder_28() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parse_ctxt = ParseCtxt::new(input);
     let mut scope = Scope::Empty;
-    let ret = Decoder27(&mut scope, &mut parse_ctxt);
+    let ret = Decoder28(&mut scope, &mut parse_ctxt);
     assert!(ret.is_some());
 }"#;
 
