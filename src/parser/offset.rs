@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
-use anyhow::{anyhow, Result as AResult};
-
+use anyhow::{ anyhow, Result as AResult };
+use super::error::StateError;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum ByteOffset {
@@ -17,7 +17,6 @@ impl std::fmt::Display for ByteOffset {
     }
 }
 
-
 impl Default for ByteOffset {
     fn default() -> Self {
         ByteOffset::Bytes(0)
@@ -31,6 +30,27 @@ impl ByteOffset {
 
     pub(crate) const fn from_bits(nbits: usize) -> Self {
         Self::Bits(nbits)
+    }
+
+    // Calculates the increment value required for self to reach `other`
+    pub(crate) fn delta(self, other: Self) -> usize {
+        if self.is_bit_mode() {
+            other
+                .as_bits()
+                .checked_sub(self.as_bits())
+                .unwrap_or_else(||
+                    unreachable!("unrepresentable negative delta-value for {self}->{other}")
+                )
+        } else if other.is_bit_mode() {
+            unreachable!("cannot calculate delta-value from Byte-mode {self} to bit-mode {other}");
+        } else {
+            other
+                .as_bytes()
+                .0.checked_sub(self.as_bytes().0)
+                .unwrap_or_else(||
+                    unreachable!("unrepresentable negative delta-value for {self}->{other}")
+                )
+        }
     }
 
     pub(crate) fn is_bit_mode(&self) -> bool {
@@ -51,8 +71,12 @@ impl ByteOffset {
     pub(crate) fn increment_assign_by(&mut self, delta: usize) -> Self {
         let ret = *self;
         match self {
-            ByteOffset::Bytes(n_bytes) => *n_bytes += delta,
-            ByteOffset::Bits(n_bits) => *n_bits += delta,
+            ByteOffset::Bytes(n_bytes) => {
+                *n_bytes += delta;
+            }
+            ByteOffset::Bits(n_bits) => {
+                *n_bits += delta;
+            }
         }
         ret
     }
@@ -108,9 +132,117 @@ impl PartialOrd for ByteOffset {
 
 pub(crate) struct BufferOffset {
     current_offset: ByteOffset, // the 'true' value of the offset, reinterpreted according to the other fields
-    checkpoints: PriorityStack<ByteOffset>, // as a FILO stack, with each top >= the last
-    limits: Vec<ByteOffset>, // as a FILO stack, with each top <= the last.
+    view_stack: ViewStack,
     max_offset: ByteOffset,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
+pub struct ViewStack {
+    stack: Vec<Lens>,
+}
+
+impl ViewStack {
+    pub(crate) fn new() -> Self {
+        ViewStack { stack: Vec::new() }
+    }
+
+    pub(crate) fn push_lens(&mut self, lens: Lens) {
+        self.stack.push(lens)
+    }
+
+    fn get_limit_from_slice(slice: &[Lens]) -> Option<ByteOffset> {
+        let (lens, rest) = slice.split_last()?;
+        match lens.get_endpoint() {
+            None => Self::get_limit_from_slice(rest),
+            // FIXME - this could be avoided by amortizing comparison-cost into the push-lens method, but that involves more complex work.
+            // FIXME - consider memoizing this value until the stack is manipulated enough it might change?
+            Some(end) =>
+                Self::get_limit_from_slice(rest).map(|lim| if end > lim { lim } else { end }),
+        }
+    }
+
+    pub(crate) fn get_limit(&self) -> Option<ByteOffset> {
+        let ret = Self::get_limit_from_slice(self.stack.as_slice());
+        // FIXME - introduce caching mechanic
+        ret
+    }
+
+    pub(crate) fn escape(mut self) -> (ViewStack, Option<Lens>) {
+        let ret = self.stack.pop();
+        (self, ret)
+    }
+
+    pub(crate) fn restore(mut self) -> Result<(ByteOffset, ViewStack), StateError> {
+        for (ix, lens) in self.stack.iter().enumerate().rev() {
+            match lens.restore() {
+                Some(offset) => {
+                    self.stack.truncate(ix);
+                    return Ok((offset, self));
+                }
+                None => {
+                    continue;
+                }
+            }
+        }
+        Err(StateError::NoRestore)
+    }
+
+    pub(crate) fn recover(mut self) -> Result<(ByteOffset, ViewStack), StateError> {
+        for (ix, lens) in self.stack.iter().enumerate().rev() {
+            match lens.recover() {
+                Some(offset) => {
+                    self.stack.truncate(ix);
+                    return Ok((offset, self));
+                }
+                None => {
+                    continue;
+                }
+            }
+        }
+        Err(StateError::NoRecovery)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub(crate) enum Lens {
+    PeekNot {
+        checkpoint: ByteOffset,
+        endpoint: ByteOffset,
+    },
+    Peek {
+        checkpoint: ByteOffset,
+    },
+    Slice {
+        endpoint: ByteOffset,
+    },
+    Alts {
+        checkpoint: ByteOffset,
+    },
+}
+
+impl Lens {
+    fn recover(&self) -> Option<ByteOffset> {
+        match self {
+            Lens::Alts { checkpoint } | Lens::PeekNot { checkpoint, .. } => Some(*checkpoint),
+            Lens::Peek { .. } | Lens::Slice { .. } => None,
+        }
+    }
+
+    fn restore(&self) -> Option<ByteOffset> {
+        match self {
+            Lens::Peek { checkpoint } => Some(*checkpoint),
+            Lens::Slice { .. } => None,
+            // NOTE - despite having checkpoints in theory, these are fail-safes rather than save-states and can only be 'restored' upon recovery
+            Lens::Alts { .. } | Lens::PeekNot { .. } => None,
+        }
+    }
+
+    fn get_endpoint(&self) -> Option<ByteOffset> {
+        match self {
+            Lens::PeekNot { endpoint, .. } | Lens::Slice { endpoint } => Some(*endpoint),
+            _ => None,
+        }
+    }
 }
 
 impl BufferOffset {
@@ -119,8 +251,7 @@ impl BufferOffset {
     pub(crate) fn new(max_offset: ByteOffset) -> Self {
         Self {
             current_offset: ByteOffset::default(),
-            checkpoints: PriorityStack::new(),
-            limits: Vec::new(),
+            view_stack: ViewStack::new(),
             max_offset,
         }
     }
@@ -130,7 +261,7 @@ impl BufferOffset {
     }
 
     pub(crate) fn can_increment(&self, delta: usize) -> bool {
-        let lim = <Vec<ByteOffset> as CopyStack>::peek_or(&self.limits, self.max_offset);
+        let lim = self.current_limit();
         let after_increment = self.current_offset.increment_by(delta);
         !(after_increment > lim)
     }
@@ -145,12 +276,19 @@ impl BufferOffset {
     /// In most cases this will be bytes, but within a `Format::Bits` context, delta will measure
     /// bits within each byte.
     pub(crate) fn try_increment(&mut self, delta: usize) -> AResult<ByteOffset> {
-        let lim = <Vec<ByteOffset> as CopyStack>::peek_or(&self.limits, self.max_offset);
+        let lim = self.current_limit();
         let after_increment = self.current_offset.increment_by(delta);
         if !(after_increment > lim) {
             Ok(self.current_offset.increment_assign_by(delta))
         } else {
-            Err(anyhow!("Cannot increment current offset {} by {} without violating limit {}", self.current_offset, delta, lim))
+            Err(
+                anyhow!(
+                    "Cannot increment current offset {} by {} without violating limit {:?}",
+                    self.current_offset,
+                    delta,
+                    lim
+                )
+            )
         }
     }
 
@@ -162,138 +300,88 @@ impl BufferOffset {
         self.current_offset.escape_bits_mode()
     }
 
-    pub(crate) fn push_limit(&mut self, limit: ByteOffset) -> AResult<()> {
-        let f = |o_lim: Option<ByteOffset>, new_lim: ByteOffset| -> Option<anyhow::Error> {
-            let old_lim = o_lim.unwrap_or(self.max_offset);
-            (new_lim > old_lim).then(|| anyhow!("new limit {} exceeds previous limit {}", new_lim, old_lim))
-        };
-        <Vec<ByteOffset> as CopyStack>::push_cond(&mut self.limits, limit, f)
+    pub(crate) unsafe fn push_lens(&mut self, lens: Lens) {
+        self.view_stack.push_lens(lens);
     }
 
-    pub(crate) fn escape_limit(&mut self) -> AResult<ByteOffset> {
-        if let Some(offs) = self.limits.pop() {
-            if self.current_offset > offs {
-                return Err(anyhow!("Current offset exceeds limit being escaped: {} > {}", self.current_offset, offs));
+    pub(crate) unsafe fn open_slice_unchecked(&mut self, slice_len: usize) {
+        self.push_lens(Lens::Slice { endpoint: self.current_offset.increment_by(slice_len) })
+    }
+
+    pub(crate) fn close_slice(&mut self) -> AResult<ByteOffset> {
+        let mut stack = ViewStack::new();
+        std::mem::swap(&mut stack, &mut self.view_stack);
+        match stack.escape() {
+            (stack, Some(Lens::Slice { endpoint })) => {
+                if self.current_offset > endpoint {
+                    return Err(
+                        anyhow!(
+                            "Current offset exceeds limit being escaped: {} > {}",
+                            self.current_offset,
+                            endpoint
+                        )
+                    );
+                }
+                self.current_offset = endpoint;
+                Ok(endpoint)
             }
-            self.current_offset = offs;
-            Ok(offs)
-        } else {
-            Err(anyhow!("No enforced limit to escape"))
+            (_, other) =>
+                Err(
+                    anyhow!("ViewStack expected to have a Slice on top, found {:?} instead", other)
+                ),
         }
     }
 
-    pub(crate) fn set_checkpoint(&mut self, can_fail: bool) {
-        self.checkpoints.push(self.current_offset, can_fail);
+    pub(crate) fn open_peek(&mut self) {
+        let checkpoint = self.current_offset;
+        let peek = Lens::Peek { checkpoint };
+        self.view_stack.push_lens(peek);
     }
 
-    pub(crate) fn return_checkpoint(&mut self) -> AResult<()> {
-        if let Some(offs) = self.checkpoints.pop_any() {
-            self.current_offset = offs;
-            Ok(())
-        } else {
-            Err(anyhow!("out of checkpoints to return to"))
-        }
+    pub(crate) fn open_peeknot(&mut self, lookahead: usize) {
+        let checkpoint = self.current_offset;
+        // FIXME - this currently uses 1/8 of the lookahead 'Bytes' in Bits-mode, which may not be *exactly* what we want
+        let endpoint = self.current_offset.increment_by(lookahead);
+        let peeknot = Lens::PeekNot { checkpoint, endpoint };
+        self.view_stack.push_lens(peeknot);
     }
 
-    pub(crate) fn recover_checkpoint(&mut self) -> AResult<()> {
-        if let Some(offs) = self.checkpoints.pop_marked() {
-            self.current_offset = offs;
-            Ok(())
-        } else {
-            Err(anyhow!("out of recovery-checkpoints to return to"))
-        }
-    }
-}
-
-pub(crate) struct PriorityStack<T> {
-    store: Vec<(T, bool)>,
-}
-
-impl<T> PriorityStack<T> {
-    pub(crate) const fn new() -> Self {
-        Self { store: Vec::new() }
+    pub(crate) fn open_parallel(&mut self) {
+        let checkpoint = self.current_offset;
+        let parallel = Lens::Alts { checkpoint };
+        self.view_stack.push_lens(parallel);
     }
 
-    pub(crate) fn push(&mut self, value: T, marked: bool) {
-        self.store.push((value, marked))
+    pub(crate) fn close_peek(&mut self) -> Result<(), StateError> {
+        let mut stack = ViewStack::new();
+        std::mem::swap(&mut stack, &mut self.view_stack);
+        let (offs, new_stack) = stack.restore()?;
+        self.current_offset = offs;
+        self.view_stack = new_stack;
+        Ok(())
     }
 
-    pub(crate) fn pop_any(&mut self) -> Option<T> {
-        let (ret, _) = self.store.pop()?;
-        Some(ret)
+    pub(crate) fn recover(&mut self) -> Result<(), StateError> {
+        let mut stack = ViewStack::new();
+        std::mem::swap(&mut stack, &mut self.view_stack);
+        let (offs, new_stack) = stack.recover()?;
+        self.current_offset = offs;
+        self.view_stack = new_stack;
+        Ok(())
     }
 
-    pub(crate) fn pop_marked(&mut self) -> Option<T> {
-        while let Some((ret, is_marked)) = self.store.pop() {
-            if is_marked {
-                return Some(ret);
-            }
-        }
-        None
-    }
-}
-
-pub trait CopyStack {
-    type Elem: Copy;
-
-    fn peek(&self) -> Option<Self::Elem>;
-
-    fn peek_or(&self, default: Self::Elem) -> Self::Elem {
-        self.peek().unwrap_or(default)
+    pub(crate) fn current_limit(&self) -> ByteOffset {
+        self.view_stack.get_limit().unwrap_or(self.max_offset)
     }
 
-    fn peek_mut(&mut self) -> Option<&mut Self::Elem>;
-
-    fn pop(&mut self) -> Option<Self::Elem>;
-
-    fn pop_or(&mut self, default: Self::Elem) -> Self::Elem {
-        self.pop().unwrap_or(default)
+    /// Number of bytes that can be consumed until reaching a limit,
+    /// based on the current ByteOffset mode (i.e. can become stale if the mode changes)
+    pub(crate) fn rem_local(&self) -> usize {
+        self.current_offset.delta(self.current_limit())
     }
 
-    fn push(&mut self, item: Self::Elem);
-
-    /// Pushes an element if and only if the provided validation function returns `None` when called over
-    /// the current stack-top and the item prospectively being pushed.
-    ///
-    /// If the validation function returned `Some(e)` instead, Does nothing and returns `Err(e)`.
-    fn push_cond<E, F>(&mut self, item: Self::Elem, f: F) -> Result<(), E> where
-        F: Fn(Option<Self::Elem>, Self::Elem) -> Option<E>
-    {
-        match f(self.peek(), item) {
-            None => Ok(self.push(item)),
-            Some(err) => Err(err),
-        }
-    }
-
-    fn size(&self) -> usize;
-
-    fn is_empty(&self) -> bool;
-}
-
-impl<T: Copy> CopyStack for Vec<T> {
-    type Elem = T;
-
-    fn peek(&self) -> Option<Self::Elem> {
-        self.last().copied()
-    }
-
-    fn peek_mut(&mut self) -> Option<&mut Self::Elem> {
-        self.last_mut()
-    }
-
-    fn pop(&mut self) -> Option<Self::Elem> {
-        Vec::pop(self)
-    }
-
-    fn push(&mut self, item: Self::Elem) {
-        Vec::push(self, item)
-    }
-
-    fn size(&self) -> usize {
-        self.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        Vec::is_empty(self)
+    /// Number of bytes that can be consumed in the buffer overall, based on the current ByteOffset mode (i.e. can become stale if the mode changes)
+    pub(crate) fn rem_absolute(&self) -> usize {
+        self.current_offset.delta(self.max_offset)
     }
 }
