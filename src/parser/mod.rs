@@ -1,4 +1,4 @@
-pub mod offset;
-pub(crate) mod monad;
-pub(crate) mod functor;
 pub mod error;
+pub(crate) mod functor;
+pub(crate) mod monad;
+pub mod offset;

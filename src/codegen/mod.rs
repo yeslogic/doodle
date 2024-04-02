@@ -733,7 +733,7 @@ fn embed_lambda_t(expr: &GTExpr, kind: ClosureKind) -> RustExpr {
 type RustBlock = (Vec<RustStmt>, Option<RustExpr>);
 
 #[derive(Clone, Copy)]
-struct ProdCtxt<'a> {
+pub(crate) struct ProdCtxt<'a> {
     input_varname: &'a Label,
     scope_varname: &'a Label,
 }
@@ -1086,7 +1086,7 @@ enum RepeatLogic<ExprT> {
     ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'complete sequence' is satisfied
 }
 
-trait ToAst {
+pub(crate) trait ToAst {
     type AstElem;
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> Self::AstElem;
@@ -1453,19 +1453,21 @@ enum ParallelLogic<ExprT> {
     Alts(Vec<CaseLogic<ExprT>>),
 }
 
-impl<ExprT> ParallelLogic<ExprT> {
-    fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustBlock {
+impl<ExprT> ParallelLogic<ExprT>
+where
+    CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
+{
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            ParallelLogic::Alts(_alts) => {
-                (
-                    Vec::new(),
-                    Some(
-                        // FIXME - missing logic
-                        RustExpr::local("unimplemented!")
-                            .call_with([RustExpr::str_lit("ParallelLogic::Alts.to_ast(..)")]),
-                    ),
-                )
-            }
+            ParallelLogic::Alts(alts) => (
+                Vec::from_iter(alts.iter().enumerate().flat_map(|(ix, cl)| {
+                    [
+                        RustStmt::Comment(RustComment::Line(Label::from(format!("Branch #{ix}")))),
+                        RustStmt::Expr(cl.to_ast(ctxt).into()),
+                    ]
+                })),
+                Some(RustExpr::local(Label::from("Ok")).call_with([RustExpr::UNIT])),
+            ),
         }
     }
 }
@@ -1662,22 +1664,13 @@ where
             input_varname: &Label::from("input"),
             scope_varname: &Label::from("scope"),
         };
-        // FIXME - hack for introspection
-        let extra = /* if self.0.to_usize() == 129 */ {
-            // RustStmt::Comment(RustComment::Block(Label::Owned(format!("{:?}", self.1))))
-            // } else {
-            RustStmt::Comment(RustComment::Empty)
-        };
         let (stmts, ret) = self.1.to_ast(ctxt);
         let body = Iterator::chain(
-            std::iter::once(extra),
-            Iterator::chain(
-                stmts.into_iter(),
-                std::iter::once(RustStmt::Return(
-                    ReturnKind::Implicit,
-                    RustExpr::some(ret.unwrap()),
-                )),
-            ),
+            stmts.into_iter(),
+            std::iter::once(RustStmt::Return(
+                ReturnKind::Implicit,
+                RustExpr::some(ret.unwrap()),
+            )),
         )
         .collect();
         RustFn::new(name, Some(params), sig, body)
@@ -1686,7 +1679,7 @@ where
 
 #[derive(Clone, Debug)]
 pub struct SourceMap<ExprT> {
-    decoder_skels: Vec<DecoderFn<ExprT>>,
+    pub(crate) decoder_skels: Vec<DecoderFn<ExprT>>,
 }
 
 impl<TypeRep> SourceMap<TypeRep> {
@@ -1751,8 +1744,8 @@ impl<TypeRep> SourceMap<TypeRep> {
 // }
 
 pub struct Generator<'a> {
-    elaborator: Elaborator<'a>,
-    sourcemap: SourceMap<GTExpr>,
+    pub(crate) elaborator: Elaborator<'a>,
+    pub(crate) sourcemap: SourceMap<GTExpr>,
 }
 
 impl<'a> Generator<'a> {
@@ -1796,6 +1789,13 @@ impl<'a> Elaborator<'a> {
         let ret = self.next_index;
         self.next_index += 1;
         ret
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn iter_defined_types<'b: 'a>(
+        &'b self,
+    ) -> impl Iterator<Item = &'a RustTypeDef> + 'b {
+        self.codegen.defined_types.iter()
     }
 
     /// Increment the current `tree_index` by 1.
