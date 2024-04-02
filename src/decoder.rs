@@ -725,7 +725,7 @@ impl<'a> Compiler<'a> {
             }
             Format::PeekNot(a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
-                match a.match_bounds(self.module).max {
+                match a.lookahead_bounds(self.module).max {
                     None => return Err(anyhow!("PeekNot cannot require unbounded lookahead")),
                     Some(n) if n > MAX_LOOKAHEAD => {
                         return Err(anyhow!(
