@@ -209,7 +209,7 @@ impl<'a> GTCompiler<'a> {
                 Ok(TypedDecoder::Record(gt.clone(), dfields))
             }
             GTFormat::Repeat(gt, a) => {
-                if a.as_ref().is_nullable(self.module) {
+                if a.as_ref().is_nullable() {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
                 let da = self.compile_gt_format(
@@ -226,7 +226,7 @@ impl<'a> GTCompiler<'a> {
                 }
             }
             GTFormat::Repeat1(gt, a) => {
-                if a.is_nullable(self.module) {
+                if a.is_nullable() {
                     return Err(anyhow!("cannot repeat nullable format: {a:?}"));
                 }
                 let da = self.compile_gt_format(
@@ -263,7 +263,7 @@ impl<'a> GTCompiler<'a> {
             }
             GTFormat::PeekNot(_t, a) => {
                 const MAX_LOOKAHEAD: usize = 1024;
-                match a.match_bounds(self.module).max {
+                match a.lookahead_bounds().max {
                     None => {
                         return Err(anyhow!("PeekNot cannot require unbounded lookahead"));
                     }

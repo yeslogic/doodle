@@ -86,55 +86,70 @@ pub enum TypedFormat<TypeRep> {
 impl TypedFormat<GenType> {
     pub const EMPTY: Self = TypedFormat::Tuple(GenType::Inline(RustType::UNIT), Vec::new());
 
-    // pub(crate) fn expect_rust_type(&self, expected: &RustType) {
-    //     match self {
-    //         TypedFormat::FormatCall(_, _, _, gt_f) => gt_f.expect_rust_type(expected),
-    //         TypedFormat::Fail =>
-    //             unreachable!("TypedFormat::Fail has no equivalent RustType, expected {expected:?}"),
-    //         TypedFormat::Align(_) | TypedFormat::EndOfInput =>
-    //             assert!(matches!(expected, RustType::Atom(AtomType::Prim(PrimType::Unit)))),
-    //         TypedFormat::Byte(_) =>
-    //             assert!(matches!(expected, RustType::Atom(AtomType::Prim(PrimType::U8)))),
-    //         | TypedFormat::Tuple(gt, ..)
-    //         | TypedFormat::Record(gt, ..)
-    //         | TypedFormat::Repeat(gt, ..)
-    //         | TypedFormat::Repeat1(gt, ..)
-    //         | TypedFormat::RepeatCount(gt, ..)
-    //         | TypedFormat::RepeatUntilLast(gt, ..)
-    //         | TypedFormat::RepeatUntilSeq(gt, ..)
-    //         | TypedFormat::Peek(gt, ..)
-    //         | TypedFormat::PeekNot(gt, ..)
-    //         | TypedFormat::Slice(gt, ..)
-    //         | TypedFormat::Bits(gt, ..)
-    //         | TypedFormat::WithRelativeOffset(gt, ..)
-    //         | TypedFormat::Map(gt, ..)
-    //         | TypedFormat::Compute(gt, ..)
-    //         | TypedFormat::Let(gt, ..)
-    //         | TypedFormat::Match(gt, ..)
-    //         | TypedFormat::Dynamic(gt, ..)
-    //         | TypedFormat::Apply(gt, ..)
-    //         | TypedFormat::Union(gt, ..)
-    //         | TypedFormat::UnionNondet(gt, ..)
-    //         | TypedFormat::Variant(gt, ..) =>
-    //             match gt {
-    //                 GenType::Inline(actual) => assert_eq!(actual, expected),
-    //                 GenType::Def((ix1, lb1), ..) =>
-    //                     match expected {
-    //                         RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, lb0))) => {
-    //                             assert_eq!((ix0, lb0), (ix1, lb1));
-    //                         }
-    //                         _ =>
-    //                             unreachable!(
-    //                                 "actual type GenType::Def({ix1}, {lb1}) != expected type ({expected:?}) [{self:?}]"
-    //                             ),
-    //                     }
-    //             }
-    //     }
-    // }
-
-    pub(crate) fn match_bounds(&self, module: &FormatModule) -> Bounds {
+    pub(crate) fn lookahead_bounds(&self) -> Bounds {
         match self {
-            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.match_bounds(module),
+            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
+
+            TypedFormat::Compute(_, _)
+            | TypedFormat::EndOfInput
+            | TypedFormat::Fail => Bounds::exact(0),
+
+            | TypedFormat::Peek(_, inner)
+            | TypedFormat::PeekNot(_, inner) => inner.lookahead_bounds(),
+
+            TypedFormat::Align(n) => Bounds::new(0, Some(n - 1)),
+            TypedFormat::Byte(_) => Bounds::exact(1),
+            TypedFormat::Variant(_, _, f) => f.lookahead_bounds(),
+            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
+                .iter()
+                .map(TypedFormat::lookahead_bounds)
+                .reduce(Bounds::union)
+                .unwrap(),
+            TypedFormat::Tuple(_, elts) => elts
+                .iter()
+                .map(TypedFormat::lookahead_bounds)
+                .reduce(<Bounds as Add>::add)
+                .unwrap_or(Bounds::exact(0)),
+            TypedFormat::Record(_, flds) => flds
+                .iter()
+                .map(|(_l, f)| f.lookahead_bounds())
+                .reduce(<Bounds as Add>::add)
+                .unwrap_or(Bounds::exact(0)),
+
+            TypedFormat::RepeatCount(_, t_exp, f) => f.lookahead_bounds() * t_exp.bounds(),
+
+            TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
+                f.lookahead_bounds() * Bounds::new(1, None)
+            }
+
+            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => {
+                Bounds::new(0, None)
+            }
+
+            TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
+
+            TypedFormat::Bits(_, f) => f.lookahead_bounds().bits_to_bytes(),
+
+            TypedFormat::WithRelativeOffset(_, offset_expr, inner) => offset_expr.bounds() + inner.lookahead_bounds(),
+
+            TypedFormat::Map(_, f, _)
+            | TypedFormat::Dynamic(_, _, _, f)
+            | TypedFormat::Let(_, _, _, f) => f.lookahead_bounds(),
+
+            TypedFormat::Match(_, _, branches) => branches
+                .iter()
+                .map(|(_, f)| f.lookahead_bounds())
+                .reduce(Bounds::union)
+                .unwrap(),
+
+            TypedFormat::Apply(_, _, _) => Bounds::new(1, None),
+
+        }
+    }
+
+    pub(crate) fn match_bounds(&self) -> Bounds {
+        match self {
+            TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.match_bounds(),
 
             TypedFormat::Compute(_, _)
             | TypedFormat::Peek(_, _)
@@ -144,27 +159,27 @@ impl TypedFormat<GenType> {
 
             TypedFormat::Align(n) => Bounds::new(0, Some(n - 1)),
             TypedFormat::Byte(_) => Bounds::exact(1),
-            TypedFormat::Variant(_, _, f) => f.match_bounds(module),
+            TypedFormat::Variant(_, _, f) => f.match_bounds(),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => branches
                 .iter()
-                .map(|f| f.match_bounds(module))
+                .map(TypedFormat::match_bounds)
                 .reduce(Bounds::union)
                 .unwrap(),
             TypedFormat::Tuple(_, elts) => elts
                 .iter()
-                .map(|f| f.match_bounds(module))
+                .map(TypedFormat::match_bounds)
                 .reduce(<Bounds as Add>::add)
                 .unwrap_or(Bounds::exact(0)),
             TypedFormat::Record(_, flds) => flds
                 .iter()
-                .map(|(_l, f)| f.match_bounds(module))
+                .map(|(_l, f)| f.match_bounds())
                 .reduce(<Bounds as Add>::add)
                 .unwrap_or(Bounds::exact(0)),
 
-            TypedFormat::RepeatCount(_, t_exp, f) => f.match_bounds(module) * t_exp.bounds(),
+            TypedFormat::RepeatCount(_, t_exp, f) => f.match_bounds() * t_exp.bounds(),
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
-                f.match_bounds(module) * Bounds::new(1, None)
+                f.match_bounds() * Bounds::new(1, None)
             }
 
             TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => {
@@ -173,17 +188,17 @@ impl TypedFormat<GenType> {
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
 
-            TypedFormat::Bits(_, f) => f.match_bounds(module).bits_to_bytes(),
+            TypedFormat::Bits(_, f) => f.match_bounds().bits_to_bytes(),
 
             TypedFormat::WithRelativeOffset(_, _, _) => Bounds::exact(0),
 
             TypedFormat::Map(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
-            | TypedFormat::Let(_, _, _, f) => f.match_bounds(module),
+            | TypedFormat::Let(_, _, _, f) => f.match_bounds(),
 
             TypedFormat::Match(_, _, branches) => branches
                 .iter()
-                .map(|(_, f)| f.match_bounds(module))
+                .map(|(_, f)| f.match_bounds())
                 .reduce(Bounds::union)
                 .unwrap(),
 
@@ -191,8 +206,10 @@ impl TypedFormat<GenType> {
         }
     }
 
-    pub(crate) fn is_nullable(&self, module: &FormatModule) -> bool {
-        self.match_bounds(module).min == 0
+
+
+    pub(crate) fn is_nullable(&self) -> bool {
+        self.match_bounds().min == 0
     }
 
     pub(crate) fn tuple(elts: Vec<TypedFormat<GenType>>) -> Self {
