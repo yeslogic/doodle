@@ -6,7 +6,7 @@ use super::rust_ast::{PrimType, RustType, RustTypeDef};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::{Arith, FormatModule, IntRel, Label, ValueType};
+use crate::{Arith, IntRel, Label, ValueType};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {

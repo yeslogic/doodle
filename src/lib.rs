@@ -21,9 +21,9 @@ pub mod error;
 pub mod helper;
 
 pub mod output;
+pub mod parser;
 mod precedence;
 pub mod prelude;
-pub mod parser;
 pub mod read;
 
 mod typecheck;
