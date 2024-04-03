@@ -7,7 +7,7 @@ type PResult<T> = Result<T, ParseError>;
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum ByteOffset {
     Bytes(usize),
-    Bits(usize),
+    Bits { starting_byte: usize, bits_advanced: usize },
 }
 
 impl std::fmt::Display for ByteOffset {
@@ -30,16 +30,16 @@ impl ByteOffset {
         Self::Bytes(nbytes)
     }
 
-    pub(crate) const fn from_bits(nbits: usize) -> Self {
-        Self::Bits(nbits)
+    pub(crate) const fn byte_plus_bits(starting_byte: usize, nbits: usize) -> Self {
+        Self::Bits { starting_byte, bits_advanced: nbits }
     }
 
     // Calculates the increment value required for self to reach `other`
     pub(crate) fn delta(self, other: Self) -> usize {
         if self.is_bit_mode() {
             other
-                .as_bits()
-                .checked_sub(self.as_bits())
+                .abs_bit_offset()
+                .checked_sub(self.abs_bit_offset())
                 .unwrap_or_else(|| {
                     unreachable!("unrepresentable negative delta-value for {self}->{other}")
                 })
@@ -57,7 +57,7 @@ impl ByteOffset {
     }
 
     pub(crate) fn is_bit_mode(&self) -> bool {
-        matches!(self, Self::Bits(..))
+        matches!(self, Self::Bits {..})
     }
 
     pub(crate) fn increment_assign(&mut self) -> Self {
@@ -67,7 +67,7 @@ impl ByteOffset {
     pub(crate) fn increment_by(&self, delta: usize) -> Self {
         match self {
             &ByteOffset::Bytes(n_bytes) => Self::Bytes(n_bytes + delta),
-            &ByteOffset::Bits(n_bits) => Self::Bits(n_bits + delta),
+            &ByteOffset::Bits {starting_byte, bits_advanced } => Self::Bits { starting_byte, bits_advanced: bits_advanced + delta },
         }
     }
 
@@ -77,7 +77,7 @@ impl ByteOffset {
             ByteOffset::Bytes(n_bytes) => {
                 *n_bytes += delta;
             }
-            ByteOffset::Bits(n_bits) => {
+            ByteOffset::Bits { bits_advanced: n_bits, .. } => {
                 *n_bits += delta;
             }
         }
@@ -86,45 +86,57 @@ impl ByteOffset {
 
     pub(crate) fn enter_bits_mode(&mut self) -> Result<(), ParseError> {
         if let ByteOffset::Bytes(n_bytes) = *self {
-            *self = ByteOffset::Bits(n_bytes * 8);
+            *self = ByteOffset::Bits { starting_byte: n_bytes, bits_advanced: 0 };
             Ok(())
         } else {
             Err(ParseError::InternalError(StateError::BinaryModeError))
         }
     }
 
-    pub(crate) fn escape_bits_mode(&mut self) -> Result<(), ParseError> {
-        if let ByteOffset::Bits(n_bits) = *self {
-            let floor = n_bits / 8;
-            if n_bits % 8 != 0 {
-                *self = ByteOffset::Bytes(floor + 1);
+    pub(crate) fn escape_bits_mode(&mut self) -> Result<usize, ParseError> {
+        if let ByteOffset::Bits { starting_byte, bits_advanced } = *self {
+            let delta_major = bits_advanced / 8;
+            let delta_minor = bits_advanced % 8;
+            if delta_minor != 0 {
+                *self = ByteOffset::Bytes(starting_byte + delta_major + 1);
             } else {
-                *self = ByteOffset::Bytes(floor);
+                *self = ByteOffset::Bytes(starting_byte + delta_major);
             }
-            Ok(())
+            Ok(bits_advanced)
         } else {
             Err(ParseError::InternalError(StateError::BinaryModeError))
         }
     }
 
-    pub(crate) fn as_bits(&self) -> usize {
+    pub(crate) fn abs_bit_offset(&self) -> usize {
         match self {
-            ByteOffset::Bytes(n) => *n * 8,
-            ByteOffset::Bits(n) => *n,
+            &ByteOffset::Bytes(n) => n * 8,
+            &ByteOffset::Bits { starting_byte, bits_advanced } => starting_byte * 8 + bits_advanced,
+        }
+    }
+
+    pub(crate) fn bits_advanced(&self) -> Option<usize> {
+        match self {
+            ByteOffset::Bytes(_n) => None,
+            &ByteOffset::Bits { bits_advanced, .. } => Some(bits_advanced),
         }
     }
 
     pub(crate) fn as_bytes(&self) -> (usize, Option<usize>) {
         match self {
-            ByteOffset::Bytes(n) => (*n, None),
-            ByteOffset::Bits(n) => (*n / 8, Some(*n % 8)),
+            &ByteOffset::Bytes(n) => (n, None),
+            &ByteOffset::Bits { starting_byte, bits_advanced } => {
+                let delta_major = bits_advanced / 8;
+                let delta_minor = bits_advanced % 8;
+                (starting_byte + delta_major, Some(delta_minor))
+            }
         }
     }
 }
 
 impl PartialOrd for ByteOffset {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let partial = self.as_bits().cmp(&other.as_bits());
+        let partial = self.abs_bit_offset().cmp(&other.abs_bit_offset());
         match partial {
             // yield None instead of Some(Equal) if same bit-level offset but different modes
             Ordering::Equal if self.is_bit_mode() ^ other.is_bit_mode() => None,
@@ -300,7 +312,8 @@ impl BufferOffset {
         self.current_offset.enter_bits_mode()
     }
 
-    pub(crate) fn escape_bits_mode(&mut self) -> PResult<()> {
+    /// Escapes bits mode and returns the number of bits read since entering bits mode
+    pub(crate) fn escape_bits_mode(&mut self) -> PResult<usize> {
         self.current_offset.escape_bits_mode()
     }
 
