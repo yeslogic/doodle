@@ -33,6 +33,19 @@ impl<'a> ParseMonad<'a> {
         Ok(ret)
     }
 
+    pub fn skip_align(&mut self, n: usize) -> Result<usize, ParseError> {
+        let current_offset = self.offset.get_current_offset();
+        let offset_byte_ix = current_offset.as_bytes().0;
+        let aligned_offset = if offset_byte_ix % n == 0 {
+            ByteOffset::from_bytes(offset_byte_ix)
+        } else {
+            ByteOffset::from_bytes(((offset_byte_ix / n) + 1) * n)
+        };
+        let delta = current_offset.delta(aligned_offset);
+        self.offset.try_increment(delta)?;
+        Ok(delta)
+    }
+
     pub fn enter_bits_mode(&mut self) -> Result<(), ParseError> {
         self.offset.enter_bits_mode()
     }
@@ -322,6 +335,7 @@ mod example {
 
         type PResult<T> = Result<T, ParseError>;
 
+        #[allow(non_camel_case_types)]
         #[derive(Debug, Clone)]
         enum Type0 {
             ascii(Vec<u8>),
