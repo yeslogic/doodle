@@ -50,8 +50,12 @@ impl<'a> ParseMonad<'a> {
         self.offset.enter_bits_mode()
     }
 
-    pub fn escape_bits_mode(&mut self) -> Result<(), ParseError> {
+    pub fn escape_bits_mode(&mut self) -> Result<usize, ParseError> {
         self.offset.escape_bits_mode()
+    }
+
+    pub fn get_bits_read(&self) -> Option<usize> {
+        self.offset.get_current_offset().bits_advanced()
     }
 
     pub fn start_slice(&mut self, size: usize) -> Result<(), ParseError> {
