@@ -1,3 +1,5 @@
+pub type PResult<T> = Result<T, ParseError>;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ParseError {
     FailToken,
@@ -61,6 +63,8 @@ pub enum StateError {
     UnstackableSlices,
     NoRestore,
     BinaryModeError,
+    MissingSlice,
+    SliceOverrun,
 }
 
 impl std::fmt::Display for StateError {
@@ -73,6 +77,10 @@ impl std::fmt::Display for StateError {
                 "unable to open slice that violates existing slice boundaries"
             ),
             StateError::BinaryModeError => write!(f, "illegal binary-mode switch operation"),
+            StateError::MissingSlice => write!(f, "missing slice cannot be closed"),
+            StateError::SliceOverrun => {
+                write!(f, "cannot close slice as it has already been overrun")
+            }
         }
     }
 }

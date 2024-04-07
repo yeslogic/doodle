@@ -307,6 +307,7 @@ pub(crate) enum RustType {
 impl RustType {
     pub const UNIT: RustType = RustType::Atom(AtomType::Prim(PrimType::Unit));
 
+    /// Returns the RustType representation of an externally-defined and imported type `<name>`.
     pub fn imported(name: impl Into<Label>) -> Self {
         Self::Atom(AtomType::TypeRef(LocalType::External(name.into())))
     }
@@ -333,6 +334,13 @@ impl RustType {
 
     pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
         Self::Atom(AtomType::Comp(CompType::Borrow(lt, m, Box::new(ty))))
+    }
+
+    pub fn result_of(ok_type: RustType, err_type: RustType) -> RustType {
+        Self::Atom(AtomType::Comp(CompType::Result(
+            Box::new(ok_type),
+            Box::new(err_type),
+        )))
     }
 }
 
@@ -808,9 +816,19 @@ pub(crate) enum RustExpr {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct RustClosure(Label, Option<RustType>, Box<RustExpr>);
+pub(crate) struct RustClosure(RustClosureHead, Box<RustExpr>);
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustClosureHead {
+    Thunk,
+    SimpleVar(Label, Option<RustType>),
+}
 
 impl RustClosure {
+    pub fn new_thunk(body: RustExpr) -> RustClosure {
+        RustClosure(RustClosureHead::Thunk, Box::new(body))
+    }
+
     /// Constructs a new closure with 'predicate' (ref) semantics.
     pub fn new_predicate(
         head: impl IntoLabel,
@@ -818,8 +836,10 @@ impl RustClosure {
         body: RustExpr,
     ) -> RustClosure {
         RustClosure(
-            head.into(),
-            deref_t.map(|ty| RustType::borrow_of(None, Mut::Immutable, ty)),
+            RustClosureHead::SimpleVar(
+                head.into(),
+                deref_t.map(|ty| RustType::borrow_of(None, Mut::Immutable, ty)),
+            ),
             Box::new(body),
         )
     }
@@ -830,7 +850,25 @@ impl RustClosure {
         value_t: Option<RustType>,
         body: RustExpr,
     ) -> RustClosure {
-        RustClosure(head.into(), value_t, Box::new(body))
+        RustClosure(
+            RustClosureHead::SimpleVar(head.into(), value_t),
+            Box::new(body),
+        )
+    }
+}
+
+impl ToFragment for RustClosureHead {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustClosureHead::Thunk => Fragment::string("||"),
+            RustClosureHead::SimpleVar(lbl, sig) => lbl
+                .to_fragment()
+                .intervene(
+                    Fragment::string(": "),
+                    Fragment::opt(sig.as_ref(), RustType::to_fragment),
+                )
+                .delimit(Fragment::Char('|'), Fragment::Char('|')),
+        }
     }
 }
 
@@ -843,17 +881,11 @@ impl ToFragment for RustClosure {
 impl ToFragmentExt for RustClosure {
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
-            RustClosure(lab, sig, body) => cond_paren(
-                lab.to_fragment()
-                    .intervene(
-                        Fragment::string(": "),
-                        Fragment::opt(sig.as_ref(), RustType::to_fragment),
-                    )
-                    .delimit(Fragment::Char('|'), Fragment::Char('|'))
-                    .intervene(
-                        Fragment::Char(' '),
-                        body.to_fragment_precedence(Precedence::ARROW),
-                    ),
+            RustClosure(head, body) => cond_paren(
+                head.to_fragment().intervene(
+                    Fragment::Char(' '),
+                    body.to_fragment_precedence(Precedence::ARROW),
+                ),
                 prec,
                 Precedence::ARROW,
             ),
@@ -1053,6 +1085,14 @@ impl RustExpr {
     pub fn str_lit(str: impl Into<Label>) -> Self {
         Self::PrimitiveLit(RustPrimLit::String(str.into()))
     }
+
+    pub fn err(err_val: RustExpr) -> RustExpr {
+        Self::local("Err").call_with([err_val])
+    }
+
+    pub fn ok(ok_val: RustExpr) -> RustExpr {
+        Self::local("Ok").call_with([ok_val])
+    }
 }
 
 impl ToFragmentExt for RustExpr {
@@ -1194,6 +1234,7 @@ impl RustStmt {
 
 #[derive(Clone, Debug)]
 pub(crate) enum RustControl {
+    Loop(Vec<RustStmt>),
     While(RustExpr, Vec<RustStmt>),
     ForRange0(Label, RustExpr, Vec<RustStmt>), // index variable name, upper bound (exclusive), loop contents (0..N)
     If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
@@ -1277,6 +1318,8 @@ impl ToFragment for RustPattern {
 impl ToFragment for RustControl {
     fn to_fragment(&self) -> Fragment {
         match self {
+            Self::Loop(body) => Fragment::string("loop")
+                .intervene(Fragment::Char(' '), RustStmt::block(body.iter())),
             Self::While(cond, body) => Fragment::string("while")
                 .intervene(Fragment::Char(' '), cond.to_fragment())
                 .intervene(Fragment::Char(' '), RustStmt::block(body.iter())),
