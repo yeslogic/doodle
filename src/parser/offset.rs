@@ -1,13 +1,13 @@
-use super::error::{ParseError, StateError};
-use anyhow::{anyhow, Result as AResult};
+use super::error::{PResult, ParseError, StateError};
 use std::cmp::Ordering;
-
-type PResult<T> = Result<T, ParseError>;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum ByteOffset {
     Bytes(usize),
-    Bits { starting_byte: usize, bits_advanced: usize },
+    Bits {
+        starting_byte: usize,
+        bits_advanced: usize,
+    },
 }
 
 impl std::fmt::Display for ByteOffset {
@@ -28,10 +28,6 @@ impl Default for ByteOffset {
 impl ByteOffset {
     pub(crate) const fn from_bytes(nbytes: usize) -> Self {
         Self::Bytes(nbytes)
-    }
-
-    pub(crate) const fn byte_plus_bits(starting_byte: usize, nbits: usize) -> Self {
-        Self::Bits { starting_byte, bits_advanced: nbits }
     }
 
     // Calculates the increment value required for self to reach `other`
@@ -57,17 +53,19 @@ impl ByteOffset {
     }
 
     pub(crate) fn is_bit_mode(&self) -> bool {
-        matches!(self, Self::Bits {..})
-    }
-
-    pub(crate) fn increment_assign(&mut self) -> Self {
-        self.increment_assign_by(1)
+        matches!(self, Self::Bits { .. })
     }
 
     pub(crate) fn increment_by(&self, delta: usize) -> Self {
         match self {
             &ByteOffset::Bytes(n_bytes) => Self::Bytes(n_bytes + delta),
-            &ByteOffset::Bits {starting_byte, bits_advanced } => Self::Bits { starting_byte, bits_advanced: bits_advanced + delta },
+            &ByteOffset::Bits {
+                starting_byte,
+                bits_advanced,
+            } => Self::Bits {
+                starting_byte,
+                bits_advanced: bits_advanced + delta,
+            },
         }
     }
 
@@ -77,7 +75,10 @@ impl ByteOffset {
             ByteOffset::Bytes(n_bytes) => {
                 *n_bytes += delta;
             }
-            ByteOffset::Bits { bits_advanced: n_bits, .. } => {
+            ByteOffset::Bits {
+                bits_advanced: n_bits,
+                ..
+            } => {
                 *n_bits += delta;
             }
         }
@@ -86,7 +87,10 @@ impl ByteOffset {
 
     pub(crate) fn enter_bits_mode(&mut self) -> Result<(), ParseError> {
         if let ByteOffset::Bytes(n_bytes) = *self {
-            *self = ByteOffset::Bits { starting_byte: n_bytes, bits_advanced: 0 };
+            *self = ByteOffset::Bits {
+                starting_byte: n_bytes,
+                bits_advanced: 0,
+            };
             Ok(())
         } else {
             Err(ParseError::InternalError(StateError::BinaryModeError))
@@ -94,7 +98,11 @@ impl ByteOffset {
     }
 
     pub(crate) fn escape_bits_mode(&mut self) -> Result<usize, ParseError> {
-        if let ByteOffset::Bits { starting_byte, bits_advanced } = *self {
+        if let ByteOffset::Bits {
+            starting_byte,
+            bits_advanced,
+        } = *self
+        {
             let delta_major = bits_advanced / 8;
             let delta_minor = bits_advanced % 8;
             if delta_minor != 0 {
@@ -111,7 +119,10 @@ impl ByteOffset {
     pub(crate) fn abs_bit_offset(&self) -> usize {
         match self {
             &ByteOffset::Bytes(n) => n * 8,
-            &ByteOffset::Bits { starting_byte, bits_advanced } => starting_byte * 8 + bits_advanced,
+            &ByteOffset::Bits {
+                starting_byte,
+                bits_advanced,
+            } => starting_byte * 8 + bits_advanced,
         }
     }
 
@@ -125,7 +136,10 @@ impl ByteOffset {
     pub(crate) fn as_bytes(&self) -> (usize, Option<usize>) {
         match self {
             &ByteOffset::Bytes(n) => (n, None),
-            &ByteOffset::Bits { starting_byte, bits_advanced } => {
+            &ByteOffset::Bits {
+                starting_byte,
+                bits_advanced,
+            } => {
                 let delta_major = bits_advanced / 8;
                 let delta_minor = bits_advanced % 8;
                 (starting_byte + delta_major, Some(delta_minor))
@@ -279,12 +293,6 @@ impl BufferOffset {
         self.current_offset
     }
 
-    pub(crate) fn can_increment(&self, delta: usize) -> bool {
-        let lim = self.current_limit();
-        let after_increment = self.current_offset.increment_by(delta);
-        !(after_increment > lim)
-    }
-
     /// Increments the current offset by `delta` if it is legal to do so, and returns the old offset.
     ///
     /// Instead returns `Err` if it is not legal to increment by `delta`.
@@ -327,25 +335,19 @@ impl BufferOffset {
         })
     }
 
-    pub(crate) fn close_slice(&mut self) -> AResult<ByteOffset> {
+    pub(crate) fn close_slice(&mut self) -> PResult<ByteOffset> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);
         match stack.escape() {
             (stack, Some(Lens::Slice { endpoint })) => {
                 if self.current_offset > endpoint {
-                    return Err(anyhow!(
-                        "Current offset exceeds limit being escaped: {} > {}",
-                        self.current_offset,
-                        endpoint
-                    ));
+                    return Err(ParseError::InternalError(StateError::SliceOverrun));
                 }
                 self.current_offset = endpoint;
+                self.view_stack = stack;
                 Ok(endpoint)
             }
-            (_, other) => Err(anyhow!(
-                "ViewStack expected to have a Slice on top, found {:?} instead",
-                other
-            )),
+            _ => Err(ParseError::InternalError(StateError::MissingSlice)),
         }
     }
 
@@ -397,10 +399,5 @@ impl BufferOffset {
     /// based on the current ByteOffset mode (i.e. can become stale if the mode changes)
     pub(crate) fn rem_local(&self) -> usize {
         self.current_offset.delta(self.current_limit())
-    }
-
-    /// Number of bytes that can be consumed in the buffer overall, based on the current ByteOffset mode (i.e. can become stale if the mode changes)
-    pub(crate) fn rem_absolute(&self) -> usize {
-        self.current_offset.delta(self.max_offset)
     }
 }

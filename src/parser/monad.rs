@@ -1,8 +1,7 @@
 use super::{
-    error::{ParseError, StateError},
+    error::{PResult, ParseError, StateError},
     offset::{BufferOffset, ByteOffset},
 };
-use anyhow::Result as AResult;
 
 pub struct ParseMonad<'a> {
     pub(crate) buffer: &'a [u8],
@@ -70,7 +69,7 @@ impl<'a> ParseMonad<'a> {
         Ok(())
     }
 
-    pub fn end_slice(&mut self) -> AResult<()> {
+    pub fn end_slice(&mut self) -> PResult<()> {
         self.offset.close_slice()?;
         Ok(())
     }
@@ -127,10 +126,10 @@ impl<'a> ParseMonad<'a> {
 mod example {
     use std::io::BufWriter;
 
-    use super::*;
     use crate::codegen::{rust_ast::*, IxLabel, ProdCtxt};
     use crate::codegen::{Generator, ToAst};
     use crate::helper::*;
+    use crate::parser::error::PResult;
     use crate::{ByteSet, Expr, Format, FormatModule, FormatRef, Pattern};
 
     const VALID_ASCII: ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
@@ -337,8 +336,6 @@ mod example {
         use crate::parser::error::ParseError;
         use crate::prelude::*;
 
-        type PResult<T> = Result<T, ParseError>;
-
         #[allow(non_camel_case_types)]
         #[derive(Debug, Clone)]
         enum Type0 {
@@ -355,6 +352,7 @@ mod example {
             }
         }
 
+        #[allow(non_snake_case)]
         fn Decoder0<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,
@@ -362,6 +360,7 @@ mod example {
             Ok(Decoder1(scope, input)?)
         }
 
+        #[allow(non_snake_case)]
         fn Decoder1<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,
@@ -369,17 +368,16 @@ mod example {
             // Branch #0
             input.start_alt();
             match Decoder2(scope, input) {
-                Ok(inner) => Ok(Type0::ascii(inner)),
-                Err(_) => {
-                    input.next_alt(true)?;
-                    match Decoder3(scope, input) {
-                        Ok(inner) => Ok(Type0::utf8(inner)),
-                        Err(e) => Err(e),
-                    }
-                }
+                Ok(inner) => return Ok(Type0::ascii(inner)),
+                Err(_) => input.next_alt(true)?,
+            }
+            match Decoder3(scope, input) {
+                Ok(inner) => return Ok(Type0::utf8(inner)),
+                Err(e) => Err(e),
             }
         }
 
+        #[allow(non_snake_case)]
         fn Decoder2<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,
@@ -409,6 +407,7 @@ mod example {
             Ok(accum)
         }
 
+        #[allow(non_snake_case)]
         fn Decoder3<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,
@@ -463,6 +462,7 @@ mod example {
             Ok(accum)
         }
 
+        #[allow(non_snake_case, unreachable_patterns)]
         fn Decoder4<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,
@@ -816,6 +816,7 @@ mod example {
             Ok((|codepoint: u32| char::from_u32(codepoint).unwrap())(inner))
         }
 
+        #[allow(non_snake_case, unused_variables)]
         fn Decoder5<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,
@@ -831,6 +832,7 @@ mod example {
             Ok((|raw: u8| raw & 63)(inner))
         }
 
+        #[allow(non_snake_case, unused_variables)]
         fn Decoder6<'input>(
             scope: &mut Scope<'input>,
             input: &mut ParseMonad<'input>,

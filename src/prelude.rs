@@ -1,30 +1,9 @@
 pub use crate::byte_set::ByteSet;
 pub use crate::decoder::Scope;
-pub use crate::read::ReadCtxt;
-
-// FIXME - this model does not support split_at or backtracking to previous ReadCtxt states
-#[derive(Clone)]
-pub struct ParseCtxt<'a> {
-    input: ReadCtxt<'a>,
-}
-
-impl<'a> ParseCtxt<'a> {
-    pub fn new(bytes: &'a [u8]) -> ParseCtxt<'a> {
-        Self {
-            input: ReadCtxt::new(bytes),
-        }
-    }
-
-    pub const fn offset(&self) -> usize {
-        self.input.offset
-    }
-
-    pub fn read_byte(&mut self) -> Option<u8> {
-        let (ret, new_input) = self.input.read_byte()?;
-        self.input = new_input;
-        Some(ret)
-    }
-}
+pub use crate::parser::{
+    error::{PResult, ParseError},
+    monad::ParseMonad,
+};
 
 pub fn u16le(input: (u8, u8)) -> u16 {
     u16::from_le_bytes([input.0, input.1])
