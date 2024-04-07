@@ -64,16 +64,6 @@ fn bits16(n: usize, base: &BaseModule) -> Format {
     }
 }
 
-fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
-    record([
-        ("distance-extra-bits", bits16(extra_bits, base)),
-        (
-            "distance",
-            Format::Compute(add(Expr::U16(start as u16), var("distance-extra-bits"))),
-        ),
-    ])
-}
-
 fn length_record(
     start: usize,
     base: &BaseModule,
@@ -169,42 +159,168 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let bits5 = bits8(5, base);
     let bits7 = bits8(7, base);
 
+    let distance_record0 = module.define_format_args(
+        "deflate.distance-record0",
+        vec![
+            ("extra-bits".into(), ValueType::Base(BaseType::U8)),
+            ("start".into(), ValueType::Base(BaseType::U16)),
+        ],
+        record([
+            (
+                "distance-extra-bits",
+                Format::Match(
+                    var("extra-bits"),
+                    vec![
+                        (Pattern::U8(0), bits16(0, base)),
+                        (Pattern::U8(1), bits16(1, base)),
+                        (Pattern::U8(2), bits16(2, base)),
+                        (Pattern::U8(3), bits16(3, base)),
+                        (Pattern::U8(4), bits16(4, base)),
+                        (Pattern::U8(5), bits16(5, base)),
+                        (Pattern::U8(6), bits16(6, base)),
+                        (Pattern::U8(7), bits16(7, base)),
+                        (Pattern::U8(8), bits16(8, base)),
+                        (Pattern::U8(9), bits16(9, base)),
+                        (Pattern::U8(10), bits16(10, base)),
+                        (Pattern::U8(11), bits16(11, base)),
+                        (Pattern::U8(12), bits16(12, base)),
+                        (Pattern::U8(13), bits16(13, base)),
+                    ],
+                ),
+            ),
+            (
+                "distance",
+                Format::Compute(add(var("start"), var("distance-extra-bits"))),
+            ),
+        ]),
+    );
+
     let distance_record = module.define_format_args(
         "deflate.distance-record",
         vec![("distance-code".into(), ValueType::Base(BaseType::U16))],
         Format::Match(
             as_u8(var("distance-code")),
             vec![
-                (Pattern::U8(0), distance_record0(1, base, 0)),
-                (Pattern::U8(1), distance_record0(2, base, 0)),
-                (Pattern::U8(2), distance_record0(3, base, 0)),
-                (Pattern::U8(3), distance_record0(4, base, 0)),
-                (Pattern::U8(4), distance_record0(5, base, 1)),
-                (Pattern::U8(5), distance_record0(7, base, 1)),
-                (Pattern::U8(6), distance_record0(9, base, 2)),
-                (Pattern::U8(7), distance_record0(13, base, 2)),
-                (Pattern::U8(8), distance_record0(17, base, 3)),
-                (Pattern::U8(9), distance_record0(25, base, 3)),
-                (Pattern::U8(10), distance_record0(33, base, 4)),
-                (Pattern::U8(11), distance_record0(49, base, 4)),
-                (Pattern::U8(12), distance_record0(65, base, 5)),
-                (Pattern::U8(13), distance_record0(97, base, 5)),
-                (Pattern::U8(14), distance_record0(129, base, 6)),
-                (Pattern::U8(15), distance_record0(193, base, 6)),
-                (Pattern::U8(16), distance_record0(257, base, 7)),
-                (Pattern::U8(17), distance_record0(385, base, 7)),
-                (Pattern::U8(18), distance_record0(513, base, 8)),
-                (Pattern::U8(19), distance_record0(769, base, 8)),
-                (Pattern::U8(20), distance_record0(1025, base, 9)),
-                (Pattern::U8(21), distance_record0(1537, base, 9)),
-                (Pattern::U8(22), distance_record0(2049, base, 10)),
-                (Pattern::U8(23), distance_record0(3073, base, 10)),
-                (Pattern::U8(24), distance_record0(4097, base, 11)),
-                (Pattern::U8(25), distance_record0(6145, base, 11)),
-                (Pattern::U8(26), distance_record0(8193, base, 12)),
-                (Pattern::U8(27), distance_record0(12289, base, 12)),
-                (Pattern::U8(28), distance_record0(16385, base, 13)),
-                (Pattern::U8(29), distance_record0(24577, base, 13)),
+                (
+                    Pattern::U8(0),
+                    distance_record0.call_args(vec![Expr::U8(0), Expr::U16(1)]),
+                ),
+                (
+                    Pattern::U8(1),
+                    distance_record0.call_args(vec![Expr::U8(0), Expr::U16(2)]),
+                ),
+                (
+                    Pattern::U8(2),
+                    distance_record0.call_args(vec![Expr::U8(0), Expr::U16(3)]),
+                ),
+                (
+                    Pattern::U8(3),
+                    distance_record0.call_args(vec![Expr::U8(0), Expr::U16(4)]),
+                ),
+                (
+                    Pattern::U8(4),
+                    distance_record0.call_args(vec![Expr::U8(1), Expr::U16(5)]),
+                ),
+                (
+                    Pattern::U8(5),
+                    distance_record0.call_args(vec![Expr::U8(1), Expr::U16(7)]),
+                ),
+                (
+                    Pattern::U8(6),
+                    distance_record0.call_args(vec![Expr::U8(2), Expr::U16(9)]),
+                ),
+                (
+                    Pattern::U8(7),
+                    distance_record0.call_args(vec![Expr::U8(2), Expr::U16(13)]),
+                ),
+                (
+                    Pattern::U8(8),
+                    distance_record0.call_args(vec![Expr::U8(3), Expr::U16(17)]),
+                ),
+                (
+                    Pattern::U8(9),
+                    distance_record0.call_args(vec![Expr::U8(3), Expr::U16(25)]),
+                ),
+                (
+                    Pattern::U8(10),
+                    distance_record0.call_args(vec![Expr::U8(4), Expr::U16(33)]),
+                ),
+                (
+                    Pattern::U8(11),
+                    distance_record0.call_args(vec![Expr::U8(4), Expr::U16(49)]),
+                ),
+                (
+                    Pattern::U8(12),
+                    distance_record0.call_args(vec![Expr::U8(5), Expr::U16(65)]),
+                ),
+                (
+                    Pattern::U8(13),
+                    distance_record0.call_args(vec![Expr::U8(5), Expr::U16(97)]),
+                ),
+                (
+                    Pattern::U8(14),
+                    distance_record0.call_args(vec![Expr::U8(6), Expr::U16(129)]),
+                ),
+                (
+                    Pattern::U8(15),
+                    distance_record0.call_args(vec![Expr::U8(6), Expr::U16(193)]),
+                ),
+                (
+                    Pattern::U8(16),
+                    distance_record0.call_args(vec![Expr::U8(7), Expr::U16(257)]),
+                ),
+                (
+                    Pattern::U8(17),
+                    distance_record0.call_args(vec![Expr::U8(7), Expr::U16(385)]),
+                ),
+                (
+                    Pattern::U8(18),
+                    distance_record0.call_args(vec![Expr::U8(8), Expr::U16(513)]),
+                ),
+                (
+                    Pattern::U8(19),
+                    distance_record0.call_args(vec![Expr::U8(8), Expr::U16(769)]),
+                ),
+                (
+                    Pattern::U8(20),
+                    distance_record0.call_args(vec![Expr::U8(9), Expr::U16(1025)]),
+                ),
+                (
+                    Pattern::U8(21),
+                    distance_record0.call_args(vec![Expr::U8(9), Expr::U16(1537)]),
+                ),
+                (
+                    Pattern::U8(22),
+                    distance_record0.call_args(vec![Expr::U8(10), Expr::U16(2049)]),
+                ),
+                (
+                    Pattern::U8(23),
+                    distance_record0.call_args(vec![Expr::U8(10), Expr::U16(3073)]),
+                ),
+                (
+                    Pattern::U8(24),
+                    distance_record0.call_args(vec![Expr::U8(11), Expr::U16(4097)]),
+                ),
+                (
+                    Pattern::U8(25),
+                    distance_record0.call_args(vec![Expr::U8(11), Expr::U16(6145)]),
+                ),
+                (
+                    Pattern::U8(26),
+                    distance_record0.call_args(vec![Expr::U8(12), Expr::U16(8193)]),
+                ),
+                (
+                    Pattern::U8(27),
+                    distance_record0.call_args(vec![Expr::U8(12), Expr::U16(12289)]),
+                ),
+                (
+                    Pattern::U8(28),
+                    distance_record0.call_args(vec![Expr::U8(13), Expr::U16(16385)]),
+                ),
+                (
+                    Pattern::U8(29),
+                    distance_record0.call_args(vec![Expr::U8(13), Expr::U16(24577)]),
+                ),
             ],
         ),
     );
