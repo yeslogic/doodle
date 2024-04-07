@@ -138,7 +138,7 @@
 │           │   │               │   │           ├── length-extra-bits <- compute 0 := 0
 │           │   │               │   │           ├── length <- compute 4 + as-u16 length-extra-bits := 4
 │           │   │               │   │           ├── distance-code <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 4
-│           │   │               │   │           └── distance-record <- match (as-u8 distance-code) { ... } :=
+│           │   │               │   │           └── distance-record <- deflate.distance-record(...) :=
 │           │   │               │   │               ├── distance-extra-bits <- map (bits -> as-u16 (bits.0)) (...) := 1
 │           │   │               │   │               └── distance <- compute 5 + distance-extra-bits := 6
 │           │   │               │   ├── 8 :=
