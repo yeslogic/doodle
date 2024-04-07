@@ -74,45 +74,12 @@ fn distance_record0(start: usize, base: &BaseModule, extra_bits: usize) -> Forma
     ])
 }
 
-fn distance_record(base: &BaseModule) -> Format {
-    Format::Match(
-        as_u8(var("distance-code")),
-        vec![
-            (Pattern::U8(0), distance_record0(1, base, 0)),
-            (Pattern::U8(1), distance_record0(2, base, 0)),
-            (Pattern::U8(2), distance_record0(3, base, 0)),
-            (Pattern::U8(3), distance_record0(4, base, 0)),
-            (Pattern::U8(4), distance_record0(5, base, 1)),
-            (Pattern::U8(5), distance_record0(7, base, 1)),
-            (Pattern::U8(6), distance_record0(9, base, 2)),
-            (Pattern::U8(7), distance_record0(13, base, 2)),
-            (Pattern::U8(8), distance_record0(17, base, 3)),
-            (Pattern::U8(9), distance_record0(25, base, 3)),
-            (Pattern::U8(10), distance_record0(33, base, 4)),
-            (Pattern::U8(11), distance_record0(49, base, 4)),
-            (Pattern::U8(12), distance_record0(65, base, 5)),
-            (Pattern::U8(13), distance_record0(97, base, 5)),
-            (Pattern::U8(14), distance_record0(129, base, 6)),
-            (Pattern::U8(15), distance_record0(193, base, 6)),
-            (Pattern::U8(16), distance_record0(257, base, 7)),
-            (Pattern::U8(17), distance_record0(385, base, 7)),
-            (Pattern::U8(18), distance_record0(513, base, 8)),
-            (Pattern::U8(19), distance_record0(769, base, 8)),
-            (Pattern::U8(20), distance_record0(1025, base, 9)),
-            (Pattern::U8(21), distance_record0(1537, base, 9)),
-            (Pattern::U8(22), distance_record0(2049, base, 10)),
-            (Pattern::U8(23), distance_record0(3073, base, 10)),
-            (Pattern::U8(24), distance_record0(4097, base, 11)),
-            (Pattern::U8(25), distance_record0(6145, base, 11)),
-            (Pattern::U8(26), distance_record0(8193, base, 12)),
-            (Pattern::U8(27), distance_record0(12289, base, 12)),
-            (Pattern::U8(28), distance_record0(16385, base, 13)),
-            (Pattern::U8(29), distance_record0(24577, base, 13)),
-        ],
-    )
-}
-
-fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
+fn length_record(
+    start: usize,
+    base: &BaseModule,
+    extra_bits: usize,
+    distance_record: FormatRef,
+) -> Format {
     record([
         ("length-extra-bits", bits8(extra_bits, base)),
         (
@@ -126,11 +93,19 @@ fn length_record(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
             "distance-code",
             Format::Apply("distance-alphabet-format".into()),
         ),
-        ("distance-record", distance_record(base)),
+        (
+            "distance-record",
+            distance_record.call_args(vec![var("distance-code")]),
+        ),
     ])
 }
 
-fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Format {
+fn length_record_fixed(
+    start: usize,
+    base: &BaseModule,
+    extra_bits: usize,
+    distance_record: FormatRef,
+) -> Format {
     record([
         ("length-extra-bits", bits8(extra_bits, base)),
         (
@@ -141,7 +116,10 @@ fn length_record_fixed(start: usize, base: &BaseModule, extra_bits: usize) -> Fo
             )),
         ),
         ("distance-code", bits8(5, base)),
-        ("distance-record", distance_record(base)),
+        (
+            "distance-record",
+            distance_record.call_args(vec![as_u16(var("distance-code"))]),
+        ),
     ])
 }
 
@@ -191,6 +169,46 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let bits5 = bits8(5, base);
     let bits7 = bits8(7, base);
 
+    let distance_record = module.define_format_args(
+        "deflate.distance-record",
+        vec![("distance-code".into(), ValueType::Base(BaseType::U16))],
+        Format::Match(
+            as_u8(var("distance-code")),
+            vec![
+                (Pattern::U8(0), distance_record0(1, base, 0)),
+                (Pattern::U8(1), distance_record0(2, base, 0)),
+                (Pattern::U8(2), distance_record0(3, base, 0)),
+                (Pattern::U8(3), distance_record0(4, base, 0)),
+                (Pattern::U8(4), distance_record0(5, base, 1)),
+                (Pattern::U8(5), distance_record0(7, base, 1)),
+                (Pattern::U8(6), distance_record0(9, base, 2)),
+                (Pattern::U8(7), distance_record0(13, base, 2)),
+                (Pattern::U8(8), distance_record0(17, base, 3)),
+                (Pattern::U8(9), distance_record0(25, base, 3)),
+                (Pattern::U8(10), distance_record0(33, base, 4)),
+                (Pattern::U8(11), distance_record0(49, base, 4)),
+                (Pattern::U8(12), distance_record0(65, base, 5)),
+                (Pattern::U8(13), distance_record0(97, base, 5)),
+                (Pattern::U8(14), distance_record0(129, base, 6)),
+                (Pattern::U8(15), distance_record0(193, base, 6)),
+                (Pattern::U8(16), distance_record0(257, base, 7)),
+                (Pattern::U8(17), distance_record0(385, base, 7)),
+                (Pattern::U8(18), distance_record0(513, base, 8)),
+                (Pattern::U8(19), distance_record0(769, base, 8)),
+                (Pattern::U8(20), distance_record0(1025, base, 9)),
+                (Pattern::U8(21), distance_record0(1537, base, 9)),
+                (Pattern::U8(22), distance_record0(2049, base, 10)),
+                (Pattern::U8(23), distance_record0(3073, base, 10)),
+                (Pattern::U8(24), distance_record0(4097, base, 11)),
+                (Pattern::U8(25), distance_record0(6145, base, 11)),
+                (Pattern::U8(26), distance_record0(8193, base, 12)),
+                (Pattern::U8(27), distance_record0(12289, base, 12)),
+                (Pattern::U8(28), distance_record0(16385, base, 13)),
+                (Pattern::U8(29), distance_record0(24577, base, 13)),
+            ],
+        ),
+    );
+
     let uncompressed = module.define_format(
         "deflate.uncompressed",
         record([
@@ -231,147 +249,147 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (
                                             Pattern::U16(257),
                                             "some",
-                                            length_record_fixed(3, base, 0),
+                                            length_record_fixed(3, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(258),
                                             "some",
-                                            length_record_fixed(4, base, 0),
+                                            length_record_fixed(4, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(259),
                                             "some",
-                                            length_record_fixed(5, base, 0),
+                                            length_record_fixed(5, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(260),
                                             "some",
-                                            length_record_fixed(6, base, 0),
+                                            length_record_fixed(6, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(261),
                                             "some",
-                                            length_record_fixed(7, base, 0),
+                                            length_record_fixed(7, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(262),
                                             "some",
-                                            length_record_fixed(8, base, 0),
+                                            length_record_fixed(8, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(263),
                                             "some",
-                                            length_record_fixed(9, base, 0),
+                                            length_record_fixed(9, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(264),
                                             "some",
-                                            length_record_fixed(10, base, 0),
+                                            length_record_fixed(10, base, 0, distance_record),
                                         ),
                                         (
                                             Pattern::U16(265),
                                             "some",
-                                            length_record_fixed(11, base, 1),
+                                            length_record_fixed(11, base, 1, distance_record),
                                         ),
                                         (
                                             Pattern::U16(266),
                                             "some",
-                                            length_record_fixed(13, base, 1),
+                                            length_record_fixed(13, base, 1, distance_record),
                                         ),
                                         (
                                             Pattern::U16(267),
                                             "some",
-                                            length_record_fixed(15, base, 1),
+                                            length_record_fixed(15, base, 1, distance_record),
                                         ),
                                         (
                                             Pattern::U16(268),
                                             "some",
-                                            length_record_fixed(17, base, 1),
+                                            length_record_fixed(17, base, 1, distance_record),
                                         ),
                                         (
                                             Pattern::U16(269),
                                             "some",
-                                            length_record_fixed(19, base, 2),
+                                            length_record_fixed(19, base, 2, distance_record),
                                         ),
                                         (
                                             Pattern::U16(270),
                                             "some",
-                                            length_record_fixed(23, base, 2),
+                                            length_record_fixed(23, base, 2, distance_record),
                                         ),
                                         (
                                             Pattern::U16(271),
                                             "some",
-                                            length_record_fixed(27, base, 2),
+                                            length_record_fixed(27, base, 2, distance_record),
                                         ),
                                         (
                                             Pattern::U16(272),
                                             "some",
-                                            length_record_fixed(31, base, 2),
+                                            length_record_fixed(31, base, 2, distance_record),
                                         ),
                                         (
                                             Pattern::U16(273),
                                             "some",
-                                            length_record_fixed(35, base, 3),
+                                            length_record_fixed(35, base, 3, distance_record),
                                         ),
                                         (
                                             Pattern::U16(274),
                                             "some",
-                                            length_record_fixed(43, base, 3),
+                                            length_record_fixed(43, base, 3, distance_record),
                                         ),
                                         (
                                             Pattern::U16(275),
                                             "some",
-                                            length_record_fixed(51, base, 3),
+                                            length_record_fixed(51, base, 3, distance_record),
                                         ),
                                         (
                                             Pattern::U16(276),
                                             "some",
-                                            length_record_fixed(59, base, 3),
+                                            length_record_fixed(59, base, 3, distance_record),
                                         ),
                                         (
                                             Pattern::U16(277),
                                             "some",
-                                            length_record_fixed(67, base, 4),
+                                            length_record_fixed(67, base, 4, distance_record),
                                         ),
                                         (
                                             Pattern::U16(278),
                                             "some",
-                                            length_record_fixed(83, base, 4),
+                                            length_record_fixed(83, base, 4, distance_record),
                                         ),
                                         (
                                             Pattern::U16(279),
                                             "some",
-                                            length_record_fixed(99, base, 4),
+                                            length_record_fixed(99, base, 4, distance_record),
                                         ),
                                         (
                                             Pattern::U16(280),
                                             "some",
-                                            length_record_fixed(115, base, 4),
+                                            length_record_fixed(115, base, 4, distance_record),
                                         ),
                                         (
                                             Pattern::U16(281),
                                             "some",
-                                            length_record_fixed(131, base, 5),
+                                            length_record_fixed(131, base, 5, distance_record),
                                         ),
                                         (
                                             Pattern::U16(282),
                                             "some",
-                                            length_record_fixed(163, base, 5),
+                                            length_record_fixed(163, base, 5, distance_record),
                                         ),
                                         (
                                             Pattern::U16(283),
                                             "some",
-                                            length_record_fixed(195, base, 5),
+                                            length_record_fixed(195, base, 5, distance_record),
                                         ),
                                         (
                                             Pattern::U16(284),
                                             "some",
-                                            length_record_fixed(227, base, 5),
+                                            length_record_fixed(227, base, 5, distance_record),
                                         ),
                                         (
                                             Pattern::U16(285),
                                             "some",
-                                            length_record_fixed(258, base, 0),
+                                            length_record_fixed(258, base, 0, distance_record),
                                         ),
                                         (Pattern::Wildcard, "none", Format::EMPTY),
                                     ],
@@ -688,58 +706,150 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     match_variant(
                                         var("code"),
                                         vec![
-                                            (Pattern::U16(257), "some", length_record(3, base, 0)),
-                                            (Pattern::U16(258), "some", length_record(4, base, 0)),
-                                            (Pattern::U16(259), "some", length_record(5, base, 0)),
-                                            (Pattern::U16(260), "some", length_record(6, base, 0)),
-                                            (Pattern::U16(261), "some", length_record(7, base, 0)),
-                                            (Pattern::U16(262), "some", length_record(8, base, 0)),
-                                            (Pattern::U16(263), "some", length_record(9, base, 0)),
-                                            (Pattern::U16(264), "some", length_record(10, base, 0)),
-                                            (Pattern::U16(265), "some", length_record(11, base, 1)),
-                                            (Pattern::U16(266), "some", length_record(13, base, 1)),
-                                            (Pattern::U16(267), "some", length_record(15, base, 1)),
-                                            (Pattern::U16(268), "some", length_record(17, base, 1)),
-                                            (Pattern::U16(269), "some", length_record(19, base, 2)),
-                                            (Pattern::U16(270), "some", length_record(23, base, 2)),
-                                            (Pattern::U16(271), "some", length_record(27, base, 2)),
-                                            (Pattern::U16(272), "some", length_record(31, base, 2)),
-                                            (Pattern::U16(273), "some", length_record(35, base, 3)),
-                                            (Pattern::U16(274), "some", length_record(43, base, 3)),
-                                            (Pattern::U16(275), "some", length_record(51, base, 3)),
-                                            (Pattern::U16(276), "some", length_record(59, base, 3)),
-                                            (Pattern::U16(277), "some", length_record(67, base, 4)),
-                                            (Pattern::U16(278), "some", length_record(83, base, 4)),
-                                            (Pattern::U16(279), "some", length_record(99, base, 4)),
+                                            (
+                                                Pattern::U16(257),
+                                                "some",
+                                                length_record(3, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(258),
+                                                "some",
+                                                length_record(4, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(259),
+                                                "some",
+                                                length_record(5, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(260),
+                                                "some",
+                                                length_record(6, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(261),
+                                                "some",
+                                                length_record(7, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(262),
+                                                "some",
+                                                length_record(8, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(263),
+                                                "some",
+                                                length_record(9, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(264),
+                                                "some",
+                                                length_record(10, base, 0, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(265),
+                                                "some",
+                                                length_record(11, base, 1, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(266),
+                                                "some",
+                                                length_record(13, base, 1, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(267),
+                                                "some",
+                                                length_record(15, base, 1, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(268),
+                                                "some",
+                                                length_record(17, base, 1, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(269),
+                                                "some",
+                                                length_record(19, base, 2, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(270),
+                                                "some",
+                                                length_record(23, base, 2, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(271),
+                                                "some",
+                                                length_record(27, base, 2, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(272),
+                                                "some",
+                                                length_record(31, base, 2, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(273),
+                                                "some",
+                                                length_record(35, base, 3, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(274),
+                                                "some",
+                                                length_record(43, base, 3, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(275),
+                                                "some",
+                                                length_record(51, base, 3, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(276),
+                                                "some",
+                                                length_record(59, base, 3, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(277),
+                                                "some",
+                                                length_record(67, base, 4, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(278),
+                                                "some",
+                                                length_record(83, base, 4, distance_record),
+                                            ),
+                                            (
+                                                Pattern::U16(279),
+                                                "some",
+                                                length_record(99, base, 4, distance_record),
+                                            ),
                                             (
                                                 Pattern::U16(280),
                                                 "some",
-                                                length_record(115, base, 4),
+                                                length_record(115, base, 4, distance_record),
                                             ),
                                             (
                                                 Pattern::U16(281),
                                                 "some",
-                                                length_record(131, base, 5),
+                                                length_record(131, base, 5, distance_record),
                                             ),
                                             (
                                                 Pattern::U16(282),
                                                 "some",
-                                                length_record(163, base, 5),
+                                                length_record(163, base, 5, distance_record),
                                             ),
                                             (
                                                 Pattern::U16(283),
                                                 "some",
-                                                length_record(195, base, 5),
+                                                length_record(195, base, 5, distance_record),
                                             ),
                                             (
                                                 Pattern::U16(284),
                                                 "some",
-                                                length_record(227, base, 5),
+                                                length_record(227, base, 5, distance_record),
                                             ),
                                             (
                                                 Pattern::U16(285),
                                                 "some",
-                                                length_record(258, base, 0),
+                                                length_record(258, base, 0, distance_record),
                                             ),
                                             (Pattern::Wildcard, "none", Format::EMPTY),
                                         ],
