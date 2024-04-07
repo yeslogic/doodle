@@ -1568,8 +1568,8 @@ fn Decoder1<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
 }
 
 fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type19> {
-    let header = { (Decoder151(scope, input))? };
-    let logical_screen = { (Decoder152(scope, input))? };
+    let header = { (Decoder152(scope, input))? };
+    let logical_screen = { (Decoder153(scope, input))? };
     let blocks = {
         let mut accum = (Vec::new());
         while true {
@@ -1589,7 +1589,7 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder153(scope, input))?;
+                let next_elem = (Decoder154(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -1597,7 +1597,7 @@ fn Decoder2<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<
         }
         accum
     };
-    let trailer = { (Decoder154(scope, input))? };
+    let trailer = { (Decoder155(scope, input))? };
     (Some(Type19 {
         header,
         logical_screen,
@@ -6926,7 +6926,7 @@ fn Decoder140<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 }
 
 fn Decoder141<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
-    (Some((Decoder150(scope, input))?))
+    (Some((Decoder151(scope, input))?))
 }
 
 fn Decoder142<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type38> {
@@ -10106,813 +10106,65 @@ fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
 
 fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type24> {
     (Some(match (distance_code as u8) {
-        0 => {
-            let distance_extra_bits = { 0 };
-            let distance = { (1 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        0 => (Decoder150(scope, input))?,
 
-        1 => {
-            let distance_extra_bits = { 0 };
-            let distance = { (2 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        1 => (Decoder150(scope, input))?,
 
-        2 => {
-            let distance_extra_bits = { 0 };
-            let distance = { (3 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        2 => (Decoder150(scope, input))?,
 
-        3 => {
-            let distance_extra_bits = { 0 };
-            let distance = { (4 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        3 => (Decoder150(scope, input))?,
 
-        4 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    (field0)
-                };
-                ((|bits: (u8)| bits.0 as u16)(inner))
-            };
-            let distance = { (5 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        4 => (Decoder150(scope, input))?,
 
-        5 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    (field0)
-                };
-                ((|bits: (u8)| bits.0 as u16)(inner))
-            };
-            let distance = { (7 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        5 => (Decoder150(scope, input))?,
 
-        6 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    (field0, field1)
-                };
-                ((|bits: (u8, u8)| (bits.1 as u16) << 1 | (bits.0 as u16))(inner))
-            };
-            let distance = { (9 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        6 => (Decoder150(scope, input))?,
 
-        7 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    (field0, field1)
-                };
-                ((|bits: (u8, u8)| (bits.1 as u16) << 1 | (bits.0 as u16))(inner))
-            };
-            let distance = { (13 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        7 => (Decoder150(scope, input))?,
 
-        8 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2)
-                };
-                ((|bits: (u8, u8, u8)| {
-                    (bits.2 as u16) << 2 | (bits.1 as u16) << 1 | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (17 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        8 => (Decoder150(scope, input))?,
 
-        9 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2)
-                };
-                ((|bits: (u8, u8, u8)| {
-                    (bits.2 as u16) << 2 | (bits.1 as u16) << 1 | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (25 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        9 => (Decoder150(scope, input))?,
 
-        10 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3)
-                };
-                ((|bits: (u8, u8, u8, u8)| {
-                    (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (33 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        10 => (Decoder150(scope, input))?,
 
-        11 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3)
-                };
-                ((|bits: (u8, u8, u8, u8)| {
-                    (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (49 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        11 => (Decoder150(scope, input))?,
 
-        12 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3, field4)
-                };
-                ((|bits: (u8, u8, u8, u8, u8)| {
-                    (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (65 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        12 => (Decoder150(scope, input))?,
 
-        13 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3, field4)
-                };
-                ((|bits: (u8, u8, u8, u8, u8)| {
-                    (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (97 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        13 => (Decoder150(scope, input))?,
 
-        14 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3, field4, field5)
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8)| {
-                    (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (129 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        14 => (Decoder150(scope, input))?,
 
-        15 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3, field4, field5)
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8)| {
-                    (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (193 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        15 => (Decoder150(scope, input))?,
 
-        16 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3, field4, field5, field6)
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (257 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        16 => (Decoder150(scope, input))?,
 
-        17 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    (field0, field1, field2, field3, field4, field5, field6)
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (385 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        17 => (Decoder150(scope, input))?,
 
-        18 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (513 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        18 => (Decoder150(scope, input))?,
 
-        19 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (769 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        19 => (Decoder150(scope, input))?,
 
-        20 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (1025 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        20 => (Decoder150(scope, input))?,
 
-        21 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (1537 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        21 => (Decoder150(scope, input))?,
 
-        22 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (2049 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        22 => (Decoder150(scope, input))?,
 
-        23 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (3073 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        23 => (Decoder150(scope, input))?,
 
-        24 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    let field10 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9, field10,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.10 as u16) << 10
-                        | (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (4097 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        24 => (Decoder150(scope, input))?,
 
-        25 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    let field10 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9, field10,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.10 as u16) << 10
-                        | (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (6145 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        25 => (Decoder150(scope, input))?,
 
-        26 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    let field10 = { (Decoder145(scope, input))? };
-                    let field11 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9, field10, field11,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.11 as u16) << 11
-                        | (bits.10 as u16) << 10
-                        | (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (8193 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        26 => (Decoder150(scope, input))?,
 
-        27 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    let field10 = { (Decoder145(scope, input))? };
-                    let field11 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9, field10, field11,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.11 as u16) << 11
-                        | (bits.10 as u16) << 10
-                        | (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (12289 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        27 => (Decoder150(scope, input))?,
 
-        28 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    let field10 = { (Decoder145(scope, input))? };
-                    let field11 = { (Decoder145(scope, input))? };
-                    let field12 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9, field10, field11, field12,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.12 as u16) << 12
-                        | (bits.11 as u16) << 11
-                        | (bits.10 as u16) << 10
-                        | (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (16385 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        28 => (Decoder150(scope, input))?,
 
-        29 => {
-            let distance_extra_bits = {
-                let inner = {
-                    let field0 = { (Decoder145(scope, input))? };
-                    let field1 = { (Decoder145(scope, input))? };
-                    let field2 = { (Decoder145(scope, input))? };
-                    let field3 = { (Decoder145(scope, input))? };
-                    let field4 = { (Decoder145(scope, input))? };
-                    let field5 = { (Decoder145(scope, input))? };
-                    let field6 = { (Decoder145(scope, input))? };
-                    let field7 = { (Decoder145(scope, input))? };
-                    let field8 = { (Decoder145(scope, input))? };
-                    let field9 = { (Decoder145(scope, input))? };
-                    let field10 = { (Decoder145(scope, input))? };
-                    let field11 = { (Decoder145(scope, input))? };
-                    let field12 = { (Decoder145(scope, input))? };
-                    (
-                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
-                        field9, field10, field11, field12,
-                    )
-                };
-                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                    (bits.12 as u16) << 12
-                        | (bits.11 as u16) << 11
-                        | (bits.10 as u16) << 10
-                        | (bits.9 as u16) << 9
-                        | (bits.8 as u16) << 8
-                        | (bits.7 as u16) << 7
-                        | (bits.6 as u16) << 6
-                        | (bits.5 as u16) << 5
-                        | (bits.4 as u16) << 4
-                        | (bits.3 as u16) << 3
-                        | (bits.2 as u16) << 2
-                        | (bits.1 as u16) << 1
-                        | (bits.0 as u16)
-                })(inner))
-            };
-            let distance = { (24577 + distance_extra_bits) };
-            Type24 {
-                distance_extra_bits,
-                distance,
-            }
-        }
+        29 => (Decoder150(scope, input))?,
 
         _other => {
             (unreachable!(r#"unexpected: {:?}"#, _other));
@@ -10920,7 +10172,319 @@ fn Decoder149<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
+fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type24> {
+    let distance_extra_bits = {
+        match extra_bits {
+            0 => 0,
+
+            1 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    (field0)
+                };
+                ((|bits: (u8)| bits.0 as u16)(inner))
+            }
+
+            2 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    (field0, field1)
+                };
+                ((|bits: (u8, u8)| (bits.1 as u16) << 1 | (bits.0 as u16))(inner))
+            }
+
+            3 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    (field0, field1, field2)
+                };
+                ((|bits: (u8, u8, u8)| {
+                    (bits.2 as u16) << 2 | (bits.1 as u16) << 1 | (bits.0 as u16)
+                })(inner))
+            }
+
+            4 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    (field0, field1, field2, field3)
+                };
+                ((|bits: (u8, u8, u8, u8)| {
+                    (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            5 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    (field0, field1, field2, field3, field4)
+                };
+                ((|bits: (u8, u8, u8, u8, u8)| {
+                    (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            6 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    (field0, field1, field2, field3, field4, field5)
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8)| {
+                    (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            7 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    (field0, field1, field2, field3, field4, field5, field6)
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            8 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7,
+                    )
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            9 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    let field8 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
+                    )
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            10 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    let field8 = { (Decoder145(scope, input))? };
+                    let field9 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
+                        field9,
+                    )
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.9 as u16) << 9
+                        | (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            11 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    let field8 = { (Decoder145(scope, input))? };
+                    let field9 = { (Decoder145(scope, input))? };
+                    let field10 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
+                        field9, field10,
+                    )
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.10 as u16) << 10
+                        | (bits.9 as u16) << 9
+                        | (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            12 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    let field8 = { (Decoder145(scope, input))? };
+                    let field9 = { (Decoder145(scope, input))? };
+                    let field10 = { (Decoder145(scope, input))? };
+                    let field11 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
+                        field9, field10, field11,
+                    )
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.11 as u16) << 11
+                        | (bits.10 as u16) << 10
+                        | (bits.9 as u16) << 9
+                        | (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            13 => {
+                let inner = {
+                    let field0 = { (Decoder145(scope, input))? };
+                    let field1 = { (Decoder145(scope, input))? };
+                    let field2 = { (Decoder145(scope, input))? };
+                    let field3 = { (Decoder145(scope, input))? };
+                    let field4 = { (Decoder145(scope, input))? };
+                    let field5 = { (Decoder145(scope, input))? };
+                    let field6 = { (Decoder145(scope, input))? };
+                    let field7 = { (Decoder145(scope, input))? };
+                    let field8 = { (Decoder145(scope, input))? };
+                    let field9 = { (Decoder145(scope, input))? };
+                    let field10 = { (Decoder145(scope, input))? };
+                    let field11 = { (Decoder145(scope, input))? };
+                    let field12 = { (Decoder145(scope, input))? };
+                    (
+                        field0, field1, field2, field3, field4, field5, field6, field7, field8,
+                        field9, field10, field11, field12,
+                    )
+                };
+                ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
+                    (bits.12 as u16) << 12
+                        | (bits.11 as u16) << 11
+                        | (bits.10 as u16) << 10
+                        | (bits.9 as u16) << 9
+                        | (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)
+                })(inner))
+            }
+
+            _other => {
+                (unreachable!(r#"unexpected: {:?}"#, _other));
+            }
+        }
+    };
+    let distance = { (start + distance_extra_bits) };
+    (Some(Type24 {
+        distance_extra_bits,
+        distance,
+    }))
+}
+
+fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type21> {
     let string = {
         let mut accum = (Vec::new());
         while true {
@@ -10964,7 +10528,7 @@ fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type21 { string, null }))
 }
 
-fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type0> {
+fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type0> {
     let signature = {
         let field0 = {
             let b = (input.read_byte())?;
@@ -11002,15 +10566,15 @@ fn Decoder151<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type0 { signature, version }))
 }
 
-fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type4> {
-    let descriptor = { (Decoder168(scope, input))? };
+fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type4> {
+    let descriptor = { (Decoder169(scope, input))? };
     let global_color_table = {
         match (descriptor.flags & 128 != 0) {
             true => {
                 let inner = {
                     let mut accum = (Vec::new());
                     for _ in 0..(2 << (descriptor.flags & 7)) {
-                        (accum.push((Decoder166(scope, input))?));
+                        (accum.push((Decoder167(scope, input))?));
                     }
                     accum
                 };
@@ -11033,7 +10597,7 @@ fn Decoder152<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type17> {
+fn Decoder154<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type17> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -11064,12 +10628,12 @@ fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder155(scope, input))?;
+            let inner = (Decoder156(scope, input))?;
             (Type17::graphic_block(inner))
         }
 
         1 => {
-            let inner = (Decoder156(scope, input))?;
+            let inner = (Decoder157(scope, input))?;
             (Type17::special_purpose_block(inner))
         }
 
@@ -11079,7 +10643,7 @@ fn Decoder153<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder154<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type18> {
+fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type18> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 59) {
@@ -11091,7 +10655,7 @@ fn Decoder154<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type18 { separator }))
 }
 
-fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
+fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type13> {
     let graphic_control_extension = {
         let tree_index = {
             let lookahead = &mut (input.clone());
@@ -11119,7 +10683,7 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         };
         match tree_index {
             0 => {
-                let inner = (Decoder161(scope, input))?;
+                let inner = (Decoder162(scope, input))?;
                 (Type6::some(inner))
             }
 
@@ -11133,14 +10697,14 @@ fn Decoder155<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    let graphic_rendering_block = { (Decoder162(scope, input))? };
+    let graphic_rendering_block = { (Decoder163(scope, input))? };
     (Some(Type13 {
         graphic_control_extension,
         graphic_rendering_block,
     }))
 }
 
-fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
+fn Decoder157<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type16> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -11161,12 +10725,12 @@ fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder157(scope, input))?;
+            let inner = (Decoder158(scope, input))?;
             (Type16::application_extension(inner))
         }
 
         1 => {
-            let inner = (Decoder158(scope, input))?;
+            let inner = (Decoder159(scope, input))?;
             (Type16::comment_extension(inner))
         }
 
@@ -11176,7 +10740,7 @@ fn Decoder156<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder157<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type14> {
+fn Decoder158<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type14> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -11232,7 +10796,7 @@ fn Decoder157<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder159(scope, input))?;
+                let next_elem = (Decoder160(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -11240,7 +10804,7 @@ fn Decoder157<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder160(scope, input))? };
+    let terminator = { (Decoder161(scope, input))? };
     (Some(Type14 {
         separator,
         label,
@@ -11252,7 +10816,7 @@ fn Decoder157<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder158<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type15> {
+fn Decoder159<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type15> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -11286,7 +10850,7 @@ fn Decoder158<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder159(scope, input))?;
+                let next_elem = (Decoder160(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -11294,7 +10858,7 @@ fn Decoder158<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder160(scope, input))? };
+    let terminator = { (Decoder161(scope, input))? };
     (Some(Type15 {
         separator,
         label,
@@ -11303,7 +10867,7 @@ fn Decoder158<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder159<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
+fn Decoder160<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type7> {
     let len_bytes = {
         let b = (input.read_byte())?;
         if (b != 0) {
@@ -11322,7 +10886,7 @@ fn Decoder159<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     (Some(Type7 { len_bytes, data }))
 }
 
-fn Decoder160<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
+fn Decoder161<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<u8> {
     let b = (input.read_byte())?;
     (Some(if (b == 0) {
         b
@@ -11331,7 +10895,7 @@ fn Decoder160<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder161<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
+fn Decoder162<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type5> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -11359,7 +10923,7 @@ fn Decoder161<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     let flags = { (Decoder17(scope, input))? };
     let delay_time = { (Decoder135(scope, input))? };
     let transparent_color_index = { (Decoder17(scope, input))? };
-    let terminator = { (Decoder160(scope, input))? };
+    let terminator = { (Decoder161(scope, input))? };
     (Some(Type5 {
         separator,
         label,
@@ -11371,7 +10935,7 @@ fn Decoder161<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder162<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
+fn Decoder163<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type12> {
     let tree_index = {
         let lookahead = &mut (input.clone());
         let b = (lookahead.read_byte())?;
@@ -11387,12 +10951,12 @@ fn Decoder162<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     };
     (Some(match tree_index {
         0 => {
-            let inner = (Decoder163(scope, input))?;
+            let inner = (Decoder164(scope, input))?;
             (Type12::table_based_image(inner))
         }
 
         1 => {
-            let inner = (Decoder164(scope, input))?;
+            let inner = (Decoder165(scope, input))?;
             (Type12::plain_text_extension(inner))
         }
 
@@ -11402,15 +10966,15 @@ fn Decoder162<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder163<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type11> {
-    let descriptor = { (Decoder165(scope, input))? };
+fn Decoder164<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type11> {
+    let descriptor = { (Decoder166(scope, input))? };
     let local_color_table = {
         match (descriptor.flags & 128 != 0) {
             true => {
                 let inner = {
                     let mut accum = (Vec::new());
                     for _ in 0..(2 << (descriptor.flags & 7)) {
-                        (accum.push((Decoder166(scope, input))?));
+                        (accum.push((Decoder167(scope, input))?));
                     }
                     accum
                 };
@@ -11427,7 +10991,7 @@ fn Decoder163<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             }
         }
     };
-    let data = { (Decoder167(scope, input))? };
+    let data = { (Decoder168(scope, input))? };
     (Some(Type11 {
         descriptor,
         local_color_table,
@@ -11435,7 +10999,7 @@ fn Decoder163<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder164<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
+fn Decoder165<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type8> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 33) {
@@ -11485,7 +11049,7 @@ fn Decoder164<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder159(scope, input))?;
+                let next_elem = (Decoder160(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -11493,7 +11057,7 @@ fn Decoder164<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder160(scope, input))? };
+    let terminator = { (Decoder161(scope, input))? };
     (Some(Type8 {
         separator,
         label,
@@ -11511,7 +11075,7 @@ fn Decoder164<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder165<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
+fn Decoder166<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type9> {
     let separator = {
         let b = (input.read_byte())?;
         if (b == 44) {
@@ -11535,14 +11099,14 @@ fn Decoder165<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder166<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type2> {
+fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type2> {
     let r = { (Decoder17(scope, input))? };
     let g = { (Decoder17(scope, input))? };
     let b = { (Decoder17(scope, input))? };
     (Some(Type2 { r, g, b }))
 }
 
-fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type10> {
+fn Decoder168<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type10> {
     let lzw_min_code_size = { (Decoder17(scope, input))? };
     let image_data = {
         let mut accum = (Vec::new());
@@ -11561,7 +11125,7 @@ fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                 }
             };
             if (matching_ix == 0) {
-                let next_elem = (Decoder159(scope, input))?;
+                let next_elem = (Decoder160(scope, input))?;
                 (accum.push(next_elem));
             } else {
                 break;
@@ -11569,7 +11133,7 @@ fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
         }
         accum
     };
-    let terminator = { (Decoder160(scope, input))? };
+    let terminator = { (Decoder161(scope, input))? };
     (Some(Type10 {
         lzw_min_code_size,
         image_data,
@@ -11577,7 +11141,7 @@ fn Decoder167<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
     }))
 }
 
-fn Decoder168<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type1> {
+fn Decoder169<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Option<Type1> {
     let screen_width = { (Decoder135(scope, input))? };
     let screen_height = { (Decoder135(scope, input))? };
     let flags = { (Decoder17(scope, input))? };

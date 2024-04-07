@@ -273,8 +273,8 @@
 │           │   │               │   │           ├── length <- compute 4 + as-u16 length-extra-bits := 4
 │           │   │               │   │           ├── distance-code <- apply := 27
 │           │   │               │   │           └── distance-record <- deflate.distance-record(...) :=
-│           │   │               │   │               ├── distance-extra-bits <- map (bits -> as-u16 (bits.11) << 11 | as-u16 (bits.10) << 10 | as-u16 (bits.9) << 9 | as-u16 (bits.8) << 8 | as-u16 (bits.7) << 7 | as-u16 (bits.6) << 6 | as-u16 (bits.5) << 5 | as-u16 (bits.4) << 4 | as-u16 (bits.3) << 3 | as-u16 (bits.2) << 2 | as-u16 (bits.1) << 1 | as-u16 (bits.0)) (...) := 830
-│           │   │               │   │               └── distance <- compute 12289 + distance-extra-bits := 13119
+│           │   │               │   │               ├── distance-extra-bits <- match extra-bits { ... } := 830
+│           │   │               │   │               └── distance <- compute start + distance-extra-bits := 13119
 │           │   │               │   ├── 6 :=
 │           │   │               │   │   ├── code <- apply := 54
 │           │   │               │   │   └── extra <- match code { ... } := { none := () }
@@ -286,8 +286,8 @@
 │           │   │               │   │           ├── length <- compute 3 + as-u16 length-extra-bits := 3
 │           │   │               │   │           ├── distance-code <- apply := 20
 │           │   │               │   │           └── distance-record <- deflate.distance-record(...) :=
-│           │   │               │   │               ├── distance-extra-bits <- map (bits -> as-u16 (bits.8) << 8 | as-u16 (bits.7) << 7 | as-u16 (bits.6) << 6 | as-u16 (bits.5) << 5 | as-u16 (bits.4) << 4 | as-u16 (bits.3) << 3 | as-u16 (bits.2) << 2 | as-u16 (bits.1) << 1 | as-u16 (bits.0)) (...) := 239
-│           │   │               │   │               └── distance <- compute 1025 + distance-extra-bits := 1264
+│           │   │               │   │               ├── distance-extra-bits <- match extra-bits { ... } := 239
+│           │   │               │   │               └── distance <- compute start + distance-extra-bits := 1264
 │           │   │               │   ├── 8 :=
 │           │   │               │   │   ├── code <- apply := 57
 │           │   │               │   │   └── extra <- match code { ... } := { none := () }
