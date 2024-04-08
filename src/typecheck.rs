@@ -2207,14 +2207,20 @@ impl TypeChecker {
         match f {
             Format::ItemVar(level, args) => {
                 let newvar = self.get_new_uvar();
-                if !args.is_empty() {
+                let level_var = if !args.is_empty() {
+                    let mut argscope = UMultiScope::new(ctxt.scope);
                     let expected = ctxt.module.get_args(*level);
-                    for ((_lbl, vt), arg) in Iterator::zip(expected.iter(), args.iter()) {
+                    for ((lbl, vt), arg) in Iterator::zip(expected.iter(), args.iter()) {
                         let v_arg = self.infer_var_expr(arg, ctxt.scope)?;
+                        argscope.push(lbl.clone(), v_arg);
                         self.unify_var_valuetype(v_arg, vt)?;
                     }
-                }
-                let level_var = self.infer_var_format_level(*level, ctxt)?;
+                    let newscope = UScope::Multi(&argscope);
+                    let newctxt = ctxt.with_scope(&newscope);
+                    self.infer_var_format_level(*level, newctxt)?
+                } else {
+                   self.infer_var_format_level(*level, ctxt)?
+                };
                 self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)
             }
