@@ -2219,7 +2219,7 @@ impl TypeChecker {
                     let newctxt = ctxt.with_scope(&newscope);
                     self.infer_var_format_level(*level, newctxt)?
                 } else {
-                   self.infer_var_format_level(*level, ctxt)?
+                    self.infer_var_format_level(*level, ctxt)?
                 };
                 self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)

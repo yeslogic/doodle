@@ -90,12 +90,13 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
 
-            TypedFormat::Compute(_, _)
-            | TypedFormat::EndOfInput
-            | TypedFormat::Fail => Bounds::exact(0),
+            TypedFormat::Compute(_, _) | TypedFormat::EndOfInput | TypedFormat::Fail => {
+                Bounds::exact(0)
+            }
 
-            | TypedFormat::Peek(_, inner)
-            | TypedFormat::PeekNot(_, inner) => inner.lookahead_bounds(),
+            TypedFormat::Peek(_, inner) | TypedFormat::PeekNot(_, inner) => {
+                inner.lookahead_bounds()
+            }
 
             TypedFormat::Align(n) => Bounds::new(0, Some(n - 1)),
             TypedFormat::Byte(_) => Bounds::exact(1),
@@ -130,7 +131,9 @@ impl TypedFormat<GenType> {
 
             TypedFormat::Bits(_, f) => f.lookahead_bounds().bits_to_bytes(),
 
-            TypedFormat::WithRelativeOffset(_, offset_expr, inner) => offset_expr.bounds() + inner.lookahead_bounds(),
+            TypedFormat::WithRelativeOffset(_, offset_expr, inner) => {
+                offset_expr.bounds() + inner.lookahead_bounds()
+            }
 
             TypedFormat::Map(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
@@ -143,7 +146,6 @@ impl TypedFormat<GenType> {
                 .unwrap(),
 
             TypedFormat::Apply(_, _, _) => Bounds::new(1, None),
-
         }
     }
 
@@ -205,8 +207,6 @@ impl TypedFormat<GenType> {
             TypedFormat::Apply(_, _, _) => Bounds::new(1, None),
         }
     }
-
-
 
     pub(crate) fn is_nullable(&self) -> bool {
         self.match_bounds().min == 0

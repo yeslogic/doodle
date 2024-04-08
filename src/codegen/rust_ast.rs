@@ -346,8 +346,12 @@ impl ToFragment for RustType {
             }
             RustType::AnonTuple(args) => {
                 let inner = args.iter().map(|elt| elt.to_fragment());
-                Fragment::seq(inner, Some(Fragment::string(", ")))
-                    .delimit(Fragment::Char('('), Fragment::Char(')'))
+                let mut elems = Fragment::seq(inner, Some(Fragment::string(", ")));
+                // NOTE - Rust 1-tuples need an explicit ',' after the sole element
+                if args.len() == 1 {
+                    elems.encat(Fragment::Char(','));
+                }
+                elems.delimit(Fragment::Char('('), Fragment::Char(')'))
             }
             RustType::Verbatim(con, params) => con.to_fragment().cat(params.to_fragment()),
             RustType::SelfType => Fragment::string("Self"),
@@ -1071,7 +1075,12 @@ impl ToFragmentExt for RustExpr {
                 prec,
                 Precedence::FUNAPP,
             ),
-            RustExpr::Tuple(elts) => Self::paren_list(elts),
+            RustExpr::Tuple(elts) => match elts.as_slice() {
+                [elt] => elt
+                    .to_fragment_precedence(Precedence::Top)
+                    .delimit(Fragment::Char('('), Fragment::string(",)")),
+                _ => Self::paren_list(elts),
+            },
             RustExpr::Struct(con, fields) => {
                 let f_fields = Fragment::seq(
                     fields.iter().map(|(lab, expr)| {
