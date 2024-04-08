@@ -7457,9 +7457,9 @@ fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (11 + (length_extra_bits as u16)) };
                                 let distance_code = {
@@ -7495,9 +7495,9 @@ fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (13 + (length_extra_bits as u16)) };
                                 let distance_code = {
@@ -7533,9 +7533,9 @@ fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (15 + (length_extra_bits as u16)) };
                                 let distance_code = {
@@ -7571,9 +7571,9 @@ fn Decoder147<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (17 + (length_extra_bits as u16)) };
                                 let distance_code = {
@@ -9118,9 +9118,9 @@ fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (11 + (length_extra_bits as u16)) };
                                 let distance_code = { (distance_alphabet_format(scope, input))? };
@@ -9140,9 +9140,9 @@ fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (13 + (length_extra_bits as u16)) };
                                 let distance_code = { (distance_alphabet_format(scope, input))? };
@@ -9162,9 +9162,9 @@ fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (15 + (length_extra_bits as u16)) };
                                 let distance_code = { (distance_alphabet_format(scope, input))? };
@@ -9184,9 +9184,9 @@ fn Decoder148<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
                                 let length_extra_bits = {
                                     let inner = {
                                         let field0 = { (Decoder145(scope, input))? };
-                                        (field0)
+                                        (field0,)
                                     };
-                                    ((|bits: (u8)| bits.0)(inner))
+                                    ((|bits: (u8,)| bits.0)(inner))
                                 };
                                 let length = { (17 + (length_extra_bits as u16)) };
                                 let distance_code = { (distance_alphabet_format(scope, input))? };
@@ -10180,9 +10180,9 @@ fn Decoder150<'input>(scope: &mut Scope, input: &mut ParseCtxt<'input>) -> Optio
             1 => {
                 let inner = {
                     let field0 = { (Decoder145(scope, input))? };
-                    (field0)
+                    (field0,)
                 };
-                ((|bits: (u8)| bits.0 as u16)(inner))
+                ((|bits: (u8,)| bits.0 as u16)(inner))
             }
 
             2 => {
