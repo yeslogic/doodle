@@ -1242,8 +1242,69 @@ pub(crate) enum RustControl {
     While(RustExpr, Vec<RustStmt>),
     ForRange0(Label, RustExpr, Vec<RustStmt>), // index variable name, upper bound (exclusive), loop contents (0..N)
     If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),
-    Match(RustExpr, Vec<(MatchCaseLHS, Vec<RustStmt>)>),
+    Match(RustExpr, RustMatchBody),
     Break, // no support for break values or loop labels, yet
+}
+
+pub(crate) type RustMatchCase = (MatchCaseLHS, Vec<RustStmt>);
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustCatchAll {
+    PanicUnreachable { message: Label },
+    ReturnErrorValue { value: RustExpr },
+}
+
+impl RustCatchAll {
+    pub fn to_match_case(&self) -> RustMatchCase {
+        match self {
+            RustCatchAll::PanicUnreachable { message } => (
+                MatchCaseLHS::Pattern(RustPattern::CatchAll(Some(Label::Borrowed("_other")))),
+                [RustStmt::Expr(RustExpr::local("unreachable!").call_with([
+                    RustExpr::str_lit(format!(
+                        "{message}match refuted with unexpected value {{_other:?}}"
+                    )),
+                ]))]
+                .to_vec(),
+            ),
+            RustCatchAll::ReturnErrorValue { value } => (
+                MatchCaseLHS::Pattern(RustPattern::CatchAll(None)),
+                [RustStmt::Return(ReturnKind::Keyword, value.clone())].to_vec(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum RustMatchBody {
+    Irrefutable(Vec<RustMatchCase>),
+    Refutable(Vec<RustMatchCase>, RustCatchAll),
+}
+
+impl ToFragment for RustMatchBody {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustMatchBody::Irrefutable(cases) => {
+                <RustMatchCase>::block_sep(cases, Fragment::string(",\n"))
+            }
+            RustMatchBody::Refutable(cases, catchall) => <RustMatchCase>::block_sep(
+                cases
+                    .iter()
+                    .chain(std::iter::once(&catchall.to_match_case())),
+                Fragment::string(",\n"),
+            ),
+        }
+    }
+}
+
+impl From<Vec<RustMatchCase>> for RustMatchBody {
+    fn from(value: Vec<RustMatchCase>) -> Self {
+        RustMatchBody::Refutable(
+            value,
+            RustCatchAll::ReturnErrorValue {
+                value: RustExpr::scoped(["ParseError"], "ExcludedBranch"),
+            },
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1334,12 +1395,9 @@ impl ToFragment for RustControl {
                     Fragment::string(" else "),
                     Fragment::opt(b_else.as_ref(), |branch| RustStmt::block(branch.iter())),
                 ),
-            Self::Match(expr, cases) => Fragment::string("match")
+            Self::Match(expr, body) => Fragment::string("match")
                 .intervene(Fragment::Char(' '), expr.to_fragment())
-                .intervene(
-                    Fragment::Char(' '),
-                    <(MatchCaseLHS, Vec<RustStmt>)>::block_sep(cases, Fragment::string(",\n")),
-                ),
+                .intervene(Fragment::Char(' '), body.to_fragment()),
             Self::ForRange0(ctr_name, ubound, body) => Fragment::string("for")
                 .intervene(Fragment::Char(' '), Fragment::String(ctr_name.clone()))
                 .intervene(

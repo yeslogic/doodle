@@ -194,7 +194,9 @@ impl Codegen {
                                                 // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
                                                 match &typs[0] {
                                                     RustType::AnonTuple(..) => {
-                                                        let cl_mono_tuple = self.translate(inner.get_dec());
+                                                        let cl_mono_tuple = self.translate(
+                                                            inner.get_dec()
+                                                        );
                                                         CaseLogic::Derived(
                                                             DerivedLogic::VariantOf(
                                                                 constr,
@@ -347,7 +349,10 @@ impl Codegen {
 
             TypedDecoder::Until(_gt, tree_break, single) =>
                 CaseLogic::Repeat(
-                    RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(self.translate(single.get_dec())))
+                    RepeatLogic::BreakOnMatch(
+                        tree_break.clone(),
+                        Box::new(self.translate(single.get_dec()))
+                    )
                 ),
 
             TypedDecoder::RepeatCount(_gt, expr_count, single) =>
@@ -360,14 +365,14 @@ impl Codegen {
             TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionTerminal(
-                        embed_lambda_t(pred_terminal, ClosureKind::Predicate),
+                        embed_lambda_t(pred_terminal, ClosureKind::Predicate, true),
                         Box::new(self.translate(single.get_dec()))
                     )
                 ),
             TypedDecoder::RepeatUntilSeq(_gt, pred_complete, single) => {
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionComplete(
-                        embed_lambda_t(pred_complete, ClosureKind::Predicate),
+                        embed_lambda_t(pred_complete, ClosureKind::Predicate, true),
                         Box::new(self.translate(single.get_dec()))
                     )
                 )
@@ -376,7 +381,7 @@ impl Codegen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::MapOf(
-                        embed_lambda_t(f, ClosureKind::Transform),
+                        embed_lambda_t(f, ClosureKind::Transform, true),
                         Box::new(cl_inner)
                     )
                 )
@@ -405,7 +410,8 @@ impl Codegen {
                         self.translate(dec.get_dec()),
                     ));
                 }
-                CaseLogic::Other(OtherLogic::ExprMatch(head, cl_cases))
+                let ck = refutability_check(scrutinee.get_type().expect("bad lambda in scrutinee position").as_ref(), cases);
+                CaseLogic::Other(OtherLogic::ExprMatch(head, cl_cases, ck))
             }
             TypedDecoder::Dynamic(_t, name, f_dyn, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
@@ -572,26 +578,28 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
                 ) => scrutinized.call_method("as_ref"),
                 _ => scrutinized,
             };
-            RustExpr::Control(
-                Box::new(
-                    RustControl::Match(
-                        head,
-                            cases
-                                .iter()
-                                .map(|(pat, rhs)| {
-                                    (
-                                        MatchCaseLHS::Pattern(embed_pattern_t(pat)),
-                                        vec![
-                                            RustStmt::Return(
-                                                ReturnKind::Implicit,
-                                                embed_expr_t(rhs)
-                                            )
-                                        ],
-                                    )
-                                }).collect()
+            let ck = refutability_check(
+                &*scrutinee.get_type().expect("unexpected lambda in match-scrutinee position"),
+                cases
+            );
+
+            let rust_cases = cases
+                .iter()
+                .map(|(pat, rhs)| {
+                    (
+                        MatchCaseLHS::Pattern(embed_pattern_t(pat)),
+                        vec![RustStmt::Return(ReturnKind::Implicit, embed_expr_t(rhs))],
                     )
-                )
-            )
+                })
+                .collect::<Vec<RustMatchCase>>();
+            let rust_body = match ck {
+                Refutability::Refutable | Refutability::Indeterminate =>
+                    RustMatchBody::Refutable(rust_cases, RustCatchAll::ReturnErrorValue {
+                        value: RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch")),
+                    }),
+                Refutability::Irrefutable => RustMatchBody::Irrefutable(rust_cases),
+            };
+            RustExpr::Control(Box::new(RustControl::Match(head, rust_body)))
         }
         TypedExpr::Tuple(_t, tup) => RustExpr::Tuple(tup.iter().map(embed_expr_t).collect()),
         TypedExpr::TupleProj(_, expr_tup, ix) => embed_expr_t(expr_tup).nth(*ix),
@@ -664,18 +672,19 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
             )
         }
         TypedExpr::FlatMap(_, f, seq) =>
-            embed_expr_t(seq)
+            RustExpr::local("try_flat_map_vec").call_with([
+                embed_expr_t(seq)
                 .call_method("iter")
                 .call_method("cloned")
-                .call_method_with("flat_map", [embed_lambda_t(f, ClosureKind::Transform)])
-                .call_method("collect"),
+                ,
+                embed_lambda_t(f, ClosureKind::Transform, false)]),
         TypedExpr::FlatMapAccum(_, f, acc_init, _acc_type, seq) =>
             embed_expr_t(seq)
                 .call_method("iter")
                 .call_method("cloned")
-                .call_method_with("fold", [
+                .call_method_with("try_fold", [
                     embed_expr_t(acc_init),
-                    embed_lambda_t(f, ClosureKind::Transform),
+                    embed_lambda_t(f, ClosureKind::Transform, true),
                 ])
                 .call_method("collect"),
         TypedExpr::Dup(_, n, expr) => {
@@ -703,13 +712,241 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Ord, Eq, Default)]
+enum Refutability {
+    Refutable,
+    #[default]
+    Indeterminate,
+    Irrefutable,
+}
+
+impl Refutability {
+    fn and(self, other: Self) -> Self {
+        Ord::min(self, other)
+    }
+
+    fn or(self, other: Self) -> Self {
+        Ord::max(self, other)
+    }
+}
+
+fn refutability_check<A: std::fmt::Debug>(
+    head_type: &GenType,
+    cases: &[(TypedPattern<GenType>, A)],
+) -> Refutability {
+    if contains_irrefutable_pattern(cases) {
+        return Refutability::Irrefutable;
+    }
+    match head_type {
+        GenType::Inline(rt) =>
+            match rt {
+                RustType::Atom(at) =>
+                    match at {
+                        AtomType::TypeRef(lt) =>
+                            match lt {
+                                LocalType::LocalDef(ix, lbl) =>
+                                    unreachable!(
+                                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Defined instead"
+                                    ),
+                                LocalType::External(t) =>
+                                    unreachable!(
+                                        "external type '{t}' cannot be resolved without further information"
+                                    ),
+                            }
+                        AtomType::Prim(pt) =>
+                            match pt {
+                                PrimType::Unit => {
+                                    if cases.is_empty() {
+                                        Refutability::Refutable
+                                    } else {
+                                        Refutability::Irrefutable
+                                    }
+                                }
+                                // these cases have too many values to practically cover...
+                                | PrimType::U8
+                                | PrimType::U16
+                                | PrimType::U32
+                                | PrimType::U64
+                                | PrimType::Char => Refutability::Indeterminate,
+                                //
+                                PrimType::Bool => {
+                                    // mask for inclusion with indices 0: false, 1: true
+                                    let mut cover_mask = [false, false];
+                                    for (pat, _) in cases {
+                                        match pat {
+                                            TypedPattern::Bool(b) => {
+                                                let ix = if *b { 1 } else { 0 };
+                                                cover_mask[ix] = true;
+                                            }
+                                            _ => {
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    if cover_mask[0] && cover_mask[1] {
+                                        Refutability::Irrefutable
+                                    } else {
+                                        Refutability::Refutable
+                                    }
+                                }
+                                // any match on usize is only exhaustive with a catch-all, which we have precluded above
+                                PrimType::Usize => Refutability::Refutable,
+                            }
+                        AtomType::Comp(ct) =>
+                            match ct {
+                                CompType::Vec(_) => Refutability::Refutable, // vecs can have any length, so no match can be exhaustive without catchalls
+                                CompType::Option(_inner_t) => {
+                                    // only bother with (None | Some(_)), without recursing into sub-patterns
+                                    // mask for inclusion with indices 0: None, 1: Some(_)
+                                    let mut cover_mask = [false, false];
+                                    for (pat, _) in cases {
+                                        match pat {
+                                            TypedPattern::Variant(_, lab, pat) => {
+                                                match &**lab {
+                                                    "Some" => if is_pattern_irrefutable(pat) {
+                                                        cover_mask[1] = true;
+                                                    } else {
+                                                        continue;
+                                                    }
+                                                    "None" => {
+                                                        cover_mask[0] = true;
+                                                        continue;
+                                                    }
+                                                    _other =>
+                                                        unreachable!(
+                                                            "only some and none are allowed as Option, found {_other}"
+                                                        ),
+                                                }
+                                            }
+                                            _ =>
+                                                unreachable!(
+                                                    "the only non-variant patterns allowed would be picked up by contains_irrefutable_pattern"
+                                                ),
+                                        }
+                                    }
+                                    if cover_mask[0] && cover_mask[1] {
+                                        Refutability::Irrefutable
+                                    } else {
+                                        Refutability::Indeterminate
+                                    }
+                                }
+                                CompType::Box(t) =>
+                                    unreachable!("unexpected box in pattern head-type"),
+                                CompType::Result(_, _) => todo!(),
+                                CompType::Borrow(_, _, t) => {
+                                    refutability_check(&GenType::Inline((&**t).clone()), cases)
+                                }
+                                CompType::Slice(_, _, _) => {
+                                    Refutability::Refutable // without fill-patterns, we cannot account for every possible slice-length
+                                }
+                                CompType::Array(t, n) => {
+                                    // we assume that we will not cover all cases through cartesian product rather than having a single irrefutable pattern included
+                                    // e.g. [true, false] | [false, true] | [false, false] | [true, true] rather than [Binding | Wildcard, Binding | Wildcard]
+                                    // this also doesn't account for [true, x] | [false, x] for [bool; 2]. So this is a best-effort, admittedly
+                                    for (pat, _) in cases {
+                                        match pat {
+                                            TypedPattern::Seq(_, ps) => {
+                                                if
+                                                    ps.len() == *n &&
+                                                    ps.iter().all(is_pattern_irrefutable)
+                                                {
+                                                    return Refutability::Irrefutable;
+                                                }
+                                            }
+                                            _ => {
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                    Refutability::Indeterminate
+                                }
+                            }
+                    }
+                RustType::AnonTuple(ts) => {
+                    // we have already checked in contains_irrefutable_pattern that there is no (_x0, ..., _xN) pattern
+                    if ts.is_empty() && !cases.is_empty() {
+                        Refutability::Irrefutable
+                    } else {
+                        Refutability::Indeterminate
+                    }
+                }
+                RustType::Generic(_) =>
+                    unreachable!("generic type-params not expected in generated match-expressions"),
+                RustType::Verbatim(_, _) =>
+                    unreachable!("verbatim types not expected in generated match-expressions"),
+                RustType::ImplTrait(_) =>
+                    unreachable!("impl-types not expected in generated match-expressions"),
+                RustType::SelfType =>
+                    unreachable!("self-type cannot be used in a simple free-function"),
+            }
+        GenType::Def(_ixlb, def) => {
+            match def {
+                RustTypeDef::Enum(vars) => {
+                    // bad things happen when we try to break up the type, so err on the side of caution
+                    let mut variant_coverage : HashMap<Label, Refutability> = HashMap::from_iter(vars.iter().map(|x| (x.get_label().clone(), Refutability::Refutable) ));
+                    for (pat, _) in cases {
+                        match pat {
+                            TypedPattern::Variant(_, vname, inner_pat) => {
+                                let entry = variant_coverage.entry(vname.clone());
+
+                                if is_pattern_irrefutable(inner_pat) {
+                                    entry.and_modify(|prior| *prior = prior.or(Refutability::Irrefutable));
+                                } else {
+                                    entry.and_modify(|prior| *prior = prior.or(Refutability::Indeterminate));
+                                }
+                            }
+                            _ => continue,
+                        }
+                    }
+                    variant_coverage.values().cloned().reduce(Refutability::and).unwrap()
+                }
+                RustTypeDef::Struct(st) => {
+                    unreachable!("there are no patterns that match simple structures in place: {st:?}, {cases:#?}");
+                }
+            }
+        }
+    }
+}
+
+fn is_pattern_irrefutable(pat: &TypedPattern<GenType>) -> bool {
+    match pat {
+        TypedPattern::Binding(..) | TypedPattern::Wildcard(..) => true,
+        TypedPattern::Tuple(_, elts) => elts.iter().all(is_pattern_irrefutable),
+        TypedPattern::Seq(..) => false, // there is no exhaustive pattern-set for sequences as they can have any length...
+        TypedPattern::Variant(gt, lab, inner) => {
+            // a variant pattern is irrefutable if there are no other variants and the inner expression is also irrefutable
+            is_pattern_irrefutable(inner)
+                && (match gt {
+                    GenType::Def(_, def) => match def {
+                        RustTypeDef::Enum(vars) => vars.len() == 1 && vars[0].get_label() == lab,
+                        _ => unreachable!("variant pattern will never match struct-typed value"),
+                    },
+                    GenType::Inline(RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(..)))) => {
+                        false
+                    } // we cannot identify mono-variants at this layer
+                    _ => unreachable!("variant pattern cannot match non-LocalDef type"),
+                })
+        }
+        _ => false, // all the other cases are prim-types that cover only one of N > 1 possible values
+    }
+}
+
+fn contains_irrefutable_pattern<A>(head_cases: &[(TypedPattern<GenType>, A)]) -> bool {
+    for (pat, _) in head_cases {
+        if is_pattern_irrefutable(pat) {
+            return true;
+        }
+    }
+    false
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ClosureKind {
     Predicate,
     Transform,
 }
 
-fn embed_lambda_t(expr: &GTExpr, kind: ClosureKind) -> RustExpr {
+fn embed_lambda_t(expr: &GTExpr, kind: ClosureKind, needs_ok: bool) -> RustExpr {
     match expr {
         TypedExpr::Lambda((head_t, _), head, body) => match kind {
             ClosureKind::Predicate => {
@@ -723,7 +960,11 @@ fn embed_lambda_t(expr: &GTExpr, kind: ClosureKind) -> RustExpr {
                 RustExpr::Paren(Box::new(RustExpr::Closure(RustClosure::new_transform(
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
-                    embed_expr_t(body),
+                    if needs_ok {
+                        RustExpr::scoped(["PResult"], "Ok").call_with([embed_expr_t(body)])
+                    } else {
+                        embed_expr_t(body)
+                    },
                 ))))
             }
         },
@@ -860,8 +1101,7 @@ impl SimpleLogic<GTExpr> {
                     let b_true = vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::local("b"))];
                     let b_false = vec![RustStmt::Return(
                         ReturnKind::Keyword,
-                        RustExpr::local("Err")
-                            .call_with([RustExpr::scoped(["ParseError"], "ExcludedBranch")]),
+                        RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch")),
                     )];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
@@ -1058,7 +1298,11 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 }
             }
         }
-        let matchblock = RustControl::Match(RustExpr::local("b"), add_error_catchall(cases));
+        let value = RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch"));
+        let matchblock = RustControl::Match(
+            RustExpr::local("b"),
+            RustMatchBody::Refutable(cases, RustCatchAll::ReturnErrorValue { value }),
+        );
         (vec![bind], Some(RustExpr::Control(Box::new(matchblock))))
     }
 
@@ -1361,7 +1605,6 @@ where
                     );
                     let cond = cpred
                         .clone()
-                        .call()
                         .call_with([RustExpr::Borrow(Box::new(RustExpr::local("accum")))]);
                     let b_terminal = [RustStmt::Control(RustControl::Break)].to_vec();
                     let escape_clause = RustControl::If(cond, b_terminal, None);
@@ -1470,7 +1713,11 @@ where
 #[derive(Clone, Debug)]
 enum OtherLogic<ExprT> {
     Descend(MatchTree, Vec<CaseLogic<ExprT>>),
-    ExprMatch(RustExpr, Vec<(MatchCaseLHS, CaseLogic<ExprT>)>),
+    ExprMatch(
+        RustExpr,
+        Vec<(MatchCaseLHS, CaseLogic<ExprT>)>,
+        Refutability,
+    ),
 }
 
 fn add_panic_catchall(
@@ -1524,13 +1771,17 @@ where
                     ));
                 }
                 let bind = RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt));
+                let fallthrough = RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch"));
                 let ret = RustExpr::Control(Box::new(RustControl::Match(
                     RustExpr::local("tree_index"),
-                    branches,
+                    RustMatchBody::Refutable(
+                        branches,
+                        RustCatchAll::ReturnErrorValue { value: fallthrough },
+                    ),
                 )));
                 (vec![bind], Some(ret))
             }
-            OtherLogic::ExprMatch(expr, cases) => {
+            OtherLogic::ExprMatch(expr, cases, ck) => {
                 let mut branches = Vec::new();
                 for (lhs, logic) in cases.iter() {
                     let (mut rhs, o_val) = logic.to_ast(ctxt);
@@ -1539,10 +1790,19 @@ where
                     }
                     branches.push((lhs.clone(), rhs));
                 }
-                let ret = RustExpr::Control(Box::new(RustControl::Match(
-                    expr.clone(),
-                    add_panic_catchall(branches),
-                )));
+
+                let mbody = match ck {
+                    Refutability::Refutable | Refutability::Indeterminate => {
+                        RustMatchBody::Refutable(
+                            branches,
+                            RustCatchAll::PanicUnreachable {
+                                message: Label::from("ExprMatch refuted: "),
+                            },
+                        )
+                    }
+                    Refutability::Irrefutable => RustMatchBody::Irrefutable(branches),
+                };
+                let ret = RustExpr::Control(Box::new(RustControl::Match(expr.clone(), mbody)));
                 (vec![], Some(ret))
             }
         }
@@ -1597,7 +1857,7 @@ where
                             [RustStmt::assign_mut("f_tmp", thunk)].to_vec(),
                             Box::new(RustExpr::Control(Box::new(RustControl::Match(
                                 RustExpr::local("f_tmp").call(),
-                                vec![
+                                RustMatchBody::Irrefutable(vec![
                                     (
                                         MatchCaseLHS::Pattern(RustPattern::Variant(
                                             Constructor::Simple(Label::from("Ok")),
@@ -1607,7 +1867,8 @@ where
                                         )),
                                         [RustStmt::Return(
                                             ReturnKind::Keyword,
-                                            RustExpr::ok(RustExpr::local("inner")),
+                                            RustExpr::scoped(["PResult"], "Ok")
+                                                .call_with([RustExpr::local("inner")]),
                                         )]
                                         .to_vec(),
                                     ),
@@ -1620,7 +1881,7 @@ where
                                         )),
                                         [on_err].to_vec(),
                                     ),
-                                ],
+                                ]),
                             )))),
                         ))
                     }),
@@ -1720,7 +1981,7 @@ where
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
                 (
                     vec![assign_inner],
-                    Some(f.clone().call_with([RustExpr::local("inner")])),
+                    Some(f.clone().call_with([RustExpr::local("inner")]).wrap_try()),
                 )
             }
             DerivedLogic::Let(name, expr, inner) => {
@@ -1845,7 +2106,7 @@ where
             stmts.into_iter(),
             std::iter::once(RustStmt::Return(
                 ReturnKind::Implicit,
-                RustExpr::ok(ret.unwrap()),
+                RustExpr::scoped(["PResult"], "Ok").call_with([ret.unwrap()]),
             )),
         )
         .collect();
