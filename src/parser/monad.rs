@@ -129,7 +129,6 @@ mod example {
     use crate::codegen::{rust_ast::*, IxLabel, ProdCtxt};
     use crate::codegen::{Generator, ToAst};
     use crate::helper::*;
-    use crate::parser::error::PResult;
     use crate::{ByteSet, Expr, Format, FormatModule, FormatRef, Pattern};
 
     const VALID_ASCII: ByteSet = ByteSet::from_bits([u64::MAX, u64::MAX, 0, 0]);
@@ -353,35 +352,26 @@ mod example {
         }
 
         #[allow(non_snake_case)]
-        fn Decoder0<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<Type0> {
-            Ok(Decoder1(scope, input)?)
+        fn Decoder0<'input>(input: &mut ParseMonad<'input>) -> PResult<Type0> {
+            Decoder1(input)
         }
 
         #[allow(non_snake_case)]
-        fn Decoder1<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<Type0> {
+        fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> PResult<Type0> {
             // Branch #0
             input.start_alt();
-            match Decoder2(scope, input) {
+            match Decoder2(input) {
                 Ok(inner) => return Ok(Type0::ascii(inner)),
                 Err(_) => input.next_alt(true)?,
             }
-            match Decoder3(scope, input) {
+            match Decoder3(input) {
                 Ok(inner) => return Ok(Type0::utf8(inner)),
                 Err(e) => Err(e),
             }
         }
 
         #[allow(non_snake_case)]
-        fn Decoder2<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<Vec<u8>> {
+        fn Decoder2<'input>(input: &mut ParseMonad<'input>) -> PResult<Vec<u8>> {
             let mut accum = Vec::new();
             while input.remaining() > 0 {
                 let matching_ix = {
@@ -399,7 +389,7 @@ mod example {
                 if matching_ix == 0 {
                     break;
                 } else {
-                    let next_elem = Decoder6(scope, input)?;
+                    let next_elem = Decoder6(input)?;
                     accum.push(next_elem);
                 }
             }
@@ -408,10 +398,7 @@ mod example {
         }
 
         #[allow(non_snake_case)]
-        fn Decoder3<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<Vec<char>> {
+        fn Decoder3<'input>(input: &mut ParseMonad<'input>) -> PResult<Vec<char>> {
             let mut accum = Vec::new();
             while input.remaining() > 0 {
                 let matching_ix = {
@@ -452,7 +439,7 @@ mod example {
                 };
                 input.close_peek_context()?;
                 if matching_ix == 0 {
-                    let next_elem = Decoder4(scope, input)?;
+                    let next_elem = Decoder4(input)?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -463,10 +450,7 @@ mod example {
         }
 
         #[allow(non_snake_case, unreachable_patterns)]
-        fn Decoder4<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<char> {
+        fn Decoder4<'input>(input: &mut ParseMonad<'input>) -> PResult<char> {
             let inner = {
                 let tree_index = {
                     input.open_peek_context();
@@ -538,7 +522,7 @@ mod example {
                                 };
                                 (|raw: u8| raw & 31)(inner)
                             };
-                            let field1 = { Decoder5(scope, input)? };
+                            let field1 = { Decoder5(input)? };
                             (field0, field1)
                         };
                         (|bytes: (u8, u8)| match bytes {
@@ -604,7 +588,7 @@ mod example {
                                         };
                                         (|raw: u8| raw & 63)(inner)
                                     };
-                                    let field2 = { Decoder5(scope, input)? };
+                                    let field2 = { Decoder5(input)? };
                                     (field0, field1, field2)
                                 }
 
@@ -622,8 +606,8 @@ mod example {
                                         };
                                         (|raw: u8| raw & 15)(inner)
                                     };
-                                    let field1 = { Decoder5(scope, input)? };
-                                    let field2 = { Decoder5(scope, input)? };
+                                    let field1 = { Decoder5(input)? };
+                                    let field2 = { Decoder5(input)? };
                                     (field0, field1, field2)
                                 }
 
@@ -651,7 +635,7 @@ mod example {
                                         };
                                         (|raw: u8| raw & 63)(inner)
                                     };
-                                    let field2 = { Decoder5(scope, input)? };
+                                    let field2 = { Decoder5(input)? };
                                     (field0, field1, field2)
                                 }
 
@@ -669,8 +653,8 @@ mod example {
                                         };
                                         (|raw: u8| raw & 15)(inner)
                                     };
-                                    let field1 = { Decoder5(scope, input)? };
-                                    let field2 = { Decoder5(scope, input)? };
+                                    let field1 = { Decoder5(input)? };
+                                    let field2 = { Decoder5(input)? };
                                     (field0, field1, field2)
                                 }
 
@@ -736,8 +720,8 @@ mod example {
                                         };
                                         (|raw: u8| raw & 63)(inner)
                                     };
-                                    let field2 = { Decoder5(scope, input)? };
-                                    let field3 = { Decoder5(scope, input)? };
+                                    let field2 = { Decoder5(input)? };
+                                    let field3 = { Decoder5(input)? };
                                     (field0, field1, field2, field3)
                                 }
 
@@ -755,9 +739,9 @@ mod example {
                                         };
                                         (|raw: u8| raw & 7)(inner)
                                     };
-                                    let field1 = { Decoder5(scope, input)? };
-                                    let field2 = { Decoder5(scope, input)? };
-                                    let field3 = { Decoder5(scope, input)? };
+                                    let field1 = { Decoder5(input)? };
+                                    let field2 = { Decoder5(input)? };
+                                    let field3 = { Decoder5(input)? };
                                     (field0, field1, field2, field3)
                                 }
 
@@ -784,8 +768,8 @@ mod example {
                                         };
                                         (|raw: u8| raw & 63)(inner)
                                     };
-                                    let field2 = { Decoder5(scope, input)? };
-                                    let field3 = { Decoder5(scope, input)? };
+                                    let field2 = { Decoder5(input)? };
+                                    let field3 = { Decoder5(input)? };
                                     (field0, field1, field2, field3)
                                 }
 
@@ -817,10 +801,7 @@ mod example {
         }
 
         #[allow(non_snake_case, unused_variables)]
-        fn Decoder5<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<u8> {
+        fn Decoder5<'input>(input: &mut ParseMonad<'input>) -> PResult<u8> {
             let inner = {
                 let b = input.read_byte()?;
                 if ByteSet::from_bits([0, 0, 18446744073709551615, 0]).contains(b) {
@@ -833,10 +814,7 @@ mod example {
         }
 
         #[allow(non_snake_case, unused_variables)]
-        fn Decoder6<'input>(
-            scope: &mut Scope<'input>,
-            input: &mut ParseMonad<'input>,
-        ) -> PResult<u8> {
+        fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> PResult<u8> {
             let b = input.read_byte()?;
             Ok(
                 if ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0])
@@ -851,8 +829,7 @@ mod example {
 
         fn run_utf8_parse(buf: &[u8]) -> Result<String, ParseError> {
             let mut monad = ParseMonad::new(buf);
-            let mut scope = Scope::Empty;
-            Ok(String::from(Decoder0(&mut scope, &mut monad)?))
+            Ok(String::from(Decoder0(&mut monad)?))
         }
 
         assert_eq!(&run_utf8_parse("hello world".as_bytes())?, "hello world");

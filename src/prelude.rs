@@ -1,5 +1,4 @@
 pub use crate::byte_set::ByteSet;
-pub use crate::decoder::Scope;
 pub use crate::parser::{
     error::{PResult, ParseError},
     monad::ParseMonad,

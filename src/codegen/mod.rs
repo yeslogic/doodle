@@ -177,7 +177,7 @@ impl Codegen {
                                 CaseLogic::Derived(
                                     DerivedLogic::UnitVariantOf(
                                         constr,
-                                        Box::new(self.translate(inner))
+                                        Box::new(self.translate(inner.get_dec()))
                                     )
                                 )
                             }
@@ -187,14 +187,14 @@ impl Codegen {
                                         "unexpected Tuple-Variant with 0 positional arguments"
                                     );
                                 }
-                                match inner.as_ref() {
+                                match inner.get_dec() {
                                     TypedDecoder::Tuple(_, decs) => {
                                         if decs.len() != typs.len() {
                                             if typs.len() == 1 {
                                                 // REVIEW - allowance for 1-tuple variant whose argument type is itself an n-tuple
                                                 match &typs[0] {
                                                     RustType::AnonTuple(..) => {
-                                                        let cl_mono_tuple = self.translate(inner);
+                                                        let cl_mono_tuple = self.translate(inner.get_dec());
                                                         CaseLogic::Derived(
                                                             DerivedLogic::VariantOf(
                                                                 constr,
@@ -217,7 +217,7 @@ impl Codegen {
                                         } else {
                                             let mut cl_args = Vec::new();
                                             for dec in decs.iter() {
-                                                let cl_arg = self.translate(dec);
+                                                let cl_arg = self.translate(dec.get_dec());
                                                 cl_args.push(cl_arg);
                                             }
                                             CaseLogic::Sequential(SequentialLogic::AccumTuple {
@@ -228,7 +228,7 @@ impl Codegen {
                                     }
                                     _ => {
                                         if typs.len() == 1 {
-                                            let cl_mono = self.translate(inner);
+                                            let cl_mono = self.translate(inner.get_dec());
                                             CaseLogic::Derived(
                                                 DerivedLogic::VariantOf(constr, Box::new(cl_mono))
                                             )
@@ -241,7 +241,7 @@ impl Codegen {
                                 }
                             }
                             Some(RustVariant::Record(_, fields)) => {
-                                match inner.as_ref() {
+                                match inner.get_dec() {
                                     TypedDecoder::Record(_, inner_fields) => {
                                         let mut assocs = Vec::new();
                                         for (i, (l0, d)) in inner_fields.iter().enumerate() {
@@ -251,7 +251,7 @@ impl Codegen {
                                                 l1.as_ref(),
                                                 "Decoder field `{l0}` != RustTypeDef field `{l1}` (at index {i} in {decoder:?} | {tdef:?})"
                                             );
-                                            assocs.push((l0.clone(), self.translate(d)));
+                                            assocs.push((l0.clone(), self.translate(d.get_dec())));
                                         }
                                         CaseLogic::Sequential(SequentialLogic::AccumRecord {
                                             constructor: constr,
@@ -281,7 +281,7 @@ impl Codegen {
                     ParallelLogic::Alts(
                         alts
                             .iter()
-                            .map(|alt| self.translate(alt))
+                            .map(|alt| self.translate(alt.get_dec()))
                             .collect()
                     )
                 ),
@@ -291,7 +291,7 @@ impl Codegen {
                         tree.clone(),
                         flat
                             .iter()
-                            .map(|alt| self.translate(alt))
+                            .map(|alt| self.translate(alt.get_dec()))
                             .collect()
                     )
                 ),
@@ -302,7 +302,7 @@ impl Codegen {
                             constructor: None,
                             elements: elts
                                 .iter()
-                                .map(|elt| self.translate(elt))
+                                .map(|elt| self.translate(elt.get_dec()))
                                 .collect(),
                         })
                     }
@@ -324,7 +324,7 @@ impl Codegen {
                       ) => {
                         let mut assocs = Vec::new();
                         for (l0, d) in flds.iter() {
-                            assocs.push((l0.clone(), self.translate(d)));
+                            assocs.push((l0.clone(), self.translate(d.get_dec())));
                         }
                         CaseLogic::Sequential(SequentialLogic::AccumRecord {
                             constructor: Constructor::Simple(lab.clone()),
@@ -341,39 +341,39 @@ impl Codegen {
                 CaseLogic::Repeat(
                     RepeatLogic::ContinueOnMatch(
                         tree_continue.clone(),
-                        Box::new(self.translate(single))
+                        Box::new(self.translate(single.get_dec()))
                     )
                 ),
 
             TypedDecoder::Until(_gt, tree_break, single) =>
                 CaseLogic::Repeat(
-                    RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(self.translate(single)))
+                    RepeatLogic::BreakOnMatch(tree_break.clone(), Box::new(self.translate(single.get_dec())))
                 ),
 
             TypedDecoder::RepeatCount(_gt, expr_count, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ExactCount(
                         embed_expr_t(expr_count),
-                        Box::new(self.translate(single))
+                        Box::new(self.translate(single.get_dec()))
                     )
                 ),
             TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionTerminal(
                         embed_lambda_t(pred_terminal, ClosureKind::Predicate),
-                        Box::new(self.translate(single))
+                        Box::new(self.translate(single.get_dec()))
                     )
                 ),
             TypedDecoder::RepeatUntilSeq(_gt, pred_complete, single) => {
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionComplete(
                         embed_lambda_t(pred_complete, ClosureKind::Predicate),
-                        Box::new(self.translate(single))
+                        Box::new(self.translate(single.get_dec()))
                     )
                 )
             }
             TypedDecoder::Map(_gt, inner, f) => {
-                let cl_inner = self.translate(inner);
+                let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::MapOf(
                         embed_lambda_t(f, ClosureKind::Transform),
@@ -384,7 +384,7 @@ impl Codegen {
             TypedDecoder::Compute(_t, expr) =>
                 CaseLogic::Simple(SimpleLogic::Eval(embed_expr_t(expr))),
             TypedDecoder::Let(_t, name, expr, inner) => {
-                let cl_inner = self.translate(inner);
+                let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::Let(name.clone(), embed_expr_t(expr), Box::new(cl_inner))
                 )
@@ -402,13 +402,13 @@ impl Codegen {
                 for (pat, dec) in cases.iter() {
                     cl_cases.push((
                         MatchCaseLHS::Pattern(embed_pattern_t(pat)),
-                        self.translate(dec),
+                        self.translate(dec.get_dec()),
                     ));
                 }
                 CaseLogic::Other(OtherLogic::ExprMatch(head, cl_cases))
             }
             TypedDecoder::Dynamic(_t, name, f_dyn, inner) => {
-                let cl_inner = self.translate(inner);
+                let cl_inner = self.translate(inner.get_dec());
                 match f_dyn {
                     TypedDynFormat::Huffman(code_lengths, opt_values) => {
                         CaseLogic::Derived(
@@ -429,7 +429,7 @@ impl Codegen {
             }
             // FIXME - missing logic
             TypedDecoder::Peek(_t, inner) => {
-                let cl_inner = self.translate(inner);
+                let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Peek(Box::new(cl_inner)))
             }
             // FIXME - missing logic
@@ -437,7 +437,7 @@ impl Codegen {
                 CaseLogic::Unhandled("translate @ Decoder::PeekNot".into()),
             TypedDecoder::Slice(_t, width, inner) => {
                 let rexpr_width = embed_expr_t(width);
-                let cl_inner = self.translate(inner);
+                let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Slice(rexpr_width, Box::new(cl_inner)))
             }
             // FIXME - missing logic
@@ -576,7 +576,6 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
                 Box::new(
                     RustControl::Match(
                         head,
-                        add_error_catchall(
                             cases
                                 .iter()
                                 .map(|(pat, rhs)| {
@@ -589,8 +588,7 @@ fn embed_expr_t(expr: &TypedExpr<GenType>) -> RustExpr {
                                             )
                                         ],
                                     )
-                                })
-                        )
+                                }).collect()
                     )
                 )
             )
@@ -738,14 +736,12 @@ type RustBlock = (Vec<RustStmt>, Option<RustExpr>);
 #[derive(Clone, Copy)]
 pub(crate) struct ProdCtxt<'a> {
     input_varname: &'a Label,
-    scope_varname: &'a Label,
 }
 
 impl<'a> Default for ProdCtxt<'a> {
     fn default() -> Self {
         Self {
             input_varname: &Cow::Borrowed(""),
-            scope_varname: &Cow::Borrowed(""),
         }
     }
 }
@@ -786,13 +782,10 @@ macro_rules! impl_toast_caselogic {
     };
 }
 
-impl_toast_caselogic!(Expr, GTExpr);
+impl_toast_caselogic!(GTExpr);
 
-impl<ExprT> SimpleLogic<ExprT> {
-    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock
-    where
-        ExprT: Clone,
-    {
+impl SimpleLogic<GTExpr> {
+    fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
             SimpleLogic::Fail => (
                 vec![RustStmt::Return(
@@ -820,19 +813,25 @@ impl<ExprT> SimpleLogic<ExprT> {
                 )
             }
             // FIXME - not sure what should be done with _args
-            SimpleLogic::Invoke(ix_dec, _args) => {
+            SimpleLogic::Invoke(ix_dec, args) => {
                 let fname = format!("Decoder{ix_dec}");
-                let call = RustExpr::local(fname).call_with([
-                    RustExpr::local(ctxt.scope_varname.clone()),
-                    RustExpr::local(ctxt.input_varname.clone()),
-                ]);
+                let call_args = {
+                    let base_args = [RustExpr::local(ctxt.input_varname.clone())];
+                    if args.is_empty() {
+                        base_args.to_vec()
+                    } else {
+                        base_args
+                            .into_iter()
+                            .chain(args.iter().map(|(_lab, x)| embed_expr_t(x)))
+                            .collect()
+                    }
+                };
+                let call = RustExpr::local(fname).call_with(call_args);
                 (Vec::new(), Some(call.wrap_try()))
             }
             SimpleLogic::CallDynamic(dynf_name) => {
-                let call = RustExpr::local(dynf_name.clone()).call_with([
-                    RustExpr::local(ctxt.scope_varname.clone()),
-                    RustExpr::local(ctxt.input_varname.clone()),
-                ]);
+                let call = RustExpr::local(dynf_name.clone())
+                    .call_with([RustExpr::local(ctxt.input_varname.clone())]);
                 (Vec::new(), Some(call.wrap_try()))
             }
             SimpleLogic::SkipToNextMultiple(n) => {
@@ -1128,13 +1127,19 @@ where
         match self {
             EngineLogic::Slice(sz, cl_inner) => (
                 vec![
-                    RustStmt::assign("sz", sz.clone()),
+                    RustStmt::assign(
+                        Label::from("sz"),
+                        RustExpr::Operation(RustOp::AsCast(
+                            Box::new(sz.clone()),
+                            RustType::verbatim("usize", None),
+                        )),
+                    ),
                     RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone())
-                            .call_method_with("start_slice", [RustExpr::local("_sz")])
+                            .call_method_with("start_slice", [RustExpr::local("sz")])
                             .wrap_try(),
                     ),
-                    RustStmt::assign(
+                    RustStmt::assign_mut(
                         "ret",
                         abstracted_try_block(cl_inner.to_ast(ctxt))
                             .call()
@@ -1154,7 +1159,7 @@ where
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("open_peek_context"),
                     ),
-                    RustStmt::assign(
+                    RustStmt::assign_mut(
                         "ret",
                         abstracted_try_block(cl_inner.to_ast(ctxt))
                             .call()
@@ -1521,7 +1526,7 @@ where
                 let bind = RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt));
                 let ret = RustExpr::Control(Box::new(RustControl::Match(
                     RustExpr::local("tree_index"),
-                    add_error_catchall(branches),
+                    branches,
                 )));
                 (vec![bind], Some(ret))
             }
@@ -1589,7 +1594,7 @@ where
                         };
                         let thunk = abstracted_try_block(branch_cl.to_ast(ctxt).into());
                         RustStmt::Expr(RustExpr::BlockScope(
-                            [RustStmt::assign("f_tmp", thunk)].to_vec(),
+                            [RustStmt::assign_mut("f_tmp", thunk)].to_vec(),
                             Box::new(RustExpr::Control(Box::new(RustControl::Match(
                                 RustExpr::local("f_tmp").call(),
                                 vec![
@@ -1761,8 +1766,7 @@ fn test_decoder_28() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parse_ctxt = ParseCtxt::new(input);
-    let mut scope = Scope::Empty;
-    let ret = Decoder28(&mut scope, &mut parse_ctxt);
+    let ret = Decoder28(&mut parse_ctxt);
     assert!(ret.is_some());
 }"#;
 
@@ -1778,7 +1782,12 @@ fn test_decoder_28() {
 }
 
 #[derive(Clone, Debug)]
-pub struct DecoderFn<ExprT>(IxLabel, CaseLogic<ExprT>, RustType);
+pub struct DecoderFn<ExprT> {
+    ixlabel: IxLabel,
+    logic: CaseLogic<ExprT>,
+    extra_args: Option<Vec<(Label, GenType)>>,
+    ret_type: RustType,
+}
 
 impl<ExprT> ToAst for DecoderFn<ExprT>
 where
@@ -1788,7 +1797,7 @@ where
     type AstElem = RustFn;
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
-        let name = Label::from(format!("Decoder{}", self.0.to_usize()));
+        let name = Label::from(format!("Decoder{}", self.ixlabel.to_usize()));
         let params = {
             let mut tmp = DefParams::new();
             tmp.push_lifetime("'input");
@@ -1797,19 +1806,6 @@ where
         let sig = {
             let args = {
                 let arg0 = {
-                    let name = "scope".into();
-                    let ty = {
-                        let mut params = RustParams::<RustLt, RustType>::new();
-                        params.push_lifetime(RustLt::Parametric("'input".into()));
-                        RustType::borrow_of(
-                            None,
-                            Mut::Mutable,
-                            RustType::verbatim("Scope", Some(params)),
-                        )
-                    };
-                    (name, ty)
-                };
-                let arg1 = {
                     let name = "input".into();
                     let ty = {
                         let mut params = RustParams::<RustLt, RustType>::new();
@@ -1822,21 +1818,29 @@ where
                     };
                     (name, ty)
                 };
-                [arg0, arg1].to_vec()
+                if let Some(ref args) = self.extra_args {
+                    Iterator::chain(
+                        std::iter::once(arg0),
+                        args.iter()
+                            .map(|(lab, gt)| (lab.clone(), gt.to_rust_type())),
+                    )
+                    .collect()
+                } else {
+                    [arg0].to_vec()
+                }
             };
             FnSig::new(
                 args,
                 Some(RustType::result_of(
-                    self.2.clone(),
+                    self.ret_type.clone(),
                     RustType::imported("ParseError"),
                 )),
             )
         };
         let ctxt = ProdCtxt {
             input_varname: &Label::from("input"),
-            scope_varname: &Label::from("scope"),
         };
-        let (stmts, ret) = self.1.to_ast(ctxt);
+        let (stmts, ret) = self.logic.to_ast(ctxt);
         let body = Iterator::chain(
             stmts.into_iter(),
             std::iter::once(RustStmt::Return(
@@ -1862,59 +1866,6 @@ impl<TypeRep> SourceMap<TypeRep> {
     }
 }
 
-// pub struct RustTypeScope<'a> {
-//     parent: Option<&'a RustTypeScope<'a>>,
-//     names: Vec<Label>,
-//     rtypes: Vec<RustType>,
-// }
-
-// impl<'a> RustTypeScope<'a> {
-//     fn new() -> Self {
-//         let parent = None;
-//         let names = Vec::new();
-//         let rtypes = Vec::new();
-//         RustTypeScope {
-//             parent,
-//             names,
-//             rtypes,
-//         }
-//     }
-
-//     fn child(parent: &'a RustTypeScope<'a>) -> Self {
-//         let parent = Some(parent);
-//         let names = Vec::new();
-//         let rtypes = Vec::new();
-//         RustTypeScope {
-//             parent,
-//             names,
-//             rtypes,
-//         }
-//     }
-
-//     fn push(&mut self, name: Label, rt: RustType) {
-//         self.names.push(name);
-//         self.rtypes.push(rt);
-//     }
-
-//     fn push_format(&mut self, name: Label, rt: RustType) {
-//         self.names.push(name);
-//         self.rtypes.push(rt);
-//     }
-
-//     fn get_type_by_name(&self, name: &str) -> &RustType {
-//         for (i, n) in self.names.iter().enumerate().rev() {
-//             if n == name {
-//                 return &self.rtypes[i];
-//             }
-//         }
-//         if let Some(scope) = self.parent {
-//             scope.get_type_by_name(name)
-//         } else {
-//             panic!("variable not found: {name}");
-//         }
-//     }
-// }
-
 pub struct Generator<'a> {
     pub(crate) elaborator: Elaborator<'a>,
     pub(crate) sourcemap: SourceMap<GTExpr>,
@@ -1936,10 +1887,17 @@ impl<'a> Generator<'a> {
         let top = elab.elaborate_format(top_format, &TypedDynScope::Empty);
         // assert_eq!(elab.next_index, elab.tc.size());
         let prog = GTCompiler::compile_program(module, &top).expect("failed to compile program");
-        for (ix, (dec, t)) in prog.decoders.iter().enumerate() {
+        for (ix, (dec_ext, t)) in prog.decoders.iter().enumerate() {
             let dec_fn = {
+                let dec = dec_ext.get_dec();
+                let args = dec_ext.get_args();
                 let cl = elab.codegen.translate(dec);
-                DecoderFn(IxLabel::from(ix), cl, t.clone().to_rust_type())
+                DecoderFn {
+                    ixlabel: IxLabel::from(ix),
+                    logic: cl,
+                    extra_args: args.clone(),
+                    ret_type: t.to_rust_type(),
+                }
             };
             gen.sourcemap.decoder_skels.push(dec_fn);
         }
