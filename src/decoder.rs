@@ -850,8 +850,8 @@ impl<'a> MultiScope<'a> {
         Value::Record(self.entries)
     }
 
-    pub fn push(&mut self, name: Label, v: Value) {
-        self.entries.push((name, v));
+    pub fn push(&mut self, name: impl Into<Label>, v: Value) {
+        self.entries.push((name.into(), v));
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {

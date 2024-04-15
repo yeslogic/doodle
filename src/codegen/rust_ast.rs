@@ -1230,6 +1230,10 @@ impl RustStmt {
     pub fn assign(name: impl Into<Label>, rhs: RustExpr) -> Self {
         Self::Let(Mut::Immutable, name.into(), None, rhs)
     }
+
+    pub fn assign_mut(name: impl Into<Label>, rhs: RustExpr) -> Self {
+        Self::Let(Mut::Mutable, name.into(), None, rhs)
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -15,7 +15,14 @@ pub(crate) enum GenType {
 }
 
 impl GenType {
-    pub(crate) fn to_rust_type(self) -> RustType {
+    pub(crate) fn to_rust_type(&self) -> RustType {
+        match self {
+            GenType::Inline(rt) => rt.clone(),
+            GenType::Def((ix, lbl), _) => RustType::defined(*ix, lbl.clone()),
+        }
+    }
+
+    pub(crate) fn into_rust_type(self) -> RustType {
         match self {
             GenType::Inline(rt) => rt,
             GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),

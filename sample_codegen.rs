@@ -1,3 +1,4 @@
+
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 use doodle::prelude::*;
@@ -1550,24 +1551,18 @@ struct Type196 {
     end: (),
 }
 
-fn Decoder0<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type196, ParseError> {
-    (Ok((Decoder1(scope, input))?))
+fn Decoder0<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseError> {
+    (Ok((Decoder1(input))?))
 }
 
-fn Decoder1<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type196, ParseError> {
+fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseError> {
     let data = ((|| {
         PResult::Ok({
             (input.start_alt());
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder2(scope, input))?;
+                        let inner = (Decoder2(input))?;
                         (Type193::gif(inner))
                     })
                 });
@@ -1582,9 +1577,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder3(scope, input))?;
+                        let inner = (Decoder3(input))?;
                         (Type193::gzip(inner))
                     })
                 });
@@ -1599,9 +1594,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder4(scope, input))?;
+                        let inner = (Decoder4(input))?;
                         (Type193::jpeg(inner))
                     })
                 });
@@ -1616,9 +1611,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder5(scope, input))?;
+                        let inner = (Decoder5(input))?;
                         (Type193::mpeg4(inner))
                     })
                 });
@@ -1633,9 +1628,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder6(scope, input))?;
+                        let inner = (Decoder6(input))?;
                         (Type193::png(inner))
                     })
                 });
@@ -1650,9 +1645,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder7(scope, input))?;
+                        let inner = (Decoder7(input))?;
                         (Type193::riff(inner))
                     })
                 });
@@ -1667,9 +1662,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder8(scope, input))?;
+                        let inner = (Decoder8(input))?;
                         (Type193::tar(inner))
                     })
                 });
@@ -1684,9 +1679,9 @@ fn Decoder1<'input>(
                 }
             };
             {
-                let f_tmp = (|| {
+                let mut f_tmp = (|| {
                     PResult::Ok({
-                        let inner = (Decoder9(scope, input))?;
+                        let inner = (Decoder9(input))?;
                         (Type193::text(inner))
                     })
                 });
@@ -1715,12 +1710,9 @@ fn Decoder1<'input>(
     (Ok(Type196 { data, end }))
 }
 
-fn Decoder2<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type19, ParseError> {
-    let header = ((|| PResult::Ok({ (Decoder152(scope, input))? }))())?;
-    let logical_screen = ((|| PResult::Ok({ (Decoder153(scope, input))? }))())?;
+fn Decoder2<'input>(input: &mut ParseMonad<'input>) -> Result<Type19, ParseError> {
+    let header = ((|| PResult::Ok({ (Decoder152(input))? }))())?;
+    let logical_screen = ((|| PResult::Ok({ (Decoder153(input))? }))())?;
     let blocks = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -1745,7 +1737,7 @@ fn Decoder2<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder154(scope, input))?;
+                    let next_elem = (Decoder154(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -1754,7 +1746,7 @@ fn Decoder2<'input>(
             accum
         })
     })())?;
-    let trailer = ((|| PResult::Ok({ (Decoder155(scope, input))? }))())?;
+    let trailer = ((|| PResult::Ok({ (Decoder155(input))? }))())?;
     (Ok(Type19 {
         header,
         logical_screen,
@@ -1763,10 +1755,7 @@ fn Decoder2<'input>(
     }))
 }
 
-fn Decoder3<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Vec<Type40>, ParseError> {
+fn Decoder3<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<Type40>, ParseError> {
     let mut accum = (Vec::new());
     while (input.remaining() > 0) {
         let matching_ix = {
@@ -1782,12 +1771,12 @@ fn Decoder3<'input>(
             break;
         } else {
             let next_elem = {
-                let header = ((|| PResult::Ok({ (Decoder140(scope, input))? }))())?;
+                let header = ((|| PResult::Ok({ (Decoder140(input))? }))())?;
                 let fname = ((|| {
                     PResult::Ok({
                         match (header.file_flags & 8 != 0) {
                             true => {
-                                let inner = (Decoder141(scope, input))?;
+                                let inner = (Decoder141(input))?;
                                 (Type22::yes(inner))
                             }
 
@@ -1804,7 +1793,7 @@ fn Decoder3<'input>(
                 })())?;
                 let data =
                     ((|| PResult::Ok({ (unimplemented!(r#"translate @ Decoder::Bits"#)) }))())?;
-                let footer = ((|| PResult::Ok({ (Decoder143(scope, input))? }))())?;
+                let footer = ((|| PResult::Ok({ (Decoder143(input))? }))())?;
                 Type40 {
                     header,
                     fname,
@@ -1818,20 +1807,14 @@ fn Decoder3<'input>(
     (Ok(accum))
 }
 
-fn Decoder4<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type80, ParseError> {
-    let soi = ((|| PResult::Ok({ (Decoder67(scope, input))? }))())?;
-    let frame = ((|| PResult::Ok({ (Decoder68(scope, input))? }))())?;
-    let eoi = ((|| PResult::Ok({ (Decoder69(scope, input))? }))())?;
+fn Decoder4<'input>(input: &mut ParseMonad<'input>) -> Result<Type80, ParseError> {
+    let soi = ((|| PResult::Ok({ (Decoder67(input))? }))())?;
+    let frame = ((|| PResult::Ok({ (Decoder68(input))? }))())?;
+    let eoi = ((|| PResult::Ok({ (Decoder69(input))? }))())?;
     (Ok(Type80 { soi, frame, eoi }))
 }
 
-fn Decoder5<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type163, ParseError> {
+fn Decoder5<'input>(input: &mut ParseMonad<'input>) -> Result<Type163, ParseError> {
     let atoms = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -1845,7 +1828,7 @@ fn Decoder5<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder46(scope, input))?;
+                    let next_elem = (Decoder46(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -1857,12 +1840,9 @@ fn Decoder5<'input>(
     (Ok(Type163 { atoms }))
 }
 
-fn Decoder6<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type181, ParseError> {
-    let signature = ((|| PResult::Ok({ (Decoder28(scope, input))? }))())?;
-    let ihdr = ((|| PResult::Ok({ (Decoder29(scope, input))? }))())?;
+fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseError> {
+    let signature = ((|| PResult::Ok({ (Decoder28(input))? }))())?;
+    let ihdr = ((|| PResult::Ok({ (Decoder29(input))? }))())?;
     let chunks = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -1891,7 +1871,7 @@ fn Decoder6<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder30(scope, input))?;
+                    let next_elem = (Decoder30(input, ihdr))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -1941,7 +1921,7 @@ fn Decoder6<'input>(
                 if (matching_ix == 0) {
                     break;
                 } else {
-                    let next_elem = (Decoder31(scope, input))?;
+                    let next_elem = (Decoder31(input))?;
                     (accum.push(next_elem));
                 }
             }
@@ -1976,7 +1956,7 @@ fn Decoder6<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder30(scope, input))?;
+                    let next_elem = (Decoder30(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -1985,7 +1965,7 @@ fn Decoder6<'input>(
             accum
         })
     })())?;
-    let iend = ((|| PResult::Ok({ (Decoder32(scope, input))? }))())?;
+    let iend = ((|| PResult::Ok({ (Decoder32(input))? }))())?;
     (Ok(Type181 {
         signature,
         ihdr,
@@ -1996,10 +1976,7 @@ fn Decoder6<'input>(
     }))
 }
 
-fn Decoder7<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type185, ParseError> {
+fn Decoder7<'input>(input: &mut ParseMonad<'input>) -> Result<Type185, ParseError> {
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -2045,12 +2022,12 @@ fn Decoder7<'input>(
             (field0, field1, field2, field3)
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder24(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder25(scope, input))? }))())?;
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder25(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -2089,10 +2066,7 @@ fn Decoder7<'input>(
     }))
 }
 
-fn Decoder8<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type191, ParseError> {
+fn Decoder8<'input>(input: &mut ParseMonad<'input>) -> Result<Type191, ParseError> {
     let contents = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -2117,7 +2091,7 @@ fn Decoder8<'input>(
                 if (matching_ix == 0) {
                     break;
                 } else {
-                    let next_elem = (Decoder15(scope, input))?;
+                    let next_elem = (Decoder15(input))?;
                     (accum.push(next_elem));
                 }
             }
@@ -2177,15 +2151,12 @@ fn Decoder8<'input>(
     }))
 }
 
-fn Decoder9<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type192, ParseError> {
+fn Decoder9<'input>(input: &mut ParseMonad<'input>) -> Result<Type192, ParseError> {
     (input.start_alt());
     {
-        let f_tmp = (|| {
+        let mut f_tmp = (|| {
             PResult::Ok({
-                let inner = (Decoder10(scope, input))?;
+                let inner = (Decoder10(input))?;
                 (Type192::ascii(inner))
             })
         });
@@ -2200,9 +2171,9 @@ fn Decoder9<'input>(
         }
     };
     {
-        let f_tmp = (|| {
+        let mut f_tmp = (|| {
             PResult::Ok({
-                let inner = (Decoder11(scope, input))?;
+                let inner = (Decoder11(input))?;
                 (Type192::utf8(inner))
             })
         });
@@ -2219,10 +2190,7 @@ fn Decoder9<'input>(
     (Ok((panic!(r#"last branch should return something unconditionally"#))))
 }
 
-fn Decoder10<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Vec<u8>, ParseError> {
+fn Decoder10<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseError> {
     let mut accum = (Vec::new());
     while (input.remaining() > 0) {
         let matching_ix = {
@@ -2244,17 +2212,14 @@ fn Decoder10<'input>(
         if (matching_ix == 0) {
             break;
         } else {
-            let next_elem = (Decoder14(scope, input))?;
+            let next_elem = (Decoder14(input))?;
             (accum.push(next_elem));
         }
     }
     (Ok(accum))
 }
 
-fn Decoder11<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Vec<char>, ParseError> {
+fn Decoder11<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<char>, ParseError> {
     let mut accum = (Vec::new());
     while (input.remaining() > 0) {
         let matching_ix = {
@@ -2298,7 +2263,7 @@ fn Decoder11<'input>(
             }
         };
         if (matching_ix == 0) {
-            let next_elem = (Decoder12(scope, input))?;
+            let next_elem = (Decoder12(input))?;
             (accum.push(next_elem));
         } else {
             break;
@@ -2307,10 +2272,7 @@ fn Decoder11<'input>(
     (Ok(accum))
 }
 
-fn Decoder12<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<char, ParseError> {
+fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError> {
     let inner = {
         let tree_index = {
             (input.open_peek_context());
@@ -2382,15 +2344,11 @@ fn Decoder12<'input>(
                             ((|raw: u8| raw & 31)(inner))
                         })
                     })())?;
-                    let field1 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                    let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                     (field0, field1)
                 };
                 ((|bytes: (u8, u8)| match bytes {
                     (x1, x0) => ((x1 as u32) << 6 | (x0 as u32)),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 })(inner))
             }
 
@@ -2455,7 +2413,7 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 63)(inner))
                                 })
                             })())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2)
                         }
 
@@ -2475,8 +2433,8 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 15)(inner))
                                 })
                             })())?;
-                            let field1 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2)
                         }
 
@@ -2508,7 +2466,7 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 63)(inner))
                                 })
                             })())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2)
                         }
 
@@ -2528,22 +2486,14 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 15)(inner))
                                 })
                             })())?;
-                            let field1 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2)
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     }
                 };
                 ((|bytes: (u8, u8, u8)| match bytes {
                     (x2, x1, x0) => ((x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32)),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 })(inner))
             }
 
@@ -2602,8 +2552,8 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 63)(inner))
                                 })
                             })())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
-                            let field3 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
+                            let field3 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2, field3)
                         }
 
@@ -2623,9 +2573,9 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 7)(inner))
                                 })
                             })())?;
-                            let field1 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
-                            let field3 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
+                            let field3 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2, field3)
                         }
 
@@ -2656,13 +2606,9 @@ fn Decoder12<'input>(
                                     ((|raw: u8| raw & 63)(inner))
                                 })
                             })())?;
-                            let field2 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
-                            let field3 = ((|| PResult::Ok({ (Decoder13(scope, input))? }))())?;
+                            let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
+                            let field3 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2, field3)
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     }
                 };
@@ -2670,25 +2616,14 @@ fn Decoder12<'input>(
                     (x3, x2, x1, x0) => {
                         ((x3 as u32) << 18 | (x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32))
                     }
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 })(inner))
-            }
-
-            _other => {
-                return (Err(ParseError::ExcludedBranch));
             }
         }
     };
     (Ok(((|codepoint: u32| (char::from_u32(codepoint)).unwrap())(inner))))
 }
 
-fn Decoder13<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder13<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let inner = {
         let b = (input.read_byte())?;
         if ((ByteSet::from_bits([0, 0, 18446744073709551615, 0])).contains(b)) {
@@ -2700,10 +2635,7 @@ fn Decoder13<'input>(
     (Ok(((|raw: u8| raw & 63)(inner))))
 }
 
-fn Decoder14<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder14<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(
         if ((ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0])).contains(b)) {
@@ -2714,16 +2646,13 @@ fn Decoder14<'input>(
     ))
 }
 
-fn Decoder15<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type190, ParseError> {
-    let header = ((|| PResult::Ok({ (Decoder16(scope, input))? }))())?;
+fn Decoder15<'input>(input: &mut ParseMonad<'input>) -> Result<Type190, ParseError> {
+    let header = ((|| PResult::Ok({ (Decoder16(input))? }))())?;
     let file = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..header.size {
-                (accum.push((Decoder17(scope, input))?));
+                (accum.push((Decoder17(input))?));
             }
             accum
         })
@@ -2741,29 +2670,26 @@ fn Decoder15<'input>(
     }))
 }
 
-fn Decoder16<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type189, ParseError> {
-    let sz = 512;
-    (input.start_slice(_sz))?;
-    let ret =
+fn Decoder16<'input>(input: &mut ParseMonad<'input>) -> Result<Type189, ParseError> {
+    let sz = (512 as usize);
+    (input.start_slice(sz))?;
+    let mut ret =
         ((|| {
             PResult::Ok({
                 let name = ((|| {
                     PResult::Ok({
-                        let sz = 100;
-                        (input.start_slice(_sz))?;
-                        let ret = ((|| PResult::Ok({ (Decoder18(scope, input))? }))())?;
+                        let sz = (100 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret = ((|| PResult::Ok({ (Decoder18(input))? }))())?;
                         (input.end_slice())?;
                         ret
                     })
                 })())?;
                 let mode = ((|| {
                     PResult::Ok({
-                        let sz = 8;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (8 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -2794,7 +2720,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -2804,7 +2730,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -2850,9 +2776,9 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let uid = ((|| {
                     PResult::Ok({
-                        let sz = 8;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (8 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -2883,7 +2809,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -2893,7 +2819,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -2939,9 +2865,9 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let gid = ((|| {
                     PResult::Ok({
-                        let sz = 8;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (8 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -2972,7 +2898,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -2982,7 +2908,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -3031,71 +2957,71 @@ return (Err(ParseError::ExcludedBranch));
                         let inner = {
                             let oA = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o9 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o8 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o7 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o6 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o5 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o4 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o3 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o2 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o1 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
                             let o0 = ((|| {
                                 PResult::Ok({
-                                    let inner = (Decoder19(scope, input))?;
+                                    let inner = (Decoder19(input))?;
                                     ((|bit: u8| (bit as u8) - 48)(inner))
                                 })
                             })())?;
-                            let __nil = ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                            let __nil = ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                             let value = ((|| {
                                 PResult::Ok({
                                     ((((0 as u32) << 3 | (oA as u32)) << 6
@@ -3132,9 +3058,9 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let mtime = ((|| {
                     PResult::Ok({
-                        let sz = 12;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (12 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -3165,7 +3091,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -3175,7 +3101,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -3221,9 +3147,9 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let chksum = ((|| {
                     PResult::Ok({
-                        let sz = 8;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (8 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -3254,7 +3180,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -3264,7 +3190,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -3308,12 +3234,12 @@ return (Err(ParseError::ExcludedBranch));
                         ret
                     })
                 })())?;
-                let typeflag = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
+                let typeflag = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
                 let linkname = ((|| {
                     PResult::Ok({
-                        let sz = 100;
-                        (input.start_slice(_sz))?;
-                        let ret = ((|| PResult::Ok({ (Decoder22(scope, input))? }))())?;
+                        let sz = (100 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret = ((|| PResult::Ok({ (Decoder22(input))? }))())?;
                         (input.end_slice())?;
                         ret
                     })
@@ -3410,27 +3336,27 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let uname = ((|| {
                     PResult::Ok({
-                        let sz = 32;
-                        (input.start_slice(_sz))?;
-                        let ret = ((|| PResult::Ok({ (Decoder23(scope, input))? }))())?;
+                        let sz = (32 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret = ((|| PResult::Ok({ (Decoder23(input))? }))())?;
                         (input.end_slice())?;
                         ret
                     })
                 })())?;
                 let gname = ((|| {
                     PResult::Ok({
-                        let sz = 32;
-                        (input.start_slice(_sz))?;
-                        let ret = ((|| PResult::Ok({ (Decoder23(scope, input))? }))())?;
+                        let sz = (32 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret = ((|| PResult::Ok({ (Decoder23(input))? }))())?;
                         (input.end_slice())?;
                         ret
                     })
                 })())?;
                 let devmajor = ((|| {
                     PResult::Ok({
-                        let sz = 8;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (8 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -3461,7 +3387,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -3471,7 +3397,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -3517,9 +3443,9 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let devminor = ((|| {
                     PResult::Ok({
-                        let sz = 8;
-                        (input.start_slice(_sz))?;
-                        let ret =
+                        let sz = (8 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret =
                             ((|| {
                                 PResult::Ok({
                                     let string =
@@ -3550,7 +3476,7 @@ return (Err(ParseError::ExcludedBranch));
                                                             }
                                                         };
                                                     if (matching_ix == 0) {
-                                                        let next_elem = (Decoder19(scope, input))?;
+                                                        let next_elem = (Decoder19(input))?;
                                                         (accum.push(next_elem));
                                                     } else {
                                                         break;
@@ -3560,7 +3486,7 @@ return (Err(ParseError::ExcludedBranch));
                                             })
                                         })())?;
                                     let __nul_or_wsp =
-                                        ((|| PResult::Ok({ (Decoder20(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder20(input))? }))())?;
                                     let __padding = ((|| {
                                         PResult::Ok({
                                             let mut accum = (Vec::new());
@@ -3606,9 +3532,9 @@ return (Err(ParseError::ExcludedBranch));
                 })())?;
                 let prefix = ((|| {
                     PResult::Ok({
-                        let sz = 155;
-                        (input.start_slice(_sz))?;
-                        let ret = ((|| PResult::Ok({ (Decoder22(scope, input))? }))())?;
+                        let sz = (155 as usize);
+                        (input.start_slice(sz))?;
+                        let mut ret = ((|| PResult::Ok({ (Decoder22(input))? }))())?;
                         (input.end_slice())?;
                         ret
                     })
@@ -3654,18 +3580,12 @@ return (Err(ParseError::ExcludedBranch));
     (Ok(ret))
 }
 
-fn Decoder17<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder17<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(b))
 }
 
-fn Decoder18<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type186, ParseError> {
+fn Decoder18<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -3737,10 +3657,7 @@ fn Decoder18<'input>(
     (Ok(Type186 { string, __padding }))
 }
 
-fn Decoder19<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder19<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(
         if ((ByteSet::from_bits([71776119061217280, 0, 0, 0])).contains(b)) {
@@ -3751,10 +3668,7 @@ fn Decoder19<'input>(
     ))
 }
 
-fn Decoder20<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder20<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(
         if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(b)) {
@@ -3765,18 +3679,12 @@ fn Decoder20<'input>(
     ))
 }
 
-fn Decoder21<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder21<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(b))
 }
 
-fn Decoder22<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type186, ParseError> {
+fn Decoder22<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -3848,10 +3756,7 @@ fn Decoder22<'input>(
     (Ok(Type186 { string, __padding }))
 }
 
-fn Decoder23<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type188, ParseError> {
+fn Decoder23<'input>(input: &mut ParseMonad<'input>) -> Result<Type188, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -3923,25 +3828,19 @@ fn Decoder23<'input>(
     (Ok(Type188 { string, padding }))
 }
 
-fn Decoder24<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u32, ParseError> {
+fn Decoder24<'input>(input: &mut ParseMonad<'input>) -> Result<u32, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field1 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field2 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field3 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field3 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1, field2, field3)
     };
     (Ok(((|x: (u8, u8, u8, u8)| u32le(x))(inner))))
 }
 
-fn Decoder25<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type184, ParseError> {
-    let tag = ((|| PResult::Ok({ (Decoder26(scope, input))? }))())?;
+fn Decoder25<'input>(input: &mut ParseMonad<'input>) -> Result<Type184, ParseError> {
+    let tag = ((|| PResult::Ok({ (Decoder26(input))? }))())?;
     let chunks = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -3955,7 +3854,7 @@ fn Decoder25<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder27(scope, input))?;
+                    let next_elem = (Decoder27(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -3967,28 +3866,22 @@ fn Decoder25<'input>(
     (Ok(Type184 { tag, chunks }))
 }
 
-fn Decoder26<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<(u8, u8, u8, u8), ParseError> {
-    let field0 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
-    let field1 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
-    let field2 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
-    let field3 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
+fn Decoder26<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+    let field0 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
+    let field1 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
+    let field2 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
+    let field3 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
     (Ok((field0, field1, field2, field3)))
 }
 
-fn Decoder27<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type183, ParseError> {
-    let tag = ((|| PResult::Ok({ (Decoder26(scope, input))? }))())?;
-    let length = ((|| PResult::Ok({ (Decoder24(scope, input))? }))())?;
+fn Decoder27<'input>(input: &mut ParseMonad<'input>) -> Result<Type183, ParseError> {
+    let tag = ((|| PResult::Ok({ (Decoder26(input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -4001,7 +3894,7 @@ fn Decoder27<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -4049,7 +3942,6 @@ fn Decoder27<'input>(
 }
 
 fn Decoder28<'input>(
-    scope: &mut Scope<'input>,
     input: &mut ParseMonad<'input>,
 ) -> Result<(u8, u8, u8, u8, u8, u8, u8, u8), ParseError> {
     let field0 = ((|| {
@@ -4137,22 +4029,19 @@ fn Decoder28<'input>(
     )))
 }
 
-fn Decoder29<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type165, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let tag = ((|| PResult::Ok({ (Decoder44(scope, input))? }))())?;
+fn Decoder29<'input>(input: &mut ParseMonad<'input>) -> Result<Type165, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let tag = ((|| PResult::Ok({ (Decoder44(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder45(scope, input))? }))())?;
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder45(input))? }))())?;
             (input.end_slice())?;
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type165 {
         length,
         tag,
@@ -4161,10 +4050,7 @@ fn Decoder29<'input>(
     }))
 }
 
-fn Decoder30<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type178, ParseError> {
+fn Decoder30<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Type178, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -4199,52 +4085,45 @@ fn Decoder30<'input>(
     };
     (Ok(match tree_index {
         0 => {
-            let inner = (Decoder38(scope, input))?;
+            let inner = (Decoder38(input, ihdr))?;
             (Type178::bKGD(inner))
         }
 
         1 => {
-            let inner = (Decoder39(scope, input))?;
+            let inner = (Decoder39(input))?;
             (Type178::pHYs(inner))
         }
 
         2 => {
-            let inner = (Decoder40(scope, input))?;
+            let inner = (Decoder40(input))?;
             (Type178::PLTE(inner))
         }
 
         3 => {
-            let inner = (Decoder41(scope, input))?;
+            let inner = (Decoder41(input))?;
             (Type178::tIME(inner))
         }
 
         4 => {
-            let inner = (Decoder42(scope, input))?;
+            let inner = (Decoder42(input, ihdr))?;
             (Type178::tRNS(inner))
-        }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
 
-fn Decoder31<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type179, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let tag = ((|| PResult::Ok({ (Decoder36(scope, input))? }))())?;
+fn Decoder31<'input>(input: &mut ParseMonad<'input>) -> Result<Type179, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let tag = ((|| PResult::Ok({ (Decoder36(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder37(scope, input))? }))())?;
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder37(input))? }))())?;
             (input.end_slice())?;
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type179 {
         length,
         tag,
@@ -4253,22 +4132,19 @@ fn Decoder31<'input>(
     }))
 }
 
-fn Decoder32<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type180, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let tag = ((|| PResult::Ok({ (Decoder34(scope, input))? }))())?;
+fn Decoder32<'input>(input: &mut ParseMonad<'input>) -> Result<Type180, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let tag = ((|| PResult::Ok({ (Decoder34(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder35(scope, input))? }))())?;
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder35(input))? }))())?;
             (input.end_slice())?;
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type180 {
         length,
         tag,
@@ -4277,24 +4153,18 @@ fn Decoder32<'input>(
     }))
 }
 
-fn Decoder33<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u32, ParseError> {
+fn Decoder33<'input>(input: &mut ParseMonad<'input>) -> Result<u32, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field1 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field2 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field3 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field3 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1, field2, field3)
     };
     (Ok(((|x: (u8, u8, u8, u8)| u32be(x))(inner))))
 }
 
-fn Decoder34<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder34<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
     let field0 = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -4338,17 +4208,11 @@ fn Decoder34<'input>(
     (Ok((field0, field1, field2, field3)))
 }
 
-fn Decoder35<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<(), ParseError> {
+fn Decoder35<'input>(input: &mut ParseMonad<'input>) -> Result<(), ParseError> {
     (Ok(()))
 }
 
-fn Decoder36<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder36<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
     let field0 = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -4392,10 +4256,7 @@ fn Decoder36<'input>(
     (Ok((field0, field1, field2, field3)))
 }
 
-fn Decoder37<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Vec<u8>, ParseError> {
+fn Decoder37<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseError> {
     let mut accum = (Vec::new());
     while (input.remaining() > 0) {
         let matching_ix = {
@@ -4407,7 +4268,7 @@ fn Decoder37<'input>(
             }
         };
         if (matching_ix == 0) {
-            let next_elem = (Decoder17(scope, input))?;
+            let next_elem = (Decoder17(input))?;
             (accum.push(next_elem));
         } else {
             break;
@@ -4416,11 +4277,8 @@ fn Decoder37<'input>(
     (Ok(accum))
 }
 
-fn Decoder38<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type171, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+fn Decoder38<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Type171, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -4468,15 +4326,14 @@ fn Decoder38<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match ihdr.data.color_type {
                         0 => {
                             let inner = {
-                                let greyscale =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let greyscale = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type167 { greyscale }
                             };
                             (Type170::color_type_0(inner))
@@ -4484,8 +4341,7 @@ fn Decoder38<'input>(
 
                         4 => {
                             let inner = {
-                                let greyscale =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let greyscale = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type167 { greyscale }
                             };
                             (Type170::color_type_4(inner))
@@ -4493,9 +4349,9 @@ fn Decoder38<'input>(
 
                         2 => {
                             let inner = {
-                                let red = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let green = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let blue = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let red = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let green = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let blue = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type168 { red, green, blue }
                             };
                             (Type170::color_type_2(inner))
@@ -4503,9 +4359,9 @@ fn Decoder38<'input>(
 
                         6 => {
                             let inner = {
-                                let red = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let green = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let blue = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let red = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let green = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let blue = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type168 { red, green, blue }
                             };
                             (Type170::color_type_6(inner))
@@ -4513,8 +4369,7 @@ fn Decoder38<'input>(
 
                         3 => {
                             let inner = {
-                                let palette_index =
-                                    ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let palette_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 Type169 { palette_index }
                             };
                             (Type170::color_type_3(inner))
@@ -4530,7 +4385,7 @@ fn Decoder38<'input>(
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type171 {
         length,
         tag,
@@ -4539,11 +4394,8 @@ fn Decoder38<'input>(
     }))
 }
 
-fn Decoder39<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type173, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+fn Decoder39<'input>(input: &mut ParseMonad<'input>) -> Result<Type173, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -4591,13 +4443,13 @@ fn Decoder39<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
-                    let pixels_per_unit_x = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                    let pixels_per_unit_y = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                    let unit_specifier = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                    let pixels_per_unit_x = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                    let pixels_per_unit_y = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                    let unit_specifier = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                     Type172 {
                         pixels_per_unit_x,
                         pixels_per_unit_y,
@@ -4609,7 +4461,7 @@ fn Decoder39<'input>(
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type173 {
         length,
         tag,
@@ -4618,11 +4470,8 @@ fn Decoder39<'input>(
     }))
 }
 
-fn Decoder40<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type166, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+fn Decoder40<'input>(input: &mut ParseMonad<'input>) -> Result<Type166, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -4670,9 +4519,9 @@ fn Decoder40<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -4688,9 +4537,9 @@ fn Decoder40<'input>(
                             break;
                         } else {
                             let next_elem = {
-                                let r = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                let g = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                let b = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let r = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                let g = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                let b = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 Type2 { r, g, b }
                             };
                             (accum.push(next_elem));
@@ -4703,7 +4552,7 @@ fn Decoder40<'input>(
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type166 {
         length,
         tag,
@@ -4712,11 +4561,8 @@ fn Decoder40<'input>(
     }))
 }
 
-fn Decoder41<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type175, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+fn Decoder41<'input>(input: &mut ParseMonad<'input>) -> Result<Type175, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -4764,16 +4610,16 @@ fn Decoder41<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
-                    let year = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                    let month = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                    let day = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                    let hour = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                    let minute = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                    let second = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                    let year = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                    let month = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                    let day = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                    let hour = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                    let minute = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                    let second = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                     Type174 {
                         year,
                         month,
@@ -4788,7 +4634,7 @@ fn Decoder41<'input>(
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type175 {
         length,
         tag,
@@ -4797,11 +4643,8 @@ fn Decoder41<'input>(
     }))
 }
 
-fn Decoder42<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type177, ParseError> {
-    let length = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+fn Decoder42<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Type177, ParseError> {
+    let length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -4849,15 +4692,14 @@ fn Decoder42<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = length;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (length as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match ihdr.data.color_type {
                         0 => {
                             let inner = {
-                                let greyscale =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let greyscale = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type167 { greyscale }
                             };
                             (Type176::color_type_0(inner))
@@ -4865,9 +4707,9 @@ fn Decoder42<'input>(
 
                         2 => {
                             let inner = {
-                                let red = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let green = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let blue = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let red = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let green = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let blue = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type168 { red, green, blue }
                             };
                             (Type176::color_type_2(inner))
@@ -4888,8 +4730,7 @@ fn Decoder42<'input>(
                                     if (matching_ix == 0) {
                                         let next_elem = {
                                             let palette_index =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
+                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                             Type169 { palette_index }
                                         };
                                         (accum.push(next_elem));
@@ -4912,7 +4753,7 @@ fn Decoder42<'input>(
             ret
         })
     })())?;
-    let crc = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+    let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
     (Ok(Type177 {
         length,
         tag,
@@ -4921,22 +4762,16 @@ fn Decoder42<'input>(
     }))
 }
 
-fn Decoder43<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u16, ParseError> {
+fn Decoder43<'input>(input: &mut ParseMonad<'input>) -> Result<u16, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field1 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1)
     };
     (Ok(((|x: (u8, u8)| u16be(x))(inner))))
 }
 
-fn Decoder44<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder44<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
     let field0 = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -4980,17 +4815,14 @@ fn Decoder44<'input>(
     (Ok((field0, field1, field2, field3)))
 }
 
-fn Decoder45<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type164, ParseError> {
-    let width = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let height = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let bit_depth = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let color_type = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let compression_method = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let filter_method = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let interlace_method = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder45<'input>(input: &mut ParseMonad<'input>) -> Result<Type164, ParseError> {
+    let width = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let height = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let bit_depth = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let color_type = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let compression_method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let filter_method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let interlace_method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type164 {
         width,
         height,
@@ -5002,19 +4834,16 @@ fn Decoder45<'input>(
     }))
 }
 
-fn Decoder46<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type162, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder46<'input>(input: &mut ParseMonad<'input>) -> Result<Type162, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -5028,17 +4857,15 @@ fn Decoder46<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (102, 116, 121, 112) => {
                             let inner = {
-                                let major_brand =
-                                    ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
-                                let minor_version =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let major_brand = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
+                                let minor_version = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let compatible_brands = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
@@ -5052,7 +4879,7 @@ fn Decoder46<'input>(
                                                 }
                                             };
                                             if (matching_ix == 0) {
-                                                let next_elem = (Decoder47(scope, input))?;
+                                                let next_elem = (Decoder47(input))?;
                                                 (accum.push(next_elem));
                                             } else {
                                                 break;
@@ -5081,7 +4908,7 @@ fn Decoder46<'input>(
                         }
 
                         (109, 101, 116, 97) => {
-                            let field0 = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                            let field0 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                             let field1 = ((|| {
                                 PResult::Ok({
                                     let mut accum = (Vec::new());
@@ -5095,7 +4922,7 @@ fn Decoder46<'input>(
                                             }
                                         };
                                         if (matching_ix == 0) {
-                                            let next_elem = (Decoder49(scope, input))?;
+                                            let next_elem = (Decoder49(input))?;
                                             (accum.push(next_elem));
                                         } else {
                                             break;
@@ -5120,7 +4947,7 @@ fn Decoder46<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder50(scope, input))?;
+                                        let next_elem = (Decoder50(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -5144,7 +4971,7 @@ fn Decoder46<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -5173,30 +5000,24 @@ fn Decoder46<'input>(
     }))
 }
 
-fn Decoder47<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<(u8, u8, u8, u8), ParseError> {
-    let field0 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
-    let field1 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
-    let field2 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
-    let field3 = ((|| PResult::Ok({ (Decoder21(scope, input))? }))())?;
+fn Decoder47<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+    let field0 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
+    let field1 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
+    let field2 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
+    let field3 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
     (Ok((field0, field1, field2, field3)))
 }
 
-fn Decoder48<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u64, ParseError> {
+fn Decoder48<'input>(input: &mut ParseMonad<'input>) -> Result<u64, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field1 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field2 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field3 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field4 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field5 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field6 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field7 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field3 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field4 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field5 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field6 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field7 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (
             field0, field1, field2, field3, field4, field5, field6, field7,
         )
@@ -5204,19 +5025,16 @@ fn Decoder48<'input>(
     (Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| u64be(x))(inner))))
 }
 
-fn Decoder49<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type115, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -5230,9 +5048,9 @@ fn Decoder49<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (100, 105, 110, 102) => {
@@ -5248,7 +5066,7 @@ fn Decoder49<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder57(scope, input))?;
+                                        let next_elem = (Decoder57(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -5261,34 +5079,26 @@ fn Decoder49<'input>(
 
                         (104, 100, 108, 114) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let predefined =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                let handler_type =
-                                    ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+                                let predefined = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let handler_type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
                                 let reserved = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let name = ((|| PResult::Ok({ (Decoder55(scope, input))? }))())?;
+                                let name = ((|| PResult::Ok({ (Decoder55(input))? }))())?;
                                 Type86 {
                                     version,
                                     flags,
@@ -5303,15 +5113,12 @@ fn Decoder49<'input>(
 
                         (112, 105, 116, 109) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -5319,12 +5126,12 @@ fn Decoder49<'input>(
                                     PResult::Ok({
                                         match (version == 0) {
                                             true => {
-                                                let inner = (Decoder43(scope, input))?;
+                                                let inner = (Decoder43(input))?;
                                                 (Type112::yes(inner))
                                             }
 
                                             false => {
-                                                let inner = (Decoder33(scope, input))?;
+                                                let inner = (Decoder33(input))?;
                                                 (Type112::no(inner))
                                             }
 
@@ -5345,15 +5152,12 @@ fn Decoder49<'input>(
 
                         (105, 105, 110, 102) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -5361,11 +5165,11 @@ fn Decoder49<'input>(
                                     PResult::Ok({
                                         match (version == 0) {
                                             true => {
-                                                let inner = (Decoder43(scope, input))?;
+                                                let inner = (Decoder43(input))?;
                                                 ((|x: u16| x as u32)(inner))
                                             }
 
-                                            false => (Decoder33(scope, input))?,
+                                            false => (Decoder33(input))?,
 
                                             _other => {
                                                 (unreachable!(r#"bad value {_other:?}"#));
@@ -5377,7 +5181,7 @@ fn Decoder49<'input>(
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
-                                            (accum.push((Decoder59(scope, input))?));
+                                            (accum.push((Decoder59(input))?));
                                         }
                                         accum
                                     })
@@ -5394,15 +5198,12 @@ fn Decoder49<'input>(
 
                         (105, 114, 101, 102) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -5425,13 +5226,13 @@ fn Decoder49<'input>(
                                                             let next_elem = {
                                                                 let size_field = ((|| {
                                                                     PResult::Ok({
-                                                                        (Decoder33(scope, input))?
+                                                                        (Decoder33(input))?
                                                                     })
                                                                 })(
                                                                 ))?;
                                                                 let r#type = ((|| {
                                                                     PResult::Ok({
-                                                                        (Decoder47(scope, input))?
+                                                                        (Decoder47(input))?
                                                                     })
                                                                 })(
                                                                 ))?;
@@ -5443,7 +5244,6 @@ fn Decoder49<'input>(
                                                                             1 => {
                                                                                 let inner =
                                                                                     (Decoder48(
-                                                                                        scope,
                                                                                         input,
                                                                                     ))?;
                                                                                 ((|x: u64| x - 16)(
@@ -5467,15 +5267,15 @@ fn Decoder49<'input>(
                                                                 ))?;
                                                                 let data = ((|| {
                                                                     PResult::Ok({
-                                                                        let sz = size;
-                                                                        (input.start_slice(_sz))?;
-                                                                        let ret = ((|| {
+                                                                        let sz = (size as usize);
+                                                                        (input.start_slice(sz))?;
+                                                                        let mut ret = ((|| {
                                                                             PResult::Ok({
                                                                                 let from_item_ID =
                                                                                     ((|| {
                                                                                         PResult::Ok(
                                                                                             {
-                                                                                                (Decoder43(scope, input))?
+                                                                                                (Decoder43(input))?
                                                                                             },
                                                                                         )
                                                                                     })(
@@ -5484,7 +5284,7 @@ fn Decoder49<'input>(
                                                                                     ((|| {
                                                                                         PResult::Ok(
                                                                                             {
-                                                                                                (Decoder43(scope, input))?
+                                                                                                (Decoder43(input))?
                                                                                             },
                                                                                         )
                                                                                     })(
@@ -5495,7 +5295,7 @@ fn Decoder49<'input>(
                                                                                             {
                                                                                                 let mut accum = (Vec::new());
                                                                                                 for _ in 0..reference_count {
-(accum.push((Decoder43(scope, input))?));
+(accum.push((Decoder43(input))?));
 }
                                                                                                 accum
                                                                                             },
@@ -5548,13 +5348,13 @@ fn Decoder49<'input>(
                                                             let next_elem = {
                                                                 let size_field = ((|| {
                                                                     PResult::Ok({
-                                                                        (Decoder33(scope, input))?
+                                                                        (Decoder33(input))?
                                                                     })
                                                                 })(
                                                                 ))?;
                                                                 let r#type = ((|| {
                                                                     PResult::Ok({
-                                                                        (Decoder47(scope, input))?
+                                                                        (Decoder47(input))?
                                                                     })
                                                                 })(
                                                                 ))?;
@@ -5566,7 +5366,6 @@ fn Decoder49<'input>(
                                                                             1 => {
                                                                                 let inner =
                                                                                     (Decoder48(
-                                                                                        scope,
                                                                                         input,
                                                                                     ))?;
                                                                                 ((|x: u64| x - 16)(
@@ -5590,15 +5389,15 @@ fn Decoder49<'input>(
                                                                 ))?;
                                                                 let data = ((|| {
                                                                     PResult::Ok({
-                                                                        let sz = size;
-                                                                        (input.start_slice(_sz))?;
-                                                                        let ret = ((|| {
+                                                                        let sz = (size as usize);
+                                                                        (input.start_slice(sz))?;
+                                                                        let mut ret = ((|| {
                                                                             PResult::Ok({
                                                                                 let from_item_ID =
                                                                                     ((|| {
                                                                                         PResult::Ok(
                                                                                             {
-                                                                                                (Decoder33(scope, input))?
+                                                                                                (Decoder33(input))?
                                                                                             },
                                                                                         )
                                                                                     })(
@@ -5607,7 +5406,7 @@ fn Decoder49<'input>(
                                                                                     ((|| {
                                                                                         PResult::Ok(
                                                                                             {
-                                                                                                (Decoder43(scope, input))?
+                                                                                                (Decoder43(input))?
                                                                                             },
                                                                                         )
                                                                                     })(
@@ -5618,7 +5417,7 @@ fn Decoder49<'input>(
                                                                                             {
                                                                                                 let mut accum = (Vec::new());
                                                                                                 for _ in 0..reference_count {
-(accum.push((Decoder33(scope, input))?));
+(accum.push((Decoder33(input))?));
 }
                                                                                                 accum
                                                                                             },
@@ -5673,26 +5472,22 @@ fn Decoder49<'input>(
                         (105, 108, 111, 99) => {
                             let inner =
                                 {
-                                    let version =
-                                        ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                    let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                     let flags = ((|| {
                                         PResult::Ok({
                                             let field0 =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
+                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                             let field1 =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
+                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                             let field2 =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
+                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                             (field0, field1, field2)
                                         })
                                     })())?;
                                     let offset_size_length_size =
-                                        ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                     let base_offset_size_index_size =
-                                        ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                     let offset_size =
                                         ((|| PResult::Ok({ (offset_size_length_size >> 4) }))())?;
                                     let length_size =
@@ -5717,11 +5512,11 @@ fn Decoder49<'input>(
                                         PResult::Ok({
                                             match (version < 2) {
                                                 true => {
-                                                    let inner = (Decoder43(scope, input))?;
+                                                    let inner = (Decoder43(input))?;
                                                     ((|x: u16| x as u32)(inner))
                                                 }
 
-                                                false => (Decoder33(scope, input))?,
+                                                false => (Decoder33(input))?,
 
                                                 _other => {
                                                     (unreachable!(r#"bad value {_other:?}"#));
@@ -5738,12 +5533,12 @@ fn Decoder49<'input>(
 let item_ID = ((|| PResult::Ok({
 match (version < 2) {
 true => {
-let inner = (Decoder43(scope, input))?;
+let inner = (Decoder43(input))?;
 (((|x: u16| x as u32))(inner))
 },
 
 false => {
-(Decoder33(scope, input))?
+(Decoder33(input))?
 },
 
 _other => {
@@ -5754,7 +5549,7 @@ _other => {
 let construction_method = ((|| PResult::Ok({
 match (version > 0) {
 true => {
-let inner = (Decoder43(scope, input))?;
+let inner = (Decoder43(input))?;
 (Type97::yes(inner))
 },
 
@@ -5769,7 +5564,7 @@ _other => {
 }
 }))())?;
 let data_reference_index = ((|| PResult::Ok({
-(Decoder43(scope, input))?
+(Decoder43(input))?
 }))())?;
 let base_offset = ((|| PResult::Ok({
 match base_offset_size {
@@ -5778,12 +5573,12 @@ match base_offset_size {
 },
 
 4 => {
-let inner = (Decoder33(scope, input))?;
+let inner = (Decoder33(input))?;
 (((|x: u32| x as u64))(inner))
 },
 
 8 => {
-(Decoder48(scope, input))?
+(Decoder48(input))?
 },
 
 _other => {
@@ -5792,7 +5587,7 @@ _other => {
 }
 }))())?;
 let extent_count = ((|| PResult::Ok({
-(Decoder43(scope, input))?
+(Decoder43(input))?
 }))())?;
 let extents = ((|| PResult::Ok({
 let mut accum = (Vec::new());
@@ -5805,12 +5600,12 @@ match index_size {
 },
 
 4 => {
-let inner = (Decoder33(scope, input))?;
+let inner = (Decoder33(input))?;
 (((|x: u32| x as u64))(inner))
 },
 
 8 => {
-(Decoder48(scope, input))?
+(Decoder48(input))?
 },
 
 _other => {
@@ -5825,12 +5620,12 @@ match offset_size {
 },
 
 4 => {
-let inner = (Decoder33(scope, input))?;
+let inner = (Decoder33(input))?;
 (((|x: u32| x as u64))(inner))
 },
 
 8 => {
-(Decoder48(scope, input))?
+(Decoder48(input))?
 },
 
 _other => {
@@ -5845,12 +5640,12 @@ match length_size {
 },
 
 4 => {
-let inner = (Decoder33(scope, input))?;
+let inner = (Decoder33(input))?;
 (((|x: u32| x as u64))(inner))
 },
 
 8 => {
-(Decoder48(scope, input))?
+(Decoder48(input))?
 },
 
 _other => {
@@ -5898,7 +5693,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder60(scope, input))?;
+                                        let next_elem = (Decoder60(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -5922,7 +5717,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -5946,7 +5741,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -5975,19 +5770,16 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
     }))
 }
 
-fn Decoder50<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type160, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder50<'input>(input: &mut ParseMonad<'input>) -> Result<Type160, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -6001,22 +5793,19 @@ fn Decoder50<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (109, 118, 104, 100) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -6026,19 +5815,19 @@ fn Decoder50<'input>(
                                             0 => {
                                                 let inner = {
                                                     let creation_time = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let modification_time = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let timescale = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let duration = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     Type116 {
@@ -6054,19 +5843,19 @@ fn Decoder50<'input>(
                                             1 => {
                                                 let inner = {
                                                     let creation_time = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     let modification_time = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     let timescale = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let duration = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     Type117 {
@@ -6085,16 +5874,13 @@ fn Decoder50<'input>(
                                         }
                                     })
                                 })())?;
-                                let rate = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                let volume = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let reserved1 =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let rate = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let volume = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let reserved1 = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 let reserved2 = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                         (field0, field1)
                                     })
                                 })())?;
@@ -6102,7 +5888,7 @@ fn Decoder50<'input>(
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..9 {
-                                            (accum.push((Decoder33(scope, input))?));
+                                            (accum.push((Decoder33(input))?));
                                         }
                                         accum
                                     })
@@ -6111,13 +5897,12 @@ fn Decoder50<'input>(
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..6 {
-                                            (accum.push((Decoder33(scope, input))?));
+                                            (accum.push((Decoder33(input))?));
                                         }
                                         accum
                                     })
                                 })())?;
-                                let next_track_ID =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let next_track_ID = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 Type119 {
                                     version,
                                     flags,
@@ -6147,7 +5932,7 @@ fn Decoder50<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder51(scope, input))?;
+                                        let next_elem = (Decoder51(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6171,7 +5956,7 @@ fn Decoder50<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder52(scope, input))?;
+                                        let next_elem = (Decoder52(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6195,7 +5980,7 @@ fn Decoder50<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6224,19 +6009,16 @@ fn Decoder50<'input>(
     }))
 }
 
-fn Decoder51<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type156, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder51<'input>(input: &mut ParseMonad<'input>) -> Result<Type156, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -6250,22 +6032,19 @@ fn Decoder51<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (116, 107, 104, 100) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -6275,23 +6054,23 @@ fn Decoder51<'input>(
                                             0 => {
                                                 let inner = {
                                                     let creation_time = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let modification_time = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let track_ID = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let reserved = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let duration = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     Type151 {
@@ -6308,23 +6087,23 @@ fn Decoder51<'input>(
                                             1 => {
                                                 let inner = {
                                                     let creation_time = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     let modification_time = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     let track_ID = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let reserved = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let duration = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     Type152 {
@@ -6346,30 +6125,27 @@ fn Decoder51<'input>(
                                 })())?;
                                 let reserved2 = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                         (field0, field1)
                                     })
                                 })())?;
-                                let layer = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let layer = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 let alternate_group =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let volume = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let reserved1 =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let volume = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let reserved1 = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 let matrix = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..9 {
-                                            (accum.push((Decoder33(scope, input))?));
+                                            (accum.push((Decoder33(input))?));
                                         }
                                         accum
                                     })
                                 })())?;
-                                let width = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                let height = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let width = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let height = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 Type154 {
                                     version,
                                     flags,
@@ -6400,7 +6176,7 @@ fn Decoder51<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder53(scope, input))?;
+                                        let next_elem = (Decoder53(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6424,7 +6200,7 @@ fn Decoder51<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder54(scope, input))?;
+                                        let next_elem = (Decoder54(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6448,7 +6224,7 @@ fn Decoder51<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6477,19 +6253,16 @@ fn Decoder51<'input>(
     }))
 }
 
-fn Decoder52<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type158, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder52<'input>(input: &mut ParseMonad<'input>) -> Result<Type158, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -6503,13 +6276,13 @@ fn Decoder52<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (109, 101, 116, 97) => {
-                            let field0 = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                            let field0 = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                             let field1 = ((|| {
                                 PResult::Ok({
                                     let mut accum = (Vec::new());
@@ -6523,7 +6296,7 @@ fn Decoder52<'input>(
                                             }
                                         };
                                         if (matching_ix == 0) {
-                                            let next_elem = (Decoder49(scope, input))?;
+                                            let next_elem = (Decoder49(input))?;
                                             (accum.push(next_elem));
                                         } else {
                                             break;
@@ -6548,7 +6321,7 @@ fn Decoder52<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6577,19 +6350,16 @@ fn Decoder52<'input>(
     }))
 }
 
-fn Decoder53<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type123, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder53<'input>(input: &mut ParseMonad<'input>) -> Result<Type123, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -6603,44 +6373,35 @@ fn Decoder53<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (101, 108, 115, 116) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
                                 let number_of_entries =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let edit_list_table = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..number_of_entries {
                                             (accum.push({
-                                                let track_duration = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let media_time = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let media_rate = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
+                                                let track_duration =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let media_time =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let media_rate =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                                 Type120 {
                                                     track_duration,
                                                     media_time,
@@ -6674,7 +6435,7 @@ fn Decoder53<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6703,19 +6464,16 @@ fn Decoder53<'input>(
     }))
 }
 
-fn Decoder54<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type150, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder54<'input>(input: &mut ParseMonad<'input>) -> Result<Type150, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -6729,37 +6487,32 @@ fn Decoder54<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (104, 100, 108, 114) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let component_type =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let component_type = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let component_subtype =
-                                    ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder47(input))? }))())?;
                                 let component_manufacturer =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let component_flags =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let component_flags_mask =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                let component_name =
-                                    ((|| PResult::Ok({ (Decoder55(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let component_name = ((|| PResult::Ok({ (Decoder55(input))? }))())?;
                                 Type124 {
                                     version,
                                     flags,
@@ -6776,15 +6529,12 @@ fn Decoder54<'input>(
 
                         (109, 100, 104, 100) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -6794,19 +6544,19 @@ fn Decoder54<'input>(
                                             0 => {
                                                 let inner = {
                                                     let creation_time = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let modification_time = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let timescale = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let duration = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     Type116 {
@@ -6822,19 +6572,19 @@ fn Decoder54<'input>(
                                             1 => {
                                                 let inner = {
                                                     let creation_time = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     let modification_time = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     let timescale = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let duration = ((|| {
-                                                        PResult::Ok({ (Decoder48(scope, input))? })
+                                                        PResult::Ok({ (Decoder48(input))? })
                                                     })(
                                                     ))?;
                                                     Type117 {
@@ -6853,10 +6603,8 @@ fn Decoder54<'input>(
                                         }
                                     })
                                 })())?;
-                                let language =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let pre_defined =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let language = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let pre_defined = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type125 {
                                     version,
                                     flags,
@@ -6881,7 +6629,7 @@ fn Decoder54<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder56(scope, input))?;
+                                        let next_elem = (Decoder56(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6905,7 +6653,7 @@ fn Decoder54<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -6934,10 +6682,7 @@ fn Decoder54<'input>(
     }))
 }
 
-fn Decoder55<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder55<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -6989,19 +6734,16 @@ fn Decoder55<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder56<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type148, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder56<'input>(input: &mut ParseMonad<'input>) -> Result<Type148, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -7015,32 +6757,28 @@ fn Decoder56<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (118, 109, 104, 100) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let graphicsmode =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let graphicsmode = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 let opcolor = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..3 {
-                                            (accum.push((Decoder43(scope, input))?));
+                                            (accum.push((Decoder43(input))?));
                                         }
                                         accum
                                     })
@@ -7057,21 +6795,17 @@ fn Decoder56<'input>(
 
                         (115, 109, 104, 100) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let balance = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-                                let reserved =
-                                    ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+                                let balance = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+                                let reserved = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
                                 Type126 {
                                     version,
                                     flags,
@@ -7095,7 +6829,7 @@ fn Decoder56<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder57(scope, input))?;
+                                        let next_elem = (Decoder57(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -7119,7 +6853,7 @@ fn Decoder56<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder58(scope, input))?;
+                                        let next_elem = (Decoder58(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -7143,7 +6877,7 @@ fn Decoder56<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -7172,19 +6906,16 @@ fn Decoder56<'input>(
     }))
 }
 
-fn Decoder57<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type85, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder57<'input>(input: &mut ParseMonad<'input>) -> Result<Type85, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -7198,27 +6929,24 @@ fn Decoder57<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (100, 114, 101, 102) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
                                 let number_of_entries =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let data = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
@@ -7234,11 +6962,11 @@ fn Decoder57<'input>(
                                             if (matching_ix == 0) {
                                                 let next_elem = {
                                                     let size_field = ((|| {
-                                                        PResult::Ok({ (Decoder33(scope, input))? })
+                                                        PResult::Ok({ (Decoder33(input))? })
                                                     })(
                                                     ))?;
                                                     let r#type = ((|| {
-                                                        PResult::Ok({ (Decoder47(scope, input))? })
+                                                        PResult::Ok({ (Decoder47(input))? })
                                                     })(
                                                     ))?;
                                                     let size = ((|| {
@@ -7247,8 +6975,7 @@ fn Decoder57<'input>(
                                                                 0 => 0,
 
                                                                 1 => {
-                                                                    let inner =
-                                                                        (Decoder48(scope, input))?;
+                                                                    let inner = (Decoder48(input))?;
                                                                     ((|x: u64| x - 16)(inner))
                                                                 }
 
@@ -7265,9 +6992,9 @@ fn Decoder57<'input>(
                                                     ))?;
                                                     let data = ((|| {
                                                         PResult::Ok({
-                                                            let sz = size;
-                                                            (input.start_slice(_sz))?;
-                                                            let ret = ((|| {
+                                                            let sz = (size as usize);
+                                                            (input.start_slice(sz))?;
+                                                            let mut ret = ((|| {
                                                                 PResult::Ok({
                                                                     let mut accum = (Vec::new());
                                                                     while (input.remaining() > 0) {
@@ -7283,9 +7010,7 @@ fn Decoder57<'input>(
                                                                         };
                                                                         if (matching_ix == 0) {
                                                                             let next_elem =
-                                                                                (Decoder17(
-                                                                                    scope, input,
-                                                                                ))?;
+                                                                                (Decoder17(input))?;
                                                                             (accum.push(next_elem));
                                                                         } else {
                                                                             break;
@@ -7338,7 +7063,7 @@ fn Decoder57<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -7367,19 +7092,16 @@ fn Decoder57<'input>(
     }))
 }
 
-fn Decoder58<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type145, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder58<'input>(input: &mut ParseMonad<'input>) -> Result<Type145, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -7393,27 +7115,23 @@ fn Decoder58<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (115, 116, 115, 100) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let sample_entries =
                                     ((|| {
                                         PResult::Ok({
@@ -7421,10 +7139,10 @@ fn Decoder58<'input>(
                                             for _ in 0..entry_count {
                                                 (accum.push({
 let size_field = ((|| PResult::Ok({
-(Decoder33(scope, input))?
+(Decoder33(input))?
 }))())?;
 let r#type = ((|| PResult::Ok({
-(Decoder47(scope, input))?
+(Decoder47(input))?
 }))())?;
 let size = ((|| PResult::Ok({
 match size_field {
@@ -7433,7 +7151,7 @@ match size_field {
 },
 
 1 => {
-let inner = (Decoder48(scope, input))?;
+let inner = (Decoder48(input))?;
 (((|x: u64| x - 16))(inner))
 },
 
@@ -7447,9 +7165,9 @@ _other => {
 }
 }))())?;
 let data = ((|| PResult::Ok({
-let sz = size;
-(input.start_slice(_sz))?;
-let ret = ((|| PResult::Ok({
+let sz = (size as usize<>);
+(input.start_slice(sz))?;
+let mut ret = ((|| PResult::Ok({
 let mut accum = (Vec::new());
 while (input.remaining() > 0) {
 let matching_ix = {
@@ -7461,7 +7179,7 @@ ret
 }
 };
 if (matching_ix == 0) {
-let next_elem = (Decoder17(scope, input))?;
+let next_elem = (Decoder17(input))?;
 (accum.push(next_elem));
 } else {
 break
@@ -7490,33 +7208,25 @@ Type82 { size_field, r#type, size, data }
 
                         (115, 116, 116, 115) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let sample_entries = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
                                             (accum.push({
-                                                let sample_count = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let sample_delta = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
+                                                let sample_count =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let sample_delta =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                                 Type142 {
                                                     sample_count,
                                                     sample_delta,
@@ -7538,33 +7248,25 @@ Type82 { size_field, r#type, size, data }
 
                         (99, 116, 116, 115) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let sample_entries = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
                                             (accum.push({
-                                                let sample_count = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let sample_offset = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
+                                                let sample_count =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let sample_offset =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                                 Type128 {
                                                     sample_count,
                                                     sample_offset,
@@ -7586,25 +7288,21 @@ Type82 { size_field, r#type, size, data }
 
                         (115, 116, 115, 115) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let sample_number = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
-                                            (accum.push((Decoder33(scope, input))?));
+                                            (accum.push((Decoder33(input))?));
                                         }
                                         accum
                                     })
@@ -7621,37 +7319,27 @@ Type82 { size_field, r#type, size, data }
 
                         (115, 116, 115, 99) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let chunk_entries = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
                                             (accum.push({
-                                                let first_chunk = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let samples_per_chunk = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let sample_description_index = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
+                                                let first_chunk =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let samples_per_chunk =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let sample_description_index =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                                 Type136 {
                                                     first_chunk,
                                                     samples_per_chunk,
@@ -7674,22 +7362,17 @@ Type82 { size_field, r#type, size, data }
 
                         (115, 116, 115, 122) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let sample_size =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                let sample_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let sample_size = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let sample_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let entry_size = ((|| {
                                     PResult::Ok({
                                         match (sample_size == 0) {
@@ -7697,7 +7380,7 @@ Type82 { size_field, r#type, size, data }
                                                 let inner = {
                                                     let mut accum = (Vec::new());
                                                     for _ in 0..sample_count {
-                                                        (accum.push((Decoder33(scope, input))?));
+                                                        (accum.push((Decoder33(input))?));
                                                     }
                                                     accum
                                                 };
@@ -7728,25 +7411,21 @@ Type82 { size_field, r#type, size, data }
 
                         (115, 116, 99, 111) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let chunk_offset = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
-                                            (accum.push((Decoder33(scope, input))?));
+                                            (accum.push((Decoder33(input))?));
                                         }
                                         accum
                                     })
@@ -7763,25 +7442,21 @@ Type82 { size_field, r#type, size, data }
 
                         (99, 111, 54, 52) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let chunk_offset = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
-                                            (accum.push((Decoder48(scope, input))?));
+                                            (accum.push((Decoder48(input))?));
                                         }
                                         accum
                                     })
@@ -7797,97 +7472,88 @@ Type82 { size_field, r#type, size, data }
                         }
 
                         (115, 103, 112, 100) => {
-                            let inner =
-                                {
-                                    let version =
-                                        ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                    let flags = ((|| {
-                                        PResult::Ok({
-                                            let field0 =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
-                                            let field1 =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
-                                            let field2 =
-                                                ((|| PResult::Ok({ (Decoder17(scope, input))? }))(
-                                                ))?;
-                                            (field0, field1, field2)
-                                        })
-                                    })())?;
-                                    let grouping_type =
-                                        ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                    let default_length =
-                                        ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                    let entry_count =
-                                        ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-                                    let sample_groups =
-                                        ((|| {
-                                            PResult::Ok({
-                                                let mut accum = (Vec::new());
-                                                for _ in 0..entry_count {
-                                                    (accum.push({
-let description_length = ((|| PResult::Ok({
-match (default_length == 0) {
-true => {
-(Decoder33(scope, input))?
-},
+                            let inner = {
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                let flags = ((|| {
+                                    PResult::Ok({
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        (field0, field1, field2)
+                                    })
+                                })())?;
+                                let grouping_type = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let default_length = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                let sample_groups = ((|| {
+                                    PResult::Ok({
+                                        let mut accum = (Vec::new());
+                                        for _ in 0..entry_count {
+                                            (accum.push({
+                                                let description_length = ((|| {
+                                                    PResult::Ok({
+                                                        match (default_length == 0) {
+                                                            true => (Decoder33(input))?,
 
-false => {
-default_length
-},
+                                                            false => default_length,
 
-_other => {
-(unreachable!(r#"bad value {_other:?}"#));
-}
-}
-}))())?;
-let sample_group_entry = ((|| PResult::Ok({
-let mut accum = (Vec::new());
-for _ in 0..description_length {
-(accum.push((Decoder17(scope, input))?));
-}
-accum
-}))())?;
-Type133 { description_length, sample_group_entry }
-}));
+                                                            _other => {
+                                                                (unreachable!(
+                                                                    r#"bad value {_other:?}"#
+                                                                ));
+                                                            }
+                                                        }
+                                                    })
+                                                })(
+                                                ))?;
+                                                let sample_group_entry = ((|| {
+                                                    PResult::Ok({
+                                                        let mut accum = (Vec::new());
+                                                        for _ in 0..description_length {
+                                                            (accum.push((Decoder17(input))?));
+                                                        }
+                                                        accum
+                                                    })
+                                                })(
+                                                ))?;
+                                                Type133 {
+                                                    description_length,
+                                                    sample_group_entry,
                                                 }
-                                                accum
-                                            })
-                                        })())?;
-                                    Type134 {
-                                        version,
-                                        flags,
-                                        grouping_type,
-                                        default_length,
-                                        entry_count,
-                                        sample_groups,
-                                    }
-                                };
+                                            }));
+                                        }
+                                        accum
+                                    })
+                                })())?;
+                                Type134 {
+                                    version,
+                                    flags,
+                                    grouping_type,
+                                    default_length,
+                                    entry_count,
+                                    sample_groups,
+                                }
+                            };
                             (Type144::sgpd(inner))
                         }
 
                         (115, 98, 103, 112) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
-                                let grouping_type =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let grouping_type = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let grouping_type_parameter = ((|| {
                                     PResult::Ok({
                                         match (version == 1) {
                                             true => {
-                                                let inner = (Decoder33(scope, input))?;
+                                                let inner = (Decoder33(input))?;
                                                 (Type130::yes(inner))
                                             }
 
@@ -7903,21 +7569,16 @@ Type133 { description_length, sample_group_entry }
                                     })
                                 })(
                                 ))?;
-                                let entry_count =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let entry_count = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let sample_groups = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
                                         for _ in 0..entry_count {
                                             (accum.push({
-                                                let sample_count = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
-                                                let group_description_index = ((|| {
-                                                    PResult::Ok({ (Decoder33(scope, input))? })
-                                                })(
-                                                ))?;
+                                                let sample_count =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+                                                let group_description_index =
+                                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                                 Type131 {
                                                     sample_count,
                                                     group_description_index,
@@ -7952,7 +7613,7 @@ Type133 { description_length, sample_group_entry }
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -7981,19 +7642,16 @@ Type133 { description_length, sample_group_entry }
     }))
 }
 
-fn Decoder59<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type95, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -8007,22 +7665,19 @@ fn Decoder59<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (105, 110, 102, 101) => {
                             let inner = {
-                                let version = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                 let flags = ((|| {
                                     PResult::Ok({
-                                        let field0 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field1 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-                                        let field2 =
-                                            ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
                                         (field0, field1, field2)
                                     })
                                 })())?;
@@ -8032,23 +7687,23 @@ fn Decoder59<'input>(
                                             true => {
                                                 let inner = {
                                                     let item_ID = ((|| {
-                                                        PResult::Ok({ (Decoder43(scope, input))? })
+                                                        PResult::Ok({ (Decoder43(input))? })
                                                     })(
                                                     ))?;
                                                     let item_protection_index = ((|| {
-                                                        PResult::Ok({ (Decoder43(scope, input))? })
+                                                        PResult::Ok({ (Decoder43(input))? })
                                                     })(
                                                     ))?;
                                                     let item_name = ((|| {
-                                                        PResult::Ok({ (Decoder62(scope, input))? })
+                                                        PResult::Ok({ (Decoder62(input))? })
                                                     })(
                                                     ))?;
                                                     let content_type = ((|| {
-                                                        PResult::Ok({ (Decoder63(scope, input))? })
+                                                        PResult::Ok({ (Decoder63(input))? })
                                                     })(
                                                     ))?;
                                                     let content_encoding = ((|| {
-                                                        PResult::Ok({ (Decoder64(scope, input))? })
+                                                        PResult::Ok({ (Decoder64(input))? })
                                                     })(
                                                     ))?;
                                                     Type91 {
@@ -8068,12 +7723,11 @@ fn Decoder59<'input>(
                                                         PResult::Ok({
                                                             match (version == 2) {
                                                                 true => {
-                                                                    let inner =
-                                                                        (Decoder43(scope, input))?;
+                                                                    let inner = (Decoder43(input))?;
                                                                     ((|x: u16| x as u32)(inner))
                                                                 }
 
-                                                                false => (Decoder33(scope, input))?,
+                                                                false => (Decoder33(input))?,
 
                                                                 _other => {
                                                                     (unreachable!(
@@ -8085,15 +7739,15 @@ fn Decoder59<'input>(
                                                     })(
                                                     ))?;
                                                     let item_protection_index = ((|| {
-                                                        PResult::Ok({ (Decoder43(scope, input))? })
+                                                        PResult::Ok({ (Decoder43(input))? })
                                                     })(
                                                     ))?;
                                                     let item_type = ((|| {
-                                                        PResult::Ok({ (Decoder47(scope, input))? })
+                                                        PResult::Ok({ (Decoder47(input))? })
                                                     })(
                                                     ))?;
                                                     let item_name = ((|| {
-                                                        PResult::Ok({ (Decoder65(scope, input))? })
+                                                        PResult::Ok({ (Decoder65(input))? })
                                                     })(
                                                     ))?;
                                                     let extra_fields = ((|| {
@@ -8105,7 +7759,6 @@ fn Decoder59<'input>(
                                                                             ((|| {
                                                                                 PResult::Ok({
                                                                                     (Decoder66(
-                                                                                        scope,
                                                                                         input,
                                                                                     ))?
                                                                                 })
@@ -8122,7 +7775,6 @@ fn Decoder59<'input>(
                                                                             ((|| {
                                                                                 PResult::Ok({
                                                                                     (Decoder66(
-                                                                                        scope,
                                                                                         input,
                                                                                     ))?
                                                                                 })
@@ -8186,7 +7838,7 @@ fn Decoder59<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -8215,19 +7867,16 @@ fn Decoder59<'input>(
     }))
 }
 
-fn Decoder60<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type105, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder60<'input>(input: &mut ParseMonad<'input>) -> Result<Type105, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -8241,9 +7890,9 @@ fn Decoder60<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (169, 116, 111, 111) => {
@@ -8259,7 +7908,7 @@ fn Decoder60<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder61(scope, input))?;
+                                        let next_elem = (Decoder61(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -8283,7 +7932,7 @@ fn Decoder60<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -8312,19 +7961,16 @@ fn Decoder60<'input>(
     }))
 }
 
-fn Decoder61<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type103, ParseError> {
-    let size_field = ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
-    let r#type = ((|| PResult::Ok({ (Decoder47(scope, input))? }))())?;
+fn Decoder61<'input>(input: &mut ParseMonad<'input>) -> Result<Type103, ParseError> {
+    let size_field = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
+    let r#type = ((|| PResult::Ok({ (Decoder47(input))? }))())?;
     let size = ((|| {
         PResult::Ok({
             match size_field {
                 0 => 0,
 
                 1 => {
-                    let inner = (Decoder48(scope, input))?;
+                    let inner = (Decoder48(input))?;
                     ((|x: u64| x - 16)(inner))
                 }
 
@@ -8338,17 +7984,16 @@ fn Decoder61<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = size;
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = (size as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     match r#type {
                         (100, 97, 116, 97) => {
                             let inner = {
-                                let type_indicator =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                let type_indicator = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let locale_indicator =
-                                    ((|| PResult::Ok({ (Decoder33(scope, input))? }))())?;
+                                    ((|| PResult::Ok({ (Decoder33(input))? }))())?;
                                 let value = ((|| {
                                     PResult::Ok({
                                         let mut accum = (Vec::new());
@@ -8362,7 +8007,7 @@ fn Decoder61<'input>(
                                                 }
                                             };
                                             if (matching_ix == 0) {
-                                                let next_elem = (Decoder21(scope, input))?;
+                                                let next_elem = (Decoder21(input))?;
                                                 (accum.push(next_elem));
                                             } else {
                                                 break;
@@ -8393,7 +8038,7 @@ fn Decoder61<'input>(
                                         }
                                     };
                                     if (matching_ix == 0) {
-                                        let next_elem = (Decoder17(scope, input))?;
+                                        let next_elem = (Decoder17(input))?;
                                         (accum.push(next_elem));
                                     } else {
                                         break;
@@ -8422,10 +8067,7 @@ fn Decoder61<'input>(
     }))
 }
 
-fn Decoder62<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder62<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -8477,10 +8119,7 @@ fn Decoder62<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder63<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder63<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -8532,10 +8171,7 @@ fn Decoder63<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder64<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder64<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -8587,10 +8223,7 @@ fn Decoder64<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder65<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder65<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -8642,10 +8275,7 @@ fn Decoder65<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder66<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder66<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -8697,10 +8327,7 @@ fn Decoder66<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder67<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder67<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -8724,10 +8351,7 @@ fn Decoder67<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder68<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type79, ParseError> {
+fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseError> {
     let initial_segment = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -8754,17 +8378,13 @@ fn Decoder68<'input>(
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder70(scope, input))?;
+                    let inner = (Decoder70(input))?;
                     (Type55::app0(inner))
                 }
 
                 1 => {
-                    let inner = (Decoder71(scope, input))?;
+                    let inner = (Decoder71(input))?;
                     (Type55::app1(inner))
-                }
-
-                _other => {
-                    return (Err(ParseError::ExcludedBranch));
                 }
             }
         })
@@ -8860,7 +8480,7 @@ fn Decoder68<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder72(scope, input))?;
+                    let next_elem = (Decoder72(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -8869,8 +8489,8 @@ fn Decoder68<'input>(
             accum
         })
     })())?;
-    let header = ((|| PResult::Ok({ (Decoder73(scope, input))? }))())?;
-    let scan = ((|| PResult::Ok({ (Decoder74(scope, input))? }))())?;
+    let header = ((|| PResult::Ok({ (Decoder73(input))? }))())?;
+    let scan = ((|| PResult::Ok({ (Decoder74(input))? }))())?;
     let dnl = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -8941,17 +8561,13 @@ fn Decoder68<'input>(
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder75(scope, input))?;
+                    let inner = (Decoder75(input))?;
                     (Type78::some(inner))
                 }
 
                 1 => {
                     let _ = ();
                     Type78::none
-                }
-
-                _other => {
-                    return (Err(ParseError::ExcludedBranch));
                 }
             }
         })
@@ -9025,7 +8641,7 @@ fn Decoder68<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder76(scope, input))?;
+                    let next_elem = (Decoder76(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -9044,10 +8660,7 @@ fn Decoder68<'input>(
     }))
 }
 
-fn Decoder69<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder69<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -9071,10 +8684,7 @@ fn Decoder69<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder70<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type45, ParseError> {
+fn Decoder70<'input>(input: &mut ParseMonad<'input>) -> Result<Type45, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -9100,12 +8710,12 @@ fn Decoder70<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder136(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder136(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -9117,10 +8727,7 @@ fn Decoder70<'input>(
     }))
 }
 
-fn Decoder71<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type54, ParseError> {
+fn Decoder71<'input>(input: &mut ParseMonad<'input>) -> Result<Type54, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -9146,12 +8753,12 @@ fn Decoder71<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder130(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder130(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -9163,10 +8770,7 @@ fn Decoder71<'input>(
     }))
 }
 
-fn Decoder72<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type65, ParseError> {
+fn Decoder72<'input>(input: &mut ParseMonad<'input>) -> Result<Type65, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -9229,120 +8833,113 @@ fn Decoder72<'input>(
     };
     (Ok(match tree_index {
         0 => {
-            let inner = (Decoder107(scope, input))?;
+            let inner = (Decoder107(input))?;
             (Type65::dqt(inner))
         }
 
         1 => {
-            let inner = (Decoder108(scope, input))?;
+            let inner = (Decoder108(input))?;
             (Type65::dht(inner))
         }
 
         2 => {
-            let inner = (Decoder109(scope, input))?;
+            let inner = (Decoder109(input))?;
             (Type65::dac(inner))
         }
 
         3 => {
-            let inner = (Decoder110(scope, input))?;
+            let inner = (Decoder110(input))?;
             (Type65::dri(inner))
         }
 
         4 => {
-            let inner = (Decoder70(scope, input))?;
+            let inner = (Decoder70(input))?;
             (Type65::app0(inner))
         }
 
         5 => {
-            let inner = (Decoder71(scope, input))?;
+            let inner = (Decoder71(input))?;
             (Type65::app1(inner))
         }
 
         6 => {
-            let inner = (Decoder111(scope, input))?;
+            let inner = (Decoder111(input))?;
             (Type65::app2(inner))
         }
 
         7 => {
-            let inner = (Decoder112(scope, input))?;
+            let inner = (Decoder112(input))?;
             (Type65::app3(inner))
         }
 
         8 => {
-            let inner = (Decoder113(scope, input))?;
+            let inner = (Decoder113(input))?;
             (Type65::app4(inner))
         }
 
         9 => {
-            let inner = (Decoder114(scope, input))?;
+            let inner = (Decoder114(input))?;
             (Type65::app5(inner))
         }
 
         10 => {
-            let inner = (Decoder115(scope, input))?;
+            let inner = (Decoder115(input))?;
             (Type65::app6(inner))
         }
 
         11 => {
-            let inner = (Decoder116(scope, input))?;
+            let inner = (Decoder116(input))?;
             (Type65::app7(inner))
         }
 
         12 => {
-            let inner = (Decoder117(scope, input))?;
+            let inner = (Decoder117(input))?;
             (Type65::app8(inner))
         }
 
         13 => {
-            let inner = (Decoder118(scope, input))?;
+            let inner = (Decoder118(input))?;
             (Type65::app9(inner))
         }
 
         14 => {
-            let inner = (Decoder119(scope, input))?;
+            let inner = (Decoder119(input))?;
             (Type65::app10(inner))
         }
 
         15 => {
-            let inner = (Decoder120(scope, input))?;
+            let inner = (Decoder120(input))?;
             (Type65::app11(inner))
         }
 
         16 => {
-            let inner = (Decoder121(scope, input))?;
+            let inner = (Decoder121(input))?;
             (Type65::app12(inner))
         }
 
         17 => {
-            let inner = (Decoder122(scope, input))?;
+            let inner = (Decoder122(input))?;
             (Type65::app13(inner))
         }
 
         18 => {
-            let inner = (Decoder123(scope, input))?;
+            let inner = (Decoder123(input))?;
             (Type65::app14(inner))
         }
 
         19 => {
-            let inner = (Decoder124(scope, input))?;
+            let inner = (Decoder124(input))?;
             (Type65::app15(inner))
         }
 
         20 => {
-            let inner = (Decoder125(scope, input))?;
+            let inner = (Decoder125(input))?;
             (Type65::com(inner))
-        }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
 
-fn Decoder73<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type69, ParseError> {
+fn Decoder73<'input>(input: &mut ParseMonad<'input>) -> Result<Type69, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -9389,80 +8986,73 @@ fn Decoder73<'input>(
     };
     (Ok(match tree_index {
         0 => {
-            let inner = (Decoder92(scope, input))?;
+            let inner = (Decoder92(input))?;
             (Type69::sof0(inner))
         }
 
         1 => {
-            let inner = (Decoder93(scope, input))?;
+            let inner = (Decoder93(input))?;
             (Type69::sof1(inner))
         }
 
         2 => {
-            let inner = (Decoder94(scope, input))?;
+            let inner = (Decoder94(input))?;
             (Type69::sof2(inner))
         }
 
         3 => {
-            let inner = (Decoder95(scope, input))?;
+            let inner = (Decoder95(input))?;
             (Type69::sof3(inner))
         }
 
         4 => {
-            let inner = (Decoder96(scope, input))?;
+            let inner = (Decoder96(input))?;
             (Type69::sof5(inner))
         }
 
         5 => {
-            let inner = (Decoder97(scope, input))?;
+            let inner = (Decoder97(input))?;
             (Type69::sof6(inner))
         }
 
         6 => {
-            let inner = (Decoder98(scope, input))?;
+            let inner = (Decoder98(input))?;
             (Type69::sof7(inner))
         }
 
         7 => {
-            let inner = (Decoder99(scope, input))?;
+            let inner = (Decoder99(input))?;
             (Type69::sof9(inner))
         }
 
         8 => {
-            let inner = (Decoder100(scope, input))?;
+            let inner = (Decoder100(input))?;
             (Type69::sof10(inner))
         }
 
         9 => {
-            let inner = (Decoder101(scope, input))?;
+            let inner = (Decoder101(input))?;
             (Type69::sof11(inner))
         }
 
         10 => {
-            let inner = (Decoder102(scope, input))?;
+            let inner = (Decoder102(input))?;
             (Type69::sof13(inner))
         }
 
         11 => {
-            let inner = (Decoder103(scope, input))?;
+            let inner = (Decoder103(input))?;
             (Type69::sof14(inner))
         }
 
         12 => {
-            let inner = (Decoder104(scope, input))?;
+            let inner = (Decoder104(input))?;
             (Type69::sof15(inner))
-        }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
 
-fn Decoder74<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type75, ParseError> {
+fn Decoder74<'input>(input: &mut ParseMonad<'input>) -> Result<Type75, ParseError> {
     let segments = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -9530,7 +9120,7 @@ fn Decoder74<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder72(scope, input))?;
+                    let next_elem = (Decoder72(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -9539,8 +9129,8 @@ fn Decoder74<'input>(
             accum
         })
     })())?;
-    let sos = ((|| PResult::Ok({ (Decoder77(scope, input))? }))())?;
-    let data = ((|| PResult::Ok({ (Decoder91(scope, input))? }))())?;
+    let sos = ((|| PResult::Ok({ (Decoder77(input))? }))())?;
+    let data = ((|| PResult::Ok({ (Decoder91(input))? }))())?;
     (Ok(Type75 {
         segments,
         sos,
@@ -9548,10 +9138,7 @@ fn Decoder74<'input>(
     }))
 }
 
-fn Decoder75<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type77, ParseError> {
+fn Decoder75<'input>(input: &mut ParseMonad<'input>) -> Result<Type77, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -9577,12 +9164,12 @@ fn Decoder75<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder90(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder90(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -9594,10 +9181,7 @@ fn Decoder75<'input>(
     }))
 }
 
-fn Decoder76<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type75, ParseError> {
+fn Decoder76<'input>(input: &mut ParseMonad<'input>) -> Result<Type75, ParseError> {
     let segments = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -9665,7 +9249,7 @@ fn Decoder76<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder72(scope, input))?;
+                    let next_elem = (Decoder72(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -9674,8 +9258,8 @@ fn Decoder76<'input>(
             accum
         })
     })())?;
-    let sos = ((|| PResult::Ok({ (Decoder77(scope, input))? }))())?;
-    let data = ((|| PResult::Ok({ (Decoder78(scope, input))? }))())?;
+    let sos = ((|| PResult::Ok({ (Decoder77(input))? }))())?;
+    let data = ((|| PResult::Ok({ (Decoder78(input))? }))())?;
     (Ok(Type75 {
         segments,
         sos,
@@ -9683,10 +9267,7 @@ fn Decoder76<'input>(
     }))
 }
 
-fn Decoder77<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type72, ParseError> {
+fn Decoder77<'input>(input: &mut ParseMonad<'input>) -> Result<Type72, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -9712,12 +9293,12 @@ fn Decoder77<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder88(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder88(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -9729,10 +9310,7 @@ fn Decoder77<'input>(
     }))
 }
 
-fn Decoder78<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type74, ParseError> {
+fn Decoder78<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseError> {
     let scan_data = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -9871,52 +9449,48 @@ fn Decoder78<'input>(
                         };
                         match tree_index {
                             0 => {
-                                let inner = (Decoder79(scope, input))?;
+                                let inner = (Decoder79(input))?;
                                 (Type73::mcu(inner))
                             }
 
                             1 => {
-                                let inner = (Decoder80(scope, input))?;
+                                let inner = (Decoder80(input))?;
                                 (Type73::rst0(inner))
                             }
 
                             2 => {
-                                let inner = (Decoder81(scope, input))?;
+                                let inner = (Decoder81(input))?;
                                 (Type73::rst1(inner))
                             }
 
                             3 => {
-                                let inner = (Decoder82(scope, input))?;
+                                let inner = (Decoder82(input))?;
                                 (Type73::rst2(inner))
                             }
 
                             4 => {
-                                let inner = (Decoder83(scope, input))?;
+                                let inner = (Decoder83(input))?;
                                 (Type73::rst3(inner))
                             }
 
                             5 => {
-                                let inner = (Decoder84(scope, input))?;
+                                let inner = (Decoder84(input))?;
                                 (Type73::rst4(inner))
                             }
 
                             6 => {
-                                let inner = (Decoder85(scope, input))?;
+                                let inner = (Decoder85(input))?;
                                 (Type73::rst5(inner))
                             }
 
                             7 => {
-                                let inner = (Decoder86(scope, input))?;
+                                let inner = (Decoder86(input))?;
                                 (Type73::rst6(inner))
                             }
 
                             8 => {
-                                let inner = (Decoder87(scope, input))?;
+                                let inner = (Decoder87(input))?;
                                 (Type73::rst7(inner))
-                            }
-
-                            _other => {
-                                return (Err(ParseError::ExcludedBranch));
                             }
                         }
                     };
@@ -9949,10 +9523,6 @@ fn Decoder78<'input>(
                     Type73::rst6(..) => ([].to_vec()),
 
                     Type73::rst7(..) => ([].to_vec()),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 }),
             ))
             .collect())
@@ -9964,10 +9534,7 @@ fn Decoder78<'input>(
     }))
 }
 
-fn Decoder79<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder79<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -10021,17 +9588,10 @@ fn Decoder79<'input>(
             };
             ((|_: (u8, u8)| 255)(inner))
         }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
-        }
     }))
 }
 
-fn Decoder80<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder80<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10055,10 +9615,7 @@ fn Decoder80<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder81<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder81<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10082,10 +9639,7 @@ fn Decoder81<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder82<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder82<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10109,10 +9663,7 @@ fn Decoder82<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder83<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder83<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10136,10 +9687,7 @@ fn Decoder83<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder84<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder84<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10163,10 +9711,7 @@ fn Decoder84<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder85<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder85<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10190,10 +9735,7 @@ fn Decoder85<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder86<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder86<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10217,10 +9759,7 @@ fn Decoder86<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder87<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type41, ParseError> {
+fn Decoder87<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -10244,23 +9783,20 @@ fn Decoder87<'input>(
     (Ok(Type41 { ff, marker }))
 }
 
-fn Decoder88<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type71, ParseError> {
-    let num_image_components = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder88<'input>(input: &mut ParseMonad<'input>) -> Result<Type71, ParseError> {
+    let num_image_components = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let image_components = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..num_image_components {
-                (accum.push((Decoder89(scope, input))?));
+                (accum.push((Decoder89(input))?));
             }
             accum
         })
     })())?;
-    let start_spectral_selection = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let end_spectral_selection = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let approximation_bit_position = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+    let start_spectral_selection = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let end_spectral_selection = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let approximation_bit_position = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type71 {
         num_image_components,
         image_components,
@@ -10270,30 +9806,21 @@ fn Decoder88<'input>(
     }))
 }
 
-fn Decoder89<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type70, ParseError> {
-    let component_selector = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let entropy_coding_table_ids = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder89<'input>(input: &mut ParseMonad<'input>) -> Result<Type70, ParseError> {
+    let component_selector = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let entropy_coding_table_ids = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type70 {
         component_selector,
         entropy_coding_table_ids,
     }))
 }
 
-fn Decoder90<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type76, ParseError> {
-    let num_lines = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+fn Decoder90<'input>(input: &mut ParseMonad<'input>) -> Result<Type76, ParseError> {
+    let num_lines = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     (Ok(Type76 { num_lines }))
 }
 
-fn Decoder91<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type74, ParseError> {
+fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseError> {
     let scan_data = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -10434,52 +9961,48 @@ fn Decoder91<'input>(
                         };
                         match tree_index {
                             0 => {
-                                let inner = (Decoder79(scope, input))?;
+                                let inner = (Decoder79(input))?;
                                 (Type73::mcu(inner))
                             }
 
                             1 => {
-                                let inner = (Decoder80(scope, input))?;
+                                let inner = (Decoder80(input))?;
                                 (Type73::rst0(inner))
                             }
 
                             2 => {
-                                let inner = (Decoder81(scope, input))?;
+                                let inner = (Decoder81(input))?;
                                 (Type73::rst1(inner))
                             }
 
                             3 => {
-                                let inner = (Decoder82(scope, input))?;
+                                let inner = (Decoder82(input))?;
                                 (Type73::rst2(inner))
                             }
 
                             4 => {
-                                let inner = (Decoder83(scope, input))?;
+                                let inner = (Decoder83(input))?;
                                 (Type73::rst3(inner))
                             }
 
                             5 => {
-                                let inner = (Decoder84(scope, input))?;
+                                let inner = (Decoder84(input))?;
                                 (Type73::rst4(inner))
                             }
 
                             6 => {
-                                let inner = (Decoder85(scope, input))?;
+                                let inner = (Decoder85(input))?;
                                 (Type73::rst5(inner))
                             }
 
                             7 => {
-                                let inner = (Decoder86(scope, input))?;
+                                let inner = (Decoder86(input))?;
                                 (Type73::rst6(inner))
                             }
 
                             8 => {
-                                let inner = (Decoder87(scope, input))?;
+                                let inner = (Decoder87(input))?;
                                 (Type73::rst7(inner))
-                            }
-
-                            _other => {
-                                return (Err(ParseError::ExcludedBranch));
                             }
                         }
                     };
@@ -10512,10 +10035,6 @@ fn Decoder91<'input>(
                     Type73::rst6(..) => ([].to_vec()),
 
                     Type73::rst7(..) => ([].to_vec()),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 }),
             ))
             .collect())
@@ -10527,10 +10046,7 @@ fn Decoder91<'input>(
     }))
 }
 
-fn Decoder92<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder92<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10556,12 +10072,12 @@ fn Decoder92<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10573,10 +10089,7 @@ fn Decoder92<'input>(
     }))
 }
 
-fn Decoder93<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder93<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10602,12 +10115,12 @@ fn Decoder93<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10619,10 +10132,7 @@ fn Decoder93<'input>(
     }))
 }
 
-fn Decoder94<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder94<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10648,12 +10158,12 @@ fn Decoder94<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10665,10 +10175,7 @@ fn Decoder94<'input>(
     }))
 }
 
-fn Decoder95<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder95<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10694,12 +10201,12 @@ fn Decoder95<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10711,10 +10218,7 @@ fn Decoder95<'input>(
     }))
 }
 
-fn Decoder96<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder96<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10740,12 +10244,12 @@ fn Decoder96<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10757,10 +10261,7 @@ fn Decoder96<'input>(
     }))
 }
 
-fn Decoder97<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder97<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10786,12 +10287,12 @@ fn Decoder97<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10803,10 +10304,7 @@ fn Decoder97<'input>(
     }))
 }
 
-fn Decoder98<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder98<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10832,12 +10330,12 @@ fn Decoder98<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10849,10 +10347,7 @@ fn Decoder98<'input>(
     }))
 }
 
-fn Decoder99<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder99<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10878,12 +10373,12 @@ fn Decoder99<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10895,10 +10390,7 @@ fn Decoder99<'input>(
     }))
 }
 
-fn Decoder100<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder100<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10924,12 +10416,12 @@ fn Decoder100<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10941,10 +10433,7 @@ fn Decoder100<'input>(
     }))
 }
 
-fn Decoder101<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder101<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10970,12 +10459,12 @@ fn Decoder101<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -10987,10 +10476,7 @@ fn Decoder101<'input>(
     }))
 }
 
-fn Decoder102<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder102<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11016,12 +10502,12 @@ fn Decoder102<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11033,10 +10519,7 @@ fn Decoder102<'input>(
     }))
 }
 
-fn Decoder103<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder103<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11062,12 +10545,12 @@ fn Decoder103<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11079,10 +10562,7 @@ fn Decoder103<'input>(
     }))
 }
 
-fn Decoder104<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type68, ParseError> {
+fn Decoder104<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11108,12 +10588,12 @@ fn Decoder104<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder105(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder105(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11125,19 +10605,16 @@ fn Decoder104<'input>(
     }))
 }
 
-fn Decoder105<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type67, ParseError> {
-    let sample_precision = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let num_lines = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-    let num_samples_per_line = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-    let num_image_components = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder105<'input>(input: &mut ParseMonad<'input>) -> Result<Type67, ParseError> {
+    let sample_precision = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let num_lines = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+    let num_samples_per_line = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+    let num_image_components = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let image_components = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..num_image_components {
-                (accum.push((Decoder106(scope, input))?));
+                (accum.push((Decoder106(input))?));
             }
             accum
         })
@@ -11151,13 +10628,10 @@ fn Decoder105<'input>(
     }))
 }
 
-fn Decoder106<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type66, ParseError> {
-    let id = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let sampling_factor = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let quantization_table_id = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder106<'input>(input: &mut ParseMonad<'input>) -> Result<Type66, ParseError> {
+    let id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let sampling_factor = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let quantization_table_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type66 {
         id,
         sampling_factor,
@@ -11165,10 +10639,7 @@ fn Decoder106<'input>(
     }))
 }
 
-fn Decoder107<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type62, ParseError> {
+fn Decoder107<'input>(input: &mut ParseMonad<'input>) -> Result<Type62, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11194,12 +10665,12 @@ fn Decoder107<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder129(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder129(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11211,10 +10682,7 @@ fn Decoder107<'input>(
     }))
 }
 
-fn Decoder108<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type60, ParseError> {
+fn Decoder108<'input>(input: &mut ParseMonad<'input>) -> Result<Type60, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11240,12 +10708,12 @@ fn Decoder108<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder128(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder128(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11257,10 +10725,7 @@ fn Decoder108<'input>(
     }))
 }
 
-fn Decoder109<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type58, ParseError> {
+fn Decoder109<'input>(input: &mut ParseMonad<'input>) -> Result<Type58, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11286,12 +10751,12 @@ fn Decoder109<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder127(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder127(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11303,10 +10768,7 @@ fn Decoder109<'input>(
     }))
 }
 
-fn Decoder110<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type64, ParseError> {
+fn Decoder110<'input>(input: &mut ParseMonad<'input>) -> Result<Type64, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11332,12 +10794,12 @@ fn Decoder110<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| PResult::Ok({ (Decoder126(scope, input))? }))())?;
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| PResult::Ok({ (Decoder126(input))? }))())?;
             (input.end_slice())?;
             ret
         })
@@ -11349,10 +10811,7 @@ fn Decoder110<'input>(
     }))
 }
 
-fn Decoder111<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder111<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11378,12 +10837,12 @@ fn Decoder111<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11396,7 +10855,7 @@ fn Decoder111<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11416,10 +10875,7 @@ fn Decoder111<'input>(
     }))
 }
 
-fn Decoder112<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder112<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11445,12 +10901,12 @@ fn Decoder112<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11463,7 +10919,7 @@ fn Decoder112<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11483,10 +10939,7 @@ fn Decoder112<'input>(
     }))
 }
 
-fn Decoder113<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder113<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11512,12 +10965,12 @@ fn Decoder113<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11530,7 +10983,7 @@ fn Decoder113<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11550,10 +11003,7 @@ fn Decoder113<'input>(
     }))
 }
 
-fn Decoder114<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder114<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11579,12 +11029,12 @@ fn Decoder114<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11597,7 +11047,7 @@ fn Decoder114<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11617,10 +11067,7 @@ fn Decoder114<'input>(
     }))
 }
 
-fn Decoder115<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder115<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11646,12 +11093,12 @@ fn Decoder115<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11664,7 +11111,7 @@ fn Decoder115<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11684,10 +11131,7 @@ fn Decoder115<'input>(
     }))
 }
 
-fn Decoder116<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder116<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11713,12 +11157,12 @@ fn Decoder116<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11731,7 +11175,7 @@ fn Decoder116<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11751,10 +11195,7 @@ fn Decoder116<'input>(
     }))
 }
 
-fn Decoder117<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder117<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11780,12 +11221,12 @@ fn Decoder117<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11798,7 +11239,7 @@ fn Decoder117<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11818,10 +11259,7 @@ fn Decoder117<'input>(
     }))
 }
 
-fn Decoder118<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder118<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11847,12 +11285,12 @@ fn Decoder118<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11865,7 +11303,7 @@ fn Decoder118<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11885,10 +11323,7 @@ fn Decoder118<'input>(
     }))
 }
 
-fn Decoder119<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder119<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11914,12 +11349,12 @@ fn Decoder119<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11932,7 +11367,7 @@ fn Decoder119<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -11952,10 +11387,7 @@ fn Decoder119<'input>(
     }))
 }
 
-fn Decoder120<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder120<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -11981,12 +11413,12 @@ fn Decoder120<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -11999,7 +11431,7 @@ fn Decoder120<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -12019,10 +11451,7 @@ fn Decoder120<'input>(
     }))
 }
 
-fn Decoder121<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder121<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -12048,12 +11477,12 @@ fn Decoder121<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -12066,7 +11495,7 @@ fn Decoder121<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -12086,10 +11515,7 @@ fn Decoder121<'input>(
     }))
 }
 
-fn Decoder122<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder122<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -12115,12 +11541,12 @@ fn Decoder122<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -12133,7 +11559,7 @@ fn Decoder122<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -12153,10 +11579,7 @@ fn Decoder122<'input>(
     }))
 }
 
-fn Decoder123<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder123<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -12182,12 +11605,12 @@ fn Decoder123<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -12200,7 +11623,7 @@ fn Decoder123<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -12220,10 +11643,7 @@ fn Decoder123<'input>(
     }))
 }
 
-fn Decoder124<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder124<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -12249,12 +11669,12 @@ fn Decoder124<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -12267,7 +11687,7 @@ fn Decoder124<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -12287,10 +11707,7 @@ fn Decoder124<'input>(
     }))
 }
 
-fn Decoder125<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type56, ParseError> {
+fn Decoder125<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -12316,12 +11733,12 @@ fn Decoder125<'input>(
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
-            let sz = (length - 2);
-            (input.start_slice(_sz))?;
-            let ret = ((|| {
+            let sz = ((length - 2) as usize);
+            (input.start_slice(sz))?;
+            let mut ret = ((|| {
                 PResult::Ok({
                     let mut accum = (Vec::new());
                     while (input.remaining() > 0) {
@@ -12334,7 +11751,7 @@ fn Decoder125<'input>(
                             }
                         };
                         if (matching_ix == 0) {
-                            let next_elem = (Decoder17(scope, input))?;
+                            let next_elem = (Decoder17(input))?;
                             (accum.push(next_elem));
                         } else {
                             break;
@@ -12354,36 +11771,27 @@ fn Decoder125<'input>(
     }))
 }
 
-fn Decoder126<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type63, ParseError> {
-    let restart_interval = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
+fn Decoder126<'input>(input: &mut ParseMonad<'input>) -> Result<Type63, ParseError> {
+    let restart_interval = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
     (Ok(Type63 { restart_interval }))
 }
 
-fn Decoder127<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type57, ParseError> {
-    let class_table_id = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let value = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder127<'input>(input: &mut ParseMonad<'input>) -> Result<Type57, ParseError> {
+    let class_table_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let value = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type57 {
         class_table_id,
         value,
     }))
 }
 
-fn Decoder128<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type59, ParseError> {
-    let class_table_id = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder128<'input>(input: &mut ParseMonad<'input>) -> Result<Type59, ParseError> {
+    let class_table_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let num_codes = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..16 {
-                (accum.push((Decoder17(scope, input))?));
+                (accum.push((Decoder17(input))?));
             }
             accum
         })
@@ -12401,7 +11809,7 @@ fn Decoder128<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder17(scope, input))?;
+                    let next_elem = (Decoder17(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -12417,11 +11825,8 @@ fn Decoder128<'input>(
     }))
 }
 
-fn Decoder129<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type61, ParseError> {
-    let precision_table_id = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder129<'input>(input: &mut ParseMonad<'input>) -> Result<Type61, ParseError> {
+    let precision_table_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let elements = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -12435,7 +11840,7 @@ fn Decoder129<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder17(scope, input))?;
+                    let next_elem = (Decoder17(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -12450,22 +11855,19 @@ fn Decoder129<'input>(
     }))
 }
 
-fn Decoder130<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type53, ParseError> {
-    let identifier = ((|| PResult::Ok({ (Decoder131(scope, input))? }))())?;
+fn Decoder130<'input>(input: &mut ParseMonad<'input>) -> Result<Type53, ParseError> {
+    let identifier = ((|| PResult::Ok({ (Decoder131(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
             match (identifier.string.as_slice()) {
                 [69, 120, 105, 102] => {
-                    let inner = (Decoder132(scope, input))?;
+                    let inner = (Decoder132(input))?;
                     (Type52::exif(inner))
                 }
 
                 [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] =>
                 {
-                    let inner = (Decoder133(scope, input))?;
+                    let inner = (Decoder133(input))?;
                     (Type52::xmp(inner))
                 }
 
@@ -12482,7 +11884,7 @@ fn Decoder130<'input>(
                                 }
                             };
                             if (matching_ix == 0) {
-                                let next_elem = (Decoder17(scope, input))?;
+                                let next_elem = (Decoder17(input))?;
                                 (accum.push(next_elem));
                             } else {
                                 break;
@@ -12502,10 +11904,7 @@ fn Decoder130<'input>(
     (Ok(Type53 { identifier, data }))
 }
 
-fn Decoder131<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder131<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -12557,10 +11956,7 @@ fn Decoder131<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder132<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type50, ParseError> {
+fn Decoder132<'input>(input: &mut ParseMonad<'input>) -> Result<Type50, ParseError> {
     let padding = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -12571,14 +11967,11 @@ fn Decoder132<'input>(
             }
         })
     })())?;
-    let exif = ((|| PResult::Ok({ (Decoder134(scope, input))? }))())?;
+    let exif = ((|| PResult::Ok({ (Decoder134(input))? }))())?;
     (Ok(Type50 { padding, exif }))
 }
 
-fn Decoder133<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type51, ParseError> {
+fn Decoder133<'input>(input: &mut ParseMonad<'input>) -> Result<Type51, ParseError> {
     let xmp = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -12592,7 +11985,7 @@ fn Decoder133<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder17(scope, input))?;
+                    let next_elem = (Decoder17(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -12604,10 +11997,7 @@ fn Decoder133<'input>(
     (Ok(Type51 { xmp }))
 }
 
-fn Decoder134<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type49, ParseError> {
+fn Decoder134<'input>(input: &mut ParseMonad<'input>) -> Result<Type49, ParseError> {
     let byte_order = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -12675,19 +12065,15 @@ fn Decoder134<'input>(
                     })())?;
                     (Type46::be(field0, field1))
                 }
-
-                _other => {
-                    return (Err(ParseError::ExcludedBranch));
-                }
             }
         })
     })())?;
     let magic = ((|| {
         PResult::Ok({
             match byte_order {
-                Type46::le(..) => (Decoder135(scope, input))?,
+                Type46::le(..) => (Decoder135(input))?,
 
-                Type46::be(..) => (Decoder43(scope, input))?,
+                Type46::be(..) => (Decoder43(input))?,
 
                 _other => {
                     (unreachable!(r#"bad value {_other:?}"#));
@@ -12698,9 +12084,9 @@ fn Decoder134<'input>(
     let offset = ((|| {
         PResult::Ok({
             match byte_order {
-                Type46::le(..) => (Decoder24(scope, input))?,
+                Type46::le(..) => (Decoder24(input))?,
 
-                Type46::be(..) => (Decoder33(scope, input))?,
+                Type46::be(..) => (Decoder33(input))?,
 
                 _other => {
                     (unreachable!(r#"bad value {_other:?}"#));
@@ -12718,28 +12104,22 @@ fn Decoder134<'input>(
     }))
 }
 
-fn Decoder135<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u16, ParseError> {
+fn Decoder135<'input>(input: &mut ParseMonad<'input>) -> Result<u16, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-        let field1 = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1)
     };
     (Ok(((|x: (u8, u8)| u16le(x))(inner))))
 }
 
-fn Decoder136<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type44, ParseError> {
-    let identifier = ((|| PResult::Ok({ (Decoder137(scope, input))? }))())?;
+fn Decoder136<'input>(input: &mut ParseMonad<'input>) -> Result<Type44, ParseError> {
+    let identifier = ((|| PResult::Ok({ (Decoder137(input))? }))())?;
     let data = ((|| {
         PResult::Ok({
             match (identifier.string.as_slice()) {
                 [74, 70, 73, 70] => {
-                    let inner = (Decoder138(scope, input))?;
+                    let inner = (Decoder138(input))?;
                     (Type43::jfif(inner))
                 }
 
@@ -12756,7 +12136,7 @@ fn Decoder136<'input>(
                                 }
                             };
                             if (matching_ix == 0) {
-                                let next_elem = (Decoder17(scope, input))?;
+                                let next_elem = (Decoder17(input))?;
                                 (accum.push(next_elem));
                             } else {
                                 break;
@@ -12776,10 +12156,7 @@ fn Decoder136<'input>(
     (Ok(Type44 { identifier, data }))
 }
 
-fn Decoder137<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder137<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -12831,17 +12208,14 @@ fn Decoder137<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder138<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type42, ParseError> {
-    let version_major = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let version_minor = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let density_units = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let density_x = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-    let density_y = ((|| PResult::Ok({ (Decoder43(scope, input))? }))())?;
-    let thumbnail_width = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let thumbnail_height = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder138<'input>(input: &mut ParseMonad<'input>) -> Result<Type42, ParseError> {
+    let version_major = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let version_minor = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let density_units = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let density_x = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+    let density_y = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
+    let thumbnail_width = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let thumbnail_height = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let thumbnail_pixels = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -12849,7 +12223,7 @@ fn Decoder138<'input>(
                 (accum.push({
                     let mut accum = (Vec::new());
                     for _ in 0..thumbnail_width {
-                        (accum.push((Decoder139(scope, input))?));
+                        (accum.push((Decoder139(input))?));
                     }
                     accum
                 }));
@@ -12869,20 +12243,14 @@ fn Decoder138<'input>(
     }))
 }
 
-fn Decoder139<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type2, ParseError> {
-    let r = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let g = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let b = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder139<'input>(input: &mut ParseMonad<'input>) -> Result<Type2, ParseError> {
+    let r = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let g = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let b = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type2 { r, g, b }))
 }
 
-fn Decoder140<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type20, ParseError> {
+fn Decoder140<'input>(input: &mut ParseMonad<'input>) -> Result<Type20, ParseError> {
     let magic = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -12908,11 +12276,11 @@ fn Decoder140<'input>(
             (field0, field1)
         })
     })())?;
-    let method = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let file_flags = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let timestamp = ((|| PResult::Ok({ (Decoder24(scope, input))? }))())?;
-    let compression_flags = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let os_id = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+    let method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let file_flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let timestamp = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
+    let compression_flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let os_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type20 {
         magic,
         method,
@@ -12923,22 +12291,16 @@ fn Decoder140<'input>(
     }))
 }
 
-fn Decoder141<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
-    (Ok((Decoder151(scope, input))?))
+fn Decoder141<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
+    (Ok((Decoder151(input))?))
 }
 
-fn Decoder142<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type38, ParseError> {
+fn Decoder142<'input>(input: &mut ParseMonad<'input>) -> Result<Type38, ParseError> {
     let blocks = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
             loop {
-                let elem = (Decoder144(scope, input))?;
+                let elem = (Decoder144(input))?;
                 if ((|x: &Type37| x.r#final == 1)(&elem)) {
                     (accum.push(elem));
                     break;
@@ -12958,10 +12320,6 @@ fn Decoder142<'input>(
                     Type36::fixed_huffman(y) => y.codes_values,
 
                     Type36::dynamic_huffman(y) => y.codes_values,
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 }),
             ))
             .collect())
@@ -12977,25 +12335,19 @@ fn Decoder142<'input>(
     }))
 }
 
-fn Decoder143<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type39, ParseError> {
-    let crc = ((|| PResult::Ok({ (Decoder24(scope, input))? }))())?;
-    let length = ((|| PResult::Ok({ (Decoder24(scope, input))? }))())?;
+fn Decoder143<'input>(input: &mut ParseMonad<'input>) -> Result<Type39, ParseError> {
+    let crc = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
+    let length = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
     (Ok(Type39 { crc, length }))
 }
 
-fn Decoder144<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type37, ParseError> {
-    let r#final = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+fn Decoder144<'input>(input: &mut ParseMonad<'input>) -> Result<Type37, ParseError> {
+    let r#final = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
     let r#type = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (field0, field1)
             };
             ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
@@ -13005,17 +12357,17 @@ fn Decoder144<'input>(
         PResult::Ok({
             match r#type {
                 0 => {
-                    let inner = (Decoder146(scope, input))?;
+                    let inner = (Decoder146(input))?;
                     (Type36::uncompressed(inner))
                 }
 
                 1 => {
-                    let inner = (Decoder147(scope, input))?;
+                    let inner = (Decoder147(input))?;
                     (Type36::fixed_huffman(inner))
                 }
 
                 2 => {
-                    let inner = (Decoder148(scope, input))?;
+                    let inner = (Decoder148(input))?;
                     (Type36::dynamic_huffman(inner))
                 }
 
@@ -13032,18 +12384,12 @@ fn Decoder144<'input>(
     }))
 }
 
-fn Decoder145<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder145<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(b))
 }
 
-fn Decoder146<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type35, ParseError> {
+fn Decoder146<'input>(input: &mut ParseMonad<'input>) -> Result<Type35, ParseError> {
     let align = ((|| {
         PResult::Ok({
             (input.skip_align(8))?;
@@ -13053,22 +12399,22 @@ fn Decoder146<'input>(
     let len = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field9 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field10 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field11 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field12 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field13 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field14 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field15 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field9 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field10 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field11 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field12 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field13 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field14 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field15 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (
                     field0, field1, field2, field3, field4, field5, field6, field7, field8, field9,
                     field10, field11, field12, field13, field14, field15,
@@ -13114,22 +12460,22 @@ fn Decoder146<'input>(
     let nlen = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field9 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field10 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field11 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field12 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field13 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field14 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field15 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field9 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field10 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field11 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field12 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field13 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field14 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field15 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (
                     field0, field1, field2, field3, field4, field5, field6, field7, field8, field9,
                     field10, field11, field12, field13, field14, field15,
@@ -13178,14 +12524,14 @@ fn Decoder146<'input>(
             for _ in 0..len {
                 (accum.push({
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7,
                         )
@@ -13220,10 +12566,7 @@ fn Decoder146<'input>(
     }))
 }
 
-fn Decoder147<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type34, ParseError> {
+fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseError> {
     let codes = ((|| {
         PResult::Ok({
             let format = (unimplemented!(
@@ -13232,7 +12575,7 @@ fn Decoder147<'input>(
             let mut accum = (Vec::new());
             loop {
                 let elem = {
-                    let code = ((|| PResult::Ok({ (format(scope, input))? }))())?;
+                    let code = ((|| PResult::Ok({ (format(input))? }))())?;
                     let extra = ((|| {
                         PResult::Ok({
                             match code {
@@ -13247,23 +12590,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13280,8 +12623,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13303,23 +12650,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13336,8 +12683,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13359,23 +12710,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13392,8 +12743,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13415,23 +12770,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13448,8 +12803,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13471,23 +12830,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13504,8 +12863,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13527,23 +12890,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13560,8 +12923,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13583,23 +12950,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13616,8 +12983,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13639,23 +13010,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13672,8 +13043,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13690,7 +13065,7 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -13707,23 +13082,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13740,8 +13115,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13758,7 +13137,7 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -13775,23 +13154,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13808,8 +13187,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13826,7 +13209,7 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -13843,23 +13226,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13876,8 +13259,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13894,7 +13281,7 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -13911,23 +13298,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -13944,8 +13331,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -13962,11 +13353,11 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -13983,23 +13374,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14016,8 +13407,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14034,11 +13429,11 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -14055,23 +13450,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14088,8 +13483,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14106,11 +13505,11 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -14127,23 +13526,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14160,8 +13559,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14178,11 +13581,11 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -14199,23 +13602,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14232,8 +13635,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14250,15 +13657,15 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -14279,23 +13686,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14312,8 +13719,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14330,15 +13741,15 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -14359,23 +13770,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14392,8 +13803,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14410,15 +13825,15 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -14439,23 +13854,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14472,8 +13887,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14490,15 +13909,15 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -14519,23 +13938,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14552,8 +13971,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14570,19 +13993,19 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -14603,23 +14026,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14636,8 +14059,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14654,19 +14081,19 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -14687,23 +14114,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14720,8 +14147,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14738,19 +14169,19 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -14771,23 +14202,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14804,8 +14235,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14822,19 +14257,19 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -14855,23 +14290,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14888,8 +14323,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14906,23 +14345,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14947,23 +14386,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -14980,8 +14419,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -14998,23 +14441,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15039,23 +14482,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15072,8 +14515,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -15090,23 +14537,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15131,23 +14578,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15164,8 +14611,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -15182,23 +14633,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15223,23 +14674,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15256,8 +14707,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -15279,23 +14734,23 @@ fn Decoder147<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -15312,8 +14767,12 @@ fn Decoder147<'input>(
                                             })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({
+                                                (Decoder149(input, (distance_code as u16)))?
+                                            })
+                                        })(
+                                        ))?;
                                         Type31 {
                                             length_extra_bits,
                                             length,
@@ -15361,10 +14820,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     258 => match x.extra {
@@ -15374,10 +14829,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15389,10 +14840,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     260 => match x.extra {
@@ -15402,10 +14849,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15417,10 +14860,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     262 => match x.extra {
@@ -15430,10 +14869,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15445,10 +14880,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     264 => match x.extra {
@@ -15458,10 +14889,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15473,10 +14900,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     266 => match x.extra {
@@ -15486,10 +14909,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15501,10 +14920,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     268 => match x.extra {
@@ -15514,10 +14929,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15529,10 +14940,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     270 => match x.extra {
@@ -15542,10 +14949,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15557,10 +14960,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     272 => match x.extra {
@@ -15570,10 +14969,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15585,10 +14980,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     274 => match x.extra {
@@ -15598,10 +14989,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15613,10 +15000,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     276 => match x.extra {
@@ -15626,10 +15009,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15641,10 +15020,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     278 => match x.extra {
@@ -15654,10 +15029,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15669,10 +15040,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     280 => match x.extra {
@@ -15682,10 +15049,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15697,10 +15060,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     282 => match x.extra {
@@ -15710,10 +15069,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15725,10 +15080,6 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     284 => match x.extra {
@@ -15738,10 +15089,6 @@ fn Decoder147<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15753,17 +15100,9 @@ fn Decoder147<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     _ => ([(Type29::literal((x.code as u8)))].to_vec()),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 }),
             ))
             .collect())
@@ -15775,18 +15114,15 @@ fn Decoder147<'input>(
     }))
 }
 
-fn Decoder148<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type30, ParseError> {
+fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseError> {
     let hlit = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (field0, field1, field2, field3, field4)
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -15797,11 +15133,11 @@ fn Decoder148<'input>(
     let hdist = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (field0, field1, field2, field3, field4)
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -15812,10 +15148,10 @@ fn Decoder148<'input>(
     let hclen = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (field0, field1, field2, field3)
             };
             ((|bits: (u8, u8, u8, u8)| bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
@@ -15827,9 +15163,9 @@ fn Decoder148<'input>(
             for _ in 0..(hclen + 4) {
                 (accum.push({
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2)
                     };
                     ((|bits: (u8, u8, u8)| bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
@@ -15846,17 +15182,16 @@ fn Decoder148<'input>(
             let mut accum = (Vec::new());
             loop {
                 let elem = {
-                    let code =
-                        ((|| PResult::Ok({ (code_length_alphabet_format(scope, input))? }))())?;
+                    let code = ((|| PResult::Ok({ (code_length_alphabet_format(input))? }))())?;
                     let extra = ((|| {
                         PResult::Ok({
                             match (code as u8) {
                                 16 => {
                                     let inner = {
                                         let field0 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field1 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         (field0, field1)
                                     };
                                     ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
@@ -15865,11 +15200,11 @@ fn Decoder148<'input>(
                                 17 => {
                                     let inner = {
                                         let field0 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field1 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field2 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         (field0, field1, field2)
                                     };
                                     ((|bits: (u8, u8, u8)| bits.2 << 2 | bits.1 << 1 | bits.0)(
@@ -15880,19 +15215,19 @@ fn Decoder148<'input>(
                                 18 => {
                                     let inner = {
                                         let field0 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field1 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field2 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field3 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field4 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field5 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         let field6 =
-                                            ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                                            ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         (field0, field1, field2, field3, field4, field5, field6)
                                     };
                                     ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
@@ -15930,10 +15265,6 @@ fn Decoder148<'input>(
                                     ((x.1.extra + 3) as u32),
                                     match x.0 {
                                         Type194::some(y) => y,
-
-                                        _other => {
-                                            return (Err(ParseError::ExcludedBranch));
-                                        }
                                     },
                                 )),
                             ),
@@ -15943,10 +15274,6 @@ fn Decoder148<'input>(
                             18 => (x.0, (dup32(((x.1.extra + 11) as u32), 0))),
 
                             v => ((Type194::some(v)), ([v].to_vec())),
-
-                            _other => {
-                                return (Err(ParseError::ExcludedBranch));
-                            }
                         }),
                     ))
                     .collect())
@@ -15974,10 +15301,6 @@ fn Decoder148<'input>(
                             ((x.1.extra + 3) as u32),
                             match x.0 {
                                 Type194::some(y) => y,
-
-                                _other => {
-                                    return (Err(ParseError::ExcludedBranch));
-                                }
                             },
                         )),
                     ),
@@ -15987,10 +15310,6 @@ fn Decoder148<'input>(
                     18 => (x.0, (dup32(((x.1.extra + 11) as u32), 0))),
 
                     v => ((Type194::some(v)), ([v].to_vec())),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 }),
             ))
             .collect())
@@ -16023,8 +15342,7 @@ fn Decoder148<'input>(
             let mut accum = (Vec::new());
             loop {
                 let elem = {
-                    let code =
-                        ((|| PResult::Ok({ (literal_length_alphabet_format(scope, input))? }))())?;
+                    let code = ((|| PResult::Ok({ (literal_length_alphabet_format(input))? }))())?;
                     let extra = ((|| {
                         PResult::Ok({
                             match code {
@@ -16036,13 +15354,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16061,13 +15379,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16086,13 +15404,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16111,13 +15429,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16136,13 +15454,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16161,13 +15479,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16186,13 +15504,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16211,13 +15529,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16234,7 +15552,7 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -16248,13 +15566,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16271,7 +15589,7 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -16285,13 +15603,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16308,7 +15626,7 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -16322,13 +15640,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16345,7 +15663,7 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0,)
@@ -16359,13 +15677,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16382,11 +15700,11 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -16400,13 +15718,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16423,11 +15741,11 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -16441,13 +15759,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16464,11 +15782,11 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -16482,13 +15800,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16505,11 +15823,11 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1)
@@ -16523,13 +15841,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16546,15 +15864,15 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -16572,13 +15890,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16595,15 +15913,15 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -16621,13 +15939,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16644,15 +15962,15 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -16670,13 +15988,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16693,15 +16011,15 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2)
@@ -16719,13 +16037,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16742,19 +16060,19 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -16772,13 +16090,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16795,19 +16113,19 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -16825,13 +16143,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16848,19 +16166,19 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -16878,13 +16196,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16901,19 +16219,19 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3)
@@ -16931,13 +16249,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -16954,23 +16272,23 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -16992,13 +16310,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -17015,23 +16333,23 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -17053,13 +16371,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -17076,23 +16394,23 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -17114,13 +16432,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -17137,23 +16455,23 @@ fn Decoder148<'input>(
                                             PResult::Ok({
                                                 let inner = {
                                                     let field0 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field1 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field2 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field3 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     let field4 = ((|| {
-                                                        PResult::Ok({ (Decoder145(scope, input))? })
+                                                        PResult::Ok({ (Decoder145(input))? })
                                                     })(
                                                     ))?;
                                                     (field0, field1, field2, field3, field4)
@@ -17175,13 +16493,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -17200,13 +16518,13 @@ fn Decoder148<'input>(
                                         })(
                                         ))?;
                                         let distance_code = ((|| {
-                                            PResult::Ok({
-                                                (distance_alphabet_format(scope, input))?
-                                            })
+                                            PResult::Ok({ (distance_alphabet_format(input))? })
                                         })(
                                         ))?;
-                                        let distance_record =
-                                            ((|| PResult::Ok({ (Decoder149(scope, input))? }))())?;
+                                        let distance_record = ((|| {
+                                            PResult::Ok({ (Decoder149(input, distance_code))? })
+                                        })(
+                                        ))?;
                                         Type25 {
                                             length_extra_bits,
                                             length,
@@ -17254,10 +16572,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     258 => match x.extra {
@@ -17267,10 +16581,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17282,10 +16592,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     260 => match x.extra {
@@ -17295,10 +16601,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17310,10 +16612,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     262 => match x.extra {
@@ -17323,10 +16621,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17338,10 +16632,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     264 => match x.extra {
@@ -17351,10 +16641,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17366,10 +16652,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     266 => match x.extra {
@@ -17379,10 +16661,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17394,10 +16672,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     268 => match x.extra {
@@ -17407,10 +16681,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17422,10 +16692,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     270 => match x.extra {
@@ -17435,10 +16701,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17450,10 +16712,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     272 => match x.extra {
@@ -17463,10 +16721,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17478,10 +16732,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     274 => match x.extra {
@@ -17491,10 +16741,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17506,10 +16752,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     276 => match x.extra {
@@ -17519,10 +16761,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17534,10 +16772,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     278 => match x.extra {
@@ -17547,10 +16781,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17562,10 +16792,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     280 => match x.extra {
@@ -17575,10 +16801,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17590,10 +16812,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     282 => match x.extra {
@@ -17603,10 +16821,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17618,10 +16832,6 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     284 => match x.extra {
@@ -17631,10 +16841,6 @@ fn Decoder148<'input>(
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
-                        }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -17646,17 +16852,9 @@ fn Decoder148<'input>(
                             }))]
                             .to_vec())
                         }
-
-                        _other => {
-                            return (Err(ParseError::ExcludedBranch));
-                        }
                     },
 
                     _ => ([(Type29::literal((x.code as u8)))].to_vec()),
-
-                    _other => {
-                        return (Err(ParseError::ExcludedBranch));
-                    }
                 }),
             ))
             .collect())
@@ -17677,69 +16875,69 @@ fn Decoder148<'input>(
 }
 
 fn Decoder149<'input>(
-    scope: &mut Scope<'input>,
     input: &mut ParseMonad<'input>,
+    distance_code: u16,
 ) -> Result<Type24, ParseError> {
     (Ok(match (distance_code as u8) {
-        0 => (Decoder150(scope, input))?,
+        0 => (Decoder150(input, 0, 1))?,
 
-        1 => (Decoder150(scope, input))?,
+        1 => (Decoder150(input, 0, 2))?,
 
-        2 => (Decoder150(scope, input))?,
+        2 => (Decoder150(input, 0, 3))?,
 
-        3 => (Decoder150(scope, input))?,
+        3 => (Decoder150(input, 0, 4))?,
 
-        4 => (Decoder150(scope, input))?,
+        4 => (Decoder150(input, 1, 5))?,
 
-        5 => (Decoder150(scope, input))?,
+        5 => (Decoder150(input, 1, 7))?,
 
-        6 => (Decoder150(scope, input))?,
+        6 => (Decoder150(input, 2, 9))?,
 
-        7 => (Decoder150(scope, input))?,
+        7 => (Decoder150(input, 2, 13))?,
 
-        8 => (Decoder150(scope, input))?,
+        8 => (Decoder150(input, 3, 17))?,
 
-        9 => (Decoder150(scope, input))?,
+        9 => (Decoder150(input, 3, 25))?,
 
-        10 => (Decoder150(scope, input))?,
+        10 => (Decoder150(input, 4, 33))?,
 
-        11 => (Decoder150(scope, input))?,
+        11 => (Decoder150(input, 4, 49))?,
 
-        12 => (Decoder150(scope, input))?,
+        12 => (Decoder150(input, 5, 65))?,
 
-        13 => (Decoder150(scope, input))?,
+        13 => (Decoder150(input, 5, 97))?,
 
-        14 => (Decoder150(scope, input))?,
+        14 => (Decoder150(input, 6, 129))?,
 
-        15 => (Decoder150(scope, input))?,
+        15 => (Decoder150(input, 6, 193))?,
 
-        16 => (Decoder150(scope, input))?,
+        16 => (Decoder150(input, 7, 257))?,
 
-        17 => (Decoder150(scope, input))?,
+        17 => (Decoder150(input, 7, 385))?,
 
-        18 => (Decoder150(scope, input))?,
+        18 => (Decoder150(input, 8, 513))?,
 
-        19 => (Decoder150(scope, input))?,
+        19 => (Decoder150(input, 8, 769))?,
 
-        20 => (Decoder150(scope, input))?,
+        20 => (Decoder150(input, 9, 1025))?,
 
-        21 => (Decoder150(scope, input))?,
+        21 => (Decoder150(input, 9, 1537))?,
 
-        22 => (Decoder150(scope, input))?,
+        22 => (Decoder150(input, 10, 2049))?,
 
-        23 => (Decoder150(scope, input))?,
+        23 => (Decoder150(input, 10, 3073))?,
 
-        24 => (Decoder150(scope, input))?,
+        24 => (Decoder150(input, 11, 4097))?,
 
-        25 => (Decoder150(scope, input))?,
+        25 => (Decoder150(input, 11, 6145))?,
 
-        26 => (Decoder150(scope, input))?,
+        26 => (Decoder150(input, 12, 8193))?,
 
-        27 => (Decoder150(scope, input))?,
+        27 => (Decoder150(input, 12, 12289))?,
 
-        28 => (Decoder150(scope, input))?,
+        28 => (Decoder150(input, 13, 16385))?,
 
-        29 => (Decoder150(scope, input))?,
+        29 => (Decoder150(input, 13, 24577))?,
 
         _other => {
             (unreachable!(r#"bad value {_other:?}"#));
@@ -17748,8 +16946,9 @@ fn Decoder149<'input>(
 }
 
 fn Decoder150<'input>(
-    scope: &mut Scope<'input>,
     input: &mut ParseMonad<'input>,
+    extra_bits: u8,
+    start: u16,
 ) -> Result<Type24, ParseError> {
     let distance_extra_bits = ((|| {
         PResult::Ok({
@@ -17758,7 +16957,7 @@ fn Decoder150<'input>(
 
                 1 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0,)
                     };
                     ((|bits: (u8,)| bits.0 as u16)(inner))
@@ -17766,8 +16965,8 @@ fn Decoder150<'input>(
 
                 2 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1)
                     };
                     ((|bits: (u8, u8)| (bits.1 as u16) << 1 | (bits.0 as u16))(inner))
@@ -17775,9 +16974,9 @@ fn Decoder150<'input>(
 
                 3 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2)
                     };
                     ((|bits: (u8, u8, u8)| {
@@ -17787,10 +16986,10 @@ fn Decoder150<'input>(
 
                 4 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2, field3)
                     };
                     ((|bits: (u8, u8, u8, u8)| {
@@ -17803,11 +17002,11 @@ fn Decoder150<'input>(
 
                 5 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2, field3, field4)
                     };
                     ((|bits: (u8, u8, u8, u8, u8)| {
@@ -17821,12 +17020,12 @@ fn Decoder150<'input>(
 
                 6 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2, field3, field4, field5)
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8)| {
@@ -17841,13 +17040,13 @@ fn Decoder150<'input>(
 
                 7 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2, field3, field4, field5, field6)
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
@@ -17863,14 +17062,14 @@ fn Decoder150<'input>(
 
                 8 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7,
                         )
@@ -17889,15 +17088,15 @@ fn Decoder150<'input>(
 
                 9 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7, field8,
                         )
@@ -17917,16 +17116,16 @@ fn Decoder150<'input>(
 
                 10 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field9 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field9 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7, field8,
                             field9,
@@ -17948,17 +17147,17 @@ fn Decoder150<'input>(
 
                 11 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field9 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field10 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field9 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field10 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7, field8,
                             field9, field10,
@@ -17981,18 +17180,18 @@ fn Decoder150<'input>(
 
                 12 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field9 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field10 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field11 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field9 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field10 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field11 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7, field8,
                             field9, field10, field11,
@@ -18016,19 +17215,19 @@ fn Decoder150<'input>(
 
                 13 => {
                     let inner = {
-                        let field0 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field1 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field2 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field3 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field4 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field5 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field6 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field7 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field8 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field9 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field10 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field11 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
-                        let field12 = ((|| PResult::Ok({ (Decoder145(scope, input))? }))())?;
+                        let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field4 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field5 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field6 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field7 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field8 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field9 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field10 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field11 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
+                        let field12 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7, field8,
                             field9, field10, field11, field12,
@@ -18064,10 +17263,7 @@ fn Decoder150<'input>(
     }))
 }
 
-fn Decoder151<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type21, ParseError> {
+fn Decoder151<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -18119,10 +17315,7 @@ fn Decoder151<'input>(
     (Ok(Type21 { string, null }))
 }
 
-fn Decoder152<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type0, ParseError> {
+fn Decoder152<'input>(input: &mut ParseMonad<'input>) -> Result<Type0, ParseError> {
     let signature = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -18162,7 +17355,7 @@ fn Decoder152<'input>(
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..3 {
-                (accum.push((Decoder21(scope, input))?));
+                (accum.push((Decoder21(input))?));
             }
             accum
         })
@@ -18170,11 +17363,8 @@ fn Decoder152<'input>(
     (Ok(Type0 { signature, version }))
 }
 
-fn Decoder153<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type4, ParseError> {
-    let descriptor = ((|| PResult::Ok({ (Decoder169(scope, input))? }))())?;
+fn Decoder153<'input>(input: &mut ParseMonad<'input>) -> Result<Type4, ParseError> {
+    let descriptor = ((|| PResult::Ok({ (Decoder169(input))? }))())?;
     let global_color_table = ((|| {
         PResult::Ok({
             match (descriptor.flags & 128 != 0) {
@@ -18182,7 +17372,7 @@ fn Decoder153<'input>(
                     let inner = {
                         let mut accum = (Vec::new());
                         for _ in 0..(2 << (descriptor.flags & 7)) {
-                            (accum.push((Decoder167(scope, input))?));
+                            (accum.push((Decoder167(input))?));
                         }
                         accum
                     };
@@ -18206,10 +17396,7 @@ fn Decoder153<'input>(
     }))
 }
 
-fn Decoder154<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type17, ParseError> {
+fn Decoder154<'input>(input: &mut ParseMonad<'input>) -> Result<Type17, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -18244,25 +17431,18 @@ fn Decoder154<'input>(
     };
     (Ok(match tree_index {
         0 => {
-            let inner = (Decoder156(scope, input))?;
+            let inner = (Decoder156(input))?;
             (Type17::graphic_block(inner))
         }
 
         1 => {
-            let inner = (Decoder157(scope, input))?;
+            let inner = (Decoder157(input))?;
             (Type17::special_purpose_block(inner))
-        }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
 
-fn Decoder155<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type18, ParseError> {
+fn Decoder155<'input>(input: &mut ParseMonad<'input>) -> Result<Type18, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18276,10 +17456,7 @@ fn Decoder155<'input>(
     (Ok(Type18 { separator }))
 }
 
-fn Decoder156<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type13, ParseError> {
+fn Decoder156<'input>(input: &mut ParseMonad<'input>) -> Result<Type13, ParseError> {
     let graphic_control_extension = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -18312,7 +17489,7 @@ fn Decoder156<'input>(
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder162(scope, input))?;
+                    let inner = (Decoder162(input))?;
                     (Type6::some(inner))
                 }
 
@@ -18320,24 +17497,17 @@ fn Decoder156<'input>(
                     let _ = ();
                     Type6::none
                 }
-
-                _other => {
-                    return (Err(ParseError::ExcludedBranch));
-                }
             }
         })
     })())?;
-    let graphic_rendering_block = ((|| PResult::Ok({ (Decoder163(scope, input))? }))())?;
+    let graphic_rendering_block = ((|| PResult::Ok({ (Decoder163(input))? }))())?;
     (Ok(Type13 {
         graphic_control_extension,
         graphic_rendering_block,
     }))
 }
 
-fn Decoder157<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type16, ParseError> {
+fn Decoder157<'input>(input: &mut ParseMonad<'input>) -> Result<Type16, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -18362,25 +17532,18 @@ fn Decoder157<'input>(
     };
     (Ok(match tree_index {
         0 => {
-            let inner = (Decoder158(scope, input))?;
+            let inner = (Decoder158(input))?;
             (Type16::application_extension(inner))
         }
 
         1 => {
-            let inner = (Decoder159(scope, input))?;
+            let inner = (Decoder159(input))?;
             (Type16::comment_extension(inner))
-        }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
 
-fn Decoder158<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type14, ParseError> {
+fn Decoder158<'input>(input: &mut ParseMonad<'input>) -> Result<Type14, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18415,7 +17578,7 @@ fn Decoder158<'input>(
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..8 {
-                (accum.push((Decoder17(scope, input))?));
+                (accum.push((Decoder17(input))?));
             }
             accum
         })
@@ -18424,7 +17587,7 @@ fn Decoder158<'input>(
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..3 {
-                (accum.push((Decoder17(scope, input))?));
+                (accum.push((Decoder17(input))?));
             }
             accum
         })
@@ -18451,7 +17614,7 @@ fn Decoder158<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder160(scope, input))?;
+                    let next_elem = (Decoder160(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -18460,7 +17623,7 @@ fn Decoder158<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok({ (Decoder161(scope, input))? }))())?;
+    let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
     (Ok(Type14 {
         separator,
         label,
@@ -18472,10 +17635,7 @@ fn Decoder158<'input>(
     }))
 }
 
-fn Decoder159<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type15, ParseError> {
+fn Decoder159<'input>(input: &mut ParseMonad<'input>) -> Result<Type15, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18518,7 +17678,7 @@ fn Decoder159<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder160(scope, input))?;
+                    let next_elem = (Decoder160(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -18527,7 +17687,7 @@ fn Decoder159<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok({ (Decoder161(scope, input))? }))())?;
+    let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
     (Ok(Type15 {
         separator,
         label,
@@ -18536,10 +17696,7 @@ fn Decoder159<'input>(
     }))
 }
 
-fn Decoder160<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type7, ParseError> {
+fn Decoder160<'input>(input: &mut ParseMonad<'input>) -> Result<Type7, ParseError> {
     let len_bytes = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18554,7 +17711,7 @@ fn Decoder160<'input>(
         PResult::Ok({
             let mut accum = (Vec::new());
             for _ in 0..len_bytes {
-                (accum.push((Decoder17(scope, input))?));
+                (accum.push((Decoder17(input))?));
             }
             accum
         })
@@ -18562,10 +17719,7 @@ fn Decoder160<'input>(
     (Ok(Type7 { len_bytes, data }))
 }
 
-fn Decoder161<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<u8, ParseError> {
+fn Decoder161<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
     (Ok(if (b == 0) {
         b
@@ -18574,10 +17728,7 @@ fn Decoder161<'input>(
     }))
 }
 
-fn Decoder162<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type5, ParseError> {
+fn Decoder162<'input>(input: &mut ParseMonad<'input>) -> Result<Type5, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18608,10 +17759,10 @@ fn Decoder162<'input>(
             }
         })
     })())?;
-    let flags = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let delay_time = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let transparent_color_index = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let terminator = ((|| PResult::Ok({ (Decoder161(scope, input))? }))())?;
+    let flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let delay_time = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let transparent_color_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
     (Ok(Type5 {
         separator,
         label,
@@ -18623,10 +17774,7 @@ fn Decoder162<'input>(
     }))
 }
 
-fn Decoder163<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type12, ParseError> {
+fn Decoder163<'input>(input: &mut ParseMonad<'input>) -> Result<Type12, ParseError> {
     let tree_index = {
         (input.open_peek_context());
         let b = (input.read_byte())?;
@@ -18646,26 +17794,19 @@ fn Decoder163<'input>(
     };
     (Ok(match tree_index {
         0 => {
-            let inner = (Decoder164(scope, input))?;
+            let inner = (Decoder164(input))?;
             (Type12::table_based_image(inner))
         }
 
         1 => {
-            let inner = (Decoder165(scope, input))?;
+            let inner = (Decoder165(input))?;
             (Type12::plain_text_extension(inner))
-        }
-
-        _other => {
-            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
 
-fn Decoder164<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type11, ParseError> {
-    let descriptor = ((|| PResult::Ok({ (Decoder166(scope, input))? }))())?;
+fn Decoder164<'input>(input: &mut ParseMonad<'input>) -> Result<Type11, ParseError> {
+    let descriptor = ((|| PResult::Ok({ (Decoder166(input))? }))())?;
     let local_color_table = ((|| {
         PResult::Ok({
             match (descriptor.flags & 128 != 0) {
@@ -18673,7 +17814,7 @@ fn Decoder164<'input>(
                     let inner = {
                         let mut accum = (Vec::new());
                         for _ in 0..(2 << (descriptor.flags & 7)) {
-                            (accum.push((Decoder167(scope, input))?));
+                            (accum.push((Decoder167(input))?));
                         }
                         accum
                     };
@@ -18691,7 +17832,7 @@ fn Decoder164<'input>(
             }
         })
     })())?;
-    let data = ((|| PResult::Ok({ (Decoder168(scope, input))? }))())?;
+    let data = ((|| PResult::Ok({ (Decoder168(input))? }))())?;
     (Ok(Type11 {
         descriptor,
         local_color_table,
@@ -18699,10 +17840,7 @@ fn Decoder164<'input>(
     }))
 }
 
-fn Decoder165<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type8, ParseError> {
+fn Decoder165<'input>(input: &mut ParseMonad<'input>) -> Result<Type8, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18733,14 +17871,14 @@ fn Decoder165<'input>(
             }
         })
     })())?;
-    let text_grid_left_position = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let text_grid_top_position = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let text_grid_width = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let text_grid_height = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let character_cell_width = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let character_cell_height = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let text_foreground_color_index = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let text_background_color_index = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+    let text_grid_left_position = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let text_grid_top_position = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let text_grid_width = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let text_grid_height = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let character_cell_width = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let character_cell_height = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let text_foreground_color_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let text_background_color_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let plain_text_data = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -18763,7 +17901,7 @@ fn Decoder165<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder160(scope, input))?;
+                    let next_elem = (Decoder160(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -18772,7 +17910,7 @@ fn Decoder165<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok({ (Decoder161(scope, input))? }))())?;
+    let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
     (Ok(Type8 {
         separator,
         label,
@@ -18790,10 +17928,7 @@ fn Decoder165<'input>(
     }))
 }
 
-fn Decoder166<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type9, ParseError> {
+fn Decoder166<'input>(input: &mut ParseMonad<'input>) -> Result<Type9, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = (input.read_byte())?;
@@ -18804,11 +17939,11 @@ fn Decoder166<'input>(
             }
         })
     })())?;
-    let image_left_position = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let image_top_position = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let image_width = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let image_height = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let flags = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+    let image_left_position = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let image_top_position = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let image_width = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let image_height = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type9 {
         separator,
         image_left_position,
@@ -18819,21 +17954,15 @@ fn Decoder166<'input>(
     }))
 }
 
-fn Decoder167<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type2, ParseError> {
-    let r = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let g = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let b = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder167<'input>(input: &mut ParseMonad<'input>) -> Result<Type2, ParseError> {
+    let r = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let g = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let b = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type2 { r, g, b }))
 }
 
-fn Decoder168<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type10, ParseError> {
-    let lzw_min_code_size = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder168<'input>(input: &mut ParseMonad<'input>) -> Result<Type10, ParseError> {
+    let lzw_min_code_size = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let image_data = ((|| {
         PResult::Ok({
             let mut accum = (Vec::new());
@@ -18856,7 +17985,7 @@ fn Decoder168<'input>(
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder160(scope, input))?;
+                    let next_elem = (Decoder160(input))?;
                     (accum.push(next_elem));
                 } else {
                     break;
@@ -18865,7 +17994,7 @@ fn Decoder168<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok({ (Decoder161(scope, input))? }))())?;
+    let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
     (Ok(Type10 {
         lzw_min_code_size,
         image_data,
@@ -18873,15 +18002,12 @@ fn Decoder168<'input>(
     }))
 }
 
-fn Decoder169<'input>(
-    scope: &mut Scope<'input>,
-    input: &mut ParseMonad<'input>,
-) -> Result<Type1, ParseError> {
-    let screen_width = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let screen_height = ((|| PResult::Ok({ (Decoder135(scope, input))? }))())?;
-    let flags = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let bg_color_index = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
-    let pixel_aspect_ratio = ((|| PResult::Ok({ (Decoder17(scope, input))? }))())?;
+fn Decoder169<'input>(input: &mut ParseMonad<'input>) -> Result<Type1, ParseError> {
+    let screen_width = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let screen_height = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
+    let flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let bg_color_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+    let pixel_aspect_ratio = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     (Ok(Type1 {
         screen_width,
         screen_height,
@@ -18897,7 +18023,6 @@ fn test_decoder_28() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parse_ctxt = ParseCtxt::new(input);
-    let mut scope = Scope::Empty;
-    let ret = Decoder28(&mut scope, &mut parse_ctxt);
+    let ret = Decoder28(&mut parse_ctxt);
     assert!(ret.is_some());
 }
