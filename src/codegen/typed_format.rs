@@ -22,12 +22,12 @@ impl GenType {
         }
     }
 
-    pub(crate) fn into_rust_type(self) -> RustType {
-        match self {
-            GenType::Inline(rt) => rt,
-            GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),
-        }
-    }
+    // pub(crate) fn into_rust_type(self) -> RustType {
+    //     match self {
+    //         GenType::Inline(rt) => rt,
+    //         GenType::Def((ix, lbl), _) => RustType::defined(ix, lbl.clone()),
+    //     }
+    // }
 
     pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label)> {
         match self {

@@ -1552,7 +1552,7 @@ struct Type196 {
 }
 
 fn Decoder0<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseError> {
-    (Ok((Decoder1(input))?))
+    (PResult::Ok((Decoder1(input))?))
 }
 
 fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseError> {
@@ -1568,7 +1568,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1585,7 +1585,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1602,7 +1602,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1619,7 +1619,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1636,7 +1636,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1653,7 +1653,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1670,7 +1670,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1687,7 +1687,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
                 });
                 match (f_tmp()) {
                     Ok(inner) => {
-                        return (Ok(inner));
+                        return (PResult::Ok(inner));
                     }
 
                     Err(_e) => {
@@ -1707,7 +1707,7 @@ fn Decoder1<'input>(input: &mut ParseMonad<'input>) -> Result<Type196, ParseErro
             }
         })
     })())?;
-    (Ok(Type196 { data, end }))
+    (PResult::Ok(Type196 { data, end }))
 }
 
 fn Decoder2<'input>(input: &mut ParseMonad<'input>) -> Result<Type19, ParseError> {
@@ -1728,7 +1728,7 @@ fn Decoder2<'input>(input: &mut ParseMonad<'input>) -> Result<Type19, ParseError
 
                             59 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -1747,7 +1747,7 @@ fn Decoder2<'input>(input: &mut ParseMonad<'input>) -> Result<Type19, ParseError
         })
     })())?;
     let trailer = ((|| PResult::Ok({ (Decoder155(input))? }))())?;
-    (Ok(Type19 {
+    (PResult::Ok(Type19 {
         header,
         logical_screen,
         blocks,
@@ -1784,10 +1784,6 @@ fn Decoder3<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<Type40>, Parse
                                 let _ = ();
                                 Type22::no
                             }
-
-                            _other => {
-                                (unreachable!(r#"bad value {_other:?}"#));
-                            }
                         }
                     })
                 })())?;
@@ -1804,14 +1800,14 @@ fn Decoder3<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<Type40>, Parse
             (accum.push(next_elem));
         }
     }
-    (Ok(accum))
+    (PResult::Ok(accum))
 }
 
 fn Decoder4<'input>(input: &mut ParseMonad<'input>) -> Result<Type80, ParseError> {
     let soi = ((|| PResult::Ok({ (Decoder67(input))? }))())?;
     let frame = ((|| PResult::Ok({ (Decoder68(input))? }))())?;
     let eoi = ((|| PResult::Ok({ (Decoder69(input))? }))())?;
-    (Ok(Type80 { soi, frame, eoi }))
+    (PResult::Ok(Type80 { soi, frame, eoi }))
 }
 
 fn Decoder5<'input>(input: &mut ParseMonad<'input>) -> Result<Type163, ParseError> {
@@ -1837,7 +1833,7 @@ fn Decoder5<'input>(input: &mut ParseMonad<'input>) -> Result<Type163, ParseErro
             accum
         })
     })())?;
-    (Ok(Type163 { atoms }))
+    (PResult::Ok(Type163 { atoms }))
 }
 
 fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseError> {
@@ -1862,7 +1858,7 @@ fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseErro
 
                             73 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -1896,7 +1892,7 @@ fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseErro
 
                                     68 => 1,
 
-                                    _other => {
+                                    _ => {
                                         return (Err(ParseError::ExcludedBranch));
                                     }
                                 }
@@ -1910,7 +1906,7 @@ fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseErro
 
                             116 => 0,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -1947,7 +1943,7 @@ fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseErro
 
                             73 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -1966,7 +1962,7 @@ fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseErro
         })
     })())?;
     let iend = ((|| PResult::Ok({ (Decoder32(input))? }))())?;
-    (Ok(Type181 {
+    (PResult::Ok(Type181 {
         signature,
         ihdr,
         chunks,
@@ -2051,14 +2047,10 @@ fn Decoder7<'input>(input: &mut ParseMonad<'input>) -> Result<Type185, ParseErro
                     };
                     (Type182::no(inner))
                 }
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
-    (Ok(Type185 {
+    (PResult::Ok(Type185 {
         tag,
         length,
         data,
@@ -2080,7 +2072,7 @@ fn Decoder8<'input>(input: &mut ParseMonad<'input>) -> Result<Type191, ParseErro
 
                             tmp if (tmp != 0) => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -2144,7 +2136,7 @@ fn Decoder8<'input>(input: &mut ParseMonad<'input>) -> Result<Type191, ParseErro
             accum
         })
     })())?;
-    (Ok(Type191 {
+    (PResult::Ok(Type191 {
         contents,
         __padding,
         __trailing,
@@ -2162,7 +2154,7 @@ fn Decoder9<'input>(input: &mut ParseMonad<'input>) -> Result<Type192, ParseErro
         });
         match (f_tmp()) {
             Ok(inner) => {
-                return (Ok(inner));
+                return (PResult::Ok(inner));
             }
 
             Err(_e) => {
@@ -2179,7 +2171,7 @@ fn Decoder9<'input>(input: &mut ParseMonad<'input>) -> Result<Type192, ParseErro
         });
         match (f_tmp()) {
             Ok(inner) => {
-                return (Ok(inner));
+                return (PResult::Ok(inner));
             }
 
             Err(_e) => {
@@ -2187,7 +2179,7 @@ fn Decoder9<'input>(input: &mut ParseMonad<'input>) -> Result<Type192, ParseErro
             }
         }
     };
-    (Ok((panic!(r#"last branch should return something unconditionally"#))))
+    (PResult::Ok((panic!(r#"last branch should return something unconditionally"#))))
 }
 
 fn Decoder10<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseError> {
@@ -2216,7 +2208,7 @@ fn Decoder10<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseErr
             (accum.push(next_elem));
         }
     }
-    (Ok(accum))
+    (PResult::Ok(accum))
 }
 
 fn Decoder11<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<char>, ParseError> {
@@ -2254,7 +2246,7 @@ fn Decoder11<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<char>, ParseE
 
                     244 => 0,
 
-                    _other => {
+                    _ => {
                         return (Err(ParseError::ExcludedBranch));
                     }
                 };
@@ -2269,7 +2261,7 @@ fn Decoder11<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<char>, ParseE
             break;
         }
     }
-    (Ok(accum))
+    (PResult::Ok(accum))
 }
 
 fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError> {
@@ -2306,7 +2298,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
 
                     244 => 3,
 
-                    _other => {
+                    _ => {
                         return (Err(ParseError::ExcludedBranch));
                     }
                 };
@@ -2326,7 +2318,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                         return (Err(ParseError::ExcludedBranch));
                     }
                 };
-                ((|byte: u8| byte as u32)(inner))
+                ((|byte: u8| PResult::Ok((byte as u32)))(inner))?
             }
 
             1 => {
@@ -2341,15 +2333,17 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             };
-                            ((|raw: u8| raw & 31)(inner))
+                            ((|raw: u8| PResult::Ok((raw & 31)))(inner))?
                         })
                     })())?;
                     let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                     (field0, field1)
                 };
-                ((|bytes: (u8, u8)| match bytes {
-                    (x1, x0) => ((x1 as u32) << 6 | (x0 as u32)),
-                })(inner))
+                ((|bytes: (u8, u8)| {
+                    PResult::Ok(match bytes {
+                        (x1, x0) => ((x1 as u32) << 6 | (x0 as u32)),
+                    })
+                })(inner))?
             }
 
             2 => {
@@ -2375,7 +2369,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                     3
                                 }
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             };
@@ -2395,7 +2389,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 15)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 15)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| {
@@ -2410,7 +2404,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 63)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 63)))(inner))?
                                 })
                             })())?;
                             let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
@@ -2430,7 +2424,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 15)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 15)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
@@ -2449,7 +2443,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 15)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 15)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| {
@@ -2463,7 +2457,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 63)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 63)))(inner))?
                                 })
                             })())?;
                             let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
@@ -2483,18 +2477,24 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 15)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 15)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2)
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     }
                 };
-                ((|bytes: (u8, u8, u8)| match bytes {
-                    (x2, x1, x0) => ((x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32)),
-                })(inner))
+                ((|bytes: (u8, u8, u8)| {
+                    PResult::Ok(match bytes {
+                        (x2, x1, x0) => ((x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32)),
+                    })
+                })(inner))?
             }
 
             3 => {
@@ -2514,7 +2514,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
 
                                 244 => 2,
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             };
@@ -2534,7 +2534,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 7)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 7)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| {
@@ -2549,7 +2549,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 63)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 63)))(inner))?
                                 })
                             })())?;
                             let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
@@ -2570,7 +2570,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 7)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 7)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
@@ -2590,7 +2590,7 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 7)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 7)))(inner))?
                                 })
                             })())?;
                             let field1 = ((|| {
@@ -2603,24 +2603,34 @@ fn Decoder12<'input>(input: &mut ParseMonad<'input>) -> Result<char, ParseError>
                                             return (Err(ParseError::ExcludedBranch));
                                         }
                                     };
-                                    ((|raw: u8| raw & 63)(inner))
+                                    ((|raw: u8| PResult::Ok((raw & 63)))(inner))?
                                 })
                             })())?;
                             let field2 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             let field3 = ((|| PResult::Ok({ (Decoder13(input))? }))())?;
                             (field0, field1, field2, field3)
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     }
                 };
-                ((|bytes: (u8, u8, u8, u8)| match bytes {
-                    (x3, x2, x1, x0) => {
-                        ((x3 as u32) << 18 | (x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32))
-                    }
-                })(inner))
+                ((|bytes: (u8, u8, u8, u8)| {
+                    PResult::Ok(match bytes {
+                        (x3, x2, x1, x0) => {
+                            ((x3 as u32) << 18 | (x2 as u32) << 12 | (x1 as u32) << 6 | (x0 as u32))
+                        }
+                    })
+                })(inner))?
+            }
+
+            _ => {
+                return (Err(ParseError::ExcludedBranch));
             }
         }
     };
-    (Ok(((|codepoint: u32| (char::from_u32(codepoint)).unwrap())(inner))))
+    (PResult::Ok(((|codepoint: u32| PResult::Ok(((char::from_u32(codepoint)).unwrap())))(inner))?))
 }
 
 fn Decoder13<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
@@ -2632,12 +2642,12 @@ fn Decoder13<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
             return (Err(ParseError::ExcludedBranch));
         }
     };
-    (Ok(((|raw: u8| raw & 63)(inner))))
+    (PResult::Ok(((|raw: u8| PResult::Ok((raw & 63)))(inner))?))
 }
 
 fn Decoder14<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(
+    (PResult::Ok(
         if ((ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0])).contains(b)) {
             b
         } else {
@@ -2663,7 +2673,7 @@ fn Decoder15<'input>(input: &mut ParseMonad<'input>) -> Result<Type190, ParseErr
             ()
         })
     })())?;
-    (Ok(Type190 {
+    (PResult::Ok(Type190 {
         header,
         file,
         __padding,
@@ -2711,7 +2721,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -2800,7 +2810,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -2889,7 +2899,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -2958,67 +2968,67 @@ return (Err(ParseError::ExcludedBranch));
                             let oA = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o9 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o8 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o7 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o6 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o5 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o4 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o3 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o2 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o1 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let o0 = ((|| {
                                 PResult::Ok({
                                     let inner = (Decoder19(input))?;
-                                    ((|bit: u8| (bit as u8) - 48)(inner))
+                                    ((|bit: u8| PResult::Ok(((bit as u8) - 48)))(inner))?
                                 })
                             })())?;
                             let __nil = ((|| PResult::Ok({ (Decoder20(input))? }))())?;
@@ -3053,7 +3063,7 @@ return (Err(ParseError::ExcludedBranch));
                                 value,
                             }
                         };
-                        ((|rec: Type195| rec.value)(inner))
+                        ((|rec: Type195| PResult::Ok(rec.value))(inner))?
                     })
                 })())?;
                 let mtime = ((|| {
@@ -3082,7 +3092,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -3171,7 +3181,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -3378,7 +3388,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -3467,7 +3477,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 1
 },
 
-_other => {
+_ => {
 return (Err(ParseError::ExcludedBranch));
 }
 };
@@ -3577,12 +3587,12 @@ return (Err(ParseError::ExcludedBranch));
             })
         })())?;
     (input.end_slice())?;
-    (Ok(ret))
+    (PResult::Ok(ret))
 }
 
 fn Decoder17<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(b))
+    (PResult::Ok(b))
 }
 
 fn Decoder18<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseError> {
@@ -3599,7 +3609,7 @@ fn Decoder18<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseErr
 
                             tmp if (tmp != 0) => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -3654,12 +3664,12 @@ fn Decoder18<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseErr
             accum
         })
     })())?;
-    (Ok(Type186 { string, __padding }))
+    (PResult::Ok(Type186 { string, __padding }))
 }
 
 fn Decoder19<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(
+    (PResult::Ok(
         if ((ByteSet::from_bits([71776119061217280, 0, 0, 0])).contains(b)) {
             b
         } else {
@@ -3670,7 +3680,7 @@ fn Decoder19<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
 
 fn Decoder20<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(
+    (PResult::Ok(
         if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(b)) {
             b
         } else {
@@ -3681,7 +3691,7 @@ fn Decoder20<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
 
 fn Decoder21<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(b))
+    (PResult::Ok(b))
 }
 
 fn Decoder22<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseError> {
@@ -3698,7 +3708,7 @@ fn Decoder22<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -3753,7 +3763,7 @@ fn Decoder22<'input>(input: &mut ParseMonad<'input>) -> Result<Type186, ParseErr
             accum
         })
     })())?;
-    (Ok(Type186 { string, __padding }))
+    (PResult::Ok(Type186 { string, __padding }))
 }
 
 fn Decoder23<'input>(input: &mut ParseMonad<'input>) -> Result<Type188, ParseError> {
@@ -3770,7 +3780,7 @@ fn Decoder23<'input>(input: &mut ParseMonad<'input>) -> Result<Type188, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -3825,7 +3835,7 @@ fn Decoder23<'input>(input: &mut ParseMonad<'input>) -> Result<Type188, ParseErr
             accum
         })
     })())?;
-    (Ok(Type188 { string, padding }))
+    (PResult::Ok(Type188 { string, padding }))
 }
 
 fn Decoder24<'input>(input: &mut ParseMonad<'input>) -> Result<u32, ParseError> {
@@ -3836,7 +3846,7 @@ fn Decoder24<'input>(input: &mut ParseMonad<'input>) -> Result<u32, ParseError> 
         let field3 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1, field2, field3)
     };
-    (Ok(((|x: (u8, u8, u8, u8)| u32le(x))(inner))))
+    (PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok((u32le(x))))(inner))?))
 }
 
 fn Decoder25<'input>(input: &mut ParseMonad<'input>) -> Result<Type184, ParseError> {
@@ -3863,7 +3873,7 @@ fn Decoder25<'input>(input: &mut ParseMonad<'input>) -> Result<Type184, ParseErr
             accum
         })
     })())?;
-    (Ok(Type184 { tag, chunks }))
+    (PResult::Ok(Type184 { tag, chunks }))
 }
 
 fn Decoder26<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -3871,7 +3881,7 @@ fn Decoder26<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8),
     let field1 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
     let field2 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
     let field3 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
-    (Ok((field0, field1, field2, field3)))
+    (PResult::Ok((field0, field1, field2, field3)))
 }
 
 fn Decoder27<'input>(input: &mut ParseMonad<'input>) -> Result<Type183, ParseError> {
@@ -3926,14 +3936,10 @@ fn Decoder27<'input>(input: &mut ParseMonad<'input>) -> Result<Type183, ParseErr
                     };
                     (Type182::no(inner))
                 }
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
-    (Ok(Type183 {
+    (PResult::Ok(Type183 {
         tag,
         length,
         data,
@@ -4024,7 +4030,7 @@ fn Decoder28<'input>(
             }
         })
     })())?;
-    (Ok((
+    (PResult::Ok((
         field0, field1, field2, field3, field4, field5, field6, field7,
     )))
 }
@@ -4042,7 +4048,7 @@ fn Decoder29<'input>(input: &mut ParseMonad<'input>) -> Result<Type165, ParseErr
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type165 {
+    (PResult::Ok(Type165 {
         length,
         tag,
         data,
@@ -4069,13 +4075,13 @@ fn Decoder30<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
 
                         82 => 4,
 
-                        _other => {
+                        _ => {
                             return (Err(ParseError::ExcludedBranch));
                         }
                     }
                 }
 
-                _other => {
+                _ => {
                     return (Err(ParseError::ExcludedBranch));
                 }
             };
@@ -4083,7 +4089,7 @@ fn Decoder30<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder38(input, ihdr))?;
             (Type178::bKGD(inner))
@@ -4108,6 +4114,10 @@ fn Decoder30<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
             let inner = (Decoder42(input, ihdr))?;
             (Type178::tRNS(inner))
         }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
+        }
     }))
 }
 
@@ -4124,7 +4134,7 @@ fn Decoder31<'input>(input: &mut ParseMonad<'input>) -> Result<Type179, ParseErr
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type179 {
+    (PResult::Ok(Type179 {
         length,
         tag,
         data,
@@ -4145,7 +4155,7 @@ fn Decoder32<'input>(input: &mut ParseMonad<'input>) -> Result<Type180, ParseErr
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type180 {
+    (PResult::Ok(Type180 {
         length,
         tag,
         data,
@@ -4161,7 +4171,7 @@ fn Decoder33<'input>(input: &mut ParseMonad<'input>) -> Result<u32, ParseError> 
         let field3 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1, field2, field3)
     };
-    (Ok(((|x: (u8, u8, u8, u8)| u32be(x))(inner))))
+    (PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok((u32be(x))))(inner))?))
 }
 
 fn Decoder34<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -4205,11 +4215,11 @@ fn Decoder34<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8),
             }
         })
     })())?;
-    (Ok((field0, field1, field2, field3)))
+    (PResult::Ok((field0, field1, field2, field3)))
 }
 
 fn Decoder35<'input>(input: &mut ParseMonad<'input>) -> Result<(), ParseError> {
-    (Ok(()))
+    (PResult::Ok(()))
 }
 
 fn Decoder36<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -4253,7 +4263,7 @@ fn Decoder36<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8),
             }
         })
     })())?;
-    (Ok((field0, field1, field2, field3)))
+    (PResult::Ok((field0, field1, field2, field3)))
 }
 
 fn Decoder37<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseError> {
@@ -4274,7 +4284,7 @@ fn Decoder37<'input>(input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseErr
             break;
         }
     }
-    (Ok(accum))
+    (PResult::Ok(accum))
 }
 
 fn Decoder38<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Type171, ParseError> {
@@ -4376,7 +4386,9 @@ fn Decoder38<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
                         }
 
                         _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
+                            (unreachable!(
+                                r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                            ));
                         }
                     }
                 })
@@ -4386,7 +4398,7 @@ fn Decoder38<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type171 {
+    (PResult::Ok(Type171 {
         length,
         tag,
         data,
@@ -4462,7 +4474,7 @@ fn Decoder39<'input>(input: &mut ParseMonad<'input>) -> Result<Type173, ParseErr
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type173 {
+    (PResult::Ok(Type173 {
         length,
         tag,
         data,
@@ -4553,7 +4565,7 @@ fn Decoder40<'input>(input: &mut ParseMonad<'input>) -> Result<Type166, ParseErr
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type166 {
+    (PResult::Ok(Type166 {
         length,
         tag,
         data,
@@ -4635,7 +4647,7 @@ fn Decoder41<'input>(input: &mut ParseMonad<'input>) -> Result<Type175, ParseErr
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type175 {
+    (PResult::Ok(Type175 {
         length,
         tag,
         data,
@@ -4744,7 +4756,9 @@ fn Decoder42<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
                         }
 
                         _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
+                            (unreachable!(
+                                r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                            ));
                         }
                     }
                 })
@@ -4754,7 +4768,7 @@ fn Decoder42<'input>(input: &mut ParseMonad<'input>, ihdr: Type165) -> Result<Ty
         })
     })())?;
     let crc = ((|| PResult::Ok({ (Decoder33(input))? }))())?;
-    (Ok(Type177 {
+    (PResult::Ok(Type177 {
         length,
         tag,
         data,
@@ -4768,7 +4782,7 @@ fn Decoder43<'input>(input: &mut ParseMonad<'input>) -> Result<u16, ParseError> 
         let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1)
     };
-    (Ok(((|x: (u8, u8)| u16be(x))(inner))))
+    (PResult::Ok(((|x: (u8, u8)| PResult::Ok((u16be(x))))(inner))?))
 }
 
 fn Decoder44<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -4812,7 +4826,7 @@ fn Decoder44<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8),
             }
         })
     })())?;
-    (Ok((field0, field1, field2, field3)))
+    (PResult::Ok((field0, field1, field2, field3)))
 }
 
 fn Decoder45<'input>(input: &mut ParseMonad<'input>) -> Result<Type164, ParseError> {
@@ -4823,7 +4837,7 @@ fn Decoder45<'input>(input: &mut ParseMonad<'input>) -> Result<Type164, ParseErr
     let compression_method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let filter_method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let interlace_method = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type164 {
+    (PResult::Ok(Type164 {
         width,
         height,
         bit_depth,
@@ -4844,14 +4858,10 @@ fn Decoder46<'input>(input: &mut ParseMonad<'input>) -> Result<Type162, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -4981,10 +4991,6 @@ fn Decoder46<'input>(input: &mut ParseMonad<'input>) -> Result<Type162, ParseErr
                             };
                             (Type161::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -4992,7 +4998,7 @@ fn Decoder46<'input>(input: &mut ParseMonad<'input>) -> Result<Type162, ParseErr
             ret
         })
     })())?;
-    (Ok(Type162 {
+    (PResult::Ok(Type162 {
         size_field,
         r#type,
         size,
@@ -5005,7 +5011,7 @@ fn Decoder47<'input>(input: &mut ParseMonad<'input>) -> Result<(u8, u8, u8, u8),
     let field1 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
     let field2 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
     let field3 = ((|| PResult::Ok({ (Decoder21(input))? }))())?;
-    (Ok((field0, field1, field2, field3)))
+    (PResult::Ok((field0, field1, field2, field3)))
 }
 
 fn Decoder48<'input>(input: &mut ParseMonad<'input>) -> Result<u64, ParseError> {
@@ -5022,7 +5028,7 @@ fn Decoder48<'input>(input: &mut ParseMonad<'input>) -> Result<u64, ParseError> 
             field0, field1, field2, field3, field4, field5, field6, field7,
         )
     };
-    (Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| u64be(x))(inner))))
+    (PResult::Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok((u64be(x))))(inner))?))
 }
 
 fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseError> {
@@ -5035,14 +5041,10 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -5134,10 +5136,6 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
                                                 let inner = (Decoder33(input))?;
                                                 (Type112::no(inner))
                                             }
-
-                                            _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
-                                            }
                                         }
                                     })
                                 })())?;
@@ -5166,14 +5164,10 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
                                         match (version == 0) {
                                             true => {
                                                 let inner = (Decoder43(input))?;
-                                                ((|x: u16| x as u32)(inner))
+                                                ((|x: u16| PResult::Ok((x as u32)))(inner))?
                                             }
 
                                             false => (Decoder33(input))?,
-
-                                            _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
-                                            }
                                         }
                                     })
                                 })())?;
@@ -5246,20 +5240,18 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
                                                                                     (Decoder48(
                                                                                         input,
                                                                                     ))?;
-                                                                                ((|x: u64| x - 16)(
-                                                                                    inner,
-                                                                                ))
+                                                                                ((|x: u64| {
+                                                                                    PResult::Ok(
+                                                                                        (x - 16),
+                                                                                    )
+                                                                                })(
+                                                                                    inner
+                                                                                ))?
                                                                             }
 
                                                                             _ => {
                                                                                 ((size_field - 8)
                                                                                     as u64)
-                                                                            }
-
-                                                                            _other => {
-                                                                                (unreachable!(
-                                                                                    r#"bad value {_other:?}"#
-                                                                                ));
                                                                             }
                                                                         }
                                                                     })
@@ -5368,20 +5360,18 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
                                                                                     (Decoder48(
                                                                                         input,
                                                                                     ))?;
-                                                                                ((|x: u64| x - 16)(
-                                                                                    inner,
-                                                                                ))
+                                                                                ((|x: u64| {
+                                                                                    PResult::Ok(
+                                                                                        (x - 16),
+                                                                                    )
+                                                                                })(
+                                                                                    inner
+                                                                                ))?
                                                                             }
 
                                                                             _ => {
                                                                                 ((size_field - 8)
                                                                                     as u64)
-                                                                            }
-
-                                                                            _other => {
-                                                                                (unreachable!(
-                                                                                    r#"bad value {_other:?}"#
-                                                                                ));
                                                                             }
                                                                         }
                                                                     })
@@ -5455,7 +5445,9 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
                                             }
 
                                             _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
+                                                (unreachable!(
+                                                    r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                                                ));
                                             }
                                         }
                                     })
@@ -5470,79 +5462,61 @@ fn Decoder49<'input>(input: &mut ParseMonad<'input>) -> Result<Type115, ParseErr
                         }
 
                         (105, 108, 111, 99) => {
-                            let inner =
-                                {
-                                    let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-                                    let flags = ((|| {
-                                        PResult::Ok({
-                                            let field0 =
-                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-                                            let field1 =
-                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-                                            let field2 =
-                                                ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-                                            (field0, field1, field2)
-                                        })
-                                    })())?;
-                                    let offset_size_length_size =
-                                        ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-                                    let base_offset_size_index_size =
-                                        ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-                                    let offset_size =
-                                        ((|| PResult::Ok({ (offset_size_length_size >> 4) }))())?;
-                                    let length_size =
-                                        ((|| PResult::Ok({ (offset_size_length_size & 7) }))())?;
-                                    let base_offset_size =
-                                        ((|| PResult::Ok({ (base_offset_size_index_size >> 4) }))(
-                                        ))?;
-                                    let index_size = ((|| {
-                                        PResult::Ok({
-                                            match (version > 0) {
-                                                true => (base_offset_size_index_size & 7),
+                            let inner = {
+                                let version = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                let flags = ((|| {
+                                    PResult::Ok({
+                                        let field0 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        let field2 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                        (field0, field1, field2)
+                                    })
+                                })())?;
+                                let offset_size_length_size =
+                                    ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                let base_offset_size_index_size =
+                                    ((|| PResult::Ok({ (Decoder17(input))? }))())?;
+                                let offset_size =
+                                    ((|| PResult::Ok({ (offset_size_length_size >> 4) }))())?;
+                                let length_size =
+                                    ((|| PResult::Ok({ (offset_size_length_size & 7) }))())?;
+                                let base_offset_size =
+                                    ((|| PResult::Ok({ (base_offset_size_index_size >> 4) }))())?;
+                                let index_size = ((|| {
+                                    PResult::Ok({
+                                        match (version > 0) {
+                                            true => (base_offset_size_index_size & 7),
 
-                                                false => 0,
-
-                                                _other => {
-                                                    (unreachable!(r#"bad value {_other:?}"#));
-                                                }
+                                            false => 0,
+                                        }
+                                    })
+                                })())?;
+                                let item_count = ((|| {
+                                    PResult::Ok({
+                                        match (version < 2) {
+                                            true => {
+                                                let inner = (Decoder43(input))?;
+                                                ((|x: u16| PResult::Ok((x as u32)))(inner))?
                                             }
-                                        })
-                                    })())?;
-                                    let item_count = ((|| {
-                                        PResult::Ok({
-                                            match (version < 2) {
-                                                true => {
-                                                    let inner = (Decoder43(input))?;
-                                                    ((|x: u16| x as u32)(inner))
-                                                }
 
-                                                false => (Decoder33(input))?,
-
-                                                _other => {
-                                                    (unreachable!(r#"bad value {_other:?}"#));
-                                                }
-                                            }
-                                        })
-                                    })())?;
-                                    let items =
-                                        ((|| {
-                                            PResult::Ok({
-                                                let mut accum = (Vec::new());
-                                                for _ in 0..item_count {
-                                                    (accum.push({
+                                            false => (Decoder33(input))?,
+                                        }
+                                    })
+                                })())?;
+                                let items = ((|| {
+                                    PResult::Ok({
+                                        let mut accum = (Vec::new());
+                                        for _ in 0..item_count {
+                                            (accum.push({
 let item_ID = ((|| PResult::Ok({
 match (version < 2) {
 true => {
 let inner = (Decoder43(input))?;
-(((|x: u16| x as u32))(inner))
+(((|x: u16| PResult::Ok((x as u32))))(inner))?
 },
 
 false => {
 (Decoder33(input))?
-},
-
-_other => {
-(unreachable!(r#"bad value {_other:?}"#));
 }
 }
 }))())?;
@@ -5556,10 +5530,6 @@ let inner = (Decoder43(input))?;
 false => {
 let _ = ();
 Type97::no
-},
-
-_other => {
-(unreachable!(r#"bad value {_other:?}"#));
 }
 }
 }))())?;
@@ -5574,7 +5544,7 @@ match base_offset_size {
 
 4 => {
 let inner = (Decoder33(input))?;
-(((|x: u32| x as u64))(inner))
+(((|x: u32| PResult::Ok((x as u64))))(inner))?
 },
 
 8 => {
@@ -5582,7 +5552,7 @@ let inner = (Decoder33(input))?;
 },
 
 _other => {
-(unreachable!(r#"bad value {_other:?}"#));
+(unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#));
 }
 }
 }))())?;
@@ -5601,7 +5571,7 @@ match index_size {
 
 4 => {
 let inner = (Decoder33(input))?;
-(((|x: u32| x as u64))(inner))
+(((|x: u32| PResult::Ok((x as u64))))(inner))?
 },
 
 8 => {
@@ -5609,7 +5579,7 @@ let inner = (Decoder33(input))?;
 },
 
 _other => {
-(unreachable!(r#"bad value {_other:?}"#));
+(unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#));
 }
 }
 }))())?;
@@ -5621,7 +5591,7 @@ match offset_size {
 
 4 => {
 let inner = (Decoder33(input))?;
-(((|x: u32| x as u64))(inner))
+(((|x: u32| PResult::Ok((x as u64))))(inner))?
 },
 
 8 => {
@@ -5629,7 +5599,7 @@ let inner = (Decoder33(input))?;
 },
 
 _other => {
-(unreachable!(r#"bad value {_other:?}"#));
+(unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#));
 }
 }
 }))())?;
@@ -5641,7 +5611,7 @@ match length_size {
 
 4 => {
 let inner = (Decoder33(input))?;
-(((|x: u32| x as u64))(inner))
+(((|x: u32| PResult::Ok((x as u64))))(inner))?
 },
 
 8 => {
@@ -5649,7 +5619,7 @@ let inner = (Decoder33(input))?;
 },
 
 _other => {
-(unreachable!(r#"bad value {_other:?}"#));
+(unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#));
 }
 }
 }))())?;
@@ -5660,23 +5630,23 @@ accum
 }))())?;
 Type99 { item_ID, construction_method, data_reference_index, base_offset, extent_count, extents }
 }));
-                                                }
-                                                accum
-                                            })
-                                        })())?;
-                                    Type100 {
-                                        version,
-                                        flags,
-                                        offset_size_length_size,
-                                        base_offset_size_index_size,
-                                        offset_size,
-                                        length_size,
-                                        base_offset_size,
-                                        index_size,
-                                        item_count,
-                                        items,
-                                    }
-                                };
+                                        }
+                                        accum
+                                    })
+                                })())?;
+                                Type100 {
+                                    version,
+                                    flags,
+                                    offset_size_length_size,
+                                    base_offset_size_index_size,
+                                    offset_size,
+                                    length_size,
+                                    base_offset_size,
+                                    index_size,
+                                    item_count,
+                                    items,
+                                }
+                            };
                             (Type114::iloc(inner))
                         }
 
@@ -5751,10 +5721,6 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                             };
                             (Type114::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -5762,7 +5728,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
             ret
         })
     })())?;
-    (Ok(Type115 {
+    (PResult::Ok(Type115 {
         size_field,
         r#type,
         size,
@@ -5780,14 +5746,10 @@ fn Decoder50<'input>(input: &mut ParseMonad<'input>) -> Result<Type160, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -5869,7 +5831,9 @@ fn Decoder50<'input>(input: &mut ParseMonad<'input>) -> Result<Type160, ParseErr
                                             }
 
                                             _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
+                                                (unreachable!(
+                                                    r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                                                ));
                                             }
                                         }
                                     })
@@ -5990,10 +5954,6 @@ fn Decoder50<'input>(input: &mut ParseMonad<'input>) -> Result<Type160, ParseErr
                             };
                             (Type159::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -6001,7 +5961,7 @@ fn Decoder50<'input>(input: &mut ParseMonad<'input>) -> Result<Type160, ParseErr
             ret
         })
     })())?;
-    (Ok(Type160 {
+    (PResult::Ok(Type160 {
         size_field,
         r#type,
         size,
@@ -6019,14 +5979,10 @@ fn Decoder51<'input>(input: &mut ParseMonad<'input>) -> Result<Type156, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -6118,7 +6074,9 @@ fn Decoder51<'input>(input: &mut ParseMonad<'input>) -> Result<Type156, ParseErr
                                             }
 
                                             _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
+                                                (unreachable!(
+                                                    r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                                                ));
                                             }
                                         }
                                     })
@@ -6234,10 +6192,6 @@ fn Decoder51<'input>(input: &mut ParseMonad<'input>) -> Result<Type156, ParseErr
                             };
                             (Type155::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -6245,7 +6199,7 @@ fn Decoder51<'input>(input: &mut ParseMonad<'input>) -> Result<Type156, ParseErr
             ret
         })
     })())?;
-    (Ok(Type156 {
+    (PResult::Ok(Type156 {
         size_field,
         r#type,
         size,
@@ -6263,14 +6217,10 @@ fn Decoder52<'input>(input: &mut ParseMonad<'input>) -> Result<Type158, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -6331,10 +6281,6 @@ fn Decoder52<'input>(input: &mut ParseMonad<'input>) -> Result<Type158, ParseErr
                             };
                             (Type157::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -6342,7 +6288,7 @@ fn Decoder52<'input>(input: &mut ParseMonad<'input>) -> Result<Type158, ParseErr
             ret
         })
     })())?;
-    (Ok(Type158 {
+    (PResult::Ok(Type158 {
         size_field,
         r#type,
         size,
@@ -6360,14 +6306,10 @@ fn Decoder53<'input>(input: &mut ParseMonad<'input>) -> Result<Type123, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -6445,10 +6387,6 @@ fn Decoder53<'input>(input: &mut ParseMonad<'input>) -> Result<Type123, ParseErr
                             };
                             (Type122::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -6456,7 +6394,7 @@ fn Decoder53<'input>(input: &mut ParseMonad<'input>) -> Result<Type123, ParseErr
             ret
         })
     })())?;
-    (Ok(Type123 {
+    (PResult::Ok(Type123 {
         size_field,
         r#type,
         size,
@@ -6474,14 +6412,10 @@ fn Decoder54<'input>(input: &mut ParseMonad<'input>) -> Result<Type150, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -6598,7 +6532,9 @@ fn Decoder54<'input>(input: &mut ParseMonad<'input>) -> Result<Type150, ParseErr
                                             }
 
                                             _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
+                                                (unreachable!(
+                                                    r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                                                ));
                                             }
                                         }
                                     })
@@ -6663,10 +6599,6 @@ fn Decoder54<'input>(input: &mut ParseMonad<'input>) -> Result<Type150, ParseErr
                             };
                             (Type149::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -6674,7 +6606,7 @@ fn Decoder54<'input>(input: &mut ParseMonad<'input>) -> Result<Type150, ParseErr
             ret
         })
     })())?;
-    (Ok(Type150 {
+    (PResult::Ok(Type150 {
         size_field,
         r#type,
         size,
@@ -6696,7 +6628,7 @@ fn Decoder55<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -6731,7 +6663,7 @@ fn Decoder55<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder56<'input>(input: &mut ParseMonad<'input>) -> Result<Type148, ParseError> {
@@ -6744,14 +6676,10 @@ fn Decoder56<'input>(input: &mut ParseMonad<'input>) -> Result<Type148, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -6887,10 +6815,6 @@ fn Decoder56<'input>(input: &mut ParseMonad<'input>) -> Result<Type148, ParseErr
                             };
                             (Type147::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -6898,7 +6822,7 @@ fn Decoder56<'input>(input: &mut ParseMonad<'input>) -> Result<Type148, ParseErr
             ret
         })
     })())?;
-    (Ok(Type148 {
+    (PResult::Ok(Type148 {
         size_field,
         r#type,
         size,
@@ -6916,14 +6840,10 @@ fn Decoder57<'input>(input: &mut ParseMonad<'input>) -> Result<Type85, ParseErro
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -6976,16 +6896,14 @@ fn Decoder57<'input>(input: &mut ParseMonad<'input>) -> Result<Type85, ParseErro
 
                                                                 1 => {
                                                                     let inner = (Decoder48(input))?;
-                                                                    ((|x: u64| x - 16)(inner))
+                                                                    ((|x: u64| {
+                                                                        PResult::Ok((x - 16))
+                                                                    })(
+                                                                        inner
+                                                                    ))?
                                                                 }
 
                                                                 _ => ((size_field - 8) as u64),
-
-                                                                _other => {
-                                                                    (unreachable!(
-                                                                        r#"bad value {_other:?}"#
-                                                                    ));
-                                                                }
                                                             }
                                                         })
                                                     })(
@@ -7073,10 +6991,6 @@ fn Decoder57<'input>(input: &mut ParseMonad<'input>) -> Result<Type85, ParseErro
                             };
                             (Type84::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -7084,7 +6998,7 @@ fn Decoder57<'input>(input: &mut ParseMonad<'input>) -> Result<Type85, ParseErro
             ret
         })
     })())?;
-    (Ok(Type85 {
+    (PResult::Ok(Type85 {
         size_field,
         r#type,
         size,
@@ -7102,14 +7016,10 @@ fn Decoder58<'input>(input: &mut ParseMonad<'input>) -> Result<Type145, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -7152,15 +7062,11 @@ match size_field {
 
 1 => {
 let inner = (Decoder48(input))?;
-(((|x: u64| x - 16))(inner))
+(((|x: u64| PResult::Ok((x - 16))))(inner))?
 },
 
 _ => {
 ((size_field - 8) as u64)
-},
-
-_other => {
-(unreachable!(r#"bad value {_other:?}"#));
 }
 }
 }))())?;
@@ -7391,10 +7297,6 @@ Type82 { size_field, r#type, size, data }
                                                 let _ = ();
                                                 Type140::no
                                             }
-
-                                            _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
-                                            }
                                         }
                                     })
                                 })())?;
@@ -7496,12 +7398,6 @@ Type82 { size_field, r#type, size, data }
                                                             true => (Decoder33(input))?,
 
                                                             false => default_length,
-
-                                                            _other => {
-                                                                (unreachable!(
-                                                                    r#"bad value {_other:?}"#
-                                                                ));
-                                                            }
                                                         }
                                                     })
                                                 })(
@@ -7561,10 +7457,6 @@ Type82 { size_field, r#type, size, data }
                                                 let _ = ();
                                                 Type130::no
                                             }
-
-                                            _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
-                                            }
                                         }
                                     })
                                 })(
@@ -7623,10 +7515,6 @@ Type82 { size_field, r#type, size, data }
                             };
                             (Type144::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -7634,7 +7522,7 @@ Type82 { size_field, r#type, size, data }
             ret
         })
     })())?;
-    (Ok(Type145 {
+    (PResult::Ok(Type145 {
         size_field,
         r#type,
         size,
@@ -7652,14 +7540,10 @@ fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseErro
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -7724,16 +7608,14 @@ fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseErro
                                                             match (version == 2) {
                                                                 true => {
                                                                     let inner = (Decoder43(input))?;
-                                                                    ((|x: u16| x as u32)(inner))
+                                                                    ((|x: u16| {
+                                                                        PResult::Ok((x as u32))
+                                                                    })(
+                                                                        inner
+                                                                    ))?
                                                                 }
 
                                                                 false => (Decoder33(input))?,
-
-                                                                _other => {
-                                                                    (unreachable!(
-                                                                        r#"bad value {_other:?}"#
-                                                                    ));
-                                                                }
                                                             }
                                                         })
                                                     })(
@@ -7789,12 +7671,6 @@ fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseErro
                                                                     let _ = ();
                                                                     Type89::unknown
                                                                 }
-
-                                                                _other => {
-                                                                    (unreachable!(
-                                                                        r#"bad value {_other:?}"#
-                                                                    ));
-                                                                }
                                                             }
                                                         })
                                                     })(
@@ -7808,10 +7684,6 @@ fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseErro
                                                     }
                                                 };
                                                 (Type92::no(inner))
-                                            }
-
-                                            _other => {
-                                                (unreachable!(r#"bad value {_other:?}"#));
                                             }
                                         }
                                     })
@@ -7848,10 +7720,6 @@ fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseErro
                             };
                             (Type94::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -7859,7 +7727,7 @@ fn Decoder59<'input>(input: &mut ParseMonad<'input>) -> Result<Type95, ParseErro
             ret
         })
     })())?;
-    (Ok(Type95 {
+    (PResult::Ok(Type95 {
         size_field,
         r#type,
         size,
@@ -7877,14 +7745,10 @@ fn Decoder60<'input>(input: &mut ParseMonad<'input>) -> Result<Type105, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -7942,10 +7806,6 @@ fn Decoder60<'input>(input: &mut ParseMonad<'input>) -> Result<Type105, ParseErr
                             };
                             (Type104::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -7953,7 +7813,7 @@ fn Decoder60<'input>(input: &mut ParseMonad<'input>) -> Result<Type105, ParseErr
             ret
         })
     })())?;
-    (Ok(Type105 {
+    (PResult::Ok(Type105 {
         size_field,
         r#type,
         size,
@@ -7971,14 +7831,10 @@ fn Decoder61<'input>(input: &mut ParseMonad<'input>) -> Result<Type103, ParseErr
 
                 1 => {
                     let inner = (Decoder48(input))?;
-                    ((|x: u64| x - 16)(inner))
+                    ((|x: u64| PResult::Ok((x - 16)))(inner))?
                 }
 
                 _ => ((size_field - 8) as u64),
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -8048,10 +7904,6 @@ fn Decoder61<'input>(input: &mut ParseMonad<'input>) -> Result<Type103, ParseErr
                             };
                             (Type102::unknown(inner))
                         }
-
-                        _other => {
-                            (unreachable!(r#"bad value {_other:?}"#));
-                        }
                     }
                 })
             })())?;
@@ -8059,7 +7911,7 @@ fn Decoder61<'input>(input: &mut ParseMonad<'input>) -> Result<Type103, ParseErr
             ret
         })
     })())?;
-    (Ok(Type103 {
+    (PResult::Ok(Type103 {
         size_field,
         r#type,
         size,
@@ -8081,7 +7933,7 @@ fn Decoder62<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -8116,7 +7968,7 @@ fn Decoder62<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder63<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
@@ -8133,7 +7985,7 @@ fn Decoder63<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -8168,7 +8020,7 @@ fn Decoder63<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder64<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
@@ -8185,7 +8037,7 @@ fn Decoder64<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -8220,7 +8072,7 @@ fn Decoder64<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder65<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
@@ -8237,7 +8089,7 @@ fn Decoder65<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -8272,7 +8124,7 @@ fn Decoder65<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder66<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
@@ -8289,7 +8141,7 @@ fn Decoder66<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -8324,7 +8176,7 @@ fn Decoder66<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErro
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder67<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -8348,7 +8200,7 @@ fn Decoder67<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseError> {
@@ -8365,7 +8217,7 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
 
                             225 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         }
@@ -8385,6 +8237,10 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
                 1 => {
                     let inner = (Decoder71(input))?;
                     (Type55::app1(inner))
+                }
+
+                _ => {
+                    return (Err(ParseError::ExcludedBranch));
                 }
             }
         })
@@ -8468,7 +8324,7 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
 
                                 207 => 1,
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             }
@@ -8548,7 +8404,7 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
 
                             254 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         }
@@ -8568,6 +8424,10 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
                 1 => {
                     let _ = ();
                     Type78::none
+                }
+
+                _ => {
+                    return (Err(ParseError::ExcludedBranch));
                 }
             }
         })
@@ -8629,7 +8489,7 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
 
                                 217 => 1,
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             }
@@ -8650,7 +8510,7 @@ fn Decoder68<'input>(input: &mut ParseMonad<'input>) -> Result<Type79, ParseErro
             accum
         })
     })())?;
-    (Ok(Type79 {
+    (PResult::Ok(Type79 {
         initial_segment,
         segments,
         header,
@@ -8681,7 +8541,7 @@ fn Decoder69<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder70<'input>(input: &mut ParseMonad<'input>) -> Result<Type45, ParseError> {
@@ -8720,7 +8580,7 @@ fn Decoder70<'input>(input: &mut ParseMonad<'input>) -> Result<Type45, ParseErro
             ret
         })
     })())?;
-    (Ok(Type45 {
+    (PResult::Ok(Type45 {
         marker,
         length,
         data,
@@ -8763,7 +8623,7 @@ fn Decoder71<'input>(input: &mut ParseMonad<'input>) -> Result<Type54, ParseErro
             ret
         })
     })())?;
-    (Ok(Type54 {
+    (PResult::Ok(Type54 {
         marker,
         length,
         data,
@@ -8820,7 +8680,7 @@ fn Decoder72<'input>(input: &mut ParseMonad<'input>) -> Result<Type65, ParseErro
 
                     254 => 20,
 
-                    _other => {
+                    _ => {
                         return (Err(ParseError::ExcludedBranch));
                     }
                 }
@@ -8831,7 +8691,7 @@ fn Decoder72<'input>(input: &mut ParseMonad<'input>) -> Result<Type65, ParseErro
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder107(input))?;
             (Type65::dqt(inner))
@@ -8936,6 +8796,10 @@ fn Decoder72<'input>(input: &mut ParseMonad<'input>) -> Result<Type65, ParseErro
             let inner = (Decoder125(input))?;
             (Type65::com(inner))
         }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
+        }
     }))
 }
 
@@ -8973,7 +8837,7 @@ fn Decoder73<'input>(input: &mut ParseMonad<'input>) -> Result<Type69, ParseErro
 
                     207 => 12,
 
-                    _other => {
+                    _ => {
                         return (Err(ParseError::ExcludedBranch));
                     }
                 }
@@ -8984,7 +8848,7 @@ fn Decoder73<'input>(input: &mut ParseMonad<'input>) -> Result<Type69, ParseErro
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder92(input))?;
             (Type69::sof0(inner))
@@ -9049,6 +8913,10 @@ fn Decoder73<'input>(input: &mut ParseMonad<'input>) -> Result<Type69, ParseErro
             let inner = (Decoder104(input))?;
             (Type69::sof15(inner))
         }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
+        }
     }))
 }
 
@@ -9108,7 +8976,7 @@ fn Decoder74<'input>(input: &mut ParseMonad<'input>) -> Result<Type75, ParseErro
 
                                 218 => 1,
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             }
@@ -9131,7 +8999,7 @@ fn Decoder74<'input>(input: &mut ParseMonad<'input>) -> Result<Type75, ParseErro
     })())?;
     let sos = ((|| PResult::Ok({ (Decoder77(input))? }))())?;
     let data = ((|| PResult::Ok({ (Decoder91(input))? }))())?;
-    (Ok(Type75 {
+    (PResult::Ok(Type75 {
         segments,
         sos,
         data,
@@ -9174,7 +9042,7 @@ fn Decoder75<'input>(input: &mut ParseMonad<'input>) -> Result<Type77, ParseErro
             ret
         })
     })())?;
-    (Ok(Type77 {
+    (PResult::Ok(Type77 {
         marker,
         length,
         data,
@@ -9237,7 +9105,7 @@ fn Decoder76<'input>(input: &mut ParseMonad<'input>) -> Result<Type75, ParseErro
 
                                 218 => 1,
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             }
@@ -9260,7 +9128,7 @@ fn Decoder76<'input>(input: &mut ParseMonad<'input>) -> Result<Type75, ParseErro
     })())?;
     let sos = ((|| PResult::Ok({ (Decoder77(input))? }))())?;
     let data = ((|| PResult::Ok({ (Decoder78(input))? }))())?;
-    (Ok(Type75 {
+    (PResult::Ok(Type75 {
         segments,
         sos,
         data,
@@ -9303,7 +9171,7 @@ fn Decoder77<'input>(input: &mut ParseMonad<'input>) -> Result<Type72, ParseErro
             ret
         })
     })())?;
-    (Ok(Type72 {
+    (PResult::Ok(Type72 {
         marker,
         length,
         data,
@@ -9389,13 +9257,13 @@ fn Decoder78<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
 
                                     254 => 1,
 
-                                    _other => {
+                                    _ => {
                                         return (Err(ParseError::ExcludedBranch));
                                     }
                                 }
                             }
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -9433,13 +9301,13 @@ fn Decoder78<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
 
                                             215 => 8,
 
-                                            _other => {
+                                            _ => {
                                                 return (Err(ParseError::ExcludedBranch));
                                             }
                                         }
                                     }
 
-                                    _other => {
+                                    _ => {
                                         return (Err(ParseError::ExcludedBranch));
                                     }
                                 };
@@ -9492,6 +9360,10 @@ fn Decoder78<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
                                 let inner = (Decoder87(input))?;
                                 (Type73::rst7(inner))
                             }
+
+                            _ => {
+                                return (Err(ParseError::ExcludedBranch));
+                            }
                         }
                     };
                     (accum.push(next_elem));
@@ -9504,7 +9376,8 @@ fn Decoder78<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
     })())?;
     let scan_data_stream = ((|| {
         PResult::Ok({
-            ((((scan_data.iter()).cloned()).flat_map(
+            (try_flat_map_vec(
+                ((scan_data.iter()).cloned()),
                 (|x: Type73| match x {
                     Type73::mcu(v) => ([v].to_vec()),
 
@@ -9525,10 +9398,9 @@ fn Decoder78<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
                     Type73::rst7(..) => ([].to_vec()),
                 }),
             ))
-            .collect())
         })
     })())?;
-    (Ok(Type74 {
+    (PResult::Ok(Type74 {
         scan_data,
         scan_data_stream,
     }))
@@ -9544,7 +9416,7 @@ fn Decoder79<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
 
                 255 => 1,
 
-                _other => {
+                _ => {
                     return (Err(ParseError::ExcludedBranch));
                 }
             };
@@ -9552,7 +9424,7 @@ fn Decoder79<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let b = (input.read_byte())?;
             if (b != 255) {
@@ -9586,7 +9458,11 @@ fn Decoder79<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
                 })())?;
                 (field0, field1)
             };
-            ((|_: (u8, u8)| 255)(inner))
+            ((|_: (u8, u8)| PResult::Ok(255))(inner))?
+        }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
@@ -9612,7 +9488,7 @@ fn Decoder80<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder81<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9636,7 +9512,7 @@ fn Decoder81<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder82<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9660,7 +9536,7 @@ fn Decoder82<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder83<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9684,7 +9560,7 @@ fn Decoder83<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder84<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9708,7 +9584,7 @@ fn Decoder84<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder85<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9732,7 +9608,7 @@ fn Decoder85<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder86<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9756,7 +9632,7 @@ fn Decoder86<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder87<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseError> {
@@ -9780,7 +9656,7 @@ fn Decoder87<'input>(input: &mut ParseMonad<'input>) -> Result<Type41, ParseErro
             }
         })
     })())?;
-    (Ok(Type41 { ff, marker }))
+    (PResult::Ok(Type41 { ff, marker }))
 }
 
 fn Decoder88<'input>(input: &mut ParseMonad<'input>) -> Result<Type71, ParseError> {
@@ -9797,7 +9673,7 @@ fn Decoder88<'input>(input: &mut ParseMonad<'input>) -> Result<Type71, ParseErro
     let start_spectral_selection = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let end_spectral_selection = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let approximation_bit_position = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type71 {
+    (PResult::Ok(Type71 {
         num_image_components,
         image_components,
         start_spectral_selection,
@@ -9809,7 +9685,7 @@ fn Decoder88<'input>(input: &mut ParseMonad<'input>) -> Result<Type71, ParseErro
 fn Decoder89<'input>(input: &mut ParseMonad<'input>) -> Result<Type70, ParseError> {
     let component_selector = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let entropy_coding_table_ids = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type70 {
+    (PResult::Ok(Type70 {
         component_selector,
         entropy_coding_table_ids,
     }))
@@ -9817,7 +9693,7 @@ fn Decoder89<'input>(input: &mut ParseMonad<'input>) -> Result<Type70, ParseErro
 
 fn Decoder90<'input>(input: &mut ParseMonad<'input>) -> Result<Type76, ParseError> {
     let num_lines = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
-    (Ok(Type76 { num_lines }))
+    (PResult::Ok(Type76 { num_lines }))
 }
 
 fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseError> {
@@ -9901,13 +9777,13 @@ fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
 
                                     254 => 1,
 
-                                    _other => {
+                                    _ => {
                                         return (Err(ParseError::ExcludedBranch));
                                     }
                                 }
                             }
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -9945,13 +9821,13 @@ fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
 
                                             215 => 8,
 
-                                            _other => {
+                                            _ => {
                                                 return (Err(ParseError::ExcludedBranch));
                                             }
                                         }
                                     }
 
-                                    _other => {
+                                    _ => {
                                         return (Err(ParseError::ExcludedBranch));
                                     }
                                 };
@@ -10004,6 +9880,10 @@ fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
                                 let inner = (Decoder87(input))?;
                                 (Type73::rst7(inner))
                             }
+
+                            _ => {
+                                return (Err(ParseError::ExcludedBranch));
+                            }
                         }
                     };
                     (accum.push(next_elem));
@@ -10016,7 +9896,8 @@ fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
     })())?;
     let scan_data_stream = ((|| {
         PResult::Ok({
-            ((((scan_data.iter()).cloned()).flat_map(
+            (try_flat_map_vec(
+                ((scan_data.iter()).cloned()),
                 (|x: Type73| match x {
                     Type73::mcu(v) => ([v].to_vec()),
 
@@ -10037,10 +9918,9 @@ fn Decoder91<'input>(input: &mut ParseMonad<'input>) -> Result<Type74, ParseErro
                     Type73::rst7(..) => ([].to_vec()),
                 }),
             ))
-            .collect())
         })
     })())?;
-    (Ok(Type74 {
+    (PResult::Ok(Type74 {
         scan_data,
         scan_data_stream,
     }))
@@ -10082,7 +9962,7 @@ fn Decoder92<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10125,7 +10005,7 @@ fn Decoder93<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10168,7 +10048,7 @@ fn Decoder94<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10211,7 +10091,7 @@ fn Decoder95<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10254,7 +10134,7 @@ fn Decoder96<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10297,7 +10177,7 @@ fn Decoder97<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10340,7 +10220,7 @@ fn Decoder98<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10383,7 +10263,7 @@ fn Decoder99<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErro
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10426,7 +10306,7 @@ fn Decoder100<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErr
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10469,7 +10349,7 @@ fn Decoder101<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErr
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10512,7 +10392,7 @@ fn Decoder102<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErr
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10555,7 +10435,7 @@ fn Decoder103<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErr
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10598,7 +10478,7 @@ fn Decoder104<'input>(input: &mut ParseMonad<'input>) -> Result<Type68, ParseErr
             ret
         })
     })())?;
-    (Ok(Type68 {
+    (PResult::Ok(Type68 {
         marker,
         length,
         data,
@@ -10619,7 +10499,7 @@ fn Decoder105<'input>(input: &mut ParseMonad<'input>) -> Result<Type67, ParseErr
             accum
         })
     })())?;
-    (Ok(Type67 {
+    (PResult::Ok(Type67 {
         sample_precision,
         num_lines,
         num_samples_per_line,
@@ -10632,7 +10512,7 @@ fn Decoder106<'input>(input: &mut ParseMonad<'input>) -> Result<Type66, ParseErr
     let id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let sampling_factor = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let quantization_table_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type66 {
+    (PResult::Ok(Type66 {
         id,
         sampling_factor,
         quantization_table_id,
@@ -10675,7 +10555,7 @@ fn Decoder107<'input>(input: &mut ParseMonad<'input>) -> Result<Type62, ParseErr
             ret
         })
     })())?;
-    (Ok(Type62 {
+    (PResult::Ok(Type62 {
         marker,
         length,
         data,
@@ -10718,7 +10598,7 @@ fn Decoder108<'input>(input: &mut ParseMonad<'input>) -> Result<Type60, ParseErr
             ret
         })
     })())?;
-    (Ok(Type60 {
+    (PResult::Ok(Type60 {
         marker,
         length,
         data,
@@ -10761,7 +10641,7 @@ fn Decoder109<'input>(input: &mut ParseMonad<'input>) -> Result<Type58, ParseErr
             ret
         })
     })())?;
-    (Ok(Type58 {
+    (PResult::Ok(Type58 {
         marker,
         length,
         data,
@@ -10804,7 +10684,7 @@ fn Decoder110<'input>(input: &mut ParseMonad<'input>) -> Result<Type64, ParseErr
             ret
         })
     })())?;
-    (Ok(Type64 {
+    (PResult::Ok(Type64 {
         marker,
         length,
         data,
@@ -10868,7 +10748,7 @@ fn Decoder111<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -10932,7 +10812,7 @@ fn Decoder112<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -10996,7 +10876,7 @@ fn Decoder113<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11060,7 +10940,7 @@ fn Decoder114<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11124,7 +11004,7 @@ fn Decoder115<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11188,7 +11068,7 @@ fn Decoder116<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11252,7 +11132,7 @@ fn Decoder117<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11316,7 +11196,7 @@ fn Decoder118<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11380,7 +11260,7 @@ fn Decoder119<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11444,7 +11324,7 @@ fn Decoder120<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11508,7 +11388,7 @@ fn Decoder121<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11572,7 +11452,7 @@ fn Decoder122<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11636,7 +11516,7 @@ fn Decoder123<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11700,7 +11580,7 @@ fn Decoder124<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11764,7 +11644,7 @@ fn Decoder125<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
             ret
         })
     })())?;
-    (Ok(Type56 {
+    (PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -11773,13 +11653,13 @@ fn Decoder125<'input>(input: &mut ParseMonad<'input>) -> Result<Type56, ParseErr
 
 fn Decoder126<'input>(input: &mut ParseMonad<'input>) -> Result<Type63, ParseError> {
     let restart_interval = ((|| PResult::Ok({ (Decoder43(input))? }))())?;
-    (Ok(Type63 { restart_interval }))
+    (PResult::Ok(Type63 { restart_interval }))
 }
 
 fn Decoder127<'input>(input: &mut ParseMonad<'input>) -> Result<Type57, ParseError> {
     let class_table_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let value = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type57 {
+    (PResult::Ok(Type57 {
         class_table_id,
         value,
     }))
@@ -11818,7 +11698,7 @@ fn Decoder128<'input>(input: &mut ParseMonad<'input>) -> Result<Type59, ParseErr
             accum
         })
     })())?;
-    (Ok(Type59 {
+    (PResult::Ok(Type59 {
         class_table_id,
         num_codes,
         values,
@@ -11849,7 +11729,7 @@ fn Decoder129<'input>(input: &mut ParseMonad<'input>) -> Result<Type61, ParseErr
             accum
         })
     })())?;
-    (Ok(Type61 {
+    (PResult::Ok(Type61 {
         precision_table_id,
         elements,
     }))
@@ -11894,14 +11774,10 @@ fn Decoder130<'input>(input: &mut ParseMonad<'input>) -> Result<Type53, ParseErr
                     };
                     (Type52::other(inner))
                 }
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
-    (Ok(Type53 { identifier, data }))
+    (PResult::Ok(Type53 { identifier, data }))
 }
 
 fn Decoder131<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
@@ -11918,7 +11794,7 @@ fn Decoder131<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -11953,7 +11829,7 @@ fn Decoder131<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErr
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder132<'input>(input: &mut ParseMonad<'input>) -> Result<Type50, ParseError> {
@@ -11968,7 +11844,7 @@ fn Decoder132<'input>(input: &mut ParseMonad<'input>) -> Result<Type50, ParseErr
         })
     })())?;
     let exif = ((|| PResult::Ok({ (Decoder134(input))? }))())?;
-    (Ok(Type50 { padding, exif }))
+    (PResult::Ok(Type50 { padding, exif }))
 }
 
 fn Decoder133<'input>(input: &mut ParseMonad<'input>) -> Result<Type51, ParseError> {
@@ -11994,7 +11870,7 @@ fn Decoder133<'input>(input: &mut ParseMonad<'input>) -> Result<Type51, ParseErr
             accum
         })
     })())?;
-    (Ok(Type51 { xmp }))
+    (PResult::Ok(Type51 { xmp }))
 }
 
 fn Decoder134<'input>(input: &mut ParseMonad<'input>) -> Result<Type49, ParseError> {
@@ -12009,7 +11885,7 @@ fn Decoder134<'input>(input: &mut ParseMonad<'input>) -> Result<Type49, ParseErr
 
                         77 => 1,
 
-                        _other => {
+                        _ => {
                             return (Err(ParseError::ExcludedBranch));
                         }
                     };
@@ -12065,6 +11941,10 @@ fn Decoder134<'input>(input: &mut ParseMonad<'input>) -> Result<Type49, ParseErr
                     })())?;
                     (Type46::be(field0, field1))
                 }
+
+                _ => {
+                    return (Err(ParseError::ExcludedBranch));
+                }
             }
         })
     })())?;
@@ -12074,10 +11954,6 @@ fn Decoder134<'input>(input: &mut ParseMonad<'input>) -> Result<Type49, ParseErr
                 Type46::le(..) => (Decoder135(input))?,
 
                 Type46::be(..) => (Decoder43(input))?,
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
@@ -12087,16 +11963,12 @@ fn Decoder134<'input>(input: &mut ParseMonad<'input>) -> Result<Type49, ParseErr
                 Type46::le(..) => (Decoder24(input))?,
 
                 Type46::be(..) => (Decoder33(input))?,
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
     let ifd =
         ((|| PResult::Ok({ (unimplemented!(r#"translate @ Decoder::WithRelativeOffset"#)) }))())?;
-    (Ok(Type49 {
+    (PResult::Ok(Type49 {
         byte_order,
         magic,
         offset,
@@ -12110,7 +11982,7 @@ fn Decoder135<'input>(input: &mut ParseMonad<'input>) -> Result<u16, ParseError>
         let field1 = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
         (field0, field1)
     };
-    (Ok(((|x: (u8, u8)| u16le(x))(inner))))
+    (PResult::Ok(((|x: (u8, u8)| PResult::Ok((u16le(x))))(inner))?))
 }
 
 fn Decoder136<'input>(input: &mut ParseMonad<'input>) -> Result<Type44, ParseError> {
@@ -12146,14 +12018,10 @@ fn Decoder136<'input>(input: &mut ParseMonad<'input>) -> Result<Type44, ParseErr
                     };
                     (Type43::other(inner))
                 }
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
-    (Ok(Type44 { identifier, data }))
+    (PResult::Ok(Type44 { identifier, data }))
 }
 
 fn Decoder137<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
@@ -12170,7 +12038,7 @@ fn Decoder137<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -12205,7 +12073,7 @@ fn Decoder137<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErr
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder138<'input>(input: &mut ParseMonad<'input>) -> Result<Type42, ParseError> {
@@ -12231,7 +12099,7 @@ fn Decoder138<'input>(input: &mut ParseMonad<'input>) -> Result<Type42, ParseErr
             accum
         })
     })())?;
-    (Ok(Type42 {
+    (PResult::Ok(Type42 {
         version_major,
         version_minor,
         density_units,
@@ -12247,7 +12115,7 @@ fn Decoder139<'input>(input: &mut ParseMonad<'input>) -> Result<Type2, ParseErro
     let r = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let g = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let b = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type2 { r, g, b }))
+    (PResult::Ok(Type2 { r, g, b }))
 }
 
 fn Decoder140<'input>(input: &mut ParseMonad<'input>) -> Result<Type20, ParseError> {
@@ -12281,7 +12149,7 @@ fn Decoder140<'input>(input: &mut ParseMonad<'input>) -> Result<Type20, ParseErr
     let timestamp = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
     let compression_flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let os_id = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type20 {
+    (PResult::Ok(Type20 {
         magic,
         method,
         file_flags,
@@ -12292,7 +12160,7 @@ fn Decoder140<'input>(input: &mut ParseMonad<'input>) -> Result<Type20, ParseErr
 }
 
 fn Decoder141<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseError> {
-    (Ok((Decoder151(input))?))
+    (PResult::Ok((Decoder151(input))?))
 }
 
 fn Decoder142<'input>(input: &mut ParseMonad<'input>) -> Result<Type38, ParseError> {
@@ -12313,7 +12181,8 @@ fn Decoder142<'input>(input: &mut ParseMonad<'input>) -> Result<Type38, ParseErr
     })())?;
     let codes = ((|| {
         PResult::Ok({
-            ((((blocks.iter()).cloned()).flat_map(
+            (try_flat_map_vec(
+                ((blocks.iter()).cloned()),
                 (|x: Type37| match x.data {
                     Type36::uncompressed(y) => y.codes_values,
 
@@ -12322,13 +12191,12 @@ fn Decoder142<'input>(input: &mut ParseMonad<'input>) -> Result<Type38, ParseErr
                     Type36::dynamic_huffman(y) => y.codes_values,
                 }),
             ))
-            .collect())
         })
     })())?;
     let inflate = ((|| {
         PResult::Ok({ (unimplemented!(r#"embed_expr is not implemented for Expr::Inflate"#)) })
     })())?;
-    (Ok(Type38 {
+    (PResult::Ok(Type38 {
         blocks,
         codes,
         inflate,
@@ -12338,7 +12206,7 @@ fn Decoder142<'input>(input: &mut ParseMonad<'input>) -> Result<Type38, ParseErr
 fn Decoder143<'input>(input: &mut ParseMonad<'input>) -> Result<Type39, ParseError> {
     let crc = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
     let length = ((|| PResult::Ok({ (Decoder24(input))? }))())?;
-    (Ok(Type39 { crc, length }))
+    (PResult::Ok(Type39 { crc, length }))
 }
 
 fn Decoder144<'input>(input: &mut ParseMonad<'input>) -> Result<Type37, ParseError> {
@@ -12350,7 +12218,7 @@ fn Decoder144<'input>(input: &mut ParseMonad<'input>) -> Result<Type37, ParseErr
                 let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (field0, field1)
             };
-            ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+            ((|bits: (u8, u8)| PResult::Ok((bits.1 << 1 | bits.0)))(inner))?
         })
     })())?;
     let data = ((|| {
@@ -12372,12 +12240,14 @@ fn Decoder144<'input>(input: &mut ParseMonad<'input>) -> Result<Type37, ParseErr
                 }
 
                 _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
+                    (unreachable!(
+                        r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                    ));
                 }
             }
         })
     })())?;
-    (Ok(Type37 {
+    (PResult::Ok(Type37 {
         r#final,
         r#type,
         data,
@@ -12386,7 +12256,7 @@ fn Decoder144<'input>(input: &mut ParseMonad<'input>) -> Result<Type37, ParseErr
 
 fn Decoder145<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(b))
+    (PResult::Ok(b))
 }
 
 fn Decoder146<'input>(input: &mut ParseMonad<'input>) -> Result<Type35, ParseError> {
@@ -12438,23 +12308,25 @@ fn Decoder146<'input>(input: &mut ParseMonad<'input>) -> Result<Type35, ParseErr
                 u8,
                 u8,
             )| {
-                (bits.15 as u16) << 15
-                    | (bits.14 as u16) << 14
-                    | (bits.13 as u16) << 13
-                    | (bits.12 as u16) << 12
-                    | (bits.11 as u16) << 11
-                    | (bits.10 as u16) << 10
-                    | (bits.9 as u16) << 9
-                    | (bits.8 as u16) << 8
-                    | (bits.7 as u16) << 7
-                    | (bits.6 as u16) << 6
-                    | (bits.5 as u16) << 5
-                    | (bits.4 as u16) << 4
-                    | (bits.3 as u16) << 3
-                    | (bits.2 as u16) << 2
-                    | (bits.1 as u16) << 1
-                    | (bits.0 as u16)
-            })(inner))
+                PResult::Ok(
+                    ((bits.15 as u16) << 15
+                        | (bits.14 as u16) << 14
+                        | (bits.13 as u16) << 13
+                        | (bits.12 as u16) << 12
+                        | (bits.11 as u16) << 11
+                        | (bits.10 as u16) << 10
+                        | (bits.9 as u16) << 9
+                        | (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)),
+                )
+            })(inner))?
         })
     })())?;
     let nlen = ((|| {
@@ -12499,23 +12371,25 @@ fn Decoder146<'input>(input: &mut ParseMonad<'input>) -> Result<Type35, ParseErr
                 u8,
                 u8,
             )| {
-                (bits.15 as u16) << 15
-                    | (bits.14 as u16) << 14
-                    | (bits.13 as u16) << 13
-                    | (bits.12 as u16) << 12
-                    | (bits.11 as u16) << 11
-                    | (bits.10 as u16) << 10
-                    | (bits.9 as u16) << 9
-                    | (bits.8 as u16) << 8
-                    | (bits.7 as u16) << 7
-                    | (bits.6 as u16) << 6
-                    | (bits.5 as u16) << 5
-                    | (bits.4 as u16) << 4
-                    | (bits.3 as u16) << 3
-                    | (bits.2 as u16) << 2
-                    | (bits.1 as u16) << 1
-                    | (bits.0 as u16)
-            })(inner))
+                PResult::Ok(
+                    ((bits.15 as u16) << 15
+                        | (bits.14 as u16) << 14
+                        | (bits.13 as u16) << 13
+                        | (bits.12 as u16) << 12
+                        | (bits.11 as u16) << 11
+                        | (bits.10 as u16) << 10
+                        | (bits.9 as u16) << 9
+                        | (bits.8 as u16) << 8
+                        | (bits.7 as u16) << 7
+                        | (bits.6 as u16) << 6
+                        | (bits.5 as u16) << 5
+                        | (bits.4 as u16) << 4
+                        | (bits.3 as u16) << 3
+                        | (bits.2 as u16) << 2
+                        | (bits.1 as u16) << 1
+                        | (bits.0 as u16)),
+                )
+            })(inner))?
         })
     })())?;
     let bytes = ((|| {
@@ -12537,15 +12411,17 @@ fn Decoder146<'input>(input: &mut ParseMonad<'input>) -> Result<Type35, ParseErr
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        bits.7 << 7
-                            | bits.6 << 6
-                            | bits.5 << 5
-                            | bits.4 << 4
-                            | bits.3 << 3
-                            | bits.2 << 2
-                            | bits.1 << 1
-                            | bits.0
-                    })(inner))
+                        PResult::Ok(
+                            (bits.7 << 7
+                                | bits.6 << 6
+                                | bits.5 << 5
+                                | bits.4 << 4
+                                | bits.3 << 3
+                                | bits.2 << 2
+                                | bits.1 << 1
+                                | bits.0),
+                        )
+                    })(inner))?
                 }));
             }
             accum
@@ -12553,11 +12429,13 @@ fn Decoder146<'input>(input: &mut ParseMonad<'input>) -> Result<Type35, ParseErr
     })())?;
     let codes_values = ((|| {
         PResult::Ok({
-            ((((bytes.iter()).cloned()).flat_map((|x: u8| [(Type29::literal(x))].to_vec())))
-                .collect())
+            (try_flat_map_vec(
+                ((bytes.iter()).cloned()),
+                (|x: u8| [(Type29::literal(x))].to_vec()),
+            ))
         })
     })())?;
-    (Ok(Type35 {
+    (PResult::Ok(Type35 {
         align,
         len,
         nlen,
@@ -12612,14 +12490,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -12672,14 +12552,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -12732,14 +12614,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -12792,14 +12676,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -12852,14 +12738,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -12912,14 +12800,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -12972,14 +12862,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13032,14 +12924,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13070,7 +12964,7 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -13104,14 +12998,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13142,7 +13038,7 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -13176,14 +13072,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13214,7 +13112,7 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -13248,14 +13146,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13286,7 +13186,7 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -13320,14 +13220,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13362,7 +13264,11 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13396,14 +13302,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13438,7 +13346,11 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13472,14 +13384,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13514,7 +13428,11 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13548,14 +13466,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13590,7 +13510,11 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13624,14 +13548,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13671,10 +13597,12 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13708,14 +13636,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13755,10 +13685,12 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13792,14 +13724,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13839,10 +13773,12 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13876,14 +13812,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13923,10 +13861,12 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -13960,14 +13900,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14011,10 +13953,15 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14048,14 +13995,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14099,10 +14048,15 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14136,14 +14090,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14187,10 +14143,15 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14224,14 +14185,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14275,10 +14238,15 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14312,14 +14280,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14367,14 +14337,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14408,14 +14380,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14463,14 +14437,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14504,14 +14480,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14559,14 +14537,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14600,14 +14580,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14655,14 +14637,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14696,14 +14680,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14756,14 +14742,16 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -14787,10 +14775,6 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                     let _ = ();
                                     Type32::none
                                 }
-
-                                _other => {
-                                    (unreachable!(r#"bad value {_other:?}"#));
-                                }
                             }
                         })
                     })())?;
@@ -14808,7 +14792,8 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
     })())?;
     let codes_values = ((|| {
         PResult::Ok({
-            ((((codes.iter()).cloned()).flat_map(
+            (try_flat_map_vec(
+                ((codes.iter()).cloned()),
                 (|x: Type33| match x.code {
                     256 => ([].to_vec()),
 
@@ -14820,6 +14805,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     258 => match x.extra {
@@ -14829,6 +14818,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14840,6 +14833,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     260 => match x.extra {
@@ -14849,6 +14846,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14860,6 +14861,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     262 => match x.extra {
@@ -14869,6 +14874,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14880,6 +14889,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     264 => match x.extra {
@@ -14889,6 +14902,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14900,6 +14917,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     266 => match x.extra {
@@ -14909,6 +14930,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14920,6 +14945,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     268 => match x.extra {
@@ -14929,6 +14958,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14940,6 +14973,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     270 => match x.extra {
@@ -14949,6 +14986,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14960,6 +15001,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     272 => match x.extra {
@@ -14969,6 +15014,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -14980,6 +15029,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     274 => match x.extra {
@@ -14989,6 +15042,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15000,6 +15057,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     276 => match x.extra {
@@ -15009,6 +15070,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15020,6 +15085,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     278 => match x.extra {
@@ -15029,6 +15098,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15040,6 +15113,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     280 => match x.extra {
@@ -15049,6 +15126,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15060,6 +15141,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     282 => match x.extra {
@@ -15069,6 +15154,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15080,6 +15169,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     284 => match x.extra {
@@ -15089,6 +15182,10 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -15100,15 +15197,18 @@ fn Decoder147<'input>(input: &mut ParseMonad<'input>) -> Result<Type34, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     _ => ([(Type29::literal((x.code as u8)))].to_vec()),
                 }),
             ))
-            .collect())
         })
     })())?;
-    (Ok(Type34 {
+    (PResult::Ok(Type34 {
         codes,
         codes_values,
     }))
@@ -15126,8 +15226,8 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                 (field0, field1, field2, field3, field4)
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
-                bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
-            })(inner))
+                PResult::Ok((bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0))
+            })(inner))?
         })
     })())?;
     let hdist = ((|| {
@@ -15141,8 +15241,8 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                 (field0, field1, field2, field3, field4)
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
-                bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
-            })(inner))
+                PResult::Ok((bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0))
+            })(inner))?
         })
     })())?;
     let hclen = ((|| {
@@ -15154,7 +15254,9 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                 let field3 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                 (field0, field1, field2, field3)
             };
-            ((|bits: (u8, u8, u8, u8)| bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
+            ((|bits: (u8, u8, u8, u8)| {
+                PResult::Ok((bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0))
+            })(inner))?
         })
     })())?;
     let code_length_alphabet_code_lengths = ((|| {
@@ -15168,7 +15270,9 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                         let field2 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1, field2)
                     };
-                    ((|bits: (u8, u8, u8)| bits.2 << 2 | bits.1 << 1 | bits.0)(inner))
+                    ((|bits: (u8, u8, u8)| PResult::Ok((bits.2 << 2 | bits.1 << 1 | bits.0)))(
+                        inner,
+                    ))?
                 }));
             }
             accum
@@ -15194,7 +15298,7 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                             ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         (field0, field1)
                                     };
-                                    ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                    ((|bits: (u8, u8)| PResult::Ok((bits.1 << 1 | bits.0)))(inner))?
                                 }
 
                                 17 => {
@@ -15207,9 +15311,9 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                             ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                                         (field0, field1, field2)
                                     };
-                                    ((|bits: (u8, u8, u8)| bits.2 << 2 | bits.1 << 1 | bits.0)(
-                                        inner,
-                                    ))
+                                    ((|bits: (u8, u8, u8)| {
+                                        PResult::Ok((bits.2 << 2 | bits.1 << 1 | bits.0))
+                                    })(inner))?
                                 }
 
                                 18 => {
@@ -15231,55 +15335,59 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                         (field0, field1, field2, field3, field4, field5, field6)
                                     };
                                     ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
-                                        bits.6 << 6
-                                            | bits.5 << 5
-                                            | bits.4 << 4
-                                            | bits.3 << 3
-                                            | bits.2 << 2
-                                            | bits.1 << 1
-                                            | bits.0
-                                    })(inner))
+                                        PResult::Ok(
+                                            (bits.6 << 6
+                                                | bits.5 << 5
+                                                | bits.4 << 4
+                                                | bits.3 << 3
+                                                | bits.2 << 2
+                                                | bits.1 << 1
+                                                | bits.0),
+                                        )
+                                    })(inner))?
                                 }
 
                                 _ => 0,
-
-                                _other => {
-                                    (unreachable!(r#"bad value {_other:?}"#));
-                                }
                             }
                         })
                     })())?;
                     Type23 { code, extra }
                 };
                 (accum.push(elem));
-                if (((|y: &Vec<Type23>| {
-                    ((((y.iter()).cloned()).fold(
+                if ((|y: &Vec<Type23>| {
+                    ((((y.iter()).cloned()).try_fold(
                         {
                             ();
                             Type194::none
                         },
-                        (|x: (Type194, Type23)| match (x.1.code as u8) {
-                            16 => (
-                                x.0,
-                                (dup32(
-                                    ((x.1.extra + 3) as u32),
-                                    match x.0 {
-                                        Type194::some(y) => y,
-                                    },
-                                )),
-                            ),
+                        (|x: (Type194, Type23)| {
+                            PResult::Ok(match (x.1.code as u8) {
+                                16 => (
+                                    x.0,
+                                    (dup32(
+                                        ((x.1.extra + 3) as u32),
+                                        match x.0 {
+                                            Type194::some(y) => y,
 
-                            17 => (x.0, (dup32(((x.1.extra + 3) as u32), 0))),
+                                            _ => {
+                                                return (Err(ParseError::ExcludedBranch));
+                                            }
+                                        },
+                                    )),
+                                ),
 
-                            18 => (x.0, (dup32(((x.1.extra + 11) as u32), 0))),
+                                17 => (x.0, (dup32(((x.1.extra + 3) as u32), 0))),
 
-                            v => ((Type194::some(v)), ([v].to_vec())),
+                                18 => (x.0, (dup32(((x.1.extra + 11) as u32), 0))),
+
+                                v => ((Type194::some(v)), ([v].to_vec())),
+                            })
                         }),
                     ))
                     .collect())
                     .len()
                         >= ((hlit + hdist) as u32) + 258
-                })())(&accum))
+                })(&accum))
                 {
                     break;
                 }
@@ -15289,27 +15397,33 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
     })())?;
     let literal_length_distance_alphabet_code_lengths_value = ((|| {
         PResult::Ok({
-            ((((literal_length_distance_alphabet_code_lengths.iter()).cloned()).fold(
+            ((((literal_length_distance_alphabet_code_lengths.iter()).cloned()).try_fold(
                 {
                     ();
                     Type194::none
                 },
-                (|x: (Type194, Type23)| match (x.1.code as u8) {
-                    16 => (
-                        x.0,
-                        (dup32(
-                            ((x.1.extra + 3) as u32),
-                            match x.0 {
-                                Type194::some(y) => y,
-                            },
-                        )),
-                    ),
+                (|x: (Type194, Type23)| {
+                    PResult::Ok(match (x.1.code as u8) {
+                        16 => (
+                            x.0,
+                            (dup32(
+                                ((x.1.extra + 3) as u32),
+                                match x.0 {
+                                    Type194::some(y) => y,
 
-                    17 => (x.0, (dup32(((x.1.extra + 3) as u32), 0))),
+                                    _ => {
+                                        return (Err(ParseError::ExcludedBranch));
+                                    }
+                                },
+                            )),
+                        ),
 
-                    18 => (x.0, (dup32(((x.1.extra + 11) as u32), 0))),
+                        17 => (x.0, (dup32(((x.1.extra + 3) as u32), 0))),
 
-                    v => ((Type194::some(v)), ([v].to_vec())),
+                        18 => (x.0, (dup32(((x.1.extra + 11) as u32), 0))),
+
+                        v => ((Type194::some(v)), ([v].to_vec())),
+                    })
                 }),
             ))
             .collect())
@@ -15557,7 +15671,7 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -15594,7 +15708,7 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -15631,7 +15745,7 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -15668,7 +15782,7 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0,)
                                                 };
-                                                ((|bits: (u8,)| bits.0)(inner))
+                                                ((|bits: (u8,)| PResult::Ok(bits.0))(inner))?
                                             })
                                         })(
                                         ))?;
@@ -15709,7 +15823,11 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -15750,7 +15868,11 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -15791,7 +15913,11 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -15832,7 +15958,11 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     ))?;
                                                     (field0, field1)
                                                 };
-                                                ((|bits: (u8, u8)| bits.1 << 1 | bits.0)(inner))
+                                                ((|bits: (u8, u8)| {
+                                                    PResult::Ok((bits.1 << 1 | bits.0))
+                                                })(
+                                                    inner
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -15878,10 +16008,12 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -15927,10 +16059,12 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -15976,10 +16110,12 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16025,10 +16161,12 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2)
                                                 };
                                                 ((|bits: (u8, u8, u8)| {
-                                                    bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.2 << 2 | bits.1 << 1 | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16078,10 +16216,15 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16131,10 +16274,15 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16184,10 +16332,15 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16237,10 +16390,15 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8)| {
-                                                    bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0
+                                                    PResult::Ok(
+                                                        (bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16294,14 +16452,16 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16355,14 +16515,16 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16416,14 +16578,16 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16477,14 +16641,16 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                                     (field0, field1, field2, field3, field4)
                                                 };
                                                 ((|bits: (u8, u8, u8, u8, u8)| {
-                                                    bits.4 << 4
-                                                        | bits.3 << 3
-                                                        | bits.2 << 2
-                                                        | bits.1 << 1
-                                                        | bits.0
+                                                    PResult::Ok(
+                                                        (bits.4 << 4
+                                                            | bits.3 << 3
+                                                            | bits.2 << 2
+                                                            | bits.1 << 1
+                                                            | bits.0),
+                                                    )
                                                 })(
                                                     inner
-                                                ))
+                                                ))?
                                             })
                                         })(
                                         ))?;
@@ -16539,10 +16705,6 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                     let _ = ();
                                     Type26::none
                                 }
-
-                                _other => {
-                                    (unreachable!(r#"bad value {_other:?}"#));
-                                }
                             }
                         })
                     })())?;
@@ -16560,7 +16722,8 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
     })())?;
     let codes_values = ((|| {
         PResult::Ok({
-            ((((codes.iter()).cloned()).flat_map(
+            (try_flat_map_vec(
+                ((codes.iter()).cloned()),
                 (|x: Type27| match x.code {
                     256 => ([].to_vec()),
 
@@ -16572,6 +16735,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     258 => match x.extra {
@@ -16581,6 +16748,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16592,6 +16763,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     260 => match x.extra {
@@ -16601,6 +16776,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16612,6 +16791,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     262 => match x.extra {
@@ -16621,6 +16804,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16632,6 +16819,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     264 => match x.extra {
@@ -16641,6 +16832,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16652,6 +16847,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     266 => match x.extra {
@@ -16661,6 +16860,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16672,6 +16875,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     268 => match x.extra {
@@ -16681,6 +16888,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16692,6 +16903,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     270 => match x.extra {
@@ -16701,6 +16916,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16712,6 +16931,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     272 => match x.extra {
@@ -16721,6 +16944,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16732,6 +16959,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     274 => match x.extra {
@@ -16741,6 +16972,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16752,6 +16987,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     276 => match x.extra {
@@ -16761,6 +17000,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16772,6 +17015,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     278 => match x.extra {
@@ -16781,6 +17028,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16792,6 +17043,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     280 => match x.extra {
@@ -16801,6 +17056,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16812,6 +17071,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     282 => match x.extra {
@@ -16821,6 +17084,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16832,6 +17099,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     284 => match x.extra {
@@ -16841,6 +17112,10 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                                 distance: rec.distance_record.distance,
                             }))]
                             .to_vec())
+                        }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
                         }
                     },
 
@@ -16852,15 +17127,18 @@ fn Decoder148<'input>(input: &mut ParseMonad<'input>) -> Result<Type30, ParseErr
                             }))]
                             .to_vec())
                         }
+
+                        _ => {
+                            return (Err(ParseError::ExcludedBranch));
+                        }
                     },
 
                     _ => ([(Type29::literal((x.code as u8)))].to_vec()),
                 }),
             ))
-            .collect())
         })
     })())?;
-    (Ok(Type30 {
+    (PResult::Ok(Type30 {
         hlit,
         hdist,
         hclen,
@@ -16878,7 +17156,7 @@ fn Decoder149<'input>(
     input: &mut ParseMonad<'input>,
     distance_code: u16,
 ) -> Result<Type24, ParseError> {
-    (Ok(match (distance_code as u8) {
+    (PResult::Ok(match (distance_code as u8) {
         0 => (Decoder150(input, 0, 1))?,
 
         1 => (Decoder150(input, 0, 2))?,
@@ -16940,7 +17218,7 @@ fn Decoder149<'input>(
         29 => (Decoder150(input, 13, 24577))?,
 
         _other => {
-            (unreachable!(r#"bad value {_other:?}"#));
+            (unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#));
         }
     }))
 }
@@ -16960,7 +17238,7 @@ fn Decoder150<'input>(
                         let field0 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0,)
                     };
-                    ((|bits: (u8,)| bits.0 as u16)(inner))
+                    ((|bits: (u8,)| PResult::Ok((bits.0 as u16)))(inner))?
                 }
 
                 2 => {
@@ -16969,7 +17247,9 @@ fn Decoder150<'input>(
                         let field1 = ((|| PResult::Ok({ (Decoder145(input))? }))())?;
                         (field0, field1)
                     };
-                    ((|bits: (u8, u8)| (bits.1 as u16) << 1 | (bits.0 as u16))(inner))
+                    ((|bits: (u8, u8)| PResult::Ok(((bits.1 as u16) << 1 | (bits.0 as u16))))(
+                        inner,
+                    ))?
                 }
 
                 3 => {
@@ -16980,8 +17260,8 @@ fn Decoder150<'input>(
                         (field0, field1, field2)
                     };
                     ((|bits: (u8, u8, u8)| {
-                        (bits.2 as u16) << 2 | (bits.1 as u16) << 1 | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(((bits.2 as u16) << 2 | (bits.1 as u16) << 1 | (bits.0 as u16)))
+                    })(inner))?
                 }
 
                 4 => {
@@ -16993,11 +17273,13 @@ fn Decoder150<'input>(
                         (field0, field1, field2, field3)
                     };
                     ((|bits: (u8, u8, u8, u8)| {
-                        (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 5 => {
@@ -17010,12 +17292,14 @@ fn Decoder150<'input>(
                         (field0, field1, field2, field3, field4)
                     };
                     ((|bits: (u8, u8, u8, u8, u8)| {
-                        (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 6 => {
@@ -17029,13 +17313,15 @@ fn Decoder150<'input>(
                         (field0, field1, field2, field3, field4, field5)
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8)| {
-                        (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 7 => {
@@ -17050,14 +17336,16 @@ fn Decoder150<'input>(
                         (field0, field1, field2, field3, field4, field5, field6)
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 8 => {
@@ -17075,15 +17363,17 @@ fn Decoder150<'input>(
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.7 as u16) << 7
-                            | (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.7 as u16) << 7
+                                | (bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 9 => {
@@ -17102,16 +17392,18 @@ fn Decoder150<'input>(
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.8 as u16) << 8
-                            | (bits.7 as u16) << 7
-                            | (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.8 as u16) << 8
+                                | (bits.7 as u16) << 7
+                                | (bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 10 => {
@@ -17132,17 +17424,19 @@ fn Decoder150<'input>(
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.9 as u16) << 9
-                            | (bits.8 as u16) << 8
-                            | (bits.7 as u16) << 7
-                            | (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.9 as u16) << 9
+                                | (bits.8 as u16) << 8
+                                | (bits.7 as u16) << 7
+                                | (bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 11 => {
@@ -17164,18 +17458,20 @@ fn Decoder150<'input>(
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.10 as u16) << 10
-                            | (bits.9 as u16) << 9
-                            | (bits.8 as u16) << 8
-                            | (bits.7 as u16) << 7
-                            | (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.10 as u16) << 10
+                                | (bits.9 as u16) << 9
+                                | (bits.8 as u16) << 8
+                                | (bits.7 as u16) << 7
+                                | (bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 12 => {
@@ -17198,19 +17494,21 @@ fn Decoder150<'input>(
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.11 as u16) << 11
-                            | (bits.10 as u16) << 10
-                            | (bits.9 as u16) << 9
-                            | (bits.8 as u16) << 8
-                            | (bits.7 as u16) << 7
-                            | (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.11 as u16) << 11
+                                | (bits.10 as u16) << 10
+                                | (bits.9 as u16) << 9
+                                | (bits.8 as u16) << 8
+                                | (bits.7 as u16) << 7
+                                | (bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 13 => {
@@ -17234,30 +17532,34 @@ fn Decoder150<'input>(
                         )
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
-                        (bits.12 as u16) << 12
-                            | (bits.11 as u16) << 11
-                            | (bits.10 as u16) << 10
-                            | (bits.9 as u16) << 9
-                            | (bits.8 as u16) << 8
-                            | (bits.7 as u16) << 7
-                            | (bits.6 as u16) << 6
-                            | (bits.5 as u16) << 5
-                            | (bits.4 as u16) << 4
-                            | (bits.3 as u16) << 3
-                            | (bits.2 as u16) << 2
-                            | (bits.1 as u16) << 1
-                            | (bits.0 as u16)
-                    })(inner))
+                        PResult::Ok(
+                            ((bits.12 as u16) << 12
+                                | (bits.11 as u16) << 11
+                                | (bits.10 as u16) << 10
+                                | (bits.9 as u16) << 9
+                                | (bits.8 as u16) << 8
+                                | (bits.7 as u16) << 7
+                                | (bits.6 as u16) << 6
+                                | (bits.5 as u16) << 5
+                                | (bits.4 as u16) << 4
+                                | (bits.3 as u16) << 3
+                                | (bits.2 as u16) << 2
+                                | (bits.1 as u16) << 1
+                                | (bits.0 as u16)),
+                        )
+                    })(inner))?
                 }
 
                 _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
+                    (unreachable!(
+                        r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                    ));
                 }
             }
         })
     })())?;
     let distance = ((|| PResult::Ok({ (start + distance_extra_bits) }))())?;
-    (Ok(Type24 {
+    (PResult::Ok(Type24 {
         distance_extra_bits,
         distance,
     }))
@@ -17277,7 +17579,7 @@ fn Decoder151<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -17312,7 +17614,7 @@ fn Decoder151<'input>(input: &mut ParseMonad<'input>) -> Result<Type21, ParseErr
             }
         })
     })())?;
-    (Ok(Type21 { string, null }))
+    (PResult::Ok(Type21 { string, null }))
 }
 
 fn Decoder152<'input>(input: &mut ParseMonad<'input>) -> Result<Type0, ParseError> {
@@ -17360,7 +17662,7 @@ fn Decoder152<'input>(input: &mut ParseMonad<'input>) -> Result<Type0, ParseErro
             accum
         })
     })())?;
-    (Ok(Type0 { signature, version }))
+    (PResult::Ok(Type0 { signature, version }))
 }
 
 fn Decoder153<'input>(input: &mut ParseMonad<'input>) -> Result<Type4, ParseError> {
@@ -17383,14 +17685,10 @@ fn Decoder153<'input>(input: &mut ParseMonad<'input>) -> Result<Type4, ParseErro
                     let _ = ();
                     Type3::no
                 }
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
-    (Ok(Type4 {
+    (PResult::Ok(Type4 {
         descriptor,
         global_color_table,
     }))
@@ -17413,7 +17711,7 @@ fn Decoder154<'input>(input: &mut ParseMonad<'input>) -> Result<Type17, ParseErr
 
                         254 => 1,
 
-                        _other => {
+                        _ => {
                             return (Err(ParseError::ExcludedBranch));
                         }
                     }
@@ -17421,7 +17719,7 @@ fn Decoder154<'input>(input: &mut ParseMonad<'input>) -> Result<Type17, ParseErr
 
                 44 => 0,
 
-                _other => {
+                _ => {
                     return (Err(ParseError::ExcludedBranch));
                 }
             };
@@ -17429,7 +17727,7 @@ fn Decoder154<'input>(input: &mut ParseMonad<'input>) -> Result<Type17, ParseErr
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder156(input))?;
             (Type17::graphic_block(inner))
@@ -17438,6 +17736,10 @@ fn Decoder154<'input>(input: &mut ParseMonad<'input>) -> Result<Type17, ParseErr
         1 => {
             let inner = (Decoder157(input))?;
             (Type17::special_purpose_block(inner))
+        }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
@@ -17453,7 +17755,7 @@ fn Decoder155<'input>(input: &mut ParseMonad<'input>) -> Result<Type18, ParseErr
             }
         })
     })())?;
-    (Ok(Type18 { separator }))
+    (PResult::Ok(Type18 { separator }))
 }
 
 fn Decoder156<'input>(input: &mut ParseMonad<'input>) -> Result<Type13, ParseError> {
@@ -17471,7 +17773,7 @@ fn Decoder156<'input>(input: &mut ParseMonad<'input>) -> Result<Type13, ParseErr
 
                                 1 => 1,
 
-                                _other => {
+                                _ => {
                                     return (Err(ParseError::ExcludedBranch));
                                 }
                             }
@@ -17479,7 +17781,7 @@ fn Decoder156<'input>(input: &mut ParseMonad<'input>) -> Result<Type13, ParseErr
 
                         44 => 1,
 
-                        _other => {
+                        _ => {
                             return (Err(ParseError::ExcludedBranch));
                         }
                     };
@@ -17497,11 +17799,15 @@ fn Decoder156<'input>(input: &mut ParseMonad<'input>) -> Result<Type13, ParseErr
                     let _ = ();
                     Type6::none
                 }
+
+                _ => {
+                    return (Err(ParseError::ExcludedBranch));
+                }
             }
         })
     })())?;
     let graphic_rendering_block = ((|| PResult::Ok({ (Decoder163(input))? }))())?;
-    (Ok(Type13 {
+    (PResult::Ok(Type13 {
         graphic_control_extension,
         graphic_rendering_block,
     }))
@@ -17519,7 +17825,7 @@ fn Decoder157<'input>(input: &mut ParseMonad<'input>) -> Result<Type16, ParseErr
 
                     254 => 1,
 
-                    _other => {
+                    _ => {
                         return (Err(ParseError::ExcludedBranch));
                     }
                 }
@@ -17530,7 +17836,7 @@ fn Decoder157<'input>(input: &mut ParseMonad<'input>) -> Result<Type16, ParseErr
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder158(input))?;
             (Type16::application_extension(inner))
@@ -17539,6 +17845,10 @@ fn Decoder157<'input>(input: &mut ParseMonad<'input>) -> Result<Type16, ParseErr
         1 => {
             let inner = (Decoder159(input))?;
             (Type16::comment_extension(inner))
+        }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
@@ -17605,7 +17915,7 @@ fn Decoder158<'input>(input: &mut ParseMonad<'input>) -> Result<Type14, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -17624,7 +17934,7 @@ fn Decoder158<'input>(input: &mut ParseMonad<'input>) -> Result<Type14, ParseErr
         })
     })())?;
     let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
-    (Ok(Type14 {
+    (PResult::Ok(Type14 {
         separator,
         label,
         block_size,
@@ -17669,7 +17979,7 @@ fn Decoder159<'input>(input: &mut ParseMonad<'input>) -> Result<Type15, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -17688,7 +17998,7 @@ fn Decoder159<'input>(input: &mut ParseMonad<'input>) -> Result<Type15, ParseErr
         })
     })())?;
     let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
-    (Ok(Type15 {
+    (PResult::Ok(Type15 {
         separator,
         label,
         comment_data,
@@ -17716,12 +18026,12 @@ fn Decoder160<'input>(input: &mut ParseMonad<'input>) -> Result<Type7, ParseErro
             accum
         })
     })())?;
-    (Ok(Type7 { len_bytes, data }))
+    (PResult::Ok(Type7 { len_bytes, data }))
 }
 
 fn Decoder161<'input>(input: &mut ParseMonad<'input>) -> Result<u8, ParseError> {
     let b = (input.read_byte())?;
-    (Ok(if (b == 0) {
+    (PResult::Ok(if (b == 0) {
         b
     } else {
         return (Err(ParseError::ExcludedBranch));
@@ -17763,7 +18073,7 @@ fn Decoder162<'input>(input: &mut ParseMonad<'input>) -> Result<Type5, ParseErro
     let delay_time = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
     let transparent_color_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
-    (Ok(Type5 {
+    (PResult::Ok(Type5 {
         separator,
         label,
         block_size,
@@ -17784,7 +18094,7 @@ fn Decoder163<'input>(input: &mut ParseMonad<'input>) -> Result<Type12, ParseErr
 
                 33 => 1,
 
-                _other => {
+                _ => {
                     return (Err(ParseError::ExcludedBranch));
                 }
             };
@@ -17792,7 +18102,7 @@ fn Decoder163<'input>(input: &mut ParseMonad<'input>) -> Result<Type12, ParseErr
             ret
         }
     };
-    (Ok(match tree_index {
+    (PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder164(input))?;
             (Type12::table_based_image(inner))
@@ -17801,6 +18111,10 @@ fn Decoder163<'input>(input: &mut ParseMonad<'input>) -> Result<Type12, ParseErr
         1 => {
             let inner = (Decoder165(input))?;
             (Type12::plain_text_extension(inner))
+        }
+
+        _ => {
+            return (Err(ParseError::ExcludedBranch));
         }
     }))
 }
@@ -17825,15 +18139,11 @@ fn Decoder164<'input>(input: &mut ParseMonad<'input>) -> Result<Type11, ParseErr
                     let _ = ();
                     Type3::no
                 }
-
-                _other => {
-                    (unreachable!(r#"bad value {_other:?}"#));
-                }
             }
         })
     })())?;
     let data = ((|| PResult::Ok({ (Decoder168(input))? }))())?;
-    (Ok(Type11 {
+    (PResult::Ok(Type11 {
         descriptor,
         local_color_table,
         data,
@@ -17892,7 +18202,7 @@ fn Decoder165<'input>(input: &mut ParseMonad<'input>) -> Result<Type8, ParseErro
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -17911,7 +18221,7 @@ fn Decoder165<'input>(input: &mut ParseMonad<'input>) -> Result<Type8, ParseErro
         })
     })())?;
     let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
-    (Ok(Type8 {
+    (PResult::Ok(Type8 {
         separator,
         label,
         block_size,
@@ -17944,7 +18254,7 @@ fn Decoder166<'input>(input: &mut ParseMonad<'input>) -> Result<Type9, ParseErro
     let image_width = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
     let image_height = ((|| PResult::Ok({ (Decoder135(input))? }))())?;
     let flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type9 {
+    (PResult::Ok(Type9 {
         separator,
         image_left_position,
         image_top_position,
@@ -17958,7 +18268,7 @@ fn Decoder167<'input>(input: &mut ParseMonad<'input>) -> Result<Type2, ParseErro
     let r = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let g = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let b = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type2 { r, g, b }))
+    (PResult::Ok(Type2 { r, g, b }))
 }
 
 fn Decoder168<'input>(input: &mut ParseMonad<'input>) -> Result<Type10, ParseError> {
@@ -17976,7 +18286,7 @@ fn Decoder168<'input>(input: &mut ParseMonad<'input>) -> Result<Type10, ParseErr
 
                             0 => 1,
 
-                            _other => {
+                            _ => {
                                 return (Err(ParseError::ExcludedBranch));
                             }
                         };
@@ -17995,7 +18305,7 @@ fn Decoder168<'input>(input: &mut ParseMonad<'input>) -> Result<Type10, ParseErr
         })
     })())?;
     let terminator = ((|| PResult::Ok({ (Decoder161(input))? }))())?;
-    (Ok(Type10 {
+    (PResult::Ok(Type10 {
         lzw_min_code_size,
         image_data,
         terminator,
@@ -18008,7 +18318,7 @@ fn Decoder169<'input>(input: &mut ParseMonad<'input>) -> Result<Type1, ParseErro
     let flags = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let bg_color_index = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
     let pixel_aspect_ratio = ((|| PResult::Ok({ (Decoder17(input))? }))())?;
-    (Ok(Type1 {
+    (PResult::Ok(Type1 {
         screen_width,
         screen_height,
         flags,
