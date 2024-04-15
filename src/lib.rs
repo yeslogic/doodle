@@ -925,6 +925,9 @@ impl FormatModule {
         match f {
             Format::ItemVar(level, arg_exprs) => {
                 let arg_names = self.get_args(*level);
+                if arg_names.len() != arg_exprs.len() {
+                    return Err(anyhow!("Expected {} arguments, found {}", arg_names.len(), arg_exprs.len()));
+                }
                 for ((_name, arg_type), expr) in Iterator::zip(arg_names.iter(), arg_exprs.iter()) {
                     let t = expr.infer_type(scope)?;
                     let _t = arg_type.unify(&t)?;
