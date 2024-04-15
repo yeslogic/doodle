@@ -1956,7 +1956,7 @@ fn Decoder6<'input>(input: &mut ParseMonad<'input>) -> Result<Type181, ParseErro
                     }
                 };
                 if (matching_ix == 0) {
-                    let next_elem = (Decoder30(input))?;
+                    let next_elem = (Decoder30(input, ihdr))?;
                     (accum.push(next_elem));
                 } else {
                     break;
