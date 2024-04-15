@@ -158,7 +158,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("ihdr", ihdr.call()),
             ("chunks", repeat(png_chunk.call_args(vec![var("ihdr")]))),
             ("idat", repeat1(idat.call())),
-            ("more-chunks", repeat(png_chunk.call_args(vec![var("ihdr")]))),
+            (
+                "more-chunks",
+                repeat(png_chunk.call_args(vec![var("ihdr")])),
+            ),
             ("iend", iend.call()),
         ]),
     )
