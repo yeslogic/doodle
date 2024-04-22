@@ -959,6 +959,24 @@ impl Expr {
                     _ => panic!("SubSeq: expected Seq"),
                 }
             }
+            Expr::SubSeqInflate(seq, start, length) => {
+                match seq.eval(scope).coerce_mapped_value().get_sequence() {
+                    Some(vs0) => {
+                        let start = start.eval_value(scope).unwrap_usize();
+                        let length = length.eval_value(scope).unwrap_usize();
+                        let mut vs = Vec::new();
+                        for i in 0..length {
+                            if i + start < vs0.len() {
+                                vs.push(vs0[i + start].clone());
+                            } else {
+                                vs.push(vs[i + start - vs0.len()].clone());
+                            }
+                        }
+                        Cow::Owned(V::from_evaluated_seq(vs))
+                    }
+                    _ => panic!("SubSeqInflate: expected Seq"),
+                }
+            }
             Expr::FlatMap(expr, seq) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
@@ -994,6 +1012,31 @@ impl Expr {
                 }
                 _ => panic!("FlatMapAccum: expected Seq"),
             },
+            Expr::FlatMapList(expr, _ret_type, seq) => match seq.eval_value(scope) {
+                Value::Seq(values) => {
+                    let mut vs = Vec::new();
+                    for v in values {
+                        let arg = Value::Tuple(vec![Value::Seq(vs), v]);
+                        // TODO can we avoid cloning arg here?
+                        if let Value::Seq(vn) =
+                            expr.eval_lambda(scope, &V::from_evaluated(arg.clone()))
+                        {
+                            vs = match arg {
+                                Value::Tuple(mut args) => match args.remove(0) {
+                                    Value::Seq(vs) => vs,
+                                    _ => unreachable!(),
+                                },
+                                _ => unreachable!(),
+                            };
+                            vs.extend(vn);
+                        } else {
+                            panic!("FlatMapList: expected Seq");
+                        }
+                    }
+                    Cow::Owned(V::from_evaluated(Value::Seq(vs)))
+                }
+                _ => panic!("FlatMapList: expected Seq"),
+            },
             Expr::Dup(count, expr) => {
                 let count = count.eval_value(scope).unwrap_usize();
                 let v = expr.eval_value(scope);
@@ -1003,13 +1046,6 @@ impl Expr {
                 }
                 Cow::Owned(V::from_evaluated(Value::Seq(vs)))
             }
-            Expr::Inflate(seq) => match seq.eval(scope).coerce_mapped_value().get_sequence() {
-                Some(values) => {
-                    let vs = inflate(&values[..]);
-                    Cow::Owned(V::from_evaluated(Value::Seq(vs)))
-                }
-                _ => panic!("Inflate: expected Seq"),
-            },
         }
     }
 
@@ -2121,52 +2157,6 @@ fn bit_range(n: usize, bits: usize) -> Format {
 
 fn is_bit(b: bool) -> Format {
     Format::Byte(ByteSet::from([if b { 1 } else { 0 }]))
-}
-
-fn inflate<V: ValueLike>(codes: &[V]) -> Vec<Value> {
-    let mut vs = Vec::new();
-    for code in codes {
-        match code.clone_into_value() {
-            Value::Variant(name, v) => match (name.as_ref(), v.as_ref()) {
-                ("literal", v) => match v.coerce_mapped_value() {
-                    Value::U8(b) => vs.push(Value::U8(*b)),
-                    _ => panic!("inflate: expected U8"),
-                },
-                ("reference", Value::Record(fields)) => {
-                    let length = &fields
-                        .iter()
-                        .find(|(label, _)| label == "length")
-                        .unwrap()
-                        .1;
-                    let distance = &fields
-                        .iter()
-                        .find(|(label, _)| label == "distance")
-                        .unwrap()
-                        .1;
-                    match (length, distance) {
-                        (Value::U16(length), Value::U16(distance)) => {
-                            let length = *length as usize;
-                            let distance = *distance as usize;
-                            if distance > vs.len() {
-                                panic!("inflate: distance out of range");
-                            }
-                            let start = vs.len() - distance;
-                            for i in 0..length {
-                                vs.push(vs[start + i].clone());
-                            }
-                        }
-                        _ => panic!(
-                            "inflate: unexpected length/distance {:?} {:?}",
-                            length, distance
-                        ),
-                    }
-                }
-                _ => panic!("inflate: unknown code"),
-            },
-            _ => panic!("inflate: expected variant"),
-        }
-    }
-    vs
 }
 
 #[cfg(test)]

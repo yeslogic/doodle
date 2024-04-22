@@ -336,7 +336,7 @@
 │           │   │       └── reference :=
 │           │   │           ├── length := 4
 │           │   │           └── distance := 16499
-│           │   └── inflate <- compute inflate codes :=
+│           │   └── inflate <- compute flat-map-list (x -> match x.1 { ... }) codes :=
 │           │       ├── 0 := 35
 │           │       ├── 1 := 32
 │           │       ├── 2 := 84
