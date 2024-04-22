@@ -453,7 +453,7 @@
 │           │   │   ├── 9 := { literal := 102 }
 │           │   │   ~
 │           │   │   └── 69939 := { literal := 217 }
-│           │   └── inflate <- compute inflate codes :=
+│           │   └── inflate <- compute flat-map-list (x -> match x.1 { ... }) codes :=
 │           │       ├── 0 := 255
 │           │       ├── 1 := 216
 │           │       ├── 2 := 255

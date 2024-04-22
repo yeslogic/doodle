@@ -1468,6 +1468,11 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FUNAPP,
             ),
+            Expr::SubSeqInflate(seq, start, length) => cond_paren(
+                self.compile_prefix("sub-seq-inflate", Some(&[start, length]), seq),
+                prec,
+                Precedence::FUNAPP,
+            ),
             Expr::FlatMap(expr, seq) => cond_paren(
                 self.compile_prefix("flat-map", Some(&[expr]), seq),
                 prec,
@@ -1478,13 +1483,13 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FUNAPP,
             ),
-            Expr::Dup(count, expr) => cond_paren(
-                self.compile_prefix("dup", Some(&[count]), expr),
+            Expr::FlatMapList(expr, _ret_type, seq) => cond_paren(
+                self.compile_prefix("flat-map-list", Some(&[expr]), seq),
                 prec,
                 Precedence::FUNAPP,
             ),
-            Expr::Inflate(expr) => cond_paren(
-                self.compile_prefix("inflate", None, expr),
+            Expr::Dup(count, expr) => cond_paren(
+                self.compile_prefix("dup", Some(&[count]), expr),
                 prec,
                 Precedence::FUNAPP,
             ),
