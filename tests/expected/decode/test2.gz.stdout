@@ -80,7 +80,7 @@
 │           │   │   │       ├── length := 4
 │           │   │   │       └── distance := 6
 │           │   │   └── 8 := { literal := 10 }
-│           │   └── inflate <- compute inflate codes :=
+│           │   └── inflate <- compute flat-map-list (x -> match x.1 { ... }) codes :=
 │           │       ├── 0 := 104
 │           │       ├── 1 := 101
 │           │       ├── 2 := 108

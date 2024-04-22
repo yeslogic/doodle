@@ -1087,7 +1087,33 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "inflate",
-                Format::Compute(Expr::Inflate(Box::new(var("codes")))),
+                Format::Compute(flat_map_list(
+                    lambda(
+                        "x",
+                        expr_match(
+                            tuple_proj(var("x"), 1),
+                            vec![
+                                (
+                                    Pattern::variant("literal", Pattern::binding("b")),
+                                    Expr::Seq(vec![var("b")]),
+                                ),
+                                (
+                                    Pattern::variant("reference", Pattern::binding("r")),
+                                    sub_seq_inflate(
+                                        tuple_proj(var("x"), 0),
+                                        sub(
+                                            seq_length(tuple_proj(var("x"), 0)),
+                                            as_u32(record_proj(var("r"), "distance")),
+                                        ),
+                                        as_u32(record_proj(var("r"), "length")),
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                    ValueType::Base(BaseType::U8),
+                    var("codes"),
+                )),
             ),
         ]),
     )

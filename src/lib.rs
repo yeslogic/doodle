@@ -264,10 +264,11 @@ pub enum Expr {
 
     SeqLength(Box<Expr>),
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
+    SubSeqInflate(Box<Expr>, Box<Expr>, Box<Expr>),
     FlatMap(Box<Expr>, Box<Expr>),
     FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
+    FlatMapList(Box<Expr>, ValueType, Box<Expr>),
     Dup(Box<Expr>, Box<Expr>),
-    Inflate(Box<Expr>),
 }
 
 // #[derive(Clone, Debug, PartialEq)]
@@ -462,6 +463,24 @@ impl Expr {
                 }
                 other => Err(anyhow!("SubSeq: expected Seq, found {other:?}")),
             },
+            Expr::SubSeqInflate(seq, start, length) => match seq.infer_type(scope)? {
+                ValueType::Seq(t) => {
+                    let start_type = start.infer_type(scope)?;
+                    let length_type = length.infer_type(scope)?;
+                    if start_type != ValueType::Base(BaseType::U32) {
+                        return Err(anyhow!(
+                            "SubSeqInflate `start` param: expected U32, found {start_type:?}"
+                        ));
+                    }
+                    if length_type != ValueType::Base(BaseType::U32) {
+                        return Err(anyhow!(
+                            "SubSeqInflate length must be numeric, found {length_type:?}"
+                        ));
+                    }
+                    Ok(ValueType::Seq(t))
+                }
+                other => Err(anyhow!("SubSeqInflate: expected Seq, found {other:?}")),
+            },
             Expr::FlatMap(expr, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
@@ -499,6 +518,23 @@ impl Expr {
                 },
                 other => Err(anyhow!("FlatMapAccum: expected Lambda, found {other:?}")),
             },
+            Expr::FlatMapList(expr, ret_type, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(
+                            name.clone(),
+                            ValueType::Tuple(vec![ValueType::Seq(Box::new(ret_type.clone())), *t]),
+                        );
+                        match expr.infer_type(&child_scope)? {
+                            ValueType::Seq(t2) => Ok(ValueType::Seq(t2)),
+                            other => Err(anyhow!("FlatMapList: expected Seq, found {other:?}")),
+                        }
+                    }
+                    other => Err(anyhow!("FlatMapList: expected Seq, found {other:?}")),
+                },
+                other => Err(anyhow!("FlatMapList: expected Lambda, found {other:?}")),
+            },
             Expr::Dup(count, expr) => {
                 if count.infer_type(scope)? != ValueType::Base(BaseType::U32) {
                     return Err(anyhow!("Dup: count is not U32: {count:?}"));
@@ -506,13 +542,6 @@ impl Expr {
                 let t = expr.infer_type(scope)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
-            Expr::Inflate(seq) => match seq.infer_type(scope)? {
-                // FIXME should check values are appropriate variants
-                ValueType::Seq(_values) => {
-                    Ok(ValueType::Seq(Box::new(ValueType::Base(BaseType::U8))))
-                }
-                other => Err(anyhow!("Inflate: expected Seq, found {other:?}")),
-            },
         }
     }
 

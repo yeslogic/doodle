@@ -1461,6 +1461,24 @@ impl TypeChecker {
 
                 newvar
             }
+            Expr::SubSeqInflate(seq_expr, start_expr, len_expr) => {
+                let newvar = self.get_new_uvar();
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+
+                let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
+                let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
+
+                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
+                self.unify_utype_baseset(start_t, BaseSet::USome)?;
+                self.unify_utype_baseset(len_t, BaseSet::USome)?;
+
+                // ensure that seq_t is a sequence type, and then equate it to newvar
+                let elem_var = self.get_new_uvar();
+                self.unify_var_proj_elem(seq_var, elem_var)?;
+                self.unify_var_pair(newvar, seq_var)?;
+
+                newvar
+            }
             Expr::FlatMap(f_expr, seq_expr) => {
                 let newvar = self.get_new_uvar();
 
@@ -1500,6 +1518,9 @@ impl TypeChecker {
 
                 ys_var
             }
+            Expr::FlatMapList(_f_expr, _ret_type, _seq_expr) => {
+                unimplemented!();
+            }
             Expr::Dup(count, x) => {
                 let newvar = self.get_new_uvar();
                 let count_t = self.infer_utype_expr(count, scope)?;
@@ -1509,21 +1530,6 @@ impl TypeChecker {
                 self.unify_utype_baseset(count_t, BaseSet::USome)?;
                 self.unify_var_proj_elem(newvar, x_var)?;
 
-                newvar
-            }
-            Expr::Inflate(seq_expr) => {
-                let newvar = self.get_new_uvar();
-                let seq_v = self.infer_var_expr(seq_expr, scope)?;
-                let elem_v = self.get_new_uvar();
-
-                self.unify_var_proj_elem(seq_v, elem_v)?;
-
-                // FIXME - not sure what unifications to apply to elem_v
-
-                self.unify_var_utype(
-                    newvar,
-                    Rc::new(UType::Seq(Rc::new(UType::Base(BaseType::U8)))),
-                )?;
                 newvar
             }
         };

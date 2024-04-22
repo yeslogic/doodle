@@ -220,12 +220,20 @@ pub fn sub_seq(seq: Expr, start: Expr, length: Expr) -> Expr {
     Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length))
 }
 
+pub fn sub_seq_inflate(seq: Expr, start: Expr, length: Expr) -> Expr {
+    Expr::SubSeqInflate(Box::new(seq), Box::new(start), Box::new(length))
+}
+
 pub fn flat_map(f: Expr, seq: Expr) -> Expr {
     Expr::FlatMap(Box::new(f), Box::new(seq))
 }
 
 pub fn flat_map_accum(f: Expr, accum: Expr, accum_type: ValueType, seq: Expr) -> Expr {
     Expr::FlatMapAccum(Box::new(f), Box::new(accum), accum_type, Box::new(seq))
+}
+
+pub fn flat_map_list(f: Expr, ret_type: ValueType, seq: Expr) -> Expr {
+    Expr::FlatMapList(Box::new(f), ret_type, Box::new(seq))
 }
 
 pub fn dup(count: Expr, expr: Expr) -> Expr {

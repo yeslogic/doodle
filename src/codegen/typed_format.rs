@@ -351,8 +351,6 @@ pub enum TypedExpr<TypeRep> {
         Box<TypedExpr<TypeRep>>,
     ),
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
-    // first typerep is the expression type, second is the type of each 'code' being expanded into a single literal byte or treated as a given-length back-reference
-    Inflate(TypeRep, TypeRep, Box<TypedExpr<TypeRep>>),
 }
 
 impl<TypeRep> TypedExpr<TypeRep> {
@@ -400,8 +398,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::SubSeq(gt, _, _, _)
             | TypedExpr::FlatMap(gt, _, _)
             | TypedExpr::FlatMapAccum(gt, _, _, _, _)
-            | TypedExpr::Dup(gt, _, _)
-            | TypedExpr::Inflate(gt, ..) => Some(Cow::Borrowed(gt)),
+            | TypedExpr::Dup(gt, _, _) => Some(Cow::Borrowed(gt)),
         }
     }
 }
@@ -519,7 +516,6 @@ mod __impls {
                     Expr::FlatMapAccum(rebox(lambda), rebox(acc), vt, rebox(seq))
                 }
                 TypedExpr::Dup(_, count, x) => Expr::Dup(rebox(count), rebox(x)),
-                TypedExpr::Inflate(.., x) => Expr::Inflate(rebox(x)),
             }
         }
     }
