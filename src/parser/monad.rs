@@ -17,6 +17,12 @@ impl<'a> ParseMonad<'a> {
         }
     }
 
+    pub fn advance_by(&mut self, offset: u32) -> Result<(), ParseError> {
+        let delta = offset as usize;
+        self.offset.try_increment(delta)?;
+        Ok(())
+    }
+
     /// Attempts to advance ther buffer by one after capturing the value of the byte at the current logical
     /// offset into the buffer. In bits-mode, this will be a sub-indexed 0-or-1-valued `u8` of the bit in question,
     /// reading from LSB to MSB of each byte in turn. Otherwise, it will be an entire byte.
@@ -32,7 +38,7 @@ impl<'a> ParseMonad<'a> {
         Ok(ret)
     }
 
-    pub fn skip_align(&mut self, n: usize) -> Result<usize, ParseError> {
+    pub fn skip_align(&mut self, n: usize) -> Result<(), ParseError> {
         let current_offset = self.offset.get_current_offset();
         let offset_byte_ix = current_offset.as_bytes().0;
         let aligned_offset = if offset_byte_ix % n == 0 {
@@ -42,7 +48,7 @@ impl<'a> ParseMonad<'a> {
         };
         let delta = current_offset.delta(aligned_offset);
         self.offset.try_increment(delta)?;
-        Ok(delta)
+        Ok(())
     }
 
     pub fn enter_bits_mode(&mut self) -> Result<(), ParseError> {

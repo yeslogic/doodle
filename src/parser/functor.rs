@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub(crate) enum ParseTree<'a> {
     SimpleBuffer {
         buffer: &'a [u8],
