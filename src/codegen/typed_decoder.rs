@@ -59,8 +59,8 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Branch(TypeRep, MatchTree, Vec<TypedDecoderExt<TypeRep>>),
     Tuple(TypeRep, Vec<TypedDecoderExt<TypeRep>>),
     Record(TypeRep, Vec<(Label, TypedDecoderExt<TypeRep>)>),
-    While(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
-    Until(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
+    Repeat0While(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
+    Repeat1Until(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     RepeatCount(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
     RepeatUntilLast(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
     RepeatUntilSeq(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
@@ -278,7 +278,7 @@ impl<'a> GTCompiler<'a> {
                 let fa = TypedFormat::tuple(vec![(**a).clone(), astar]);
                 let fb = TypedFormat::EMPTY;
                 if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
-                    Ok(TypedDecoder::While(gt.clone(), tree, Box::new(da)))
+                    Ok(TypedDecoder::Repeat0While(gt.clone(), tree, Box::new(da)))
                 } else {
                     Err(anyhow!("cannot build match tree for {:?}", format))
                 }
@@ -296,7 +296,7 @@ impl<'a> GTCompiler<'a> {
                 let fa = TypedFormat::EMPTY;
                 let fb = TypedFormat::tuple(vec![(**a).clone(), astar]);
                 if let Some(tree) = MatchTree::build(self.module, &[fa.into(), fb.into()], next) {
-                    Ok(TypedDecoder::Until(gt.clone(), tree, Box::new(da)))
+                    Ok(TypedDecoder::Repeat1Until(gt.clone(), tree, Box::new(da)))
                 } else {
                     Err(anyhow!("cannot build match tree for {:?}", format))
                 }

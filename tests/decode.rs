@@ -176,4 +176,11 @@ mod utf8 {
         let expected = expect_test::expect_file!("expected/decode/test.utf8.stdout");
         check_output(output, expected)
     }
+
+    #[test]
+    fn test_decode_mixed_utf8() {
+        let output = doodle().args(["file", "mixed.utf8"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/mixed.utf8.stdout");
+        check_output(output, expected)
+    }
 }

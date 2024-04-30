@@ -3,11 +3,12 @@ pub type PResult<T> = Result<T, ParseError>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ParseError {
     FailToken,
+    InsufficientRepeats,
     NegatedSuccess,
     ExcludedBranch,
     Overrun(OverrunKind),
     InternalError(StateError),
-    IncompleteParse,
+    IncompleteParse { bytes_remaining: usize },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -21,11 +22,15 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseError::FailToken => write!(f, "reached Fail token"),
+            ParseError::InsufficientRepeats => write!(
+                f,
+                "failed to find enough format repeats to satisfy requirement"
+            ),
             ParseError::ExcludedBranch => write!(f, "no MatchTree branch matches buffer contents"),
             ParseError::NegatedSuccess => write!(f, "successful parse in negated context"),
-            ParseError::IncompleteParse => write!(
+            ParseError::IncompleteParse { bytes_remaining: n } => write!(
                 f,
-                "incomplete parse: expected end-of-stream, but >0 bytes remain unconsumed"
+                "incomplete parse: expected end-of-stream, but {n} bytes remain unconsumed"
             ),
             ParseError::Overrun(k) => match k {
                 OverrunKind::EndOfStream => write!(f, "offset would extend past end of stream"),

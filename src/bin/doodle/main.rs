@@ -42,6 +42,8 @@ enum Command {
         /// How the format is rendered
         #[arg(long)]
         output: FormatOutput,
+        #[arg(long, default_value = None)]
+        dest: Option<PathBuf>,
     },
     /// Decode a binary file
     File {
@@ -57,7 +59,7 @@ enum Command {
 
 fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     match Command::parse() {
-        Command::Format { output } => {
+        Command::Format { output, dest } => {
             let mut module = FormatModule::new();
             let format = format::main(&mut module).call();
 
@@ -65,7 +67,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FormatOutput::Debug => println!("{module:?}"),
                 FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
                 FormatOutput::Rust => {
-                    doodle::codegen::print_generated_code(&module, &format);
+                    doodle::codegen::print_generated_code(&module, &format, dest);
+
                     // let program = Compiler::compile_program(&module, &format)?;
                     // doodle::codegen::print_program(&program);
                 }
@@ -116,5 +119,5 @@ fn check_all(module: &FormatModule) -> AResult<()> {
 fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
-    doodle::codegen::print_generated_code(&module, &format);
+    doodle::codegen::print_generated_code(&module, &format, None);
 }

@@ -120,10 +120,9 @@ impl<'a> ParseMonad<'a> {
     }
 
     pub fn finish(&self) -> Result<(), ParseError> {
-        if self.remaining() == 0 {
-            Ok(())
-        } else {
-            Err(ParseError::IncompleteParse)
+        match self.remaining() {
+            0 => Ok(()),
+            n => Err(ParseError::IncompleteParse { bytes_remaining: n }),
         }
     }
 }
