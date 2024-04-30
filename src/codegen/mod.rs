@@ -339,17 +339,17 @@ impl Codegen {
                         ),
                 }
             }
-            TypedDecoder::While(_gt, tree_continue, single) =>
+            TypedDecoder::Repeat0While(_gt, tree_continue, single) =>
                 CaseLogic::Repeat(
-                    RepeatLogic::ContinueOnMatch(
+                    RepeatLogic::Repeat0ContinueOnMatch(
                         tree_continue.clone(),
                         Box::new(self.translate(single.get_dec()))
                     )
                 ),
 
-            TypedDecoder::Until(_gt, tree_break, single) =>
+            TypedDecoder::Repeat1Until(_gt, tree_break, single) =>
                 CaseLogic::Repeat(
-                    RepeatLogic::BreakOnMatch(
+                    RepeatLogic::Repeat1BreakOnMatch(
                         tree_break.clone(),
                         Box::new(self.translate(single.get_dec()))
                     )
@@ -779,7 +779,12 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::Inflate(_, elemt, codes) => {
             RustExpr::BlockScope(
                 vec![RustStmt::LocalFn(mk_inflate(elemt))],
-                Box::new(RustExpr::local("inflate").call_with([RustExpr::Borrow(Box::new(embed_expr(codes, ExprInfo::Natural)))])))
+                Box::new(
+                    RustExpr::local("inflate").call_with([
+                        RustExpr::Borrow(Box::new(embed_expr(codes, ExprInfo::Natural))),
+                    ])
+                )
+            )
         }
         TypedExpr::Var(_, vname) => {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
@@ -1144,24 +1149,14 @@ impl SimpleLogic<GTExpr> {
                 )],
                 None,
             ),
-            SimpleLogic::ExpectEnd => {
-                let call = RustExpr::local(ctxt.input_varname.clone()).call_method("remaining");
-                let cond = RustExpr::infix(call, Operator::Eq, RustExpr::num_lit(0usize));
-                let b_true = [RustStmt::Return(ReturnKind::Implicit, RustExpr::UNIT)];
-                let b_false = [RustStmt::Return(
-                    ReturnKind::Keyword,
-                    RustExpr::local("Err")
-                        .call_with([RustExpr::scoped(["ParseError"], "IncompleteParse")]),
-                )];
-                (
-                    Vec::new(),
-                    Some(RustExpr::Control(Box::new(RustControl::If(
-                        cond,
-                        b_true.to_vec(),
-                        Some(b_false.to_vec()),
-                    )))),
-                )
-            }
+            SimpleLogic::ExpectEnd => (
+                Vec::new(),
+                Some(
+                    RustExpr::local(ctxt.input_varname.clone())
+                        .call_method("finish")
+                        .wrap_try(),
+                ),
+            ),
             // FIXME - not sure what should be done with _args
             SimpleLogic::Invoke(ix_dec, args) => {
                 let fname = format!("Decoder{ix_dec}");
@@ -1611,9 +1606,9 @@ where
 /// Cases where a constant block of logic is repeated (0 or more times)
 #[derive(Clone, Debug)]
 enum RepeatLogic<ExprT> {
-    ContinueOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and continues if it is matched
-    BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and breaks if it is matched
-    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),    // repeats a specific numnber of times
+    Repeat0ContinueOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and continues if it is matched
+    Repeat1BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and breaks if it is matched
+    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),           // repeats a specific numnber of times
     ConditionTerminal(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'terminal element' is satisfied
     ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'complete sequence' is satisfied
 }
@@ -1632,7 +1627,7 @@ where
 
     fn to_ast(&self, ctxt: ProdCtxt<'_>) -> RustBlock {
         match self {
-            RepeatLogic::ContinueOnMatch(ctree, elt) => {
+            RepeatLogic::Repeat0ContinueOnMatch(ctree, elt) => {
                 let mut stmts = Vec::new();
 
                 let elt_expr = elt.to_ast(ctxt).into();
@@ -1673,7 +1668,7 @@ where
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
             }
-            RepeatLogic::BreakOnMatch(btree, elt) => {
+            RepeatLogic::Repeat1BreakOnMatch(btree, elt) => {
                 let mut stmts = Vec::new();
 
                 let elt_expr = elt.to_ast(ctxt).into();
@@ -1700,7 +1695,14 @@ where
                         ),
                     ]
                     .to_vec();
-                    let b_stop = [RustStmt::Control(RustControl::Break)].to_vec();
+                    let b_stop = vec![RustStmt::Control(RustControl::If(
+                        RustExpr::local("accum").call_method("is_empty"),
+                        vec![RustStmt::Return(
+                            ReturnKind::Keyword,
+                            RustExpr::err(RustExpr::scoped(["ParseError"], "InsufficientRepeats")),
+                        )],
+                        Some(vec![RustStmt::Control(RustControl::Break)]),
+                    ))];
                     let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
                     RustStmt::Control(RustControl::While(
                         RustExpr::infix(
@@ -2151,7 +2153,11 @@ impl ToAst for DerivedLogic<GTExpr> {
     }
 }
 
-pub fn print_generated_code(module: &FormatModule, top_format: &Format) {
+pub fn print_generated_code(
+    module: &FormatModule,
+    top_format: &Format,
+    dest: Option<std::path::PathBuf>,
+) {
     let mut items = Vec::new();
 
     let Generator {
@@ -2176,26 +2182,40 @@ pub fn print_generated_code(module: &FormatModule, top_format: &Format) {
         uses: RustImportItems::Wildcard,
     });
 
-    let extra = r#"
-#[test]
-
-fn test_decoder_28() {
-    // PNG signature
-    let input = b"\x89PNG\r\n\x1A\n";
-    let mut parser = ParseMonad::new(input);
-    let ret = Decoder28(&mut parser);
-    assert!(ret.is_ok());
-}"#;
-
-    print!(
-        r#"#![allow(non_camel_case_types)]
+    fn write_to(mut f: impl std::io::Write, content: impl ToFragment) -> std::io::Result<()> {
+        let extra = r#"mod codegen_tests;"#;
+        write!(
+            f,
+            r#"#![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 {}
 {}"#,
-        content.to_fragment(),
-        extra
-    )
+            content.to_fragment(),
+            extra
+        )?;
+        Ok(())
+    }
+
+    match dest {
+        None => write_to(std::io::stdout().lock(), content).expect("failed to write"),
+        Some(path) => {
+            if !path.exists()
+                || (path.is_file()
+                    && path
+                        .file_name()
+                        .is_some_and(|s| s.to_string_lossy().contains("codegen.rs")))
+            {
+                let f = std::fs::File::create(path).unwrap_or_else(|err| panic!("error: {err}"));
+                write_to(f, content).expect("failed to write");
+            } else {
+                panic!(
+                    "will not overwrite directory or protected file: {}",
+                    path.to_string_lossy()
+                );
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -2934,11 +2954,18 @@ fn mk_inflate(adt: &GenType) -> RustFn {
                     .expect("could not find 'reference' tag in type {adt:?}");
                 let lendist = match lendist_var {
                         RustVariant::Tuple(_, elts) if elts.len() == 1 => elts[0].clone(),
-                        other => unreachable!("variant 'reference' has unexpected shape (looking for 1-tuple, found {other:?})"),
+                        other =>
+                            unreachable!(
+                                "variant 'reference' has unexpected shape (looking for 1-tuple, found {other:?})"
+                            ),
                     };
                 let (ix0, lbl0) = match lendist {
-                        RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, lbl0))) => (ix0, lbl0.clone()),
-                        other => unreachable!("argument type of variant 'reference' has unexpected form (looking for local definition, found {other:?}"),
+                        RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, lbl0))) =>
+                            (ix0, lbl0.clone()),
+                        other =>
+                            unreachable!(
+                                "argument type of variant 'reference' has unexpected form (looking for local definition, found {other:?}"
+                            ),
                     };
                 expect_variants(
                     &vars,

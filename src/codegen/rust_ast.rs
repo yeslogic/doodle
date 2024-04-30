@@ -932,7 +932,7 @@ impl ToFragment for RustClosureHead {
 
 impl ToFragment for RustClosure {
     fn to_fragment(&self) -> Fragment {
-        self.to_fragment_precedence(Precedence::Atomic)
+        self.to_fragment_precedence(Precedence::Calculus)
     }
 }
 
@@ -1198,7 +1198,7 @@ impl ToFragmentExt for RustExpr {
                 f.to_fragment_precedence(prec)
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
-                Precedence::FUNAPP,
+                Precedence::Projection,
             ),
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt

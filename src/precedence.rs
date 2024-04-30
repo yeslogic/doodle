@@ -5,15 +5,23 @@ use crate::output::Fragment;
 ///
 #[derive(Copy, Clone, Debug, Default)]
 pub(crate) enum Precedence {
-    Atomic, // Highest precedence
+    /// Highest precedence, as if implicitly (if not actually) parenthesized
+    Atomic,
+    /// Post-fix projection such as method call, field access, or Try (`?`)
     Projection,
-    Prefix, // Highest natural precedence
+    /// Highest natural precedence - used for prefix operands such as borrow (&) and deref (*)
+    Prefix,
+    /// Infix arithmetic operation of the designated arithmetic sub-precedence
     ArithInfix(ArithLevel),
+    /// Infix bitwise operation of the designated bitwise sub-precedence
     BitwiseInfix(BitwiseLevel),
-    Comparison(CompareLevel), // Unsound when chained
-    Calculus,                 // Arrow and Match
+    /// Unchainable quantiative comparison, such as inequality and equality operations
+    Comparison(CompareLevel),
+    /// Functional abstractions such as `match` expressions and closures
+    Calculus,
+    /// Lowest natural precedence - used for individual operands in the parameter list of a function call, or when no particular precedence is required or known
     #[default]
-    Top,        // Entry level for neutral context
+    Top,
 }
 
 #[derive(Copy, Clone, Debug)]

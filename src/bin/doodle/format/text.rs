@@ -21,7 +21,7 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
     )
 }
 
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
     let utf8_1 = map(
@@ -120,12 +120,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ),
     );
 
-    let ascii_str = module.define_format("text.string.ascii", repeat1(base.ascii_char_strict()));
+    // let ascii_str = module.define_format("text.string.ascii", repeat1(base.ascii_char_strict()));
     let utf8_str = module.define_format("text.string.utf8", repeat(utf8_char.call()));
 
     module.define_format(
         "text.string",
-        union_nondet(vec![("ascii", ascii_str.call()), ("utf8", utf8_str.call())]),
+        utf8_str.call()
     )
 }
 
