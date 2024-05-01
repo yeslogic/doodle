@@ -2,7 +2,7 @@ use super::error::{PResult, ParseError, StateError};
 use std::cmp::Ordering;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum ByteOffset {
+pub enum ByteOffset {
     Bytes(usize),
     Bits {
         starting_byte: usize,
@@ -185,8 +185,12 @@ impl ViewStack {
             None => Self::get_limit_from_slice(rest),
             // FIXME - this could be avoided by amortizing comparison-cost into the push-lens method, but that involves more complex work.
             // FIXME - consider memoizing this value until the stack is manipulated enough it might change?
-            Some(end) => {
-                Self::get_limit_from_slice(rest).map(|lim| if end > lim { lim } else { end })
+            Some(last_limit) => {
+                Some(last_limit)
+                // Some(match Self::get_limit_from_slice(rest) {
+                //     Some(prev_limit) => if prev_limit < last_limit { prev_limit } else { last_limit },
+                //     None => last_limit,
+                // })
             }
         }
     }

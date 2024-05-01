@@ -123,10 +123,7 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
     // let ascii_str = module.define_format("text.string.ascii", repeat1(base.ascii_char_strict()));
     let utf8_str = module.define_format("text.string.utf8", repeat(utf8_char.call()));
 
-    module.define_format(
-        "text.string",
-        utf8_str.call()
-    )
+    module.define_format("text.string", utf8_str.call())
 }
 
 fn shift6_2(hi: Expr, lo: Expr) -> Expr {
