@@ -125,6 +125,10 @@ impl<'a> ParseMonad<'a> {
             n => Err(ParseError::IncompleteParse { bytes_remaining: n }),
         }
     }
+
+    pub fn get_current_offset(&self) -> ByteOffset {
+        self.offset.get_current_offset()
+    }
 }
 
 #[cfg(test)]

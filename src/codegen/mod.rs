@@ -437,12 +437,10 @@ impl Codegen {
             TypedDecoder::Apply(_t, lab) => {
                 CaseLogic::Simple(SimpleLogic::CallDynamic(lab.clone()))
             }
-            // FIXME - missing logic
             TypedDecoder::Peek(_t, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Peek(Box::new(cl_inner)))
             }
-            // FIXME - missing logic
             TypedDecoder::PeekNot(_t, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::PeekNot(Box::new(cl_inner)))
@@ -452,12 +450,10 @@ impl Codegen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Slice(rexpr_width, Box::new(cl_inner)))
             }
-            // FIXME - missing logic
             TypedDecoder::Bits(_t, inner) => {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Engine(EngineLogic::Bits(Box::new(cl_inner)))
             }
-            // FIXME - missing logic
             TypedDecoder::WithRelativeOffset(_t, offset, inner) => {
                 let rexpr_offset = embed_expr(offset, ExprInfo::Natural);
                 let cl_inner = self.translate(inner.get_dec());
@@ -1157,7 +1153,6 @@ impl SimpleLogic<GTExpr> {
                         .wrap_try(),
                 ),
             ),
-            // FIXME - not sure what should be done with _args
             SimpleLogic::Invoke(ix_dec, args) => {
                 let fname = format!("Decoder{ix_dec}");
                 let call_args = {
@@ -1487,6 +1482,15 @@ where
                             RustType::verbatim("usize", None),
                         )),
                     ),
+                    // // FIXME - remove or gate this
+                    // RustStmt::Expr(
+                    //     RustExpr::local("eprintln!").call_with([
+                    //         RustExpr::str_lit("Opening slice at offset {} with length {}"),
+                    //         RustExpr::local(ctxt.input_varname.clone())
+                    //             .call_method("get_current_offset"),
+                    //         RustExpr::local("sz"),
+                    //     ]),
+                    // ),
                     RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method_with("start_slice", [RustExpr::local("sz")])
@@ -1498,6 +1502,14 @@ where
                             .call()
                             .wrap_try(),
                     ),
+                    // // FIXME - remove or gate this
+                    // RustStmt::Expr(
+                    //     RustExpr::local("eprintln!").call_with([
+                    //         RustExpr::str_lit("Closing latest slice at offset {}, skipping to end"),
+                    //         RustExpr::local(ctxt.input_varname.clone())
+                    //             .call_method("get_current_offset"),
+                    //     ]),
+                    // ),
                     RustStmt::Expr(
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("end_slice")
@@ -1591,7 +1603,7 @@ where
                             .wrap_try(),
                     ),
                     RustStmt::assign(
-                        "_bits_read", // FIXME: promote to non-hardcoded value
+                        "_bits_read", // FIXME: promote to non-hardcoded identifier
                         RustExpr::local(ctxt.input_varname.clone())
                             .call_method("escape_bits_mode")
                             .wrap_try(),
