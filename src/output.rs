@@ -313,6 +313,15 @@ impl Fragment {
             }
         }
     }
+
+    // FIXME - this is hacky because we want to avoid buffer-traces breaking the gutter
+    pub(crate) fn join_with_wsp_eol(self, other: Self, trailer: Self) -> Self {
+        if other.fits_inline() {
+            self.cat(Self::Char(' ')).cat(other).cat_break()
+        } else {
+            self.cat(trailer).cat_break().cat(other)
+        }
+    }
 }
 
 /// Builder pattern helper-struct for accumulating up longer sequences of [Fragment]s.
