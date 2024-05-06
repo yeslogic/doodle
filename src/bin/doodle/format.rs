@@ -55,10 +55,10 @@ mod test {
     use std::borrow::Cow;
 
     use super::*;
-    use doodle::{byte_set::ByteSet, decoder::Value, error::ParseError, read::ReadCtxt};
+    use doodle::{byte_set::ByteSet, decoder::{Value, ValueLike}, error::ParseError, read::ReadCtxt};
 
     #[test]
-    fn with_relative_offset_format() -> Result<(), ParseError> {
+    fn with_relative_offset_format() -> Result<(), ParseError<Value>> {
         let mut module = FormatModule::new();
         let base = base::main(&mut module);
 

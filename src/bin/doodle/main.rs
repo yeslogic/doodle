@@ -88,7 +88,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FileOutput::Debug => println!("{value:?}"),
                 FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
                 FileOutput::Tree => {
-                    doodle::output::tree::print_decoded_value(&module, &value, &format);
+                    // doodle::output::tree::print_decoded_value(&module, &value, &format);
+                    let (p_value, _) = program.run_ext(ReadCtxt::new(&input))?;
+                    doodle::output::tree::print_parsed_decoded_value(&module, &p_value, &format);
                 }
                 FileOutput::Flat => {
                     doodle::output::flat::print_decoded_value(&module, &value, &format);
