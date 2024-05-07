@@ -1345,8 +1345,16 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             let (bs, branch) = tree.branches.first().unwrap();
             let (guard, always_true) = ByteCriterion::from(bs).as_predicate(RustExpr::local("b"));
             if always_true {
-                // we have one non-accepting branch but it is unconditional
-                return expand_matchtree(branch, ctxt);
+                // this always accepts but needs to read a byte
+                let ignore_byte = RustStmt::Expr(
+                    RustExpr::local(ctxt.input_varname.clone())
+                        .call_method("read_byte")
+                        .wrap_try(),
+                );
+                let (stmts, opt_ret) = expand_matchtree(branch, ctxt);
+                let all_stmts =
+                    Iterator::chain(std::iter::once(ignore_byte), stmts.into_iter()).collect();
+                return (all_stmts, opt_ret);
             } else {
                 let b_true: Vec<RustStmt> = implicate_return(expand_matchtree(branch, ctxt));
                 let b_false = {

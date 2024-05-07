@@ -36,12 +36,30 @@ mod gzip {
         Ok(())
     }
 
-    #[test] fn test_decoder_gzip_test1() -> Result<(), Box<dyn Send + Sync + std::error::Error>> { test_decoder_gzip("test1.gz") }
-    #[test] fn test_decoder_gzip_test2() -> Result<(), Box<dyn Send + Sync + std::error::Error>>{ test_decoder_gzip("test2.gz") }
-    #[test] fn test_decoder_gzip_test3() -> Result<(), Box<dyn Send + Sync + std::error::Error>>{ test_decoder_gzip("test3.gz") }
-    #[test] fn test_decoder_gzip_test4() -> Result<(), Box<dyn Send + Sync + std::error::Error>>{ test_decoder_gzip("test4.gz") }
-    #[test] fn test_decoder_gzip_test5() -> Result<(), Box<dyn Send + Sync + std::error::Error>>{ test_decoder_gzip("test5.gz") }
-    #[test] fn test_decoder_gzip_test6() -> Result<(), Box<dyn Send + Sync + std::error::Error>> { test_decoder_gzip("test6.gz") }
+    #[test]
+    fn test_decoder_gzip_test1() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_gzip("test1.gz")
+    }
+    #[test]
+    fn test_decoder_gzip_test2() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_gzip("test2.gz")
+    }
+    #[test]
+    fn test_decoder_gzip_test3() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_gzip("test3.gz")
+    }
+    #[test]
+    fn test_decoder_gzip_test4() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_gzip("test4.gz")
+    }
+    #[test]
+    fn test_decoder_gzip_test5() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_gzip("test5.gz")
+    }
+    #[test]
+    fn test_decoder_gzip_test6() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_gzip("test6.gz")
+    }
 }
 
 #[test]
