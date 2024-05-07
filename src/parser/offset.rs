@@ -181,18 +181,8 @@ impl ViewStack {
 
     fn get_limit_from_slice(slice: &[Lens]) -> Option<ByteOffset> {
         let (lens, rest) = slice.split_last()?;
-        match lens.get_endpoint() {
-            None => Self::get_limit_from_slice(rest),
-            // FIXME - this could be avoided by amortizing comparison-cost into the push-lens method, but that involves more complex work.
-            // FIXME - consider memoizing this value until the stack is manipulated enough it might change?
-            Some(last_limit) => {
-                Some(last_limit)
-                // Some(match Self::get_limit_from_slice(rest) {
-                //     Some(prev_limit) => if prev_limit < last_limit { prev_limit } else { last_limit },
-                //     None => last_limit,
-                // })
-            }
-        }
+        // NOTE - because slices must nest, if we find one at any point, nothing further down will occur earlier in the buffer, so we can short-circuit
+        lens.get_endpoint().or_else(|| Self::get_limit_from_slice(rest))
     }
 
     pub(crate) fn get_limit(&self) -> Option<ByteOffset> {

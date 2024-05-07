@@ -30,7 +30,7 @@ mod gzip {
         let mut input = ParseMonad::new(&buffer);
         let oput = Decoder1(&mut input)?.data;
         match oput {
-            Type192::gzip(dat) => println!("{:?}", dat),
+            Type192::gzip(dat) => println!("{:?}", &dat[0].header),
             other => unreachable!("expected gzip, found {other:?}"),
         }
         Ok(())
