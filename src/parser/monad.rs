@@ -31,7 +31,7 @@ impl<'a> ParseMonad<'a> {
         let byte = self.buffer[ix];
         let ret = if let Some(n) = sub_bit {
             let i = n as u8;
-            byte & ((1 << i) >> i)
+            (byte & (1 << i)) >> i
         } else {
             byte
         };
@@ -40,11 +40,12 @@ impl<'a> ParseMonad<'a> {
 
     pub fn skip_align(&mut self, n: usize) -> Result<(), ParseError> {
         let current_offset = self.offset.get_current_offset();
-        let offset_byte_ix = current_offset.as_bytes().0;
-        let aligned_offset = if offset_byte_ix % n == 0 {
-            ByteOffset::from_bytes(offset_byte_ix)
-        } else {
-            ByteOffset::from_bytes(((offset_byte_ix / n) + 1) * n)
+        let aligned_offset = match current_offset {
+            ByteOffset::Bytes(nbytes) if nbytes % n == 0 => current_offset,
+            ByteOffset::Bits { bits_advanced, .. } if bits_advanced % n == 0 => current_offset,
+
+            ByteOffset::Bytes(nbytes) => ByteOffset::from_bytes(((nbytes / n) + 1) * n),
+            ByteOffset::Bits { starting_byte, bits_advanced } => ByteOffset::Bits { starting_byte, bits_advanced: (((bits_advanced / n) + 1) * n) },
         };
         let delta = current_offset.delta(aligned_offset);
         self.offset.try_increment(delta)?;
