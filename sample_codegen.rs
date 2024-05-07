@@ -1810,6 +1810,7 @@ fn Decoder5<'input>(_input: &mut ParseMonad<'input>) -> Result<Type163, ParseErr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
                     {
                         let ret = 0;
                         _input.close_peek_context()?;
@@ -1838,6 +1839,10 @@ fn Decoder6<'input>(_input: &mut ParseMonad<'input>) -> Result<Type181, ParseErr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
+                    _input.read_byte()?;
+                    _input.read_byte()?;
+                    _input.read_byte()?;
                     let b = _input.read_byte()?;
                     {
                         let ret = match b {
@@ -1875,6 +1880,10 @@ fn Decoder6<'input>(_input: &mut ParseMonad<'input>) -> Result<Type181, ParseErr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
+                    _input.read_byte()?;
+                    _input.read_byte()?;
+                    _input.read_byte()?;
                     let b = _input.read_byte()?;
                     {
                         let ret = match b {
@@ -1927,6 +1936,10 @@ fn Decoder6<'input>(_input: &mut ParseMonad<'input>) -> Result<Type181, ParseErr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
+                    _input.read_byte()?;
+                    _input.read_byte()?;
+                    _input.read_byte()?;
                     let b = _input.read_byte()?;
                     {
                         let ret = match b {
@@ -3766,6 +3779,7 @@ fn Decoder23<'input>(_input: &mut ParseMonad<'input>) -> Result<Type184, ParseEr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
                     {
                         let ret = 0;
                         _input.close_peek_context()?;
@@ -3806,6 +3820,7 @@ fn Decoder25<'input>(_input: &mut ParseMonad<'input>) -> Result<Type183, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -3971,6 +3986,10 @@ fn Decoder28<'input>(
 ) -> Result<Type178, ParseError> {
     let tree_index = {
         _input.open_peek_context();
+        _input.read_byte()?;
+        _input.read_byte()?;
+        _input.read_byte()?;
+        _input.read_byte()?;
         let b = _input.read_byte()?;
         {
             let ret = match b {
@@ -4183,6 +4202,7 @@ fn Decoder35<'input>(_input: &mut ParseMonad<'input>) -> Result<Vec<u8>, ParseEr
     while _input.remaining() > 0 {
         let matching_ix = {
             _input.open_peek_context();
+            _input.read_byte()?;
             {
                 let ret = 0;
                 _input.close_peek_context()?;
@@ -4454,6 +4474,7 @@ fn Decoder38<'input>(_input: &mut ParseMonad<'input>) -> Result<Type166, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 1;
                                 _input.close_peek_context()?;
@@ -4655,6 +4676,7 @@ fn Decoder40<'input>(
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -4804,6 +4826,7 @@ fn Decoder44<'input>(_input: &mut ParseMonad<'input>) -> Result<Type162, ParseEr
                                         while _input.remaining() > 0 {
                                             let matching_ix = {
                                                 _input.open_peek_context();
+                                                _input.read_byte()?;
                                                 {
                                                     let ret = 0;
                                                     _input.close_peek_context()?;
@@ -4847,6 +4870,7 @@ fn Decoder44<'input>(_input: &mut ParseMonad<'input>) -> Result<Type162, ParseEr
                                     while _input.remaining() > 0 {
                                         let matching_ix = {
                                             _input.open_peek_context();
+                                            _input.read_byte()?;
                                             {
                                                 let ret = 0;
                                                 _input.close_peek_context()?;
@@ -4872,6 +4896,7 @@ fn Decoder44<'input>(_input: &mut ParseMonad<'input>) -> Result<Type162, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -4896,6 +4921,7 @@ fn Decoder44<'input>(_input: &mut ParseMonad<'input>) -> Result<Type162, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -4985,6 +5011,7 @@ fn Decoder47<'input>(_input: &mut ParseMonad<'input>) -> Result<Type115, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -5134,6 +5161,7 @@ fn Decoder47<'input>(_input: &mut ParseMonad<'input>) -> Result<Type115, ParseEr
                                                     while _input.remaining() > 0 {
                                                         let matching_ix = {
                                                             _input.open_peek_context();
+                                                            _input.read_byte()?;
                                                             {
                                                                 let ret = 0;
                                                                 _input.close_peek_context()?;
@@ -5254,6 +5282,7 @@ accum.push(Decoder41(_input)?);
                                                     while _input.remaining() > 0 {
                                                         let matching_ix = {
                                                             _input.open_peek_context();
+                                                            _input.read_byte()?;
                                                             {
                                                                 let ret = 0;
                                                                 _input.close_peek_context()?;
@@ -5580,6 +5609,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -5604,6 +5634,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -5628,6 +5659,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -5797,6 +5829,7 @@ fn Decoder48<'input>(_input: &mut ParseMonad<'input>) -> Result<Type160, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -5821,6 +5854,7 @@ fn Decoder48<'input>(_input: &mut ParseMonad<'input>) -> Result<Type160, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -5845,6 +5879,7 @@ fn Decoder48<'input>(_input: &mut ParseMonad<'input>) -> Result<Type160, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6014,6 +6049,7 @@ fn Decoder49<'input>(_input: &mut ParseMonad<'input>) -> Result<Type156, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6038,6 +6074,7 @@ fn Decoder49<'input>(_input: &mut ParseMonad<'input>) -> Result<Type156, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6062,6 +6099,7 @@ fn Decoder49<'input>(_input: &mut ParseMonad<'input>) -> Result<Type156, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6126,6 +6164,7 @@ fn Decoder50<'input>(_input: &mut ParseMonad<'input>) -> Result<Type158, ParseEr
                                     while _input.remaining() > 0 {
                                         let matching_ix = {
                                             _input.open_peek_context();
+                                            _input.read_byte()?;
                                             {
                                                 let ret = 0;
                                                 _input.close_peek_context()?;
@@ -6151,6 +6190,7 @@ fn Decoder50<'input>(_input: &mut ParseMonad<'input>) -> Result<Type158, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6256,6 +6296,7 @@ fn Decoder51<'input>(_input: &mut ParseMonad<'input>) -> Result<Type123, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6426,6 +6467,7 @@ fn Decoder52<'input>(_input: &mut ParseMonad<'input>) -> Result<Type150, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6450,6 +6492,7 @@ fn Decoder52<'input>(_input: &mut ParseMonad<'input>) -> Result<Type150, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6618,6 +6661,7 @@ fn Decoder54<'input>(_input: &mut ParseMonad<'input>) -> Result<Type148, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6642,6 +6686,7 @@ fn Decoder54<'input>(_input: &mut ParseMonad<'input>) -> Result<Type148, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6666,6 +6711,7 @@ fn Decoder54<'input>(_input: &mut ParseMonad<'input>) -> Result<Type148, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6740,6 +6786,7 @@ fn Decoder55<'input>(_input: &mut ParseMonad<'input>) -> Result<Type85, ParseErr
                                         while _input.remaining() > 0 {
                                             let matching_ix = {
                                                 _input.open_peek_context();
+                                                _input.read_byte()?;
                                                 {
                                                     let ret = 0;
                                                     _input.close_peek_context()?;
@@ -6783,6 +6830,7 @@ fn Decoder55<'input>(_input: &mut ParseMonad<'input>) -> Result<Type85, ParseErr
                                                                             _input
                                                                                 .open_peek_context(
                                                                                 );
+                                                                            _input.read_byte()?;
                                                                             {
                                                                                 let ret = 0;
                                                                                 _input.close_peek_context()?;
@@ -6837,6 +6885,7 @@ fn Decoder55<'input>(_input: &mut ParseMonad<'input>) -> Result<Type85, ParseErr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -6941,6 +6990,7 @@ let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
 _input.open_peek_context();
+_input.read_byte()?;
 {
 let ret = 0;
 _input.close_peek_context()?;
@@ -7360,6 +7410,7 @@ Type82 { size_field, r#type, size, data }
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -7549,6 +7600,7 @@ fn Decoder57<'input>(_input: &mut ParseMonad<'input>) -> Result<Type95, ParseErr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -7611,6 +7663,7 @@ fn Decoder58<'input>(_input: &mut ParseMonad<'input>) -> Result<Type105, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -7635,6 +7688,7 @@ fn Decoder58<'input>(_input: &mut ParseMonad<'input>) -> Result<Type105, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -7701,6 +7755,7 @@ fn Decoder59<'input>(_input: &mut ParseMonad<'input>) -> Result<Type103, ParseEr
                                         while _input.remaining() > 0 {
                                             let matching_ix = {
                                                 _input.open_peek_context();
+                                                _input.read_byte()?;
                                                 {
                                                     let ret = 0;
                                                     _input.close_peek_context()?;
@@ -7732,6 +7787,7 @@ fn Decoder59<'input>(_input: &mut ParseMonad<'input>) -> Result<Type103, ParseEr
                                 while _input.remaining() > 0 {
                                     let matching_ix = {
                                         _input.open_peek_context();
+                                        _input.read_byte()?;
                                         {
                                             let ret = 0;
                                             _input.close_peek_context()?;
@@ -10577,6 +10633,7 @@ fn Decoder109<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -10641,6 +10698,7 @@ fn Decoder110<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -10705,6 +10763,7 @@ fn Decoder111<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -10769,6 +10828,7 @@ fn Decoder112<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -10833,6 +10893,7 @@ fn Decoder113<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -10897,6 +10958,7 @@ fn Decoder114<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -10961,6 +11023,7 @@ fn Decoder115<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11025,6 +11088,7 @@ fn Decoder116<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11089,6 +11153,7 @@ fn Decoder117<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11153,6 +11218,7 @@ fn Decoder118<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11217,6 +11283,7 @@ fn Decoder119<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11281,6 +11348,7 @@ fn Decoder120<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11345,6 +11413,7 @@ fn Decoder121<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11409,6 +11478,7 @@ fn Decoder122<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11473,6 +11543,7 @@ fn Decoder123<'input>(_input: &mut ParseMonad<'input>) -> Result<Type56, ParseEr
                     while _input.remaining() > 0 {
                         let matching_ix = {
                             _input.open_peek_context();
+                            _input.read_byte()?;
                             {
                                 let ret = 0;
                                 _input.close_peek_context()?;
@@ -11531,6 +11602,7 @@ fn Decoder126<'input>(_input: &mut ParseMonad<'input>) -> Result<Type59, ParseEr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
                     {
                         let ret = 0;
                         _input.close_peek_context()?;
@@ -11562,6 +11634,7 @@ fn Decoder127<'input>(_input: &mut ParseMonad<'input>) -> Result<Type61, ParseEr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
                     {
                         let ret = 0;
                         _input.close_peek_context()?;
@@ -11606,6 +11679,7 @@ fn Decoder128<'input>(_input: &mut ParseMonad<'input>) -> Result<Type53, ParseEr
                         while _input.remaining() > 0 {
                             let matching_ix = {
                                 _input.open_peek_context();
+                                _input.read_byte()?;
                                 {
                                     let ret = 0;
                                     _input.close_peek_context()?;
@@ -11703,6 +11777,7 @@ fn Decoder131<'input>(_input: &mut ParseMonad<'input>) -> Result<Type51, ParseEr
             while _input.remaining() > 0 {
                 let matching_ix = {
                     _input.open_peek_context();
+                    _input.read_byte()?;
                     {
                         let ret = 0;
                         _input.close_peek_context()?;
@@ -11854,6 +11929,7 @@ fn Decoder132<'input>(_input: &mut ParseMonad<'input>) -> Result<Type49, ParseEr
                                     while _input.remaining() > 0 {
                                         let matching_ix = {
                                             _input.open_peek_context();
+                                            _input.read_byte()?;
                                             {
                                                 let ret = 0;
                                                 _input.close_peek_context()?;
@@ -11910,6 +11986,7 @@ fn Decoder132<'input>(_input: &mut ParseMonad<'input>) -> Result<Type49, ParseEr
                                     while _input.remaining() > 0 {
                                         let matching_ix = {
                                             _input.open_peek_context();
+                                            _input.read_byte()?;
                                             {
                                                 let ret = 0;
                                                 _input.close_peek_context()?;
@@ -11973,6 +12050,7 @@ fn Decoder134<'input>(_input: &mut ParseMonad<'input>) -> Result<Type44, ParseEr
                         while _input.remaining() > 0 {
                             let matching_ix = {
                                 _input.open_peek_context();
+                                _input.read_byte()?;
                                 {
                                     let ret = 0;
                                     _input.close_peek_context()?;

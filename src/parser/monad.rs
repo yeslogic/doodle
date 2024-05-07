@@ -45,7 +45,13 @@ impl<'a> ParseMonad<'a> {
             ByteOffset::Bits { bits_advanced, .. } if bits_advanced % n == 0 => current_offset,
 
             ByteOffset::Bytes(nbytes) => ByteOffset::from_bytes(((nbytes / n) + 1) * n),
-            ByteOffset::Bits { starting_byte, bits_advanced } => ByteOffset::Bits { starting_byte, bits_advanced: (((bits_advanced / n) + 1) * n) },
+            ByteOffset::Bits {
+                starting_byte,
+                bits_advanced,
+            } => ByteOffset::Bits {
+                starting_byte,
+                bits_advanced: (((bits_advanced / n) + 1) * n),
+            },
         };
         let delta = current_offset.delta(aligned_offset);
         self.offset.try_increment(delta)?;
