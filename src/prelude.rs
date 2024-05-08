@@ -3,7 +3,7 @@ use std::ops::{Bound, RangeBounds};
 pub use crate::byte_set::ByteSet;
 pub use crate::parser::{
     error::{PResult, ParseError},
-    monad::ParseMonad,
+    Parser,
 };
 
 pub fn u16le(input: (u8, u8)) -> u16 {
@@ -71,7 +71,7 @@ pub fn dup32<T: Clone>(count: u32, value: T) -> Vec<T> {
 pub fn parse_huffman(
     lengths: impl AsRef<[u8]>,
     code_values: Option<Vec<u8>>,
-) -> impl for<'a> Fn(&mut ParseMonad<'a>) -> PResult<u16> {
+) -> impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> {
     let lengths = lengths
         .as_ref()
         .iter()
@@ -93,7 +93,7 @@ pub fn parse_huffman(
 
 pub fn make_huffman_decoder(
     lengths: &[usize],
-) -> impl for<'a> Fn(&mut ParseMonad<'a>) -> PResult<u16> {
+) -> impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> {
     let max_length = *lengths.iter().max().unwrap();
     let mut bl_count = [0].repeat(max_length + 1);
 
@@ -119,11 +119,11 @@ pub fn make_huffman_decoder(
         }
     }
 
-    move |p: &mut ParseMonad<'_>| driver.parse_one(p)
+    move |p: &mut Parser<'_>| driver.parse_one(p)
 }
 
 mod huffman {
-    use super::{PResult, ParseMonad};
+    use super::{PResult, Parser};
 
     #[derive(Clone, Debug)]
     pub(super) struct HuffmanDriver {
@@ -192,7 +192,7 @@ mod huffman {
             self.tree_root.insert(&code[..], value)
         }
 
-        pub fn parse_one(&self, p: &mut ParseMonad<'_>) -> PResult<u16> {
+        pub fn parse_one(&self, p: &mut Parser<'_>) -> PResult<u16> {
             let mut node = &self.tree_root;
             while !node.is_leaf() {
                 let b = p.read_byte()?;

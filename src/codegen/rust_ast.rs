@@ -932,7 +932,7 @@ impl ToFragment for RustClosureHead {
 
 impl ToFragment for RustClosure {
     fn to_fragment(&self) -> Fragment {
-        self.to_fragment_precedence(Precedence::Calculus)
+        self.to_fragment_precedence(Precedence::ARROW)
     }
 }
 
@@ -1180,7 +1180,8 @@ impl ToFragmentExt for RustExpr {
             RustExpr::Entity(e) => e.to_fragment(),
             RustExpr::PrimitiveLit(pl) => pl.to_fragment(),
             RustExpr::ArrayLit(elts) => Fragment::seq(
-                elts.iter().map(RustExpr::to_fragment),
+                elts.iter()
+                    .map(|x| RustExpr::to_fragment_precedence(x, Precedence::Top)),
                 Some(Fragment::string(", ")),
             )
             .delimit(Fragment::Char('['), Fragment::Char(']')),
@@ -1192,13 +1193,13 @@ impl ToFragmentExt for RustExpr {
                 Precedence::Projection,
             ),
             RustExpr::FieldAccess(x, name) => x
-                .to_fragment()
+                .to_fragment_precedence(Precedence::Projection)
                 .intervene(Fragment::Char('.'), name.to_fragment()),
             RustExpr::FunctionCall(f, args) => cond_paren(
                 f.to_fragment_precedence(prec)
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
-                Precedence::Projection,
+                Precedence::Calculus,
             ),
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt
@@ -1212,7 +1213,9 @@ impl ToFragmentExt for RustExpr {
                         Fragment::intervene(
                             lab.to_fragment(),
                             Fragment::string(": "),
-                            expr.as_ref().map_or(Fragment::Empty, |x| x.to_fragment()),
+                            expr.as_ref().map_or(Fragment::Empty, |x| {
+                                x.to_fragment_precedence(Precedence::Top)
+                            }),
                         )
                     }),
                     Some(Fragment::string(", ")),
@@ -1243,16 +1246,18 @@ impl ToFragmentExt for RustExpr {
             }
             RustExpr::Control(ctrl) => ctrl.to_fragment(),
             RustExpr::Closure(cl) => cl.to_fragment_precedence(prec),
-            RustExpr::Slice(expr, start, stop) => expr.to_fragment().cat(Fragment::seq(
-                [
-                    Fragment::Char('['),
-                    start.to_fragment(),
-                    Fragment::string(".."),
-                    stop.to_fragment(),
-                    Fragment::Char(']'),
-                ],
-                None,
-            )),
+            RustExpr::Slice(expr, start, stop) => expr
+                .to_fragment_precedence(Precedence::Projection)
+                .cat(Fragment::seq(
+                    [
+                        Fragment::Char('['),
+                        start.to_fragment(),
+                        Fragment::string(".."),
+                        stop.to_fragment(),
+                        Fragment::Char(']'),
+                    ],
+                    None,
+                )),
             RustExpr::RangeExclusive(start, stop) => cond_paren(
                 start.to_fragment_precedence(Precedence::Top).intervene(
                     Fragment::string(".."),
@@ -1658,6 +1663,28 @@ trait ToFragmentExt: ToFragment {
         Self: 'a,
     {
         Self::delim_list_prec(items, prec, Fragment::Char('('), Fragment::Char(')'))
+    }
+
+    fn block_prec<'a>(items: impl IntoIterator<Item = &'a Self>, prec: Precedence) -> Fragment
+    where
+        Self: 'a,
+    {
+        Self::block_sep_prec(items, Fragment::Empty, prec)
+    }
+
+    fn block_sep_prec<'a>(
+        items: impl IntoIterator<Item = &'a Self>,
+        sep: Fragment,
+        prec: Precedence,
+    ) -> Fragment
+    where
+        Self: 'a,
+    {
+        let lines = items
+            .into_iter()
+            .map(|x| Self::to_fragment_precedence(x, prec));
+        Fragment::seq(lines, Some(Fragment::cat(sep, Fragment::Char('\n'))))
+            .delimit(Fragment::string("{\n"), Fragment::string("\n}"))
     }
 }
 
