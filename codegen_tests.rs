@@ -6,7 +6,7 @@ use super::*;
 fn test_decoder_26() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
-    let mut parser = ParseMonad::new(input);
+    let mut parser = Parser::new(input);
     let ret = Decoder26(&mut parser);
     assert!(ret.is_ok());
 }
@@ -14,7 +14,7 @@ fn test_decoder_26() {
 #[test]
 fn test_decoder_gif() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.gif"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::gif(dat) => println!("{:?}", dat),
@@ -27,7 +27,7 @@ mod gzip {
     use super::*;
     fn test_decoder_gzip(testfile: &str) -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
         let buffer = std::fs::read(std::path::Path::new(testfile))?;
-        let mut input = ParseMonad::new(&buffer);
+        let mut input = Parser::new(&buffer);
         let oput = Decoder1(&mut input)?.data;
         match oput {
             Type192::gzip(dat) => println!("{:?}", &dat[0].header),
@@ -62,22 +62,34 @@ mod gzip {
     }
 }
 
-#[test]
-fn test_decoder_jpeg() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
-    let buffer = std::fs::read(std::path::Path::new("test.jpg"))?;
-    let mut input = ParseMonad::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
-        Type192::jpeg(dat) => println!("{:?}", dat),
-        other => unreachable!("expected jpeg, found {other:?}"),
+mod jpeg {
+    use super::*;
+    fn test_decoder_jpeg(testfile: &str) -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        let buffer = std::fs::read(std::path::Path::new(testfile))?;
+        let mut input = Parser::new(&buffer);
+        let oput = Decoder1(&mut input)?.data;
+        match oput {
+            Type192::jpeg(dat) => println!("{:?}", dat.frame.header),
+            other => unreachable!("expected jpeg, found {other:?}"),
+        }
+        Ok(())
     }
-    Ok(())
+
+    #[test]
+    fn test_decoder_jpeg_test_() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_jpeg("test.jpg")
+    }
+
+    #[test]
+    fn test_decoder_jpeg_test2() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+        test_decoder_jpeg("test2.jpg")
+    }
 }
 
 #[test]
 fn test_decoder_mpeg4() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.mp4"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::mpeg4(dat) => println!("{:?}", dat),
@@ -89,7 +101,7 @@ fn test_decoder_mpeg4() -> Result<(), Box<dyn Send + Sync + std::error::Error>> 
 #[test]
 fn test_decoder_png() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.png"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::png(dat) => println!("{:?}", dat),
@@ -101,7 +113,7 @@ fn test_decoder_png() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 #[test]
 fn test_decoder_riff() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.webp"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::riff(dat) => println!("{:?}", dat),
@@ -113,7 +125,7 @@ fn test_decoder_riff() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 #[test]
 fn test_decoder_tar() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.tar"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder13(&mut input)?;
     match oput {
         Type190 {
@@ -131,7 +143,7 @@ fn test_decoder_tar() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 #[test]
 fn test_decoder_text_ascii() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.txt"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::text(chars) => {
@@ -148,7 +160,7 @@ fn test_decoder_text_ascii() -> Result<(), Box<dyn Send + Sync + std::error::Err
 #[test]
 fn test_decoder_text_utf8() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("test.utf8"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::text(chars) => {
@@ -165,7 +177,7 @@ fn test_decoder_text_utf8() -> Result<(), Box<dyn Send + Sync + std::error::Erro
 #[test]
 fn test_decoder_text_mixed() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
     let buffer = std::fs::read(std::path::Path::new("mixed.utf8"))?;
-    let mut input = ParseMonad::new(&buffer);
+    let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
         Type192::text(chars) => {

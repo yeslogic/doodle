@@ -1056,7 +1056,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
         TypedExpr::Lambda((head_t, _), head, body) => match kind {
             ClosureKind::Predicate => {
                 let expansion = embed_expr(body, info);
-                RustExpr::Paren(Box::new(RustExpr::Closure(RustClosure::new_predicate(
+                RustExpr::Closure(RustClosure::new_predicate(
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
                     if needs_ok {
@@ -1064,11 +1064,11 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     } else {
                         expansion
                     },
-                ))))
+                ))
             }
             ClosureKind::Transform => {
                 let expansion = embed_expr(body, info);
-                RustExpr::Paren(Box::new(RustExpr::Closure(RustClosure::new_transform(
+                RustExpr::Closure(RustClosure::new_transform(
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
                     if needs_ok {
@@ -1076,7 +1076,7 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     } else {
                         expansion
                     },
-                ))))
+                ))
             }
         },
         _other => unreachable!("embed_lambda_t expects a lambda, found {_other:?}"),
@@ -1305,9 +1305,14 @@ fn implicate_return(value: RustBlock) -> Vec<RustStmt> {
     }
 }
 
+/// Applies a lambda-abstraction to a `RustBlock` for internal logic to simultaneously
+/// allow for local-only short-circuiting behavior of `?` and `return Err(...)`.
 fn abstracted_try_block(block: RustBlock) -> RustExpr {
     let (stmts, ret) = block;
     match ret {
+        Some(ret) if stmts.is_empty() => RustExpr::Closure(RustClosure::thunk_expr(
+            RustExpr::scoped(["PResult"], "Ok").call_with([ret]),
+        )),
         Some(ret) => RustExpr::Closure(RustClosure::thunk_expr(
             RustExpr::scoped(["PResult"], "Ok")
                 .call_with([RustExpr::BlockScope(stmts, Box::new(ret))]),
@@ -2035,7 +2040,6 @@ where
                                     .call_method_with("next_alt", [RustExpr::FALSE])
                                     .wrap_try(),
                             ),
-                            _ => unreachable!("usize bounds are weird???"),
                         };
                         let thunk = abstracted_try_block(branch_cl.to_ast(ctxt).into());
                         RustStmt::Expr(RustExpr::BlockScope(
