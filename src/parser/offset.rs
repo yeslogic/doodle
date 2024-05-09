@@ -159,26 +159,41 @@ impl PartialOrd for ByteOffset {
     }
 }
 
+/// Comined state that tracks an index, or offset, into a buffer being parsed,
+/// and stores a [`ViewStack`] to manage meta-contextual state about subarray-limited (Slice)
+/// and speculative parsing (Peek, PeekNot, Alts/UnionNondet).
 pub(crate) struct BufferOffset {
-    current_offset: ByteOffset, // the 'true' value of the offset, reinterpreted according to the other fields
+    /// The current value of the offset being tracked
+    current_offset: ByteOffset,
+    /// The stack of `Lens` objects in LIFO order
     view_stack: ViewStack,
+    /// The maximum legal offset, which is one logical position past the final legal index of the buffer (i.e. equal to the buffer length when measured in bytes)
     max_offset: ByteOffset,
 }
 
+/// Wrapper for a `Vec`-based FILO stack of [`Lens`]es
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct ViewStack {
     stack: Vec<Lens>,
 }
 
 impl ViewStack {
+    /// Creates a new, empty `ViewStack`.
     pub(crate) fn new() -> Self {
         ViewStack { stack: Vec::new() }
     }
 
+    /// Performs a stack-push operation with the provided `Lens`
     pub(crate) fn push_lens(&mut self, lens: Lens) {
         self.stack.push(lens)
     }
 
+    /// Returns the upper-bound [`ByteOffset`] implied by a LIFO-order slice of [`Lens`]es.
+    ///
+    /// # Note
+    ///
+    /// If the slice is in non-LIFO order, the result returned by this method will be biased
+    /// to the rightmost `Lens` that imposes an upper-bound, and may be inaccurate.
     fn get_limit_from_slice(slice: &[Lens]) -> Option<ByteOffset> {
         let (lens, rest) = slice.split_last()?;
         // NOTE - because slices must nest, if we find one at any point, nothing further down will occur earlier in the buffer, so we can short-circuit
@@ -186,17 +201,36 @@ impl ViewStack {
             .or_else(|| Self::get_limit_from_slice(rest))
     }
 
+    /// Returns the upper-bound [`ByteOffset`] implied  by a given `ViewStack`.
     pub(crate) fn get_limit(&self) -> Option<ByteOffset> {
         let ret = Self::get_limit_from_slice(self.stack.as_slice());
         // FIXME - introduce caching mechanic
         ret
     }
 
+    /// Performs a stack-pop operation on an owned `ViewStack`, returning the
+    /// resulting `ViewStack` and the former topmost element.
     pub(crate) fn escape(mut self) -> (ViewStack, Option<Lens>) {
         let ret = self.stack.pop();
         (self, ret)
     }
 
+    /// Unrolls a `ViewStack`, successively attempting to restore each `Lens` as it is popped.
+    ///
+    /// Returns the ByteOffset that should be restored, and remainder of the `ViewStack`, if any `Lens`
+    /// is considered a 'restore'-point.
+    ///
+    /// Otherwise, returns `Err(StateError::NoRestore)`.
+    ///
+    /// # Note
+    ///
+    /// In this context, 'restore' is used in apposition to 'recovery'.
+    ///
+    /// When a speculative parse succeeds, the offset where it was initiated is 'restored' (i.e. after a successful Peek).
+    ///
+    /// When a speculative parse fails,  the offset where it was initiated is 'recovered' (i.e. after a failed parse within a PeekNot, or on some branch of a UnionNondet)
+    ///
+    /// This convention is adopted at the [`Lens`] and [`crate::parser::Parser`] layer as well.
     pub(crate) fn restore(mut self) -> Result<(ByteOffset, ViewStack), StateError> {
         for (ix, lens) in self.stack.iter().enumerate().rev() {
             match lens.restore() {
@@ -212,6 +246,17 @@ impl ViewStack {
         Err(StateError::NoRestore)
     }
 
+    /// Unrolls a `ViewStack`, successively attempting to recover each `Lens` as it is popped.
+    ///
+    /// Returns the ByteOffset that should be recovered, and remainder of the `ViewStack`, if any `Lens`
+    /// is considered a 'recovery'-point.
+    ///
+    /// Otherwise, returns `Err(StateError::NoRecovery)`.
+    ///
+    /// # Note
+    ///
+    /// See the documentation of [`ViewStack::restore`] for the difference between 'restore' and 'recover',
+    /// both as methods and as conventional terms.
     pub(crate) fn recover(mut self) -> Result<(ByteOffset, ViewStack), StateError> {
         for (ix, lens) in self.stack.iter().enumerate().rev() {
             match lens.recover() {
@@ -228,6 +273,8 @@ impl ViewStack {
     }
 }
 
+/// Enumeration over the (four) format-combinators that require special handling,
+/// both for limited-view (Slice) and speculative (Peek, PeekNot, UnionNondet) parsing.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub(crate) enum Lens {
     PeekNot { checkpoint: ByteOffset },
@@ -284,6 +331,7 @@ impl BufferOffset {
         }
     }
 
+    /// Returns the value of the offset being tracked
     pub(crate) fn get_current_offset(&self) -> ByteOffset {
         self.current_offset
     }
@@ -311,25 +359,73 @@ impl BufferOffset {
         }
     }
 
+    /// Switches from reading byte-by-byte to reading bit-by-bit.
+    ///
+    /// Whether the resulting bit-stream is in MSB-to-LSB or LSB-to-MSB order
+    /// is determined by the operational semantics of the Parser in question.
+    ///
+    /// Will return an `Err` value if called when already in bit-by-bit mode.
     pub(crate) fn enter_bits_mode(&mut self) -> PResult<()> {
         self.current_offset.enter_bits_mode()
     }
 
-    /// Escapes bits mode and returns the number of bits read since entering bits mode
+    /// Escapes bit-by-bit mode and returns the number of bits read while in bits-mode.
+    ///
+    /// If at least one bit has been read since the last full-byte boundary, the remainder
+    /// of that byte is skipped, and otherwise the offset remains in-place while switching
+    /// between modes.
+    ///
+    /// Will return an `Err` value if called when already in byte-by-byte mode.
     pub(crate) fn escape_bits_mode(&mut self) -> PResult<usize> {
         self.current_offset.escape_bits_mode()
     }
 
-    pub(crate) unsafe fn push_lens(&mut self, lens: Lens) {
+    /// Pushes a `Lens` to the internal `ViewStack` without validation.
+    ///
+    /// # Safety
+    ///
+    /// When called on a `Lens::Slice` whose endpoint exceeds an extant `Slice` in the
+    /// `ViewStack`, this method may lead to unexpected results, but will not be
+    /// undefined behavior.
+    ///
+    /// When called on a `Lens::Slice` whose endpoint exceeds the maximum buffer offset,
+    /// may lead to future panics due to OOB attempted reads.
+    unsafe fn push_lens(&mut self, lens: Lens) {
         self.view_stack.push_lens(lens);
     }
 
+    /// Pushes a new `Lens::Slice` to the top of the `ViewStack` that ends at offset-delta `slice_len`,
+    /// without validating the upper-bound of said slice against either the most restrictive Slice on the
+    /// ViewStack thusfar, or even the `max_offset` of the `BufferOffset` in question.
+    ///
+    /// # Note
+    ///
+    /// In bits-mode, the slice-len is implicitly assumed to specify a number of bits; in bytes-mode,
+    /// it is implicitly assumed to specify a number of bytes.
     pub(crate) unsafe fn open_slice_unchecked(&mut self, slice_len: usize) {
         self.push_lens(Lens::Slice {
             endpoint: self.current_offset.increment_by(slice_len),
         })
     }
 
+    /// Skips to the end of the most recently opened slice (if not there already) and removes
+    /// the corresponding `Lens` from the `ViewStack`, popping any intervening `Lens`es that may
+    /// occur.
+    ///
+    /// Returns the value of the offset after this operation is processed, which will be the upper-bound
+    /// offset of the slice that was escaped.
+    ///
+    /// Will return an appropriate `Err` value if either of the conditions below are met:
+    ///   - There is no slice to close
+    ///   - The current `ByteOffset` has somehow violated the upper-bound imposed by the most recent slice
+    ///
+    /// # Note
+    ///
+    /// Closing a slice will inherently restore the byte-or-bit modality of the offset at the time
+    /// the slice was opened. This means that if a slice was opened in bytes-mode, closing it will
+    /// always return to bytes-mode, even if bits-mode was entered within the slice and never explicitly
+    /// escaped via [`BufferOffset::escape_bits_mode`]. The same would be true in the converse,
+    /// except there is no parsing meta-operation that that enters bytes-mode from within bits-mode.
     pub(crate) fn close_slice(&mut self) -> PResult<ByteOffset> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);
@@ -346,24 +442,33 @@ impl BufferOffset {
         }
     }
 
+    /// Creates and pushes a new [`Lens::Peek`] to the internal `ViewStack`.
     pub(crate) fn open_peek(&mut self) {
         let checkpoint = self.current_offset;
         let peek = Lens::Peek { checkpoint };
         self.view_stack.push_lens(peek);
     }
 
+    /// Creates and pushes a new [`Lens::PeekNot`] to the internal `ViewStack`.
     pub(crate) fn open_peeknot(&mut self) {
         let checkpoint = self.current_offset;
         let peeknot = Lens::PeekNot { checkpoint };
         self.view_stack.push_lens(peeknot);
     }
 
+    /// Creates and pushes a new [`Lens::Alts`] to the internal `ViewStack`.
     pub(crate) fn open_parallel(&mut self) {
         let checkpoint = self.current_offset;
         let parallel = Lens::Alts { checkpoint };
         self.view_stack.push_lens(parallel);
     }
 
+    /// Performs a [`ViewStack::restore`] operation on the internal ViewStack, replacing
+    /// the current offset and ViewStack's values with the return-value of that method call.
+    ///
+    /// If the `restore` operation returns an `Err`, will instead return the same error instead;
+    /// if such an `Err` value is returned, `self` will be left in a semi-indeterminate state,
+    /// and recovery from such an error is not possible.
     pub(crate) fn close_peek(&mut self) -> Result<(), StateError> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);
@@ -373,10 +478,11 @@ impl BufferOffset {
         Ok(())
     }
 
-    /// 'Recovers' from a failed parse by unwinding the internal ViewStack until a fail-safe lens is popped.
+    /// Performs an [`ViewStack::recover`] operation upon reaching a parse-failure, unwinding the internal ViewStack until a fail-safe `Lens` is popped.
     ///
     /// If the ViewStack is empty, or is exhausted before such a Lens is found, will return `Err` with the appropriate
-    /// `StateError` value
+    /// `StateError` value. In such a case, `self` will be left in a semi-indeterminate state, and there is no way to
+    /// recover (in the colloquial sense) from such an error.
     pub(crate) fn recover(&mut self) -> Result<(), StateError> {
         let mut stack = ViewStack::new();
         std::mem::swap(&mut stack, &mut self.view_stack);
@@ -386,12 +492,18 @@ impl BufferOffset {
         Ok(())
     }
 
+    /// Returns the least-upper-bound for the offset implied by the internal state of `self`.
+    ///
+    /// If at least one `Lens::Slice` is active, the most-recently-added will be respected and its end-point returned.
+    /// Otherwise, returns the registered `max_offset` passed in at time-of-creation via the [`BufferOffset::new`] method.
     pub(crate) fn current_limit(&self) -> ByteOffset {
         self.view_stack.get_limit().unwrap_or(self.max_offset)
     }
 
-    /// Number of bytes that can be consumed until reaching a limit,
-    /// based on the current ByteOffset mode (i.e. can become stale if the mode changes)
+    /// Returns the number of bytes (or bits, in bits-mode) 'remaining'; this will be the largest value of `n`
+    /// for which `self.try_increment(n)` will return an `Ok` value.
+    ///
+    /// If the mode changes between bits-mode and bytes-mode the return value of this method will almost always change, even if no incrementing operation is performed.
     pub(crate) fn rem_local(&self) -> usize {
         self.current_offset.delta(self.current_limit())
     }
