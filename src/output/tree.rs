@@ -184,8 +184,8 @@ impl<'module> MonoidalPrinter<'module> {
     fn compile_location(&self, loc: ParseLoc) -> Fragment {
         match loc {
             ParseLoc::InBuffer { offset, length } => match length {
-                0 => Fragment::string(format!("BUF<{offset}>")),
-                1 => Fragment::string(format!("BUF@{offset}")),
+                // 0 => Fragment::string(format!("BUF<{offset}>")),
+                // 1 => Fragment::string(format!("BUF@{offset}")),
                 _ => Fragment::string(format!("BUF({offset}:+{length})")),
             }
             ParseLoc::Synthesized => Fragment::string("<SYNTH>"),
