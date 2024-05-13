@@ -52,6 +52,8 @@ enum Command {
         output: FileOutput,
         /// The binary file to decode
         filename: PathBuf,
+        #[arg(long)]
+        trace: bool,
     },
     /// Typecheck the main FormatModule
     TypeCheck,
@@ -76,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
             Ok(())
         }
-        Command::File { output, filename } => {
+        Command::File { output, filename, trace } => {
             let mut module = FormatModule::new();
             let format = format::main(&mut module).call();
             let program = Compiler::compile_program(&module, &format)?;
@@ -87,8 +89,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
             match output {
                 FileOutput::Debug => println!("{value:?}"),
                 FileOutput::Json => serde_json::to_writer(std::io::stdout(), &value).unwrap(),
+                FileOutput::Tree if !trace => {
+                    doodle::output::tree::print_decoded_value(&module, &value, &format);
+                }
                 FileOutput::Tree => {
-                    // doodle::output::tree::print_decoded_value(&module, &value, &format);
                     let (p_value, _) = program.run_ext(ReadCtxt::new(&input))?;
                     doodle::output::tree::print_parsed_decoded_value(&module, &p_value, &format);
                 }

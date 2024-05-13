@@ -193,7 +193,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn compile_with_location(&self, frag: Fragment, loc: ParseLoc) -> Fragment {
-        Fragment::intervene(frag, Fragment::Char('\t'), self.compile_location(loc).delimit(Fragment::Char('['), Fragment::Char(']')))
+        Fragment::intervene(frag, Fragment::string(" \t"), self.compile_location(loc).delimit(Fragment::Char('['), Fragment::Char(']')))
     }
 
     fn compile_parsed_value(&mut self, value: &ParsedValue) -> Fragment {
@@ -606,7 +606,7 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_parsed_char(&self, v: &ParsedValue) -> Fragment {
         let c = match v.coerce_mapped_value() {
-            ParsedValue::Flat(Parsed { loc, inner }) => match inner {
+            ParsedValue::Flat(Parsed { inner, .. }) => match inner {
                 Value::U8(b) => *b as char,
                 Value::Char(c) => *c,
                 _v => panic!("expected U8 or Char value, found {_v:?}"),
@@ -688,7 +688,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn compile_parsed_tuple(&mut self, vals: &Parsed<Vec<ParsedValue>>, formats: Option<&[Format]>) -> Fragment {
-        let Parsed { loc, inner } = vals;
+        let Parsed { inner, .. } = vals;
         let symb = if inner.is_empty() {
             Fragment::String("()".into())
         } else {
@@ -716,7 +716,7 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn compile_parsed_seq(&mut self, vals: &Parsed<Vec<ParsedValue>>, format: Option<&Format>) -> Fragment {
-        let Parsed { loc, inner } = vals;
+        let Parsed { inner, .. } = vals;
         if inner.is_empty() {
             Fragment::String("[]".into())
         } else {
@@ -841,8 +841,7 @@ impl<'module> MonoidalPrinter<'module> {
                     format!(" {:>width$}", td, width = cols[i]).into(),
                 ));
             }
-            let breadcrumb = self.compile_location(*loc);
-            frag.engroup().encat(Fragment::Char('\t')).encat(breadcrumb).encat_break();
+            frag.engroup().encat(Fragment::string(" \t")).encat(self.compile_location(*loc).delimit(Fragment::Char('['), Fragment::Char(']'))).encat_break();
             frag = frags.renew();
         }
         self.gutter.pop();
@@ -886,7 +885,7 @@ impl<'module> MonoidalPrinter<'module> {
         p_value_fields: &Parsed<Vec<FieldPValue>>,
         format_fields: Option<&[FieldFormat]>,
     ) -> Fragment {
-        let Parsed { loc, inner: value_fields } = p_value_fields;
+        let Parsed { inner: value_fields, .. } = p_value_fields;
         let mut value_fields_filt = Vec::new();
         let mut format_fields_filt = format_fields.map(|_| Vec::new());
 
@@ -1156,19 +1155,19 @@ impl<'module> MonoidalPrinter<'module> {
         match format {
             Some(format) => {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
-                    self.compile_location(value.get_loc()).cat_break()
+                    Fragment::cat(Fragment::string(" \t"), self.compile_location(value.get_loc()).delimit(Fragment::Char('['), Fragment::Char(']'))).cat_break()
                 } else {
                     Fragment::join_with_wsp_eol(
                         Fragment::String(" :=".into()),
                         self.compile_parsed_decoded_value(value, format),
-                        Fragment::cat(Fragment::Char('\t'), self.compile_location(value.get_loc()))
+                        Fragment::cat(Fragment::string(" \t"), self.compile_location(value.get_loc()).delimit(Fragment::Char('['), Fragment::Char(']')))
                     )
                     .group()
                 }
             }
             None => {
                 Fragment::join_with_wsp_eol(Fragment::String(" :=".into()), self.compile_parsed_value(value),
-                        Fragment::cat(Fragment::Char('\t'), self.compile_location(value.get_loc()))
+                        Fragment::cat(Fragment::string(" \t"), self.compile_location(value.get_loc()).delimit(Fragment::Char('['), Fragment::Char(']')))
                 )
                     .group()
             }
