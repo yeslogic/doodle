@@ -60,22 +60,6 @@ pub(crate) enum Relation {
 
 pub(crate) trait IntransitiveOrd {
     fn relate(&self, other: &Self) -> Relation;
-
-    fn inferior(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Inferior)
-    }
-
-    fn superior(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Superior)
-    }
-
-    fn congruent(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Congruent)
-    }
-
-    fn disjoint(&self, other: &Self) -> bool {
-        matches!(self.relate(other), Relation::Disjoint)
-    }
 }
 
 impl IntransitiveOrd for CompareLevel {

@@ -367,6 +367,13 @@ impl ToFragment for RustType {
     }
 }
 
+impl ToFragmentExt for RustType {
+    // FIXME - this impl is only to fix test cases
+    fn to_fragment_precedence(&self, _prec: Precedence) -> Fragment {
+        self.to_fragment()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum RustStruct {
     Unit,
@@ -1710,8 +1717,8 @@ where
 mod test {
     use super::*;
 
-    fn expect_fragment(value: &impl ToFragment, expected: &str) {
-        assert_eq!(&format!("{}", value.to_fragment()), expected)
+    fn expect_fragment(value: &impl ToFragmentExt, expected: &str) {
+        assert_eq!(&format!("{}", value.to_fragment_precedence(Precedence::TOP)), expected)
     }
 
     #[test]
