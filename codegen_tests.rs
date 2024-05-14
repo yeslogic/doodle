@@ -2,6 +2,8 @@
 
 use super::*;
 
+type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
+
 #[test]
 fn test_decoder_26() {
     // PNG signature
@@ -12,7 +14,7 @@ fn test_decoder_26() {
 }
 
 #[test]
-fn test_decoder_gif() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_gif() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.gif"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -25,7 +27,7 @@ fn test_decoder_gif() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 
 mod gzip {
     use super::*;
-    fn test_decoder_gzip(testfile: &str) -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip(testfile: &str) -> TestResult {
         let buffer = std::fs::read(std::path::Path::new(testfile))?;
         let mut input = Parser::new(&buffer);
         let oput = Decoder1(&mut input)?.data;
@@ -37,34 +39,34 @@ mod gzip {
     }
 
     #[test]
-    fn test_decoder_gzip_test1() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip_test1() -> TestResult {
         test_decoder_gzip("test1.gz")
     }
     #[test]
-    fn test_decoder_gzip_test2() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip_test2() -> TestResult {
         test_decoder_gzip("test2.gz")
     }
     #[test]
-    fn test_decoder_gzip_test3() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip_test3() -> TestResult {
         test_decoder_gzip("test3.gz")
     }
     #[test]
-    fn test_decoder_gzip_test4() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip_test4() -> TestResult {
         test_decoder_gzip("test4.gz")
     }
     #[test]
-    fn test_decoder_gzip_test5() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip_test5() -> TestResult {
         test_decoder_gzip("test5.gz")
     }
     #[test]
-    fn test_decoder_gzip_test6() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_gzip_test6() -> TestResult {
         test_decoder_gzip("test6.gz")
     }
 }
 
 mod jpeg {
     use super::*;
-    fn test_decoder_jpeg(testfile: &str) -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_jpeg(testfile: &str) -> TestResult {
         let buffer = std::fs::read(std::path::Path::new(testfile))?;
         let mut input = Parser::new(&buffer);
         let oput = Decoder1(&mut input)?.data;
@@ -76,18 +78,18 @@ mod jpeg {
     }
 
     #[test]
-    fn test_decoder_jpeg_test_() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_jpeg_test_() -> TestResult {
         test_decoder_jpeg("test.jpg")
     }
 
     #[test]
-    fn test_decoder_jpeg_test2() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+    fn test_decoder_jpeg_test2() -> TestResult {
         test_decoder_jpeg("test2.jpg")
     }
 }
 
 #[test]
-fn test_decoder_mpeg4() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_mpeg4() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.mp4"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -99,7 +101,7 @@ fn test_decoder_mpeg4() -> Result<(), Box<dyn Send + Sync + std::error::Error>> 
 }
 
 #[test]
-fn test_decoder_png() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_png() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.png"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -111,7 +113,7 @@ fn test_decoder_png() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 }
 
 #[test]
-fn test_decoder_riff() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_riff() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.webp"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -123,7 +125,7 @@ fn test_decoder_riff() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 }
 
 #[test]
-fn test_decoder_tar() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.tar"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder13(&mut input)?;
@@ -141,7 +143,7 @@ fn test_decoder_tar() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
 }
 
 #[test]
-fn test_decoder_text_ascii() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_text_ascii() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.txt"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -158,7 +160,7 @@ fn test_decoder_text_ascii() -> Result<(), Box<dyn Send + Sync + std::error::Err
 }
 
 #[test]
-fn test_decoder_text_utf8() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_text_utf8() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.utf8"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -175,7 +177,7 @@ fn test_decoder_text_utf8() -> Result<(), Box<dyn Send + Sync + std::error::Erro
 }
 
 #[test]
-fn test_decoder_text_mixed() -> Result<(), Box<dyn Send + Sync + std::error::Error>> {
+fn test_decoder_text_mixed() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("mixed.utf8"))?;
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
@@ -189,4 +191,59 @@ fn test_decoder_text_mixed() -> Result<(), Box<dyn Send + Sync + std::error::Err
         other => unreachable!("expected text, found {other:?}"),
     }
     Ok(())
+}
+
+mod test_files {
+    use super::*;
+
+    fn mk_sig_hex(sig: (u8, u8, u8, u8, u8, u8, u8, u8)) -> String {
+        format!("{:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}",
+            sig.0,
+            sig.1,
+            sig.2,
+            sig.3,
+            sig.4,
+            sig.5,
+            sig.6,
+            sig.7
+        )
+    }
+
+    fn print_png_breadcrumb(png_data: Type181) {
+        let sig_hex = mk_sig_hex(png_data.signature);
+        println!("SIG ({}) | IHDR (len: {} | h {}px * w {}px)",
+            sig_hex,
+            png_data.ihdr.length,
+            png_data.ihdr.data.height,
+            png_data.ihdr.data.width,
+        );
+    }
+
+    fn check_png(filename: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(filename))?;
+        let mut input = Parser::new(&buffer);
+        print!("[{filename}]: ");
+        let oput = Decoder1(&mut input)?.data;
+        match oput {
+            Type192::png(dat) => print_png_breadcrumb(dat),
+            other => unreachable!("{filename}: expected png, found {other:?}"),
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_all_extra_images() -> TestResult {
+        for entry in std::fs::read_dir("test-images")?.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            match () {
+                _ if name.ends_with(".png") => {
+                    check_png(format!("test-images/{}", name).as_str())?;
+                }
+                // FIXME: add more cases as we add handlers for each image type
+                _ => continue,
+            }
+        }
+        Ok(())
+    }
+
 }
