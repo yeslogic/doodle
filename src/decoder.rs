@@ -62,6 +62,11 @@ impl Ord for ParseLoc {
 }
 
 impl ParseLoc {
+    /// Returns the length, in bytes (or bits, when parsing within a [`Format::Bits`] context) of the buffer-slice that a [`Value`] was directly interpreted from.
+    ///
+    /// Will return `0` for the associated location of any zero-width or synthesized `Value` productions. In the latter case, Synthesized values are
+    /// implicitly zero-length as they do not have a simple correspondence with any given sequence of in-buffer bytes (either being entirely constructed,
+    /// or having a complex correspondence that cannot be directly represented).
     pub fn get_length(&self) -> usize {
         match self {
             ParseLoc::Synthesized => 0,
@@ -69,6 +74,10 @@ impl ParseLoc {
         }
     }
 
+    /// Returns the offset from the start of either the entire buffer (by default) or the sub-buffer (for bits-mode parses)
+    /// where a [`Value`]'s corresponding buffer-slice began.
+    ///
+    /// Will return `None` if and only if `self` happens to be `ParseLoc::Synthesized`
     pub fn get_offset(&self) -> Option<usize> {
         match self {
             ParseLoc::Synthesized => None,
@@ -76,6 +85,16 @@ impl ParseLoc {
         }
     }
 
+    /// Naive unification that joins two `ParseLoc` values into a single `ParseLoc` under the assumption that
+    /// they are adjacent.
+    ///
+    /// As long as the set of individual `ParseLoc` values that are called on this method in a chain or iterative
+    /// fold/reduce are ultimately contiguous, the order in which they are `joined` does not matter. In fact, the
+    /// overall order does not matter as this operation is commutative, but will variously misrepresent any sparse
+    /// collection of `ParseLoc`s, or any mostly-contiguous set with even one outlier.
+    ///
+    /// In particular, will preferentially use a concrete `ParseLoc::InBuffer` and shadow any `Synthesized` locations
+    /// that are seen along the way.
     pub fn join(self, other: Self) -> Self {
         match other {
             ParseLoc::Synthesized => return self,
@@ -87,6 +106,15 @@ impl ParseLoc {
         }
     }
 
+    /// Helper function that performs a [`ParseLoc::join`] operation in a manual fold over a provided iterator
+    /// whose value type is `ParseLoc`.
+    ///
+    /// Will return [`ParseLoc::Synthesized`] when the iterator yields no [`ParseLoc::InBuffer`] values (including when it is zero-length).
+    ///
+    /// If the iterator in question traverses a set of contiguous slices in arbitrary order, the result will be the exact spanning location
+    /// from the earliest in-buffer location and of the cumulative length of each item in the iteration.
+    ///
+    /// If there are non-trivial holes or outlying elements, the returned `ParseLoc` may be misleading to varying degrees.
     pub fn accum(iter: impl Iterator<Item = Self>) -> Self {
         let mut ret = ParseLoc::Synthesized;
         for item in iter {
@@ -96,6 +124,7 @@ impl ParseLoc {
     }
 }
 
+/// Helper type for associating a [`ParseLoc`] with a value of a generic type.
 #[derive(Clone, Copy, Debug)]
 pub struct Parsed<T: Clone> {
     pub(crate) loc: ParseLoc,
@@ -103,6 +132,7 @@ pub struct Parsed<T: Clone> {
 }
 
 impl<T: Clone> Parsed<T> {
+    /// Returns a reference to the stored value, without the accompanying [`ParseLoc`].
     pub(crate) fn get_inner(&self) -> &T {
         &self.inner
     }
@@ -118,7 +148,7 @@ impl<T: Clone> AsRef<T> for Parsed<T> {
 
 #[derive(Clone, Debug)]
 pub enum ParsedValue {
-    /// Flat parses of variants without any embedded `Value` terms
+    /// Flat parses of the sub-set of `Value` variants that do not contain any embedded `Value` terms
     Flat(Parsed<Value>),
     Tuple(Parsed<Vec<ParsedValue>>),
     Record(Parsed<Vec<(Label, ParsedValue)>>),
@@ -129,6 +159,7 @@ pub enum ParsedValue {
 }
 
 impl ParsedValue {
+    /// Returns the [`ParseLoc`] directly associated with this `ParsedValue`.
     pub fn get_loc(&self) -> ParseLoc {
         match self {
             ParsedValue::Flat(Parsed { loc, .. }) => *loc,
@@ -141,15 +172,22 @@ impl ParsedValue {
         }
     }
 
+    /// Helper function to construct a `Value::UNIT` with a zero-length spanning slice at a given starting offset.
     const fn unit_at(offset: usize) -> ParsedValue {
         Self::unit_spanning(offset, 0)
     }
 
+    /// Helper function to construct a `Value::UNIT` of specific length starting at a given offset.
     const fn unit_spanning(offset: usize, length: usize) -> ParsedValue {
         ParsedValue::Tuple(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner: Vec::new() })
     }
 
-    pub fn new_flat(inner: Value, offset: usize, length: usize) -> ParsedValue {
+    /// Constructs a new `ParsedValue` from a `Value` with a provided offset and length.
+    ///
+    /// While this method will never fail and does not enforce any invariants,
+    /// there is an implicit expectation that the `Value` being passed in is 'flat', i.e. contains no embedded `Value`s.
+    /// If this expectation is violated, there may be complications down the line.
+    pub const fn new_flat(inner: Value, offset: usize, length: usize) -> ParsedValue {
         ParsedValue::Flat(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner })
     }
 
@@ -165,14 +203,17 @@ impl ParsedValue {
         ParsedValue::Seq(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner: v })
     }
 
+    /// Helper function that constructs a Synthesized `ParsedValue` as appropriate and immediately
+    /// ascribes it the same location as an original `ParsedValue`.
+    ///
+    /// Mostly useful for handling `Format::Map`.
     fn inherit(orig: &ParsedValue, v: Value) -> ParsedValue {
         let mut tmp = Self::from_evaluated(v);
         tmp.transpose(orig.get_loc());
         tmp
     }
 
-    /// Modifies a ParsedValue through a mutable reference to regard itself as having a different
-    /// location than originally ascribed to it.
+    /// Overwrites a `ParsedValue`'s associated `ParseLoc` using the provided argument, discarding its previous value.
     pub fn transpose(&mut self, new_loc: ParseLoc) {
         match self {
             ParsedValue::Flat(p) => p.loc = new_loc,
