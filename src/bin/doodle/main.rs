@@ -78,7 +78,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
             Ok(())
         }
-        Command::File { output, filename, trace } => {
+        Command::File {
+            output,
+            filename,
+            trace,
+        } => {
             let mut module = FormatModule::new();
             let format = format::main(&mut module).call();
             let program = Compiler::compile_program(&module, &format)?;

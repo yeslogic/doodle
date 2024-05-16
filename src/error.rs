@@ -87,7 +87,10 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
 impl<V: std::fmt::Debug + Clone> std::error::Error for ParseError<V> {}
 
 impl<V: std::fmt::Debug + Clone> ParseError<V> {
-    pub fn fail(scope: &Scope<'_, V>, input: ReadCtxt<'_>) -> Self where V: ValueLike {
+    pub fn fail(scope: &Scope<'_, V>, input: ReadCtxt<'_>) -> Self
+    where
+        V: ValueLike,
+    {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();

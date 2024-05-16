@@ -9,8 +9,8 @@ pub enum ParseError {
     InsufficientRepeats,
     /// Indicates a succesful parse within a negated context, as in the case of PeekNot
     NegatedSuccess,
-    /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent
-    ExcludedBranch,
+    /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent; u64 value is a trace mechanic for determining which error was triggered
+    ExcludedBranch(u64),
     /// Attempted read would overrun either the overall buffer, or a context-local `Format::Slice`.
     Overrun(OverrunKind),
     /// A `Format::EndOfInput` token occuring anywhere except the final offset of a Slice or the overall buffer.
@@ -36,7 +36,7 @@ impl std::fmt::Display for ParseError {
                 f,
                 "failed to find enough format repeats to satisfy requirement"
             ),
-            ParseError::ExcludedBranch => write!(f, "buffer contents does not correspond to an expected branch of a MatchTree or Expr::Match"),
+            ParseError::ExcludedBranch(trace) => write!(f, "buffer contents does not correspond to an expected branch of a MatchTree or Expr::Match (trace-hash: {trace})"),
             ParseError::NegatedSuccess => write!(f, "sub-parse succeeded in negated context"),
             ParseError::IncompleteParse { bytes_remaining: n } => write!(
                 f,
@@ -91,7 +91,10 @@ impl std::fmt::Display for StateError {
             StateError::BinaryModeError => write!(f, "illegal binary-mode switch operation"),
             StateError::MissingSlice => write!(f, "missing slice cannot be closed"),
             StateError::SliceOverrun => {
-                write!(f, "cannot close slice properly, as it has already been overrun")
+                write!(
+                    f,
+                    "cannot close slice properly, as it has already been overrun"
+                )
             }
         }
     }

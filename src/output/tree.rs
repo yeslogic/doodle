@@ -32,7 +32,6 @@ pub fn print_parsed_decoded_value(module: &FormatModule, p_value: &ParsedValue, 
         Ok(_) => (),
         Err(e) => eprintln!("error: {e}"),
     }
-
 }
 
 enum Column {
@@ -127,7 +126,10 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn is_atomic_value<V>(&self, value: &V, format: Option<&Format>) -> bool where V: ValueLike {
+    fn is_atomic_value<V>(&self, value: &V, format: Option<&Format>) -> bool
+    where
+        V: ValueLike,
+    {
         if let Some(format) = format {
             if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
                 return true;
@@ -187,13 +189,18 @@ impl<'module> MonoidalPrinter<'module> {
                 // 0 => Fragment::string(format!("BUF<{offset}>")),
                 // 1 => Fragment::string(format!("BUF@{offset}")),
                 _ => Fragment::string(format!("BUF({offset}:+{length})")),
-            }
+            },
             ParseLoc::Synthesized => Fragment::string("<SYNTH>"),
         }
     }
 
     fn compile_with_location(&self, frag: Fragment, loc: ParseLoc) -> Fragment {
-        Fragment::intervene(frag, Fragment::string(" \t"), self.compile_location(loc).delimit(Fragment::Char('['), Fragment::Char(']')))
+        Fragment::intervene(
+            frag,
+            Fragment::string(" \t"),
+            self.compile_location(loc)
+                .delimit(Fragment::Char('['), Fragment::Char(']')),
+        )
     }
 
     fn compile_parsed_value(&mut self, value: &ParsedValue) -> Fragment {
@@ -207,7 +214,7 @@ impl<'module> MonoidalPrinter<'module> {
                     Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
                     Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
                     Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
-                    _ => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}")
+                    _ => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}"),
                 };
                 self.compile_with_location(symb, *loc)
             }
@@ -328,13 +335,17 @@ impl<'module> MonoidalPrinter<'module> {
             Format::PeekNot(_format) => self.compile_parsed_value(value),
             Format::Slice(_, format) => self.compile_parsed_decoded_value(value, format),
             Format::Bits(format) => self.compile_parsed_decoded_value(value, format),
-            Format::WithRelativeOffset(_, format) => self.compile_parsed_decoded_value(value, format),
+            Format::WithRelativeOffset(_, format) => {
+                self.compile_parsed_decoded_value(value, format)
+            }
             Format::Map(format, _expr) => {
                 if self.flags.collapse_mapped_values {
                     self.compile_parsed_value(value)
                 } else {
                     match value {
-                        ParsedValue::Mapped(orig, _value) => self.compile_parsed_decoded_value(orig, format),
+                        ParsedValue::Mapped(orig, _value) => {
+                            self.compile_parsed_decoded_value(orig, format)
+                        }
                         _ => panic!("expected mapped value, found {value:?}"),
                     }
                 }
@@ -349,7 +360,9 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
-            Format::Dynamic(_name, _dynformat, format) => self.compile_parsed_decoded_value(value, format),
+            Format::Dynamic(_name, _dynformat, format) => {
+                self.compile_parsed_decoded_value(value, format)
+            }
             Format::Apply(_) => self.compile_parsed_value(value),
         }
     }
@@ -610,7 +623,7 @@ impl<'module> MonoidalPrinter<'module> {
                 Value::U8(b) => *b as char,
                 Value::Char(c) => *c,
                 _v => panic!("expected U8 or Char value, found {_v:?}"),
-            }
+            },
             _other => panic!("expected Flat (parsed-)value, found {_other:?}"),
         };
         match c {
@@ -633,7 +646,10 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_parsed_ascii_char(&self, v: &ParsedValue) -> Fragment {
         let (_loc, b) = match v {
-            ParsedValue::Flat(Parsed { loc, inner: Value::U8(b) }) => (*loc, *b),
+            ParsedValue::Flat(Parsed {
+                loc,
+                inner: Value::U8(b),
+            }) => (*loc, *b),
             _ => panic!("expected U8 value, found {v:?}"),
         };
         let symbol = match b {
@@ -687,7 +703,11 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn compile_parsed_tuple(&mut self, vals: &Parsed<Vec<ParsedValue>>, formats: Option<&[Format]>) -> Fragment {
+    fn compile_parsed_tuple(
+        &mut self,
+        vals: &Parsed<Vec<ParsedValue>>,
+        formats: Option<&[Format]>,
+    ) -> Fragment {
         let Parsed { inner, .. } = vals;
         let symb = if inner.is_empty() {
             Fragment::String("()".into())
@@ -715,7 +735,11 @@ impl<'module> MonoidalPrinter<'module> {
         symb
     }
 
-    fn compile_parsed_seq(&mut self, vals: &Parsed<Vec<ParsedValue>>, format: Option<&Format>) -> Fragment {
+    fn compile_parsed_seq(
+        &mut self,
+        vals: &Parsed<Vec<ParsedValue>>,
+        format: Option<&Format>,
+    ) -> Fragment {
         let Parsed { inner, .. } = vals;
         if inner.is_empty() {
             Fragment::String("[]".into())
@@ -734,11 +758,15 @@ impl<'module> MonoidalPrinter<'module> {
             if any_skipped {
                 frag.encat(self.compile_field_skipped());
             }
-            frag.encat(self.compile_parsed_field_value_last(last_index, &inner[last_index], format, false));
+            frag.encat(self.compile_parsed_field_value_last(
+                last_index,
+                &inner[last_index],
+                format,
+                false,
+            ));
             frag
         }
     }
-
 
     fn compile_seq(&mut self, vals: &[Value], format: Option<&Format>) -> Fragment {
         if vals.is_empty() {
@@ -763,7 +791,11 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn compile_parsed_seq_records(&mut self, vals: &Parsed<Vec<ParsedValue>>, format: &Format) -> Fragment {
+    fn compile_parsed_seq_records(
+        &mut self,
+        vals: &Parsed<Vec<ParsedValue>>,
+        format: &Format,
+    ) -> Fragment {
         let fields = self.try_as_record_with_atomic_fields(format).unwrap();
         let mut cols = Vec::new();
         let mut header = Vec::new();
@@ -841,7 +873,13 @@ impl<'module> MonoidalPrinter<'module> {
                     format!(" {:>width$}", td, width = cols[i]).into(),
                 ));
             }
-            frag.engroup().encat(Fragment::string(" \t")).encat(self.compile_location(*loc).delimit(Fragment::Char('['), Fragment::Char(']'))).encat_break();
+            frag.engroup()
+                .encat(Fragment::string(" \t"))
+                .encat(
+                    self.compile_location(*loc)
+                        .delimit(Fragment::Char('['), Fragment::Char(']')),
+                )
+                .encat_break();
             frag = frags.renew();
         }
         self.gutter.pop();
@@ -885,7 +923,10 @@ impl<'module> MonoidalPrinter<'module> {
         p_value_fields: &Parsed<Vec<FieldPValue>>,
         format_fields: Option<&[FieldFormat]>,
     ) -> Fragment {
-        let Parsed { inner: value_fields, .. } = p_value_fields;
+        let Parsed {
+            inner: value_fields,
+            ..
+        } = p_value_fields;
         let mut value_fields_filt = Vec::new();
         let mut format_fields_filt = format_fields.map(|_| Vec::new());
 
@@ -974,7 +1015,12 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn compile_parsed_variant(&mut self, label: &str, value: &ParsedValue, format: Option<&Format>) -> Fragment {
+    fn compile_parsed_variant(
+        &mut self,
+        label: &str,
+        value: &ParsedValue,
+        format: Option<&Format>,
+    ) -> Fragment {
         if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
             frag.encat(Fragment::String(format!("{{ {label} := ").into()));
@@ -1151,26 +1197,43 @@ impl<'module> MonoidalPrinter<'module> {
         frags.finalize().group()
     }
 
-    fn compile_parsed_field_value(&mut self, value: &ParsedValue, format: Option<&Format>) -> Fragment {
+    fn compile_parsed_field_value(
+        &mut self,
+        value: &ParsedValue,
+        format: Option<&Format>,
+    ) -> Fragment {
         match format {
             Some(format) => {
                 if self.flags.omit_implied_values && self.is_implied_value_format(format) {
-                    Fragment::cat(Fragment::string(" \t"), self.compile_location(value.get_loc()).delimit(Fragment::Char('['), Fragment::Char(']'))).cat_break()
+                    Fragment::cat(
+                        Fragment::string(" \t"),
+                        self.compile_location(value.get_loc())
+                            .delimit(Fragment::Char('['), Fragment::Char(']')),
+                    )
+                    .cat_break()
                 } else {
                     Fragment::join_with_wsp_eol(
                         Fragment::String(" :=".into()),
                         self.compile_parsed_decoded_value(value, format),
-                        Fragment::cat(Fragment::string(" \t"), self.compile_location(value.get_loc()).delimit(Fragment::Char('['), Fragment::Char(']')))
+                        Fragment::cat(
+                            Fragment::string(" \t"),
+                            self.compile_location(value.get_loc())
+                                .delimit(Fragment::Char('['), Fragment::Char(']')),
+                        ),
                     )
                     .group()
                 }
             }
-            None => {
-                Fragment::join_with_wsp_eol(Fragment::String(" :=".into()), self.compile_parsed_value(value),
-                        Fragment::cat(Fragment::string(" \t"), self.compile_location(value.get_loc()).delimit(Fragment::Char('['), Fragment::Char(']')))
-                )
-                    .group()
-            }
+            None => Fragment::join_with_wsp_eol(
+                Fragment::String(" :=".into()),
+                self.compile_parsed_value(value),
+                Fragment::cat(
+                    Fragment::string(" \t"),
+                    self.compile_location(value.get_loc())
+                        .delimit(Fragment::Char('['), Fragment::Char(']')),
+                ),
+            )
+            .group(),
         }
     }
 

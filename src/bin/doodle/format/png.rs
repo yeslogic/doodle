@@ -1,5 +1,6 @@
 use crate::format::BaseModule;
-use doodle::helper::*;
+use doodle::byte_set::ByteSet;
+use doodle::{byte_set, helper::*, Expr};
 use doodle::{Format, FormatModule, FormatRef, Pattern};
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
@@ -85,6 +86,50 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         chunk(is_bytes(b"bKGD"), bkgd_data),
     );
 
+    let chrm_data = record(vec![
+        ("whitepoint-x", base.u32be()),
+        ("whitepoint-y", base.u32be()),
+        ("red-x", base.u32be()),
+        ("red-y", base.u32be()),
+        ("green-x", base.u32be()),
+        ("green-y", base.u32be()),
+        ("blue-x", base.u32be()),
+        ("blue-y", base.u32be()),
+    ]);
+
+    let chrm = module.define_format("png.chrm", chunk(is_bytes(b"cHRM"), chrm_data));
+
+    // FIXME: do we want to map the value to its intended scale (y := x / 100_000)?
+    let gama_data = record(vec![("gamma", base.u32be())]);
+
+    let gama = module.define_format("png.gama", chunk(is_bytes(b"gAMA"), gama_data));
+
+    // PNG keyword for iTXt, zTXt, tEXt, and other contexts
+    //   - Length >= 1, < 80 characters
+    //   - Consists only of Latin-1 characters and spaces: 32..=126 | 161..=255
+    //   - No leading or trailing spaces, nor consecutive spaces
+    //   - Non-breaking space (160) not permitted in particular
+    let keyword = module.define_format(
+        "png.keyword",
+        // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
+        // FIXME - this is incorrect, and we have to fix it using new primitives
+        Format::Slice(
+            Expr::U16(79u16),
+            Box::new(repeat1(byte_in(ByteSet::union(
+                &ByteSet::from(32..=126),
+                &ByteSet::from(161..=255),
+            )))),
+        ),
+    );
+
+    let iccp_data = record(vec![
+        ("profile-name", keyword.call()),
+        ("compression-method", is_byte(0)), // FIXME: technically the value is unrestricted but 0 := deflate is the only defined value
+        ("compressed-profile", repeat(base.u8())),
+    ]);
+
+    let iccp = module.define_format("png.iccp", chunk(is_bytes(b"iCCP"), iccp_data));
+
     let phys_data = record([
         ("pixels-per-unit-x", base.u32be()),
         ("pixels-per-unit-y", base.u32be()),
@@ -95,6 +140,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let palette_entry = record([("r", base.u8()), ("g", base.u8()), ("b", base.u8())]);
     let plte_data = repeat1(palette_entry);
     let plte = module.define_format("png.plte", chunk(is_bytes(b"PLTE"), plte_data));
+
+    let text_data = record([
+        ("keyword", base.asciiz_string()),
+        ("text", repeat(base.ascii_char())),
+    ]);
+
+    let text = module.define_format("png.text", chunk(is_bytes(b"tEXt"), text_data));
 
     let time_data = record([
         ("year", base.u16be()),
@@ -141,8 +193,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         vec![("ihdr".into(), ihdr_type)],
         alts([
             ("bKGD", bkgd.call_args(vec![var("ihdr")])),
+            ("cHRM", chrm.call()),
+            ("iCCP", iccp.call()),
+            ("gAMA", gama.call()),
             ("pHYs", phys.call()),
             ("PLTE", plte.call()),
+            ("tEXt", text.call()),
             ("tIME", time.call()),
             ("tRNS", trns.call_args(vec![var("ihdr")])),
             // FIXME other tags excluding IHDR/IDAT/IEND

@@ -91,9 +91,7 @@ pub fn parse_huffman(
     make_huffman_decoder(&lengths)
 }
 
-pub fn make_huffman_decoder(
-    lengths: &[usize],
-) -> impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> {
+pub fn make_huffman_decoder(lengths: &[usize]) -> impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> {
     let max_length = *lengths.iter().max().unwrap();
     let mut bl_count = [0].repeat(max_length + 1);
 
