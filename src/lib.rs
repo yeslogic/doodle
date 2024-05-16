@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 #![deny(rust_2018_idioms)]
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Add;
 use std::rc::Rc;
@@ -604,6 +605,8 @@ pub enum Format {
     Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
     RepeatCount(Expr, Box<Format>),
+    /// Repeat a format at least N and at most M times
+    RepeatBetween(Expr, Expr, Box<Format>),
     /// Repeat a format until a condition is satisfied by its last item
     RepeatUntilLast(Expr, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
@@ -682,6 +685,7 @@ impl Format {
             Format::Repeat(_) => Bounds::new(0, None),
             Format::Repeat1(f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
+            Format::RepeatBetween(xmin, xmax, f) => f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds())),
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
@@ -729,6 +733,7 @@ impl Format {
             Format::Repeat(_) => Bounds::new(0, None),
             Format::Repeat1(f) => f.lookahead_bounds(module) * Bounds::new(1, None),
             Format::RepeatCount(expr, f) => f.lookahead_bounds(module) * expr.bounds(),
+            Format::RepeatBetween(xmin, xmax, f) => f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds()),
             Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(f) => f.lookahead_bounds(module),
@@ -770,6 +775,7 @@ impl Format {
             Format::Record(fields) => fields.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Repeat(..) => true,
             Format::Repeat1(..) => true,
+            Format::RepeatBetween(..) => true,
             Format::RepeatCount(..) => false,
             Format::RepeatUntilLast(..) => false,
             Format::RepeatUntilSeq(..) => false,
@@ -975,9 +981,10 @@ impl FormatModule {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
-            Format::RepeatCount(_expr, a)
-            | Format::RepeatUntilLast(_expr, a)
-            | Format::RepeatUntilSeq(_expr, a) => {
+            Format::RepeatCount(_, a)
+            | Format::RepeatBetween(_, _, a)
+            | Format::RepeatUntilLast(_, a)
+            | Format::RepeatUntilSeq(_, a) => {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
@@ -1087,6 +1094,8 @@ enum Next<'a> {
     Record(MTFieldSlice<'a>, Rc<Next<'a>>),
     Repeat(MTFormatRef<'a>, Rc<Next<'a>>),
     RepeatCount(usize, MTFormatRef<'a>, Rc<Next<'a>>),
+    RepeatMax(usize, MTFormatRef<'a>, Rc<Next<'a>>), // dual to [RepeatCount] for 0..=N repeats
+    RepeatBetween(usize, usize, MTFormatRef<'a>, Rc<Next<'a>>), // extension of RepeatMax/RepeatCount for N..=M repeats
     Slice(usize, Rc<Next<'a>>, Rc<Next<'a>>),
     Peek(Rc<Next<'a>>, Rc<Next<'a>>),
     PeekNot(Rc<Next<'a>>, Rc<Next<'a>>),
@@ -1257,7 +1266,7 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
-    /// Constructs a [MatchTreeStep] that accepts a fixed-count repetition of a given format, with a trailing sequence of partially-consumed formats ([`Next`s]).
+    /// Constructs a [MatchTreeStep] that accepts a fixed-count repetition of a given format, with a trailing sequence of partially-consumed formats ([`Next`]s).
     fn from_repeat_count(
         module: &'a FormatModule,
         n: usize,
@@ -1272,6 +1281,30 @@ impl<'a> MatchTreeStep<'a> {
             )
         } else {
             Self::from_next(module, next)
+        }
+    }
+
+    /// Constructs a [MatchTreeStep] that accepts a repetition whose count is bounded above and below, with a trailing sequence of partially-consuemd formats ([`Next`]s)
+    ///
+    /// The format in quiestion will  an arbitrary number of times between `min` and `max`, where `minmax ::= (min, max)`
+    ///
+    /// Presupposes that the invariant `max >= min` is upheld.
+    fn from_repeat_between(module: &'a FormatModule, minmax: (usize, usize), format: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+        let (min, max) = minmax;
+        assert!(min <= max, "min-max pair ({}, {}) incoherent (min > max)", min, max);
+        if min == max {
+            Self::from_repeat_count(module, min, format, next)
+        } else if min > 0 {
+            Self::from_format(
+                module,
+                format,
+                Rc::new(Next::RepeatBetween(min - 1, max - 1, MaybeTyped::Untyped(format), next))
+            )
+        } else {
+            Self::from_next(
+                module,
+                Rc::new(Next::RepeatMax(max, MaybeTyped::Untyped(format), next.clone())),
+            )
         }
     }
 
@@ -1358,6 +1391,28 @@ impl<'a> MatchTreeStep<'a> {
                 let tree = MatchTreeStep::<'a>::from_next(module, next0.clone());
                 let next1 = next.clone();
                 tree.union(MatchTreeStep::<'a>::from_mt_format(module, *a, next1))
+            }
+            Next::RepeatBetween(n, m, a, next0) => {
+                let min = *n;
+                let max = *m;
+                if min == max {
+                    // FIXME - this is technically allowable but we don't expect to get here...
+                    unreachable!("RepeatBetween(x, y, ..) precludes x == y");
+                }
+                if min > 0 {
+                    Self::from_mt_format(module, *a, Rc::new(Next::RepeatBetween(min - 1, max - 1, *a, next0.clone())))
+                } else {
+                    Self::from_next(module, Rc::new(Next::RepeatMax(max, *a, next0.clone())))
+                }
+            }
+            Next::RepeatMax(n, a, next0) => {
+                let n = *n;
+                if n == 0 {
+                    Self::from_next(module, next0.clone())
+                } else {
+                    let tree0 = MatchTreeStep::<'a>::from_next(module, next0.clone());
+                    tree0.union(MatchTreeStep::<'a>::from_mt_format(module, *a, Rc::new(Next::RepeatMax(n - 1, *a, next0.clone()))))
+                }
             }
             Next::RepeatCount(n, a, next0) => {
                 let n = *n;
@@ -1479,6 +1534,46 @@ impl<'a> MatchTreeStep<'a> {
                     }
                 }
             }
+            TypedFormat::RepeatBetween(_, xmin, xmax, a) => {
+                 let min_bounds = xmin.bounds();
+                let max_bounds = xmax.bounds();
+                match (min_bounds.is_exact(), max_bounds.is_exact()) {
+                    (Some(min), Some(max)) => {
+                        match min.cmp(&max) {
+                            Ordering::Less => {
+                                if min > 0 {
+                                    Self::from_gt_format(
+                                        module,
+                                        &**a,
+                                        Rc::new(Next::RepeatBetween(min - 1, max - 1, MaybeTyped::Typed(&**a), next))
+                                    )
+                                } else {
+                                    Self::from_next(
+                                        module,
+                                        Rc::new(Next::RepeatMax(max, MaybeTyped::Typed(&**a), next.clone())),
+                                    )
+                                }
+                            }
+                            Ordering::Equal => {
+                                let next = next.clone();
+                                if min > 0 {
+                                    Self::from_gt_format(
+                                        module,
+                                        &**a,
+                                        Rc::new(Next::RepeatCount(min - 1, MaybeTyped::Typed(&**a), next)),
+                                    )
+                                } else {
+                                    Self::from_next(module, next)
+                                }
+                            }
+                            Ordering::Greater => panic!("incoherent repeat-between: min {} > max {}", min, max),
+                        }
+                    }
+                    _ => {
+                        unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
+                    }
+                }
+            }
             TypedFormat::RepeatUntilLast(_, _expr, _a) => {
                 Self::accept() // FIXME
             }
@@ -1595,6 +1690,26 @@ impl<'a> MatchTreeStep<'a> {
                     Self::from_repeat_count(module, bounds.min, a, Rc::new(Next::Empty))
                 }
             }
+            Format::RepeatBetween(xmin, xmax, a) => {
+                let min_bounds = xmin.bounds();
+                let max_bounds = xmax.bounds();
+                match (min_bounds.is_exact(), max_bounds.is_exact()) {
+                    (Some(min), Some(max)) => {
+                        match min.cmp(&max) {
+                            Ordering::Less => {
+                                Self::from_repeat_between(module, (min, max), a, next.clone())
+                            }
+                            Ordering::Equal => {
+                                Self::from_repeat_count(module, min, a, next.clone())
+                            }
+                            Ordering::Greater => panic!("incoherent repeat-between: min {} > max {}", min, max),
+                        }
+                    }
+                    _ => {
+                        unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
+                    }
+                }
+            }
             Format::RepeatUntilLast(_expr, _a) => {
                 Self::accept() // FIXME
             }
@@ -1663,6 +1778,7 @@ impl<'a> MatchTreeStep<'a> {
             Format::Apply(_name) => Self::accept(),
         }
     }
+
 }
 
 impl<'a> MatchTreeLevel<'a> {

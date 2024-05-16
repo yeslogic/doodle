@@ -35,6 +35,19 @@ impl Bounds {
         }
     }
 
+    /// Dual method to `union`, which keeps the most restrictive upper-bound of the
+    /// two Bounds values rather than the least.
+    pub fn intersection(lhs: Bounds, rhs: Bounds) -> Bounds {
+        Bounds {
+            min: usize::min(lhs.min, rhs.min),
+            max: match (lhs.max, rhs.max) {
+                (Some(m1), Some(m2)) => Some(usize::min(m1, m2)),
+                (Some(m1), None) => Some(m1),
+                _ => rhs.max,
+            }
+        }
+    }
+
     pub fn bits_to_bytes(&self) -> Bounds {
         Bounds {
             min: (self.min + 7) / 8,

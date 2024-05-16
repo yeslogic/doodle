@@ -9,6 +9,7 @@ mod gif;
 mod gzip;
 mod jpeg;
 mod mpeg4;
+mod peano;
 mod png;
 mod riff;
 mod tar;
@@ -24,6 +25,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let gzip = gzip::main(module, deflate, &base);
     let jpeg = jpeg::main(module, &base, &tiff);
     let mpeg4 = mpeg4::main(module, &base);
+    let peano = peano::main(module);
     let png = png::main(module, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
@@ -35,6 +37,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             (
                 "data",
                 union_nondet(vec![
+                    ("peano", peano.call()),
                     ("gif", gif.call()),
                     ("gzip", gzip.call()),
                     ("jpeg", jpeg.call()),

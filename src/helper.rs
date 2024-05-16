@@ -83,6 +83,10 @@ pub fn repeat_count(len: Expr, format: Format) -> Format {
     Format::RepeatCount(len, Box::new(format))
 }
 
+pub fn repeat_between(min: Expr, max: Expr, format: Format) -> Format {
+    Format::RepeatBetween(min, max, Box::new(format))
+}
+
 #[allow(dead_code)]
 pub fn repeat_until_last(cond: Expr, format: Format) -> Format {
     Format::RepeatUntilLast(cond, Box::new(format))

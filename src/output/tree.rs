@@ -314,6 +314,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
+            | Format::RepeatBetween(_, _, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
                 ParsedValue::Seq(values) => {
@@ -428,6 +429,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Repeat(format)
             | Format::Repeat1(format)
             | Format::RepeatCount(_, format)
+            | Format::RepeatBetween(_, _, format)
             | Format::RepeatUntilLast(_, format)
             | Format::RepeatUntilSeq(_, format) => match value {
                 Value::Seq(values) => {
@@ -1572,6 +1574,14 @@ impl<'module> MonoidalPrinter<'module> {
                 let expr_frag = self.compile_expr(len, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("repeat-count", Some(&[expr_frag]), format, prec),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::RepeatBetween(min, max, format) => {
+                let expr_frag = self.compile_expr(&Expr::Tuple(vec![min.clone(), max.clone()]), Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format("repeat-between", Some(&[expr_frag]), format, prec),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )

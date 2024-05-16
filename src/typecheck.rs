@@ -2282,6 +2282,16 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar)
             }
+            Format::RepeatBetween(min, max, inner) => {
+                let newvar = self.get_new_uvar();
+                let min_var = self.infer_var_expr(min, ctxt.scope)?;
+                let max_var = self.infer_var_expr(max, ctxt.scope)?;
+                let _constraint = self.unify_utype_baseset(Rc::new(UType::Var(min_var)), BaseSet::UAny)?;
+                self.unify_var_pair(min_var, max_var)?;
+                let inner_t = self.infer_utype_format(inner, ctxt)?;
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
+                Ok(newvar)
+            }
             Format::RepeatUntilLast(f, inner) => {
                 let newvar = self.get_new_uvar();
                 let (in_var, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
