@@ -1341,9 +1341,14 @@ struct Type171 {
 
 #[derive(Debug, Clone)]
 struct Type172 {
-    pixels_per_unit_x: u32,
-    pixels_per_unit_y: u32,
-    unit_specifier: u8,
+    whitepoint_x: u32,
+    whitepoint_y: u32,
+    red_x: u32,
+    red_y: u32,
+    green_x: u32,
+    green_y: u32,
+    blue_x: u32,
+    blue_y: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -1356,12 +1361,7 @@ struct Type173 {
 
 #[derive(Debug, Clone)]
 struct Type174 {
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
+    gamma: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -1373,10 +1373,10 @@ struct Type175 {
 }
 
 #[derive(Debug, Clone)]
-enum Type176 {
-    color_type_0(Type167),
-    color_type_2(Type168),
-    color_type_3(Vec<Type169>),
+struct Type176 {
+    pixels_per_unit_x: u32,
+    pixels_per_unit_y: u32,
+    unit_specifier: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -1388,16 +1388,66 @@ struct Type177 {
 }
 
 #[derive(Debug, Clone)]
-enum Type178 {
-    PLTE(Type166),
-    bKGD(Type171),
-    pHYs(Type173),
-    tIME(Type175),
-    tRNS(Type177),
+struct Type178 {
+    keyword: Type21,
+    text: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 struct Type179 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type178,
+    crc: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Type180 {
+    year: u16,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+}
+
+#[derive(Debug, Clone)]
+struct Type181 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type180,
+    crc: u32,
+}
+
+#[derive(Debug, Clone)]
+enum Type182 {
+    color_type_0(Type167),
+    color_type_2(Type168),
+    color_type_3(Vec<Type169>),
+}
+
+#[derive(Debug, Clone)]
+struct Type183 {
+    length: u32,
+    tag: (u8, u8, u8, u8),
+    data: Type182,
+    crc: u32,
+}
+
+#[derive(Debug, Clone)]
+enum Type184 {
+    PLTE(Type166),
+    bKGD(Type171),
+    cHRM(Type173),
+    gAMA(Type175),
+    pHYs(Type177),
+    tEXt(Type179),
+    tIME(Type181),
+    tRNS(Type183),
+}
+
+#[derive(Debug, Clone)]
+struct Type185 {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: Vec<u8>,
@@ -1405,7 +1455,7 @@ struct Type179 {
 }
 
 #[derive(Debug, Clone)]
-struct Type180 {
+struct Type186 {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: (),
@@ -1413,117 +1463,117 @@ struct Type180 {
 }
 
 #[derive(Debug, Clone)]
-struct Type181 {
+struct Type187 {
     signature: (u8, u8, u8, u8, u8, u8, u8, u8),
     ihdr: Type165,
-    chunks: Vec<Type178>,
-    idat: Vec<Type179>,
-    more_chunks: Vec<Type178>,
-    iend: Type180,
+    chunks: Vec<Type184>,
+    idat: Vec<Type185>,
+    more_chunks: Vec<Type184>,
+    iend: Type186,
 }
 
 #[derive(Debug, Clone)]
-enum Type182 {
+enum Type188 {
     no(u8),
     yes,
 }
 
 #[derive(Debug, Clone)]
-struct Type183 {
+struct Type189 {
     tag: (u8, u8, u8, u8),
     length: u32,
     data: Vec<u8>,
-    pad: Type182,
+    pad: Type188,
 }
 
 #[derive(Debug, Clone)]
-struct Type184 {
+struct Type190 {
     tag: (u8, u8, u8, u8),
-    chunks: Vec<Type183>,
+    chunks: Vec<Type189>,
 }
 
 #[derive(Debug, Clone)]
-struct Type185 {
+struct Type191 {
     tag: (u8, u8, u8, u8),
     length: u32,
-    data: Type184,
-    pad: Type182,
+    data: Type190,
+    pad: Type188,
 }
 
 #[derive(Debug, Clone)]
-struct Type186 {
+struct Type192 {
     string: Vec<u8>,
     __padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type187 {
+struct Type193 {
     string: Vec<u8>,
     __nul_or_wsp: u8,
     __padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type188 {
+struct Type194 {
     string: Vec<u8>,
     padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type189 {
-    name: Type186,
-    mode: Type187,
-    uid: Type187,
-    gid: Type187,
+struct Type195 {
+    name: Type192,
+    mode: Type193,
+    uid: Type193,
+    gid: Type193,
     size: u32,
-    mtime: Type187,
-    chksum: Type187,
+    mtime: Type193,
+    chksum: Type193,
     typeflag: u8,
-    linkname: Type186,
+    linkname: Type192,
     magic: (u8, u8, u8, u8, u8, u8),
     version: (u8, u8),
-    uname: Type188,
-    gname: Type188,
-    devmajor: Type187,
-    devminor: Type187,
-    prefix: Type186,
+    uname: Type194,
+    gname: Type194,
+    devmajor: Type193,
+    devminor: Type193,
+    prefix: Type192,
     pad: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct Type190 {
-    header: Type189,
+struct Type196 {
+    header: Type195,
     file: Vec<u8>,
     __padding: (),
 }
 
 #[derive(Debug, Clone)]
-struct Type191 {
-    contents: Vec<Type190>,
+struct Type197 {
+    contents: Vec<Type196>,
     __padding: Vec<u8>,
     __trailing: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-enum Type192 {
+enum Type198 {
     gif(Type19),
     gzip(Vec<Type40>),
     jpeg(Type80),
     mpeg4(Type163),
-    png(Type181),
-    riff(Type185),
-    tar(Type191),
+    png(Type187),
+    riff(Type191),
+    tar(Type197),
     text(Vec<char>),
 }
 
 #[derive(Debug, Clone)]
-enum Type193 {
+enum Type199 {
     none,
     some(u8),
 }
 
 #[derive(Debug, Clone)]
-struct Type194 {
+struct Type200 {
     oA: u8,
     o9: u8,
     o8: u8,
@@ -1540,23 +1590,23 @@ struct Type194 {
 }
 
 #[derive(Debug, Clone)]
-struct Type195 {
-    data: Type192,
+struct Type201 {
+    data: Type198,
     end: (),
 }
 
-fn Decoder0<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> {
+fn Decoder0<'input>(_input: &mut Parser<'input>) -> Result<Type201, ParseError> {
     PResult::Ok((Decoder1(_input))?)
 }
 
-fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> {
+fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type201, ParseError> {
     let data = ((|| {
         _input.start_alt();
         {
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder2(_input))?;
-                    Type192::gif(inner)
+                    Type198::gif(inner)
                 })
             };
             match f_tmp() {
@@ -1573,7 +1623,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder3(_input))?;
-                    Type192::gzip(inner)
+                    Type198::gzip(inner)
                 })
             };
             match f_tmp() {
@@ -1590,7 +1640,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder4(_input))?;
-                    Type192::jpeg(inner)
+                    Type198::jpeg(inner)
                 })
             };
             match f_tmp() {
@@ -1607,7 +1657,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder5(_input))?;
-                    Type192::mpeg4(inner)
+                    Type198::mpeg4(inner)
                 })
             };
             match f_tmp() {
@@ -1624,7 +1674,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder6(_input))?;
-                    Type192::png(inner)
+                    Type198::png(inner)
                 })
             };
             match f_tmp() {
@@ -1641,7 +1691,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder7(_input))?;
-                    Type192::riff(inner)
+                    Type198::riff(inner)
                 })
             };
             match f_tmp() {
@@ -1658,7 +1708,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder8(_input))?;
-                    Type192::tar(inner)
+                    Type198::tar(inner)
                 })
             };
             match f_tmp() {
@@ -1675,7 +1725,7 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
             let mut f_tmp = || {
                 PResult::Ok({
                     let inner = (Decoder9(_input))?;
-                    Type192::text(inner)
+                    Type198::text(inner)
                 })
             };
             match f_tmp() {
@@ -1690,12 +1740,12 @@ fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> 
         };
     })())?;
     let end = ((|| PResult::Ok(_input.finish()?))())?;
-    PResult::Ok(Type195 { data, end })
+    PResult::Ok(Type201 { data, end })
 }
 
 fn Decoder2<'input>(_input: &mut Parser<'input>) -> Result<Type19, ParseError> {
-    let header = ((|| PResult::Ok((Decoder150(_input))?))())?;
-    let logical_screen = ((|| PResult::Ok((Decoder151(_input))?))())?;
+    let header = ((|| PResult::Ok((Decoder154(_input))?))())?;
+    let logical_screen = ((|| PResult::Ok((Decoder155(_input))?))())?;
     let blocks = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -1712,7 +1762,7 @@ fn Decoder2<'input>(_input: &mut Parser<'input>) -> Result<Type19, ParseError> {
                             59u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(18325384555431379809u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -1720,7 +1770,7 @@ fn Decoder2<'input>(_input: &mut Parser<'input>) -> Result<Type19, ParseError> {
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder152(_input))?;
+                    let next_elem = (Decoder156(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -1729,7 +1779,7 @@ fn Decoder2<'input>(_input: &mut Parser<'input>) -> Result<Type19, ParseError> {
             accum
         })
     })())?;
-    let trailer = ((|| PResult::Ok((Decoder153(_input))?))())?;
+    let trailer = ((|| PResult::Ok((Decoder157(_input))?))())?;
     PResult::Ok(Type19 {
         header,
         logical_screen,
@@ -1758,11 +1808,11 @@ fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<Vec<Type40>, ParseErr
             }
         } else {
             let next_elem = {
-                let header = ((|| PResult::Ok((Decoder138(_input))?))())?;
+                let header = ((|| PResult::Ok((Decoder142(_input))?))())?;
                 let fname = ((|| {
                     PResult::Ok(match header.clone().file_flags & 8u8 != 0u8 {
                         true => {
-                            let inner = (Decoder139(_input))?;
+                            let inner = (Decoder143(_input))?;
                             Type22::yes(inner)
                         }
 
@@ -1775,12 +1825,12 @@ fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<Vec<Type40>, ParseErr
                 let data = ((|| {
                     PResult::Ok({
                         _input.enter_bits_mode()?;
-                        let ret = ((|| PResult::Ok((Decoder140(_input))?))())?;
+                        let ret = ((|| PResult::Ok((Decoder144(_input))?))())?;
                         let _bits_read = _input.escape_bits_mode()?;
                         ret
                     })
                 })())?;
-                let footer = ((|| PResult::Ok((Decoder141(_input))?))())?;
+                let footer = ((|| PResult::Ok((Decoder145(_input))?))())?;
                 Type40 {
                     header,
                     fname,
@@ -1795,9 +1845,9 @@ fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<Vec<Type40>, ParseErr
 }
 
 fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<Type80, ParseError> {
-    let soi = ((|| PResult::Ok((Decoder65(_input))?))())?;
-    let frame = ((|| PResult::Ok((Decoder66(_input))?))())?;
-    let eoi = ((|| PResult::Ok((Decoder67(_input))?))())?;
+    let soi = ((|| PResult::Ok((Decoder69(_input))?))())?;
+    let frame = ((|| PResult::Ok((Decoder70(_input))?))())?;
+    let eoi = ((|| PResult::Ok((Decoder71(_input))?))())?;
     PResult::Ok(Type80 { soi, frame, eoi })
 }
 
@@ -1816,7 +1866,7 @@ fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<Type163, ParseError> 
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder44(_input))?;
+                    let next_elem = (Decoder48(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -1828,7 +1878,7 @@ fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<Type163, ParseError> 
     PResult::Ok(Type163 { atoms })
 }
 
-fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> {
+fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type187, ParseError> {
     let signature = ((|| PResult::Ok((Decoder26(_input))?))())?;
     let ihdr = ((|| PResult::Ok((Decoder27(_input))?))())?;
     let chunks = ((|| {
@@ -1846,6 +1896,10 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
                         let ret = match b {
                             98u8 => 0,
 
+                            99u8 => 0,
+
+                            103u8 => 0,
+
                             112u8 => 0,
 
                             80u8 => 0,
@@ -1855,7 +1909,7 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
                             73u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(5125128728024664750u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -1893,12 +1947,18 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
                                     68u8 => 1,
 
                                     _ => {
-                                        return Err(ParseError::ExcludedBranch);
+                                        return Err(ParseError::ExcludedBranch(
+                                            8806068124070768035u64,
+                                        ));
                                     }
                                 }
                             }
 
                             98u8 => 0,
+
+                            99u8 => 0,
+
+                            103u8 => 0,
 
                             112u8 => 0,
 
@@ -1907,7 +1967,7 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
                             116u8 => 0,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(2367749018041928916u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -1943,6 +2003,10 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
                         let ret = match b {
                             98u8 => 0,
 
+                            99u8 => 0,
+
+                            103u8 => 0,
+
                             112u8 => 0,
 
                             80u8 => 0,
@@ -1952,7 +2016,7 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
                             73u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(5125128728024664750u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -1970,7 +2034,7 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
         })
     })())?;
     let iend = ((|| PResult::Ok((Decoder30(_input))?))())?;
-    PResult::Ok(Type181 {
+    PResult::Ok(Type187 {
         signature,
         ihdr,
         chunks,
@@ -1980,7 +2044,7 @@ fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> 
     })
 }
 
-fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> {
+fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type191, ParseError> {
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -1989,7 +2053,7 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
                     if b == 82 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(4610689655322527862u64));
                     }
                 })
             })())?;
@@ -1999,7 +2063,7 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
                     if b == 73 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(17197161005512507961u64));
                     }
                 })
             })())?;
@@ -2009,7 +2073,7 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
                     if b == 70 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(14049552398800766371u64));
                     }
                 })
             })())?;
@@ -2019,7 +2083,7 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
                     if b == 70 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(14049552398800766371u64));
                     }
                 })
             })())?;
@@ -2040,7 +2104,7 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
         PResult::Ok(match length % 2u32 == 0u32 {
             true => {
                 let _ = ();
-                Type182::yes
+                Type188::yes
             }
 
             false => {
@@ -2049,14 +2113,14 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
                     if b == 0 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                     }
                 };
-                Type182::no(inner)
+                Type188::no(inner)
             }
         })
     })())?;
-    PResult::Ok(Type185 {
+    PResult::Ok(Type191 {
         tag,
         length,
         data,
@@ -2064,7 +2128,7 @@ fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> 
     })
 }
 
-fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<Type191, ParseError> {
+fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<Type197, ParseError> {
     let contents = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -2079,7 +2143,7 @@ fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<Type191, ParseError> 
                             tmp if (tmp != 0) => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(5876973260510944493u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -2109,7 +2173,7 @@ fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<Type191, ParseError> 
                     if b == 0 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                     }
                 });
             }
@@ -2135,7 +2199,7 @@ fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<Type191, ParseError> 
                         if b == 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                         }
                     };
                     accum.push(next_elem);
@@ -2146,7 +2210,7 @@ fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<Type191, ParseError> 
             accum
         })
     })())?;
-    PResult::Ok(Type191 {
+    PResult::Ok(Type197 {
         contents,
         __padding,
         __trailing,
@@ -2193,7 +2257,7 @@ fn Decoder10<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseErro
                     244u8 => 0,
 
                     _ => {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(8259468294382519899u64));
                     }
                 };
                 _input.close_peek_context()?;
@@ -2245,7 +2309,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                     244u8 => 3,
 
                     _ => {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6535045935131258590u64));
                     }
                 };
                 _input.close_peek_context()?;
@@ -2261,7 +2325,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                     {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(11920168927252633217u64));
                     }
                 };
                 ((|byte: u8| PResult::Ok(byte as u32))(inner))?
@@ -2276,7 +2340,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                 if (ByteSet::from_bits([0, 0, 0, 4294967292])).contains(b) {
                                     b
                                 } else {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(
+                                        17624589492623733874u64,
+                                    ));
                                 }
                             };
                             ((|raw: u8| PResult::Ok(raw & 31u8))(inner))?
@@ -2316,7 +2382,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                 }
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(7728581146653271998u64));
                                 }
                             };
                             _input.close_peek_context()?;
@@ -2332,7 +2398,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         if b == 224 {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                5346911683359312959u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 15u8))(inner))?
@@ -2347,7 +2415,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                10020684034467804360u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 63u8))(inner))?
@@ -2367,7 +2437,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                15018012796466655710u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 15u8))(inner))?
@@ -2386,7 +2458,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         if b == 237 {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                4000866269867594892u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 15u8))(inner))?
@@ -2399,7 +2473,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         if (ByteSet::from_bits([0, 0, 4294967295, 0])).contains(b) {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                11663367663089555181u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 63u8))(inner))?
@@ -2419,7 +2495,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                6041500870840229679u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 15u8))(inner))?
@@ -2431,7 +2509,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                         }
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(16680599075360251934u64));
                         }
                     }
                 };
@@ -2460,7 +2538,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                 244u8 => 2,
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(7207241947967887206u64));
                                 }
                             };
                             _input.close_peek_context()?;
@@ -2476,7 +2554,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         if b == 240 {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                4436478097112104593u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 7u8))(inner))?
@@ -2491,7 +2571,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                2326106400913054182u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 63u8))(inner))?
@@ -2512,7 +2594,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                2405483008932899239u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 7u8))(inner))?
@@ -2532,7 +2616,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         if b == 244 {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                7074153516412524481u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 7u8))(inner))?
@@ -2545,7 +2631,9 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                                         if (ByteSet::from_bits([0, 0, 65535, 0])).contains(b) {
                                             b
                                         } else {
-                                            return Err(ParseError::ExcludedBranch);
+                                            return Err(ParseError::ExcludedBranch(
+                                                7043438521252360401u64,
+                                            ));
                                         }
                                     };
                                     ((|raw: u8| PResult::Ok(raw & 63u8))(inner))?
@@ -2557,7 +2645,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
                         }
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10897670729404727847u64));
                         }
                     }
                 };
@@ -2574,7 +2662,7 @@ fn Decoder11<'input>(_input: &mut Parser<'input>) -> Result<char, ParseError> {
             }
 
             _ => {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(7414759281301542086u64));
             }
         }
     };
@@ -2587,13 +2675,13 @@ fn Decoder12<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
         if (ByteSet::from_bits([0, 0, 18446744073709551615, 0])).contains(b) {
             b
         } else {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(15157310944304873712u64));
         }
     };
     PResult::Ok(((|raw: u8| PResult::Ok(raw & 63u8))(inner))?)
 }
 
-fn Decoder13<'input>(_input: &mut Parser<'input>) -> Result<Type190, ParseError> {
+fn Decoder13<'input>(_input: &mut Parser<'input>) -> Result<Type196, ParseError> {
     let header = ((|| PResult::Ok((Decoder14(_input))?))())?;
     let file = ((|| {
         PResult::Ok({
@@ -2605,29 +2693,29 @@ fn Decoder13<'input>(_input: &mut Parser<'input>) -> Result<Type190, ParseError>
         })
     })())?;
     let __padding = ((|| PResult::Ok(_input.skip_align(512)?))())?;
-    PResult::Ok(Type190 {
+    PResult::Ok(Type196 {
         header,
         file,
         __padding,
     })
 }
 
-fn Decoder14<'input>(_input: &mut Parser<'input>) -> Result<Type189, ParseError> {
+fn Decoder14<'input>(_input: &mut Parser<'input>) -> Result<Type195, ParseError> {
     let sz = 512u32 as usize;
     _input.start_slice(sz)?;
-    let ret =
-        ((|| {
-            PResult::Ok({
-                let name = ((|| {
-                    PResult::Ok({
-                        let sz = 100u16 as usize;
-                        _input.start_slice(sz)?;
-                        let ret = ((|| PResult::Ok((Decoder16(_input))?))())?;
-                        _input.end_slice()?;
-                        ret
-                    })
-                })())?;
-                let mode = ((|| {
+    let ret = ((|| {
+        PResult::Ok({
+            let name = ((|| {
+                PResult::Ok({
+                    let sz = 100u16 as usize;
+                    _input.start_slice(sz)?;
+                    let ret = ((|| PResult::Ok((Decoder16(_input))?))())?;
+                    _input.end_slice()?;
+                    ret
+                })
+            })())?;
+            let mode =
+                ((|| {
                     PResult::Ok({
                         let sz = 8u16 as usize;
                         _input.start_slice(sz)?;
@@ -2654,7 +2742,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -2691,7 +2779,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -2702,7 +2794,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -2713,7 +2805,8 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let uid = ((|| {
+            let uid =
+                ((|| {
                     PResult::Ok({
                         let sz = 8u16 as usize;
                         _input.start_slice(sz)?;
@@ -2740,7 +2833,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -2777,7 +2870,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -2788,7 +2885,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -2799,7 +2896,8 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let gid = ((|| {
+            let gid =
+                ((|| {
                     PResult::Ok({
                         let sz = 8u16 as usize;
                         _input.start_slice(sz)?;
@@ -2826,7 +2924,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -2863,7 +2961,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -2874,7 +2976,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -2885,111 +2987,112 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let size = ((|| {
-                    PResult::Ok({
-                        let inner = {
-                            let oA = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o9 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o8 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o7 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o6 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o5 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o4 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o3 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o2 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o1 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let o0 = ((|| {
-                                PResult::Ok({
-                                    let inner = (Decoder17(_input))?;
-                                    ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
-                                })
-                            })())?;
-                            let __nil = ((|| PResult::Ok((Decoder18(_input))?))())?;
-                            let value = ((|| {
-                                PResult::Ok(
-                                    (((0u8 as u32) << 3u32 | (oA as u32)) << 6u32
-                                        | (o9 as u32) << 3u32
-                                        | (o8 as u32))
-                                        << 24u32
-                                        | (((o7 as u32) << 3u32 | (o6 as u32)) << 6u32
-                                            | (o5 as u32) << 3u32
-                                            | (o4 as u32))
-                                            << 12u32
-                                        | ((o3 as u32) << 3u32 | (o2 as u32)) << 6u32
-                                        | (o1 as u32) << 3u32
-                                        | (o0 as u32),
-                                )
-                            })())?;
-                            Type194 {
-                                oA,
-                                o9,
-                                o8,
-                                o7,
-                                o6,
-                                o5,
-                                o4,
-                                o3,
-                                o2,
-                                o1,
-                                o0,
-                                __nil,
-                                value,
-                            }
-                        };
-                        ((|rec: Type194| PResult::Ok(rec.clone().value))(inner))?
-                    })
-                })())?;
-                let mtime = ((|| {
+            let size = ((|| {
+                PResult::Ok({
+                    let inner = {
+                        let oA = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o9 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o8 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o7 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o6 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o5 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o4 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o3 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o2 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o1 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let o0 = ((|| {
+                            PResult::Ok({
+                                let inner = (Decoder17(_input))?;
+                                ((|bit: u8| PResult::Ok((bit as u8) - 48u8))(inner))?
+                            })
+                        })())?;
+                        let __nil = ((|| PResult::Ok((Decoder18(_input))?))())?;
+                        let value = ((|| {
+                            PResult::Ok(
+                                (((0u8 as u32) << 3u32 | (oA as u32)) << 6u32
+                                    | (o9 as u32) << 3u32
+                                    | (o8 as u32))
+                                    << 24u32
+                                    | (((o7 as u32) << 3u32 | (o6 as u32)) << 6u32
+                                        | (o5 as u32) << 3u32
+                                        | (o4 as u32))
+                                        << 12u32
+                                    | ((o3 as u32) << 3u32 | (o2 as u32)) << 6u32
+                                    | (o1 as u32) << 3u32
+                                    | (o0 as u32),
+                            )
+                        })())?;
+                        Type200 {
+                            oA,
+                            o9,
+                            o8,
+                            o7,
+                            o6,
+                            o5,
+                            o4,
+                            o3,
+                            o2,
+                            o1,
+                            o0,
+                            __nil,
+                            value,
+                        }
+                    };
+                    ((|rec: Type200| PResult::Ok(rec.clone().value))(inner))?
+                })
+            })())?;
+            let mtime =
+                ((|| {
                     PResult::Ok({
                         let sz = 12u16 as usize;
                         _input.start_slice(sz)?;
@@ -3016,7 +3119,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -3053,7 +3156,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -3064,7 +3171,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -3075,7 +3182,8 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let chksum = ((|| {
+            let chksum =
+                ((|| {
                     PResult::Ok({
                         let sz = 8u16 as usize;
                         _input.start_slice(sz)?;
@@ -3102,7 +3210,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -3139,7 +3247,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -3150,7 +3262,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -3161,125 +3273,126 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let typeflag = ((|| PResult::Ok((Decoder19(_input))?))())?;
-                let linkname = ((|| {
-                    PResult::Ok({
-                        let sz = 100u16 as usize;
-                        _input.start_slice(sz)?;
-                        let ret = ((|| PResult::Ok((Decoder20(_input))?))())?;
-                        _input.end_slice()?;
-                        ret
-                    })
-                })())?;
-                let magic = ((|| {
-                    PResult::Ok({
-                        let field0 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 117 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        let field1 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 115 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        let field2 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 116 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        let field3 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 97 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        let field4 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 114 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        let field5 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 0 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        (field0, field1, field2, field3, field4, field5)
-                    })
-                })())?;
-                let version = ((|| {
-                    PResult::Ok({
-                        let field0 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 48 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        let field1 = ((|| {
-                            PResult::Ok({
-                                let b = _input.read_byte()?;
-                                if b == 48 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            })
-                        })())?;
-                        (field0, field1)
-                    })
-                })())?;
-                let uname = ((|| {
-                    PResult::Ok({
-                        let sz = 32u16 as usize;
-                        _input.start_slice(sz)?;
-                        let ret = ((|| PResult::Ok((Decoder21(_input))?))())?;
-                        _input.end_slice()?;
-                        ret
-                    })
-                })())?;
-                let gname = ((|| {
-                    PResult::Ok({
-                        let sz = 32u16 as usize;
-                        _input.start_slice(sz)?;
-                        let ret = ((|| PResult::Ok((Decoder21(_input))?))())?;
-                        _input.end_slice()?;
-                        ret
-                    })
-                })())?;
-                let devmajor = ((|| {
+            let typeflag = ((|| PResult::Ok((Decoder19(_input))?))())?;
+            let linkname = ((|| {
+                PResult::Ok({
+                    let sz = 100u16 as usize;
+                    _input.start_slice(sz)?;
+                    let ret = ((|| PResult::Ok((Decoder20(_input))?))())?;
+                    _input.end_slice()?;
+                    ret
+                })
+            })())?;
+            let magic = ((|| {
+                PResult::Ok({
+                    let field0 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 117 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(2907868308058195485u64));
+                            }
+                        })
+                    })())?;
+                    let field1 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 115 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(17994192348199484624u64));
+                            }
+                        })
+                    })())?;
+                    let field2 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 116 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(1704008783145591213u64));
+                            }
+                        })
+                    })())?;
+                    let field3 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 97 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(5987471249031546739u64));
+                            }
+                        })
+                    })())?;
+                    let field4 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 114 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(3985419300396206930u64));
+                            }
+                        })
+                    })())?;
+                    let field5 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 0 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+                            }
+                        })
+                    })())?;
+                    (field0, field1, field2, field3, field4, field5)
+                })
+            })())?;
+            let version = ((|| {
+                PResult::Ok({
+                    let field0 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 48 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(10502325800520584810u64));
+                            }
+                        })
+                    })())?;
+                    let field1 = ((|| {
+                        PResult::Ok({
+                            let b = _input.read_byte()?;
+                            if b == 48 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(10502325800520584810u64));
+                            }
+                        })
+                    })())?;
+                    (field0, field1)
+                })
+            })())?;
+            let uname = ((|| {
+                PResult::Ok({
+                    let sz = 32u16 as usize;
+                    _input.start_slice(sz)?;
+                    let ret = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    _input.end_slice()?;
+                    ret
+                })
+            })())?;
+            let gname = ((|| {
+                PResult::Ok({
+                    let sz = 32u16 as usize;
+                    _input.start_slice(sz)?;
+                    let ret = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    _input.end_slice()?;
+                    ret
+                })
+            })())?;
+            let devmajor =
+                ((|| {
                     PResult::Ok({
                         let sz = 8u16 as usize;
                         _input.start_slice(sz)?;
@@ -3306,7 +3419,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -3343,7 +3456,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -3354,7 +3471,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -3365,7 +3482,8 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let devminor = ((|| {
+            let devminor =
+                ((|| {
                     PResult::Ok({
                         let sz = 8u16 as usize;
                         _input.start_slice(sz)?;
@@ -3392,7 +3510,7 @@ tmp if ((ByteSet::from_bits([4294967297, 0, 0, 0])).contains(tmp)) => {
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch);
+return Err(ParseError::ExcludedBranch(2596090920165813952u64));
 }
 };
                                                                 _input.close_peek_context()?;
@@ -3429,7 +3547,11 @@ return Err(ParseError::ExcludedBranch);
                                                         if b == 0 {
                                                             b
                                                         } else {
-                                                            return Err(ParseError::ExcludedBranch);
+                                                            return Err(
+                                                                ParseError::ExcludedBranch(
+                                                                    10396965092922267801u64,
+                                                                ),
+                                                            );
                                                         }
                                                     };
                                                     accum.push(next_elem);
@@ -3440,7 +3562,7 @@ return Err(ParseError::ExcludedBranch);
                                             accum
                                         })
                                     })())?;
-                                    Type187 {
+                                    Type193 {
                                         string,
                                         __nul_or_wsp,
                                         __padding,
@@ -3451,52 +3573,52 @@ return Err(ParseError::ExcludedBranch);
                         ret
                     })
                 })())?;
-                let prefix = ((|| {
-                    PResult::Ok({
-                        let sz = 155u16 as usize;
-                        _input.start_slice(sz)?;
-                        let ret = ((|| PResult::Ok((Decoder20(_input))?))())?;
-                        _input.end_slice()?;
-                        ret
-                    })
-                })())?;
-                let pad = ((|| {
-                    PResult::Ok({
-                        let mut accum = Vec::new();
-                        for _ in 0..12u32 {
-                            accum.push({
-                                let b = _input.read_byte()?;
-                                if b == 0 {
-                                    b
-                                } else {
-                                    return Err(ParseError::ExcludedBranch);
-                                }
-                            });
-                        }
-                        accum
-                    })
-                })())?;
-                Type189 {
-                    name,
-                    mode,
-                    uid,
-                    gid,
-                    size,
-                    mtime,
-                    chksum,
-                    typeflag,
-                    linkname,
-                    magic,
-                    version,
-                    uname,
-                    gname,
-                    devmajor,
-                    devminor,
-                    prefix,
-                    pad,
-                }
-            })
-        })())?;
+            let prefix = ((|| {
+                PResult::Ok({
+                    let sz = 155u16 as usize;
+                    _input.start_slice(sz)?;
+                    let ret = ((|| PResult::Ok((Decoder20(_input))?))())?;
+                    _input.end_slice()?;
+                    ret
+                })
+            })())?;
+            let pad = ((|| {
+                PResult::Ok({
+                    let mut accum = Vec::new();
+                    for _ in 0..12u32 {
+                        accum.push({
+                            let b = _input.read_byte()?;
+                            if b == 0 {
+                                b
+                            } else {
+                                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+                            }
+                        });
+                    }
+                    accum
+                })
+            })())?;
+            Type195 {
+                name,
+                mode,
+                uid,
+                gid,
+                size,
+                mtime,
+                chksum,
+                typeflag,
+                linkname,
+                magic,
+                version,
+                uname,
+                gname,
+                devmajor,
+                devminor,
+                prefix,
+                pad,
+            }
+        })
+    })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
@@ -3506,7 +3628,7 @@ fn Decoder15<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     PResult::Ok(b)
 }
 
-fn Decoder16<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError> {
+fn Decoder16<'input>(_input: &mut Parser<'input>) -> Result<Type192, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -3521,7 +3643,7 @@ fn Decoder16<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
                             tmp if (tmp != 0) => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(9907092251485419402u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -3540,7 +3662,7 @@ fn Decoder16<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -3568,7 +3690,7 @@ fn Decoder16<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
                         if b == 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                         }
                     };
                     accum.push(next_elem);
@@ -3579,7 +3701,7 @@ fn Decoder16<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
             accum
         })
     })())?;
-    PResult::Ok(Type186 { string, __padding })
+    PResult::Ok(Type192 { string, __padding })
 }
 
 fn Decoder17<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
@@ -3588,7 +3710,7 @@ fn Decoder17<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
         if (ByteSet::from_bits([71776119061217280, 0, 0, 0])).contains(b) {
             b
         } else {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(16196330650984947656u64));
         },
     )
 }
@@ -3598,7 +3720,7 @@ fn Decoder18<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     PResult::Ok(if (ByteSet::from_bits([4294967297, 0, 0, 0])).contains(b) {
         b
     } else {
-        return Err(ParseError::ExcludedBranch);
+        return Err(ParseError::ExcludedBranch(9824667705306069359u64));
     })
 }
 
@@ -3607,7 +3729,7 @@ fn Decoder19<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     PResult::Ok(b)
 }
 
-fn Decoder20<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError> {
+fn Decoder20<'input>(_input: &mut Parser<'input>) -> Result<Type192, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -3622,7 +3744,7 @@ fn Decoder20<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(10468509372044097033u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -3635,7 +3757,7 @@ fn Decoder20<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -3665,7 +3787,7 @@ fn Decoder20<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
                         if b == 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                         }
                     };
                     accum.push(next_elem);
@@ -3676,10 +3798,10 @@ fn Decoder20<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError>
             accum
         })
     })())?;
-    PResult::Ok(Type186 { string, __padding })
+    PResult::Ok(Type192 { string, __padding })
 }
 
-fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<Type188, ParseError> {
+fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<Type194, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -3694,7 +3816,7 @@ fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<Type188, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -3707,7 +3829,7 @@ fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<Type188, ParseError>
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -3743,7 +3865,7 @@ fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<Type188, ParseError>
                         if b == 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                         }
                     };
                     accum.push(next_elem);
@@ -3752,7 +3874,7 @@ fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<Type188, ParseError>
             accum
         })
     })())?;
-    PResult::Ok(Type188 { string, padding })
+    PResult::Ok(Type194 { string, padding })
 }
 
 fn Decoder22<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
@@ -3766,7 +3888,7 @@ fn Decoder22<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
     PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok(u32le(x)))(inner))?)
 }
 
-fn Decoder23<'input>(_input: &mut Parser<'input>) -> Result<Type184, ParseError> {
+fn Decoder23<'input>(_input: &mut Parser<'input>) -> Result<Type190, ParseError> {
     let tag = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let chunks = ((|| {
         PResult::Ok({
@@ -3791,7 +3913,7 @@ fn Decoder23<'input>(_input: &mut Parser<'input>) -> Result<Type184, ParseError>
             accum
         })
     })())?;
-    PResult::Ok(Type184 { tag, chunks })
+    PResult::Ok(Type190 { tag, chunks })
 }
 
 fn Decoder24<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -3802,7 +3924,7 @@ fn Decoder24<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
     PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder25<'input>(_input: &mut Parser<'input>) -> Result<Type183, ParseError> {
+fn Decoder25<'input>(_input: &mut Parser<'input>) -> Result<Type189, ParseError> {
     let tag = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let length = ((|| PResult::Ok((Decoder22(_input))?))())?;
     let data = ((|| {
@@ -3840,7 +3962,7 @@ fn Decoder25<'input>(_input: &mut Parser<'input>) -> Result<Type183, ParseError>
         PResult::Ok(match length % 2u32 == 0u32 {
             true => {
                 let _ = ();
-                Type182::yes
+                Type188::yes
             }
 
             false => {
@@ -3849,14 +3971,14 @@ fn Decoder25<'input>(_input: &mut Parser<'input>) -> Result<Type183, ParseError>
                     if b == 0 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                     }
                 };
-                Type182::no(inner)
+                Type188::no(inner)
             }
         })
     })())?;
-    PResult::Ok(Type183 {
+    PResult::Ok(Type189 {
         tag,
         length,
         data,
@@ -3873,7 +3995,7 @@ fn Decoder26<'input>(
             if b == 137 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10008271234946209065u64));
             }
         })
     })())?;
@@ -3883,7 +4005,7 @@ fn Decoder26<'input>(
             if b == 80 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(11521109187063420822u64));
             }
         })
     })())?;
@@ -3893,7 +4015,7 @@ fn Decoder26<'input>(
             if b == 78 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(8604468179520937907u64));
             }
         })
     })())?;
@@ -3903,7 +4025,7 @@ fn Decoder26<'input>(
             if b == 71 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(690880023569680479u64));
             }
         })
     })())?;
@@ -3913,7 +4035,7 @@ fn Decoder26<'input>(
             if b == 13 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10755821400739488603u64));
             }
         })
     })())?;
@@ -3923,7 +4045,7 @@ fn Decoder26<'input>(
             if b == 10 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(4202505692043699682u64));
             }
         })
     })())?;
@@ -3933,7 +4055,7 @@ fn Decoder26<'input>(
             if b == 26 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(349275303258878611u64));
             }
         })
     })())?;
@@ -3943,7 +4065,7 @@ fn Decoder26<'input>(
             if b == 10 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(4202505692043699682u64));
             }
         })
     })())?;
@@ -3954,12 +4076,12 @@ fn Decoder26<'input>(
 
 fn Decoder27<'input>(_input: &mut Parser<'input>) -> Result<Type165, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let tag = ((|| PResult::Ok((Decoder42(_input))?))())?;
+    let tag = ((|| PResult::Ok((Decoder46(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = length as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder43(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder47(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -3973,10 +4095,7 @@ fn Decoder27<'input>(_input: &mut Parser<'input>) -> Result<Type165, ParseError>
     })
 }
 
-fn Decoder28<'input>(
-    _input: &mut Parser<'input>,
-    ihdr: Type165,
-) -> Result<Type178, ParseError> {
+fn Decoder28<'input>(_input: &mut Parser<'input>, ihdr: Type165) -> Result<Type184, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         _input.read_byte()?;
@@ -3988,25 +4107,31 @@ fn Decoder28<'input>(
             let ret = match b {
                 98u8 => 0,
 
-                112u8 => 1,
+                99u8 => 1,
 
-                80u8 => 2,
+                103u8 => 2,
+
+                112u8 => 3,
+
+                80u8 => 4,
 
                 116u8 => {
                     let b = _input.read_byte()?;
                     match b {
-                        73u8 => 3,
+                        69u8 => 5,
 
-                        82u8 => 4,
+                        73u8 => 6,
+
+                        82u8 => 7,
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10357236553041691094u64));
                         }
                     }
                 }
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(1665541366391616829u64));
                 }
             };
             _input.close_peek_context()?;
@@ -4016,36 +4141,51 @@ fn Decoder28<'input>(
     PResult::Ok(match tree_index {
         0 => {
             let inner = (Decoder36(_input, ihdr.clone()))?;
-            Type178::bKGD(inner)
+            Type184::bKGD(inner)
         }
 
         1 => {
             let inner = (Decoder37(_input))?;
-            Type178::pHYs(inner)
+            Type184::cHRM(inner)
         }
 
         2 => {
             let inner = (Decoder38(_input))?;
-            Type178::PLTE(inner)
+            Type184::gAMA(inner)
         }
 
         3 => {
             let inner = (Decoder39(_input))?;
-            Type178::tIME(inner)
+            Type184::pHYs(inner)
         }
 
         4 => {
-            let inner = (Decoder40(_input, ihdr.clone()))?;
-            Type178::tRNS(inner)
+            let inner = (Decoder40(_input))?;
+            Type184::PLTE(inner)
+        }
+
+        5 => {
+            let inner = (Decoder41(_input))?;
+            Type184::tEXt(inner)
+        }
+
+        6 => {
+            let inner = (Decoder42(_input))?;
+            Type184::tIME(inner)
+        }
+
+        7 => {
+            let inner = (Decoder43(_input, ihdr.clone()))?;
+            Type184::tRNS(inner)
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(2929130490246398173u64));
         }
     })
 }
 
-fn Decoder29<'input>(_input: &mut Parser<'input>) -> Result<Type179, ParseError> {
+fn Decoder29<'input>(_input: &mut Parser<'input>) -> Result<Type185, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let tag = ((|| PResult::Ok((Decoder34(_input))?))())?;
     let data = ((|| {
@@ -4058,7 +4198,7 @@ fn Decoder29<'input>(_input: &mut Parser<'input>) -> Result<Type179, ParseError>
         })
     })())?;
     let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    PResult::Ok(Type179 {
+    PResult::Ok(Type185 {
         length,
         tag,
         data,
@@ -4066,7 +4206,7 @@ fn Decoder29<'input>(_input: &mut Parser<'input>) -> Result<Type179, ParseError>
     })
 }
 
-fn Decoder30<'input>(_input: &mut Parser<'input>) -> Result<Type180, ParseError> {
+fn Decoder30<'input>(_input: &mut Parser<'input>) -> Result<Type186, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let tag = ((|| PResult::Ok((Decoder32(_input))?))())?;
     let data = ((|| {
@@ -4079,7 +4219,7 @@ fn Decoder30<'input>(_input: &mut Parser<'input>) -> Result<Type180, ParseError>
         })
     })())?;
     let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    PResult::Ok(Type180 {
+    PResult::Ok(Type186 {
         length,
         tag,
         data,
@@ -4105,7 +4245,7 @@ fn Decoder32<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 73 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(17197161005512507961u64));
             }
         })
     })())?;
@@ -4115,7 +4255,7 @@ fn Decoder32<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 69 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(4321719390811047443u64));
             }
         })
     })())?;
@@ -4125,7 +4265,7 @@ fn Decoder32<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 78 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(8604468179520937907u64));
             }
         })
     })())?;
@@ -4135,7 +4275,7 @@ fn Decoder32<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 68 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(11087183532096489351u64));
             }
         })
     })())?;
@@ -4153,7 +4293,7 @@ fn Decoder34<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 73 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(17197161005512507961u64));
             }
         })
     })())?;
@@ -4163,7 +4303,7 @@ fn Decoder34<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 68 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(11087183532096489351u64));
             }
         })
     })())?;
@@ -4173,7 +4313,7 @@ fn Decoder34<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 65 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(5168475411614401238u64));
             }
         })
     })())?;
@@ -4183,7 +4323,7 @@ fn Decoder34<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 84 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(145148447135656575u64));
             }
         })
     })())?;
@@ -4212,10 +4352,7 @@ fn Decoder35<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError>
     PResult::Ok(accum)
 }
 
-fn Decoder36<'input>(
-    _input: &mut Parser<'input>,
-    ihdr: Type165,
-) -> Result<Type171, ParseError> {
+fn Decoder36<'input>(_input: &mut Parser<'input>, ihdr: Type165) -> Result<Type171, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let tag = ((|| {
         PResult::Ok({
@@ -4225,7 +4362,7 @@ fn Decoder36<'input>(
                     if b == 98 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(17793564444344969327u64));
                     }
                 })
             })())?;
@@ -4235,7 +4372,7 @@ fn Decoder36<'input>(
                     if b == 75 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6039736239144529496u64));
                     }
                 })
             })())?;
@@ -4245,7 +4382,7 @@ fn Decoder36<'input>(
                     if b == 71 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(690880023569680479u64));
                     }
                 })
             })())?;
@@ -4255,7 +4392,7 @@ fn Decoder36<'input>(
                     if b == 68 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(11087183532096489351u64));
                     }
                 })
             })())?;
@@ -4270,7 +4407,7 @@ fn Decoder36<'input>(
                 PResult::Ok(match ihdr.clone().data.color_type {
                     0 => {
                         let inner = {
-                            let greyscale = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let greyscale = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type167 { greyscale }
                         };
                         Type170::color_type_0(inner)
@@ -4278,7 +4415,7 @@ fn Decoder36<'input>(
 
                     4 => {
                         let inner = {
-                            let greyscale = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let greyscale = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type167 { greyscale }
                         };
                         Type170::color_type_4(inner)
@@ -4286,9 +4423,9 @@ fn Decoder36<'input>(
 
                     2 => {
                         let inner = {
-                            let red = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let green = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let blue = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let red = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let green = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let blue = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type168 { red, green, blue }
                         };
                         Type170::color_type_2(inner)
@@ -4296,9 +4433,9 @@ fn Decoder36<'input>(
 
                     6 => {
                         let inner = {
-                            let red = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let green = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let blue = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let red = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let green = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let blue = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type168 { red, green, blue }
                         };
                         Type170::color_type_6(inner)
@@ -4339,10 +4476,10 @@ fn Decoder37<'input>(_input: &mut Parser<'input>) -> Result<Type173, ParseError>
             let field0 = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 112 {
+                    if b == 99 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(11313607538540189010u64));
                     }
                 })
             })())?;
@@ -4352,27 +4489,27 @@ fn Decoder37<'input>(_input: &mut Parser<'input>) -> Result<Type173, ParseError>
                     if b == 72 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(13017675598322041426u64));
                     }
                 })
             })())?;
             let field2 = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 89 {
+                    if b == 82 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(4610689655322527862u64));
                     }
                 })
             })())?;
             let field3 = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 115 {
+                    if b == 77 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(1661485880725065159u64));
                     }
                 })
             })())?;
@@ -4385,13 +4522,23 @@ fn Decoder37<'input>(_input: &mut Parser<'input>) -> Result<Type173, ParseError>
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok({
-                    let pixels_per_unit_x = ((|| PResult::Ok((Decoder31(_input))?))())?;
-                    let pixels_per_unit_y = ((|| PResult::Ok((Decoder31(_input))?))())?;
-                    let unit_specifier = ((|| PResult::Ok((Decoder15(_input))?))())?;
+                    let whitepoint_x = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let whitepoint_y = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let red_x = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let red_y = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let green_x = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let green_y = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let blue_x = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let blue_y = ((|| PResult::Ok((Decoder31(_input))?))())?;
                     Type172 {
-                        pixels_per_unit_x,
-                        pixels_per_unit_y,
-                        unit_specifier,
+                        whitepoint_x,
+                        whitepoint_y,
+                        red_x,
+                        red_y,
+                        green_x,
+                        green_y,
+                        blue_x,
+                        blue_y,
                     }
                 })
             })())?;
@@ -4408,7 +4555,153 @@ fn Decoder37<'input>(_input: &mut Parser<'input>) -> Result<Type173, ParseError>
     })
 }
 
-fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError> {
+fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type175, ParseError> {
+    let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
+    let tag = ((|| {
+        PResult::Ok({
+            let field0 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 103 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(1468953881245131984u64));
+                    }
+                })
+            })())?;
+            let field1 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 65 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(5168475411614401238u64));
+                    }
+                })
+            })())?;
+            let field2 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 77 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(1661485880725065159u64));
+                    }
+                })
+            })())?;
+            let field3 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 65 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(5168475411614401238u64));
+                    }
+                })
+            })())?;
+            (field0, field1, field2, field3)
+        })
+    })())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = length as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let gamma = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    Type174 { gamma }
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
+    PResult::Ok(Type175 {
+        length,
+        tag,
+        data,
+        crc,
+    })
+}
+
+fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<Type177, ParseError> {
+    let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
+    let tag = ((|| {
+        PResult::Ok({
+            let field0 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 112 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(11580992248901122101u64));
+                    }
+                })
+            })())?;
+            let field1 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 72 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(13017675598322041426u64));
+                    }
+                })
+            })())?;
+            let field2 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 89 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(8653514599897871365u64));
+                    }
+                })
+            })())?;
+            let field3 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 115 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(17994192348199484624u64));
+                    }
+                })
+            })())?;
+            (field0, field1, field2, field3)
+        })
+    })())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = length as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let pixels_per_unit_x = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let pixels_per_unit_y = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    let unit_specifier = ((|| PResult::Ok((Decoder15(_input))?))())?;
+                    Type176 {
+                        pixels_per_unit_x,
+                        pixels_per_unit_y,
+                        unit_specifier,
+                    }
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
+    PResult::Ok(Type177 {
+        length,
+        tag,
+        data,
+        crc,
+    })
+}
+
+fn Decoder40<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let tag = ((|| {
         PResult::Ok({
@@ -4418,7 +4711,7 @@ fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError>
                     if b == 80 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(11521109187063420822u64));
                     }
                 })
             })())?;
@@ -4428,7 +4721,7 @@ fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError>
                     if b == 76 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(7343583089148506132u64));
                     }
                 })
             })())?;
@@ -4438,7 +4731,7 @@ fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError>
                     if b == 84 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(145148447135656575u64));
                     }
                 })
             })())?;
@@ -4448,7 +4741,7 @@ fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError>
                     if b == 69 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(4321719390811047443u64));
                     }
                 })
             })())?;
@@ -4504,7 +4797,7 @@ fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<Type166, ParseError>
     })
 }
 
-fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<Type175, ParseError> {
+fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<Type179, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let tag = ((|| {
         PResult::Ok({
@@ -4514,37 +4807,37 @@ fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<Type175, ParseError>
                     if b == 116 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(1704008783145591213u64));
                     }
                 })
             })())?;
             let field1 = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 73 {
+                    if b == 69 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(4321719390811047443u64));
                     }
                 })
             })())?;
             let field2 = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 77 {
+                    if b == 88 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(17869373923605816126u64));
                     }
                 })
             })())?;
             let field3 = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 69 {
+                    if b == 116 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(1704008783145591213u64));
                     }
                 })
             })())?;
@@ -4557,13 +4850,106 @@ fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<Type175, ParseError>
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok({
-                    let year = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                    let keyword = ((|| PResult::Ok((Decoder45(_input))?))())?;
+                    let text = ((|| {
+                        PResult::Ok({
+                            let mut accum = Vec::new();
+                            while _input.remaining() > 0 {
+                                let matching_ix = {
+                                    _input.open_peek_context();
+                                    _input.read_byte()?;
+                                    {
+                                        let ret = 0;
+                                        _input.close_peek_context()?;
+                                        ret
+                                    }
+                                };
+                                if matching_ix == 0 {
+                                    let next_elem = (Decoder19(_input))?;
+                                    accum.push(next_elem);
+                                } else {
+                                    break;
+                                }
+                            }
+                            accum
+                        })
+                    })())?;
+                    Type178 { keyword, text }
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
+    PResult::Ok(Type179 {
+        length,
+        tag,
+        data,
+        crc,
+    })
+}
+
+fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<Type181, ParseError> {
+    let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
+    let tag = ((|| {
+        PResult::Ok({
+            let field0 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 116 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(1704008783145591213u64));
+                    }
+                })
+            })())?;
+            let field1 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 73 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(17197161005512507961u64));
+                    }
+                })
+            })())?;
+            let field2 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 77 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(1661485880725065159u64));
+                    }
+                })
+            })())?;
+            let field3 = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 69 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(4321719390811047443u64));
+                    }
+                })
+            })())?;
+            (field0, field1, field2, field3)
+        })
+    })())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = length as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let year = ((|| PResult::Ok((Decoder44(_input))?))())?;
                     let month = ((|| PResult::Ok((Decoder15(_input))?))())?;
                     let day = ((|| PResult::Ok((Decoder15(_input))?))())?;
                     let hour = ((|| PResult::Ok((Decoder15(_input))?))())?;
                     let minute = ((|| PResult::Ok((Decoder15(_input))?))())?;
                     let second = ((|| PResult::Ok((Decoder15(_input))?))())?;
-                    Type174 {
+                    Type180 {
                         year,
                         month,
                         day,
@@ -4578,7 +4964,7 @@ fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<Type175, ParseError>
         })
     })())?;
     let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    PResult::Ok(Type175 {
+    PResult::Ok(Type181 {
         length,
         tag,
         data,
@@ -4586,10 +4972,7 @@ fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<Type175, ParseError>
     })
 }
 
-fn Decoder40<'input>(
-    _input: &mut Parser<'input>,
-    ihdr: Type165,
-) -> Result<Type177, ParseError> {
+fn Decoder43<'input>(_input: &mut Parser<'input>, ihdr: Type165) -> Result<Type183, ParseError> {
     let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let tag = ((|| {
         PResult::Ok({
@@ -4599,7 +4982,7 @@ fn Decoder40<'input>(
                     if b == 116 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(1704008783145591213u64));
                     }
                 })
             })())?;
@@ -4609,7 +4992,7 @@ fn Decoder40<'input>(
                     if b == 82 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(4610689655322527862u64));
                     }
                 })
             })())?;
@@ -4619,7 +5002,7 @@ fn Decoder40<'input>(
                     if b == 78 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(8604468179520937907u64));
                     }
                 })
             })())?;
@@ -4629,7 +5012,7 @@ fn Decoder40<'input>(
                     if b == 83 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(16554645260058031671u64));
                     }
                 })
             })())?;
@@ -4644,20 +5027,20 @@ fn Decoder40<'input>(
                 PResult::Ok(match ihdr.clone().data.color_type {
                     0 => {
                         let inner = {
-                            let greyscale = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let greyscale = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type167 { greyscale }
                         };
-                        Type176::color_type_0(inner)
+                        Type182::color_type_0(inner)
                     }
 
                     2 => {
                         let inner = {
-                            let red = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let green = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let blue = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let red = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let green = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let blue = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type168 { red, green, blue }
                         };
-                        Type176::color_type_2(inner)
+                        Type182::color_type_2(inner)
                     }
 
                     3 => {
@@ -4686,7 +5069,7 @@ fn Decoder40<'input>(
                             }
                             accum
                         };
-                        Type176::color_type_3(inner)
+                        Type182::color_type_3(inner)
                     }
 
                     _other => {
@@ -4701,7 +5084,7 @@ fn Decoder40<'input>(
         })
     })())?;
     let crc = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    PResult::Ok(Type177 {
+    PResult::Ok(Type183 {
         length,
         tag,
         data,
@@ -4709,7 +5092,7 @@ fn Decoder40<'input>(
     })
 }
 
-fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
+fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
     let inner = {
         let field0 = ((|| PResult::Ok((Decoder15(_input))?))())?;
         let field1 = ((|| PResult::Ok((Decoder15(_input))?))())?;
@@ -4718,14 +5101,66 @@ fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
     PResult::Ok(((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?)
 }
 
-fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder45<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+    let string = ((|| {
+        PResult::Ok({
+            let mut accum = Vec::new();
+            while _input.remaining() > 0 {
+                let matching_ix = {
+                    _input.open_peek_context();
+                    let b = _input.read_byte()?;
+                    {
+                        let ret = match b {
+                            tmp if (tmp != 0) => 0,
+
+                            0u8 => 1,
+
+                            _ => {
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+                            }
+                        };
+                        _input.close_peek_context()?;
+                        ret
+                    }
+                };
+                if matching_ix == 0 {
+                    let next_elem = {
+                        let b = _input.read_byte()?;
+                        if b != 0 {
+                            b
+                        } else {
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+                        }
+                    };
+                    accum.push(next_elem);
+                } else {
+                    break;
+                }
+            }
+            accum
+        })
+    })())?;
+    let null = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type21 { string, null })
+}
+
+fn Decoder46<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
     let field0 = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 73 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(17197161005512507961u64));
             }
         })
     })())?;
@@ -4735,7 +5170,7 @@ fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 72 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(13017675598322041426u64));
             }
         })
     })())?;
@@ -4745,7 +5180,7 @@ fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 68 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(11087183532096489351u64));
             }
         })
     })())?;
@@ -4755,14 +5190,14 @@ fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
             if b == 82 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(4610689655322527862u64));
             }
         })
     })())?;
     PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder43<'input>(_input: &mut Parser<'input>) -> Result<Type164, ParseError> {
+fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type164, ParseError> {
     let width = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let height = ((|| PResult::Ok((Decoder31(_input))?))())?;
     let bit_depth = ((|| PResult::Ok((Decoder15(_input))?))())?;
@@ -4781,15 +5216,15 @@ fn Decoder43<'input>(_input: &mut Parser<'input>) -> Result<Type164, ParseError>
     })
 }
 
-fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError> {
+fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -4804,7 +5239,7 @@ fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError>
                 PResult::Ok(match r#type {
                     (102, 116, 121, 112) => {
                         let inner = {
-                            let major_brand = ((|| PResult::Ok((Decoder45(_input))?))())?;
+                            let major_brand = ((|| PResult::Ok((Decoder49(_input))?))())?;
                             let minor_version = ((|| PResult::Ok((Decoder31(_input))?))())?;
                             let compatible_brands = ((|| {
                                 PResult::Ok({
@@ -4820,7 +5255,7 @@ fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError>
                                             }
                                         };
                                         if matching_ix == 0 {
-                                            let next_elem = (Decoder45(_input))?;
+                                            let next_elem = (Decoder49(_input))?;
                                             accum.push(next_elem);
                                         } else {
                                             break;
@@ -4864,7 +5299,7 @@ fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError>
                                         }
                                     };
                                     if matching_ix == 0 {
-                                        let next_elem = (Decoder47(_input))?;
+                                        let next_elem = (Decoder51(_input))?;
                                         accum.push(next_elem);
                                     } else {
                                         break;
@@ -4890,7 +5325,7 @@ fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder48(_input))?;
+                                    let next_elem = (Decoder52(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -4939,7 +5374,7 @@ fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<Type162, ParseError>
     })
 }
 
-fn Decoder45<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
     let field0 = ((|| PResult::Ok((Decoder19(_input))?))())?;
     let field1 = ((|| PResult::Ok((Decoder19(_input))?))())?;
     let field2 = ((|| PResult::Ok((Decoder19(_input))?))())?;
@@ -4947,7 +5382,7 @@ fn Decoder45<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), Pa
     PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder46<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
+fn Decoder50<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
     let inner = {
         let field0 = ((|| PResult::Ok((Decoder15(_input))?))())?;
         let field1 = ((|| PResult::Ok((Decoder15(_input))?))())?;
@@ -4964,15 +5399,15 @@ fn Decoder46<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
     PResult::Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(u64be(x)))(inner))?)
 }
 
-fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError> {
+fn Decoder51<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -4999,7 +5434,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder55(_input))?;
+                                    let next_elem = (Decoder59(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -5022,7 +5457,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                 })
                             })())?;
                             let predefined = ((|| PResult::Ok((Decoder31(_input))?))())?;
-                            let handler_type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+                            let handler_type = ((|| PResult::Ok((Decoder49(_input))?))())?;
                             let reserved = ((|| {
                                 PResult::Ok({
                                     let field0 = ((|| PResult::Ok((Decoder31(_input))?))())?;
@@ -5031,7 +5466,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                     (field0, field1, field2)
                                 })
                             })())?;
-                            let name = ((|| PResult::Ok((Decoder53(_input))?))())?;
+                            let name = ((|| PResult::Ok((Decoder57(_input))?))())?;
                             Type86 {
                                 version,
                                 flags,
@@ -5058,7 +5493,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                             let item_ID = ((|| {
                                 PResult::Ok(match version == 0u8 {
                                     true => {
-                                        let inner = (Decoder41(_input))?;
+                                        let inner = (Decoder44(_input))?;
                                         Type112::yes(inner)
                                     }
 
@@ -5091,7 +5526,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                             let entry_count = ((|| {
                                 PResult::Ok(match version == 0u8 {
                                     true => {
-                                        let inner = (Decoder41(_input))?;
+                                        let inner = (Decoder44(_input))?;
                                         ((|x: u16| PResult::Ok(x as u32))(inner))?
                                     }
 
@@ -5102,7 +5537,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                 PResult::Ok({
                                     let mut accum = Vec::new();
                                     for _ in 0..entry_count {
-                                        accum.push((Decoder57(_input))?);
+                                        accum.push((Decoder61(_input))?);
                                     }
                                     accum
                                 })
@@ -5150,7 +5585,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                                         })(
                                                         ))?;
                                                         let r#type = ((|| {
-                                                            PResult::Ok((Decoder45(_input))?)
+                                                            PResult::Ok((Decoder49(_input))?)
                                                         })(
                                                         ))?;
                                                         let size = ((|| {
@@ -5159,7 +5594,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
 
                                                                 1 => {
                                                                     let inner =
-                                                                        (Decoder46(_input))?;
+                                                                        (Decoder50(_input))?;
                                                                     ((|x: u64| {
                                                                         PResult::Ok(x - 16u64)
                                                                     })(
@@ -5180,7 +5615,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                                                         let from_item_ID =
                                                                             ((|| {
                                                                                 PResult::Ok(
-                                                                                    (Decoder41(
+                                                                                    (Decoder44(
                                                                                         _input,
                                                                                     ))?,
                                                                                 )
@@ -5189,7 +5624,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                                                         let reference_count =
                                                                             ((|| {
                                                                                 PResult::Ok(
-                                                                                    (Decoder41(
+                                                                                    (Decoder44(
                                                                                         _input,
                                                                                     ))?,
                                                                                 )
@@ -5201,7 +5636,7 @@ fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<Type115, ParseError>
                                                                                     let mut accum =
                                                                                         Vec::new();
                                                                                     for _ in 0..reference_count {
-accum.push((Decoder41(_input))?);
+accum.push((Decoder44(_input))?);
 }
                                                                                     accum
                                                                                 })
@@ -5257,7 +5692,7 @@ accum.push((Decoder41(_input))?);
                                                         })(
                                                         ))?;
                                                         let r#type = ((|| {
-                                                            PResult::Ok((Decoder45(_input))?)
+                                                            PResult::Ok((Decoder49(_input))?)
                                                         })(
                                                         ))?;
                                                         let size = ((|| {
@@ -5266,7 +5701,7 @@ accum.push((Decoder41(_input))?);
 
                                                                 1 => {
                                                                     let inner =
-                                                                        (Decoder46(_input))?;
+                                                                        (Decoder50(_input))?;
                                                                     ((|x: u64| {
                                                                         PResult::Ok(x - 16u64)
                                                                     })(
@@ -5296,7 +5731,7 @@ accum.push((Decoder41(_input))?);
                                                                         let reference_count =
                                                                             ((|| {
                                                                                 PResult::Ok(
-                                                                                    (Decoder41(
+                                                                                    (Decoder44(
                                                                                         _input,
                                                                                     ))?,
                                                                                 )
@@ -5389,7 +5824,7 @@ accum.push((Decoder31(_input))?);
                             let item_count = ((|| {
                                 PResult::Ok(match version < 2u8 {
                                     true => {
-                                        let inner = (Decoder41(_input))?;
+                                        let inner = (Decoder44(_input))?;
                                         ((|x: u16| PResult::Ok(x as u32))(inner))?
                                     }
 
@@ -5403,7 +5838,7 @@ accum.push((Decoder31(_input))?);
                                         accum.push({
 let item_ID = ((|| PResult::Ok(match version < 2u8 {
 true => {
-let inner = (Decoder41(_input))?;
+let inner = (Decoder44(_input))?;
 ((|x: u16| PResult::Ok(x as u32))(inner))?
 },
 
@@ -5413,7 +5848,7 @@ false => {
 }))())?;
 let construction_method = ((|| PResult::Ok(match version > 0u8 {
 true => {
-let inner = (Decoder41(_input))?;
+let inner = (Decoder44(_input))?;
 Type97::yes(inner)
 },
 
@@ -5422,7 +5857,7 @@ let _ = ();
 Type97::no
 }
 }))())?;
-let data_reference_index = ((|| PResult::Ok((Decoder41(_input))?))())?;
+let data_reference_index = ((|| PResult::Ok((Decoder44(_input))?))())?;
 let base_offset = ((|| PResult::Ok(match base_offset_size {
 0 => {
 0u64
@@ -5434,14 +5869,14 @@ let inner = (Decoder31(_input))?;
 },
 
 8 => {
-(Decoder46(_input))?
+(Decoder50(_input))?
 },
 
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-let extent_count = ((|| PResult::Ok((Decoder41(_input))?))())?;
+let extent_count = ((|| PResult::Ok((Decoder44(_input))?))())?;
 let extents = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..extent_count {
@@ -5457,7 +5892,7 @@ let inner = (Decoder31(_input))?;
 },
 
 8 => {
-(Decoder46(_input))?
+(Decoder50(_input))?
 },
 
 _other => {
@@ -5475,7 +5910,7 @@ let inner = (Decoder31(_input))?;
 },
 
 8 => {
-(Decoder46(_input))?
+(Decoder50(_input))?
 },
 
 _other => {
@@ -5493,7 +5928,7 @@ let inner = (Decoder31(_input))?;
 },
 
 8 => {
-(Decoder46(_input))?
+(Decoder50(_input))?
 },
 
 _other => {
@@ -5541,7 +5976,7 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder58(_input))?;
+                                    let next_elem = (Decoder62(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -5615,15 +6050,15 @@ Type99 { item_ID, construction_method, data_reference_index, base_offset, extent
     })
 }
 
-fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError> {
+fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -5672,13 +6107,13 @@ fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError>
                                     1 => {
                                         let inner = {
                                             let creation_time =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             let modification_time =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             let timescale =
                                                 ((|| PResult::Ok((Decoder31(_input))?))())?;
                                             let duration =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             Type117 {
                                                 creation_time,
                                                 modification_time,
@@ -5697,8 +6132,8 @@ fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError>
                                 })
                             })())?;
                             let rate = ((|| PResult::Ok((Decoder31(_input))?))())?;
-                            let volume = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let reserved1 = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let volume = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let reserved1 = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             let reserved2 = ((|| {
                                 PResult::Ok({
                                     let field0 = ((|| PResult::Ok((Decoder31(_input))?))())?;
@@ -5755,7 +6190,7 @@ fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder49(_input))?;
+                                    let next_elem = (Decoder53(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -5780,7 +6215,7 @@ fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder50(_input))?;
+                                    let next_elem = (Decoder54(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -5829,15 +6264,15 @@ fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Type160, ParseError>
     })
 }
 
-fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError> {
+fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -5889,15 +6324,15 @@ fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError>
                                     1 => {
                                         let inner = {
                                             let creation_time =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             let modification_time =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             let track_ID =
                                                 ((|| PResult::Ok((Decoder31(_input))?))())?;
                                             let reserved =
                                                 ((|| PResult::Ok((Decoder31(_input))?))())?;
                                             let duration =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             Type152 {
                                                 creation_time,
                                                 modification_time,
@@ -5923,10 +6358,10 @@ fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError>
                                     (field0, field1)
                                 })
                             })())?;
-                            let layer = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let alternate_group = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let volume = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let reserved1 = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let layer = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let alternate_group = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let volume = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let reserved1 = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             let matrix = ((|| {
                                 PResult::Ok({
                                     let mut accum = Vec::new();
@@ -5969,7 +6404,7 @@ fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder51(_input))?;
+                                    let next_elem = (Decoder55(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -5994,7 +6429,7 @@ fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder52(_input))?;
+                                    let next_elem = (Decoder56(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -6043,15 +6478,15 @@ fn Decoder49<'input>(_input: &mut Parser<'input>) -> Result<Type156, ParseError>
     })
 }
 
-fn Decoder50<'input>(_input: &mut Parser<'input>) -> Result<Type158, ParseError> {
+fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type158, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -6080,7 +6515,7 @@ fn Decoder50<'input>(_input: &mut Parser<'input>) -> Result<Type158, ParseError>
                                         }
                                     };
                                     if matching_ix == 0 {
-                                        let next_elem = (Decoder47(_input))?;
+                                        let next_elem = (Decoder51(_input))?;
                                         accum.push(next_elem);
                                     } else {
                                         break;
@@ -6130,15 +6565,15 @@ fn Decoder50<'input>(_input: &mut Parser<'input>) -> Result<Type158, ParseError>
     })
 }
 
-fn Decoder51<'input>(_input: &mut Parser<'input>) -> Result<Type123, ParseError> {
+fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<Type123, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -6232,15 +6667,15 @@ fn Decoder51<'input>(_input: &mut Parser<'input>) -> Result<Type123, ParseError>
     })
 }
 
-fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError> {
+fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -6265,12 +6700,12 @@ fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError>
                                 })
                             })())?;
                             let component_type = ((|| PResult::Ok((Decoder31(_input))?))())?;
-                            let component_subtype = ((|| PResult::Ok((Decoder45(_input))?))())?;
+                            let component_subtype = ((|| PResult::Ok((Decoder49(_input))?))())?;
                             let component_manufacturer =
                                 ((|| PResult::Ok((Decoder31(_input))?))())?;
                             let component_flags = ((|| PResult::Ok((Decoder31(_input))?))())?;
                             let component_flags_mask = ((|| PResult::Ok((Decoder31(_input))?))())?;
-                            let component_name = ((|| PResult::Ok((Decoder53(_input))?))())?;
+                            let component_name = ((|| PResult::Ok((Decoder57(_input))?))())?;
                             Type124 {
                                 version,
                                 flags,
@@ -6321,13 +6756,13 @@ fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError>
                                     1 => {
                                         let inner = {
                                             let creation_time =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             let modification_time =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             let timescale =
                                                 ((|| PResult::Ok((Decoder31(_input))?))())?;
                                             let duration =
-                                                ((|| PResult::Ok((Decoder46(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder50(_input))?))())?;
                                             Type117 {
                                                 creation_time,
                                                 modification_time,
@@ -6345,8 +6780,8 @@ fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError>
                                     }
                                 })
                             })())?;
-                            let language = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let pre_defined = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let language = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let pre_defined = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type125 {
                                 version,
                                 flags,
@@ -6372,7 +6807,7 @@ fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder54(_input))?;
+                                    let next_elem = (Decoder58(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -6421,7 +6856,7 @@ fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<Type150, ParseError>
     })
 }
 
-fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -6436,7 +6871,7 @@ fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> 
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -6449,7 +6884,7 @@ fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> 
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -6466,22 +6901,22 @@ fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> 
             if b == 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
             }
         })
     })())?;
     PResult::Ok(Type21 { string, null })
 }
 
-fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError> {
+fn Decoder58<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -6505,12 +6940,12 @@ fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError>
                                     (field0, field1, field2)
                                 })
                             })())?;
-                            let graphicsmode = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let graphicsmode = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             let opcolor = ((|| {
                                 PResult::Ok({
                                     let mut accum = Vec::new();
                                     for _ in 0..3u8 {
-                                        accum.push((Decoder41(_input))?);
+                                        accum.push((Decoder44(_input))?);
                                     }
                                     accum
                                 })
@@ -6536,8 +6971,8 @@ fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError>
                                     (field0, field1, field2)
                                 })
                             })())?;
-                            let balance = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                            let reserved = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                            let balance = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                            let reserved = ((|| PResult::Ok((Decoder44(_input))?))())?;
                             Type126 {
                                 version,
                                 flags,
@@ -6562,7 +6997,7 @@ fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder55(_input))?;
+                                    let next_elem = (Decoder59(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -6587,7 +7022,7 @@ fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder56(_input))?;
+                                    let next_elem = (Decoder60(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -6636,15 +7071,15 @@ fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<Type148, ParseError>
     })
 }
 
-fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<Type85, ParseError> {
+fn Decoder59<'input>(_input: &mut Parser<'input>) -> Result<Type85, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -6687,13 +7122,13 @@ fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<Type85, ParseError> 
                                                 let size_field =
                                                     ((|| PResult::Ok((Decoder31(_input))?))())?;
                                                 let r#type =
-                                                    ((|| PResult::Ok((Decoder45(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder49(_input))?))())?;
                                                 let size = ((|| {
                                                     PResult::Ok(match size_field {
                                                         0 => 0u64,
 
                                                         1 => {
-                                                            let inner = (Decoder46(_input))?;
+                                                            let inner = (Decoder50(_input))?;
                                                             ((|x: u64| PResult::Ok(x - 16u64))(
                                                                 inner,
                                                             ))?
@@ -6802,15 +7237,15 @@ fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<Type85, ParseError> 
     })
 }
 
-fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<Type145, ParseError> {
+fn Decoder60<'input>(_input: &mut Parser<'input>) -> Result<Type145, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -6843,14 +7278,14 @@ fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<Type145, ParseError>
                                             for _ in 0..entry_count {
                                                 accum.push({
 let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0 => {
 0u64
 },
 
 1 => {
-let inner = (Decoder46(_input))?;
+let inner = (Decoder50(_input))?;
 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
 },
 
@@ -7145,7 +7580,7 @@ Type82 { size_field, r#type, size, data }
                                 PResult::Ok({
                                     let mut accum = Vec::new();
                                     for _ in 0..entry_count {
-                                        accum.push((Decoder46(_input))?);
+                                        accum.push((Decoder50(_input))?);
                                     }
                                     accum
                                 })
@@ -7312,15 +7747,15 @@ Type82 { size_field, r#type, size, data }
     })
 }
 
-fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> {
+fn Decoder61<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -7349,15 +7784,15 @@ fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> 
                                     true => {
                                         let inner = {
                                             let item_ID =
-                                                ((|| PResult::Ok((Decoder41(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder44(_input))?))())?;
                                             let item_protection_index =
-                                                ((|| PResult::Ok((Decoder41(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder44(_input))?))())?;
                                             let item_name =
-                                                ((|| PResult::Ok((Decoder60(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder64(_input))?))())?;
                                             let content_type =
-                                                ((|| PResult::Ok((Decoder61(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder65(_input))?))())?;
                                             let content_encoding =
-                                                ((|| PResult::Ok((Decoder62(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder66(_input))?))())?;
                                             Type91 {
                                                 item_ID,
                                                 item_protection_index,
@@ -7374,7 +7809,7 @@ fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> 
                                             let item_ID = ((|| {
                                                 PResult::Ok(match version == 2u8 {
                                                     true => {
-                                                        let inner = (Decoder41(_input))?;
+                                                        let inner = (Decoder44(_input))?;
                                                         ((|x: u16| PResult::Ok(x as u32))(inner))?
                                                     }
 
@@ -7383,17 +7818,17 @@ fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> 
                                             })(
                                             ))?;
                                             let item_protection_index =
-                                                ((|| PResult::Ok((Decoder41(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder44(_input))?))())?;
                                             let item_type =
-                                                ((|| PResult::Ok((Decoder45(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder49(_input))?))())?;
                                             let item_name =
-                                                ((|| PResult::Ok((Decoder63(_input))?))())?;
+                                                ((|| PResult::Ok((Decoder67(_input))?))())?;
                                             let extra_fields = ((|| {
                                                 PResult::Ok(match item_type {
                                                     (109, 105, 109, 101) => {
                                                         let inner = {
                                                             let content_type = ((|| {
-                                                                PResult::Ok((Decoder64(_input))?)
+                                                                PResult::Ok((Decoder68(_input))?)
                                                             })(
                                                             ))?;
                                                             Type87 { content_type }
@@ -7404,7 +7839,7 @@ fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> 
                                                     (117, 114, 105, 32) => {
                                                         let inner = {
                                                             let item_uri_type = ((|| {
-                                                                PResult::Ok((Decoder64(_input))?)
+                                                                PResult::Ok((Decoder68(_input))?)
                                                             })(
                                                             ))?;
                                                             Type88 { item_uri_type }
@@ -7478,15 +7913,15 @@ fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Type95, ParseError> 
     })
 }
 
-fn Decoder58<'input>(_input: &mut Parser<'input>) -> Result<Type105, ParseError> {
+fn Decoder62<'input>(_input: &mut Parser<'input>) -> Result<Type105, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -7513,7 +7948,7 @@ fn Decoder58<'input>(_input: &mut Parser<'input>) -> Result<Type105, ParseError>
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder59(_input))?;
+                                    let next_elem = (Decoder63(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -7562,15 +7997,15 @@ fn Decoder58<'input>(_input: &mut Parser<'input>) -> Result<Type105, ParseError>
     })
 }
 
-fn Decoder59<'input>(_input: &mut Parser<'input>) -> Result<Type103, ParseError> {
+fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<Type103, ParseError> {
     let size_field = ((|| PResult::Ok((Decoder31(_input))?))())?;
-    let r#type = ((|| PResult::Ok((Decoder45(_input))?))())?;
+    let r#type = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
             0 => 0u64,
 
             1 => {
-                let inner = (Decoder46(_input))?;
+                let inner = (Decoder50(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
 
@@ -7657,214 +8092,6 @@ fn Decoder59<'input>(_input: &mut Parser<'input>) -> Result<Type103, ParseError>
     })
 }
 
-fn Decoder60<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
-    let string = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    let b = _input.read_byte()?;
-                    {
-                        let ret = match b {
-                            tmp if (tmp != 0) => 0,
-
-                            0u8 => 1,
-
-                            _ => {
-                                return Err(ParseError::ExcludedBranch);
-                            }
-                        };
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
-                    let next_elem = {
-                        let b = _input.read_byte()?;
-                        if b != 0 {
-                            b
-                        } else {
-                            return Err(ParseError::ExcludedBranch);
-                        }
-                    };
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
-            }
-            accum
-        })
-    })())?;
-    let null = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 0 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type21 { string, null })
-}
-
-fn Decoder61<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
-    let string = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    let b = _input.read_byte()?;
-                    {
-                        let ret = match b {
-                            tmp if (tmp != 0) => 0,
-
-                            0u8 => 1,
-
-                            _ => {
-                                return Err(ParseError::ExcludedBranch);
-                            }
-                        };
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
-                    let next_elem = {
-                        let b = _input.read_byte()?;
-                        if b != 0 {
-                            b
-                        } else {
-                            return Err(ParseError::ExcludedBranch);
-                        }
-                    };
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
-            }
-            accum
-        })
-    })())?;
-    let null = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 0 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type21 { string, null })
-}
-
-fn Decoder62<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
-    let string = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    let b = _input.read_byte()?;
-                    {
-                        let ret = match b {
-                            tmp if (tmp != 0) => 0,
-
-                            0u8 => 1,
-
-                            _ => {
-                                return Err(ParseError::ExcludedBranch);
-                            }
-                        };
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
-                    let next_elem = {
-                        let b = _input.read_byte()?;
-                        if b != 0 {
-                            b
-                        } else {
-                            return Err(ParseError::ExcludedBranch);
-                        }
-                    };
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
-            }
-            accum
-        })
-    })())?;
-    let null = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 0 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type21 { string, null })
-}
-
-fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
-    let string = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    let b = _input.read_byte()?;
-                    {
-                        let ret = match b {
-                            tmp if (tmp != 0) => 0,
-
-                            0u8 => 1,
-
-                            _ => {
-                                return Err(ParseError::ExcludedBranch);
-                            }
-                        };
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
-                    let next_elem = {
-                        let b = _input.read_byte()?;
-                        if b != 0 {
-                            b
-                        } else {
-                            return Err(ParseError::ExcludedBranch);
-                        }
-                    };
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
-            }
-            accum
-        })
-    })())?;
-    let null = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 0 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type21 { string, null })
-}
-
 fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
@@ -7880,7 +8107,7 @@ fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> 
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -7893,7 +8120,7 @@ fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> 
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -7910,21 +8137,229 @@ fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> 
             if b == 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
             }
         })
     })())?;
     PResult::Ok(Type21 { string, null })
 }
 
-fn Decoder65<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
+fn Decoder65<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+    let string = ((|| {
+        PResult::Ok({
+            let mut accum = Vec::new();
+            while _input.remaining() > 0 {
+                let matching_ix = {
+                    _input.open_peek_context();
+                    let b = _input.read_byte()?;
+                    {
+                        let ret = match b {
+                            tmp if (tmp != 0) => 0,
+
+                            0u8 => 1,
+
+                            _ => {
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+                            }
+                        };
+                        _input.close_peek_context()?;
+                        ret
+                    }
+                };
+                if matching_ix == 0 {
+                    let next_elem = {
+                        let b = _input.read_byte()?;
+                        if b != 0 {
+                            b
+                        } else {
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+                        }
+                    };
+                    accum.push(next_elem);
+                } else {
+                    break;
+                }
+            }
+            accum
+        })
+    })())?;
+    let null = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type21 { string, null })
+}
+
+fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+    let string = ((|| {
+        PResult::Ok({
+            let mut accum = Vec::new();
+            while _input.remaining() > 0 {
+                let matching_ix = {
+                    _input.open_peek_context();
+                    let b = _input.read_byte()?;
+                    {
+                        let ret = match b {
+                            tmp if (tmp != 0) => 0,
+
+                            0u8 => 1,
+
+                            _ => {
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+                            }
+                        };
+                        _input.close_peek_context()?;
+                        ret
+                    }
+                };
+                if matching_ix == 0 {
+                    let next_elem = {
+                        let b = _input.read_byte()?;
+                        if b != 0 {
+                            b
+                        } else {
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+                        }
+                    };
+                    accum.push(next_elem);
+                } else {
+                    break;
+                }
+            }
+            accum
+        })
+    })())?;
+    let null = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type21 { string, null })
+}
+
+fn Decoder67<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+    let string = ((|| {
+        PResult::Ok({
+            let mut accum = Vec::new();
+            while _input.remaining() > 0 {
+                let matching_ix = {
+                    _input.open_peek_context();
+                    let b = _input.read_byte()?;
+                    {
+                        let ret = match b {
+                            tmp if (tmp != 0) => 0,
+
+                            0u8 => 1,
+
+                            _ => {
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+                            }
+                        };
+                        _input.close_peek_context()?;
+                        ret
+                    }
+                };
+                if matching_ix == 0 {
+                    let next_elem = {
+                        let b = _input.read_byte()?;
+                        if b != 0 {
+                            b
+                        } else {
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+                        }
+                    };
+                    accum.push(next_elem);
+                } else {
+                    break;
+                }
+            }
+            accum
+        })
+    })())?;
+    let null = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type21 { string, null })
+}
+
+fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+    let string = ((|| {
+        PResult::Ok({
+            let mut accum = Vec::new();
+            while _input.remaining() > 0 {
+                let matching_ix = {
+                    _input.open_peek_context();
+                    let b = _input.read_byte()?;
+                    {
+                        let ret = match b {
+                            tmp if (tmp != 0) => 0,
+
+                            0u8 => 1,
+
+                            _ => {
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+                            }
+                        };
+                        _input.close_peek_context()?;
+                        ret
+                    }
+                };
+                if matching_ix == 0 {
+                    let next_elem = {
+                        let b = _input.read_byte()?;
+                        if b != 0 {
+                            b
+                        } else {
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+                        }
+                    };
+                    accum.push(next_elem);
+                } else {
+                    break;
+                }
+            }
+            accum
+        })
+    })())?;
+    let null = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type21 { string, null })
+}
+
+fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
@@ -7934,14 +8369,14 @@ fn Decoder65<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 216 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(5637435011420551755u64));
             }
         })
     })())?;
     PResult::Ok(Type41 { ff, marker })
 }
 
-fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> {
+fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> {
     let initial_segment = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -7956,11 +8391,11 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
                             225u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(4308326862885139660u64));
                             }
                         }
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(7148064920671428636u64));
                     };
                     _input.close_peek_context()?;
                     ret
@@ -7968,17 +8403,17 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder68(_input))?;
+                    let inner = (Decoder72(_input))?;
                     Type55::app0(inner)
                 }
 
                 1 => {
-                    let inner = (Decoder69(_input))?;
+                    let inner = (Decoder73(_input))?;
                     Type55::app1(inner)
                 }
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(3642042507085222192u64));
                 }
             }
         })
@@ -8063,18 +8498,18 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
                                 207u8 => 1,
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(2627803341941537249u64));
                                 }
                             }
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3984559770787002987u64));
                         };
                         _input.close_peek_context()?;
                         ret
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder70(_input))?;
+                    let next_elem = (Decoder74(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -8083,8 +8518,8 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
             accum
         })
     })())?;
-    let header = ((|| PResult::Ok((Decoder71(_input))?))())?;
-    let scan = ((|| PResult::Ok((Decoder72(_input))?))())?;
+    let header = ((|| PResult::Ok((Decoder75(_input))?))())?;
+    let scan = ((|| PResult::Ok((Decoder76(_input))?))())?;
     let dnl = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -8143,11 +8578,11 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
                             254u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(2381939729225554952u64));
                             }
                         }
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(5771732241052508004u64));
                     };
                     _input.close_peek_context()?;
                     ret
@@ -8155,7 +8590,7 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder73(_input))?;
+                    let inner = (Decoder77(_input))?;
                     Type78::some(inner)
                 }
 
@@ -8165,7 +8600,7 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
                 }
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(11678103101816798445u64));
                 }
             }
         })
@@ -8228,18 +8663,20 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
                                 217u8 => 1,
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(
+                                        18361368374853160051u64,
+                                    ));
                                 }
                             }
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(12701987380979683068u64));
                         };
                         _input.close_peek_context()?;
                         ret
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder74(_input))?;
+                    let next_elem = (Decoder78(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -8258,14 +8695,14 @@ fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<Type79, ParseError> 
     })
 }
 
-fn Decoder67<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
+fn Decoder71<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
     let ff = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
@@ -8275,14 +8712,14 @@ fn Decoder67<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 217 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(16574347298383600551u64));
             }
         })
     })())?;
     PResult::Ok(Type41 { ff, marker })
 }
 
-fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<Type45, ParseError> {
+fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<Type45, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -8291,7 +8728,7 @@ fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<Type45, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -8301,19 +8738,19 @@ fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<Type45, ParseError> 
                     if b == 224 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(5346911683359312959u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder134(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder138(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -8325,7 +8762,7 @@ fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<Type45, ParseError> 
     })
 }
 
-fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<Type54, ParseError> {
+fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<Type54, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -8334,7 +8771,7 @@ fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<Type54, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -8344,19 +8781,19 @@ fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<Type54, ParseError> 
                     if b == 225 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(301524255299452508u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder128(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder132(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -8368,7 +8805,7 @@ fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<Type54, ParseError> 
     })
 }
 
-fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<Type65, ParseError> {
+fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<Type65, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -8419,11 +8856,11 @@ fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<Type65, ParseError> 
                     254u8 => 20,
 
                     _ => {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6831883527687906764u64));
                     }
                 }
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(17358231491816636887u64));
             };
             _input.close_peek_context()?;
             ret
@@ -8431,117 +8868,117 @@ fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<Type65, ParseError> 
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder105(_input))?;
+            let inner = (Decoder109(_input))?;
             Type65::dqt(inner)
         }
 
         1 => {
-            let inner = (Decoder106(_input))?;
+            let inner = (Decoder110(_input))?;
             Type65::dht(inner)
         }
 
         2 => {
-            let inner = (Decoder107(_input))?;
+            let inner = (Decoder111(_input))?;
             Type65::dac(inner)
         }
 
         3 => {
-            let inner = (Decoder108(_input))?;
+            let inner = (Decoder112(_input))?;
             Type65::dri(inner)
         }
 
         4 => {
-            let inner = (Decoder68(_input))?;
+            let inner = (Decoder72(_input))?;
             Type65::app0(inner)
         }
 
         5 => {
-            let inner = (Decoder69(_input))?;
+            let inner = (Decoder73(_input))?;
             Type65::app1(inner)
         }
 
         6 => {
-            let inner = (Decoder109(_input))?;
+            let inner = (Decoder113(_input))?;
             Type65::app2(inner)
         }
 
         7 => {
-            let inner = (Decoder110(_input))?;
+            let inner = (Decoder114(_input))?;
             Type65::app3(inner)
         }
 
         8 => {
-            let inner = (Decoder111(_input))?;
+            let inner = (Decoder115(_input))?;
             Type65::app4(inner)
         }
 
         9 => {
-            let inner = (Decoder112(_input))?;
+            let inner = (Decoder116(_input))?;
             Type65::app5(inner)
         }
 
         10 => {
-            let inner = (Decoder113(_input))?;
+            let inner = (Decoder117(_input))?;
             Type65::app6(inner)
         }
 
         11 => {
-            let inner = (Decoder114(_input))?;
+            let inner = (Decoder118(_input))?;
             Type65::app7(inner)
         }
 
         12 => {
-            let inner = (Decoder115(_input))?;
+            let inner = (Decoder119(_input))?;
             Type65::app8(inner)
         }
 
         13 => {
-            let inner = (Decoder116(_input))?;
+            let inner = (Decoder120(_input))?;
             Type65::app9(inner)
         }
 
         14 => {
-            let inner = (Decoder117(_input))?;
+            let inner = (Decoder121(_input))?;
             Type65::app10(inner)
         }
 
         15 => {
-            let inner = (Decoder118(_input))?;
+            let inner = (Decoder122(_input))?;
             Type65::app11(inner)
         }
 
         16 => {
-            let inner = (Decoder119(_input))?;
+            let inner = (Decoder123(_input))?;
             Type65::app12(inner)
         }
 
         17 => {
-            let inner = (Decoder120(_input))?;
+            let inner = (Decoder124(_input))?;
             Type65::app13(inner)
         }
 
         18 => {
-            let inner = (Decoder121(_input))?;
+            let inner = (Decoder125(_input))?;
             Type65::app14(inner)
         }
 
         19 => {
-            let inner = (Decoder122(_input))?;
+            let inner = (Decoder126(_input))?;
             Type65::app15(inner)
         }
 
         20 => {
-            let inner = (Decoder123(_input))?;
+            let inner = (Decoder127(_input))?;
             Type65::com(inner)
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(5858366816005674364u64));
         }
     })
 }
 
-fn Decoder71<'input>(_input: &mut Parser<'input>) -> Result<Type69, ParseError> {
+fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<Type69, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -8576,11 +9013,11 @@ fn Decoder71<'input>(_input: &mut Parser<'input>) -> Result<Type69, ParseError> 
                     207u8 => 12,
 
                     _ => {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6713649261753762975u64));
                     }
                 }
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(5127673444229506389u64));
             };
             _input.close_peek_context()?;
             ret
@@ -8588,77 +9025,77 @@ fn Decoder71<'input>(_input: &mut Parser<'input>) -> Result<Type69, ParseError> 
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder90(_input))?;
+            let inner = (Decoder94(_input))?;
             Type69::sof0(inner)
         }
 
         1 => {
-            let inner = (Decoder91(_input))?;
+            let inner = (Decoder95(_input))?;
             Type69::sof1(inner)
         }
 
         2 => {
-            let inner = (Decoder92(_input))?;
+            let inner = (Decoder96(_input))?;
             Type69::sof2(inner)
         }
 
         3 => {
-            let inner = (Decoder93(_input))?;
+            let inner = (Decoder97(_input))?;
             Type69::sof3(inner)
         }
 
         4 => {
-            let inner = (Decoder94(_input))?;
+            let inner = (Decoder98(_input))?;
             Type69::sof5(inner)
         }
 
         5 => {
-            let inner = (Decoder95(_input))?;
+            let inner = (Decoder99(_input))?;
             Type69::sof6(inner)
         }
 
         6 => {
-            let inner = (Decoder96(_input))?;
+            let inner = (Decoder100(_input))?;
             Type69::sof7(inner)
         }
 
         7 => {
-            let inner = (Decoder97(_input))?;
+            let inner = (Decoder101(_input))?;
             Type69::sof9(inner)
         }
 
         8 => {
-            let inner = (Decoder98(_input))?;
+            let inner = (Decoder102(_input))?;
             Type69::sof10(inner)
         }
 
         9 => {
-            let inner = (Decoder99(_input))?;
+            let inner = (Decoder103(_input))?;
             Type69::sof11(inner)
         }
 
         10 => {
-            let inner = (Decoder100(_input))?;
+            let inner = (Decoder104(_input))?;
             Type69::sof13(inner)
         }
 
         11 => {
-            let inner = (Decoder101(_input))?;
+            let inner = (Decoder105(_input))?;
             Type69::sof14(inner)
         }
 
         12 => {
-            let inner = (Decoder102(_input))?;
+            let inner = (Decoder106(_input))?;
             Type69::sof15(inner)
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(13734934310846663046u64));
         }
     })
 }
 
-fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> {
+fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> {
     let segments = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -8715,18 +9152,18 @@ fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> 
                                 218u8 => 1,
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(9981528058996288466u64));
                                 }
                             }
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(12045452821827788867u64));
                         };
                         _input.close_peek_context()?;
                         ret
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder70(_input))?;
+                    let next_elem = (Decoder74(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -8735,8 +9172,8 @@ fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> 
             accum
         })
     })())?;
-    let sos = ((|| PResult::Ok((Decoder75(_input))?))())?;
-    let data = ((|| PResult::Ok((Decoder89(_input))?))())?;
+    let sos = ((|| PResult::Ok((Decoder79(_input))?))())?;
+    let data = ((|| PResult::Ok((Decoder93(_input))?))())?;
     PResult::Ok(Type75 {
         segments,
         sos,
@@ -8744,7 +9181,7 @@ fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> 
     })
 }
 
-fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<Type77, ParseError> {
+fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<Type77, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -8753,7 +9190,7 @@ fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<Type77, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -8763,19 +9200,19 @@ fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<Type77, ParseError> 
                     if b == 220 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(2912073318189654678u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder88(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder92(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -8787,7 +9224,7 @@ fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<Type77, ParseError> 
     })
 }
 
-fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> {
+fn Decoder78<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> {
     let segments = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -8844,18 +9281,18 @@ fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> 
                                 218u8 => 1,
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(9981528058996288466u64));
                                 }
                             }
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(12045452821827788867u64));
                         };
                         _input.close_peek_context()?;
                         ret
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder70(_input))?;
+                    let next_elem = (Decoder74(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -8864,8 +9301,8 @@ fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> 
             accum
         })
     })())?;
-    let sos = ((|| PResult::Ok((Decoder75(_input))?))())?;
-    let data = ((|| PResult::Ok((Decoder76(_input))?))())?;
+    let sos = ((|| PResult::Ok((Decoder79(_input))?))())?;
+    let data = ((|| PResult::Ok((Decoder80(_input))?))())?;
     PResult::Ok(Type75 {
         segments,
         sos,
@@ -8873,7 +9310,7 @@ fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<Type75, ParseError> 
     })
 }
 
-fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<Type72, ParseError> {
+fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<Type72, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -8882,7 +9319,7 @@ fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<Type72, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -8892,19 +9329,19 @@ fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<Type72, ParseError> 
                     if b == 218 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(5297104498937034880u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder86(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder90(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -8916,7 +9353,7 @@ fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<Type72, ParseError> 
     })
 }
 
-fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> {
+fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> {
     let scan_data = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -8996,13 +9433,15 @@ fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
                                     254u8 => 1,
 
                                     _ => {
-                                        return Err(ParseError::ExcludedBranch);
+                                        return Err(ParseError::ExcludedBranch(
+                                            9445433320207076674u64,
+                                        ));
                                     }
                                 }
                             }
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(14334550274612271578u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -9040,13 +9479,17 @@ fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
                                             215u8 => 8,
 
                                             _ => {
-                                                return Err(ParseError::ExcludedBranch);
+                                                return Err(ParseError::ExcludedBranch(
+                                                    2047945967620228231u64,
+                                                ));
                                             }
                                         }
                                     }
 
                                     _ => {
-                                        return Err(ParseError::ExcludedBranch);
+                                        return Err(ParseError::ExcludedBranch(
+                                            3966792236320797464u64,
+                                        ));
                                     }
                                 };
                                 _input.close_peek_context()?;
@@ -9055,52 +9498,52 @@ fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
                         };
                         match tree_index {
                             0 => {
-                                let inner = (Decoder77(_input))?;
+                                let inner = (Decoder81(_input))?;
                                 Type73::mcu(inner)
                             }
 
                             1 => {
-                                let inner = (Decoder78(_input))?;
+                                let inner = (Decoder82(_input))?;
                                 Type73::rst0(inner)
                             }
 
                             2 => {
-                                let inner = (Decoder79(_input))?;
+                                let inner = (Decoder83(_input))?;
                                 Type73::rst1(inner)
                             }
 
                             3 => {
-                                let inner = (Decoder80(_input))?;
+                                let inner = (Decoder84(_input))?;
                                 Type73::rst2(inner)
                             }
 
                             4 => {
-                                let inner = (Decoder81(_input))?;
+                                let inner = (Decoder85(_input))?;
                                 Type73::rst3(inner)
                             }
 
                             5 => {
-                                let inner = (Decoder82(_input))?;
+                                let inner = (Decoder86(_input))?;
                                 Type73::rst4(inner)
                             }
 
                             6 => {
-                                let inner = (Decoder83(_input))?;
+                                let inner = (Decoder87(_input))?;
                                 Type73::rst5(inner)
                             }
 
                             7 => {
-                                let inner = (Decoder84(_input))?;
+                                let inner = (Decoder88(_input))?;
                                 Type73::rst6(inner)
                             }
 
                             8 => {
-                                let inner = (Decoder85(_input))?;
+                                let inner = (Decoder89(_input))?;
                                 Type73::rst7(inner)
                             }
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(16335009692206494675u64));
                             }
                         }
                     };
@@ -9143,7 +9586,7 @@ fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
     })
 }
 
-fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -9154,7 +9597,7 @@ fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
                 255u8 => 1,
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(5885932633650161961u64));
                 }
             };
             _input.close_peek_context()?;
@@ -9167,7 +9610,7 @@ fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
             if b != 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(4029318947293129738u64));
             }
         }
 
@@ -9179,7 +9622,7 @@ fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
                         if b == 255 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                         }
                     })
                 })())?;
@@ -9189,7 +9632,7 @@ fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
                         if b == 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(10396965092922267801u64));
                         }
                     })
                 })())?;
@@ -9199,105 +9642,9 @@ fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(4297833600800538456u64));
         }
     })
-}
-
-fn Decoder78<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
-    let ff = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 255 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    let marker = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 208 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type41 { ff, marker })
-}
-
-fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
-    let ff = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 255 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    let marker = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 209 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type41 { ff, marker })
-}
-
-fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
-    let ff = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 255 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    let marker = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 210 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type41 { ff, marker })
-}
-
-fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
-    let ff = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 255 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    let marker = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 211 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch);
-            }
-        })
-    })())?;
-    PResult::Ok(Type41 { ff, marker })
 }
 
 fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
@@ -9307,17 +9654,17 @@ fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
     let marker = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
-            if b == 212 {
+            if b == 208 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(5421268784727520761u64));
             }
         })
     })())?;
@@ -9331,17 +9678,17 @@ fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
     let marker = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
-            if b == 213 {
+            if b == 209 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10069632627653602280u64));
             }
         })
     })())?;
@@ -9355,17 +9702,17 @@ fn Decoder84<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
     let marker = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
-            if b == 214 {
+            if b == 210 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(7941505592535629367u64));
             }
         })
     })())?;
@@ -9379,7 +9726,103 @@ fn Decoder85<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+            }
+        })
+    })())?;
+    let marker = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 211 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(4842764822111760355u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type41 { ff, marker })
+}
+
+fn Decoder86<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
+    let ff = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 255 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+            }
+        })
+    })())?;
+    let marker = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 212 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(172561454190383201u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type41 { ff, marker })
+}
+
+fn Decoder87<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
+    let ff = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 255 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+            }
+        })
+    })())?;
+    let marker = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 213 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(12052389963453405046u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type41 { ff, marker })
+}
+
+fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
+    let ff = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 255 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+            }
+        })
+    })())?;
+    let marker = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 214 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(14545630498792155294u64));
+            }
+        })
+    })())?;
+    PResult::Ok(Type41 { ff, marker })
+}
+
+fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> {
+    let ff = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 255 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
@@ -9389,20 +9832,20 @@ fn Decoder85<'input>(_input: &mut Parser<'input>) -> Result<Type41, ParseError> 
             if b == 215 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10573988543901039080u64));
             }
         })
     })())?;
     PResult::Ok(Type41 { ff, marker })
 }
 
-fn Decoder86<'input>(_input: &mut Parser<'input>) -> Result<Type71, ParseError> {
+fn Decoder90<'input>(_input: &mut Parser<'input>) -> Result<Type71, ParseError> {
     let num_image_components = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let image_components = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..num_image_components {
-                accum.push((Decoder87(_input))?);
+                accum.push((Decoder91(_input))?);
             }
             accum
         })
@@ -9419,7 +9862,7 @@ fn Decoder86<'input>(_input: &mut Parser<'input>) -> Result<Type71, ParseError> 
     })
 }
 
-fn Decoder87<'input>(_input: &mut Parser<'input>) -> Result<Type70, ParseError> {
+fn Decoder91<'input>(_input: &mut Parser<'input>) -> Result<Type70, ParseError> {
     let component_selector = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let entropy_coding_table_ids = ((|| PResult::Ok((Decoder15(_input))?))())?;
     PResult::Ok(Type70 {
@@ -9428,12 +9871,12 @@ fn Decoder87<'input>(_input: &mut Parser<'input>) -> Result<Type70, ParseError> 
     })
 }
 
-fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<Type76, ParseError> {
-    let num_lines = ((|| PResult::Ok((Decoder41(_input))?))())?;
+fn Decoder92<'input>(_input: &mut Parser<'input>) -> Result<Type76, ParseError> {
+    let num_lines = ((|| PResult::Ok((Decoder44(_input))?))())?;
     PResult::Ok(Type76 { num_lines })
 }
 
-fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> {
+fn Decoder93<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> {
     let scan_data = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -9515,13 +9958,15 @@ fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
                                     254u8 => 1,
 
                                     _ => {
-                                        return Err(ParseError::ExcludedBranch);
+                                        return Err(ParseError::ExcludedBranch(
+                                            9741508811552252074u64,
+                                        ));
                                     }
                                 }
                             }
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(4565915750535274488u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -9559,13 +10004,17 @@ fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
                                             215u8 => 8,
 
                                             _ => {
-                                                return Err(ParseError::ExcludedBranch);
+                                                return Err(ParseError::ExcludedBranch(
+                                                    2047945967620228231u64,
+                                                ));
                                             }
                                         }
                                     }
 
                                     _ => {
-                                        return Err(ParseError::ExcludedBranch);
+                                        return Err(ParseError::ExcludedBranch(
+                                            3966792236320797464u64,
+                                        ));
                                     }
                                 };
                                 _input.close_peek_context()?;
@@ -9574,52 +10023,52 @@ fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
                         };
                         match tree_index {
                             0 => {
-                                let inner = (Decoder77(_input))?;
+                                let inner = (Decoder81(_input))?;
                                 Type73::mcu(inner)
                             }
 
                             1 => {
-                                let inner = (Decoder78(_input))?;
+                                let inner = (Decoder82(_input))?;
                                 Type73::rst0(inner)
                             }
 
                             2 => {
-                                let inner = (Decoder79(_input))?;
+                                let inner = (Decoder83(_input))?;
                                 Type73::rst1(inner)
                             }
 
                             3 => {
-                                let inner = (Decoder80(_input))?;
+                                let inner = (Decoder84(_input))?;
                                 Type73::rst2(inner)
                             }
 
                             4 => {
-                                let inner = (Decoder81(_input))?;
+                                let inner = (Decoder85(_input))?;
                                 Type73::rst3(inner)
                             }
 
                             5 => {
-                                let inner = (Decoder82(_input))?;
+                                let inner = (Decoder86(_input))?;
                                 Type73::rst4(inner)
                             }
 
                             6 => {
-                                let inner = (Decoder83(_input))?;
+                                let inner = (Decoder87(_input))?;
                                 Type73::rst5(inner)
                             }
 
                             7 => {
-                                let inner = (Decoder84(_input))?;
+                                let inner = (Decoder88(_input))?;
                                 Type73::rst6(inner)
                             }
 
                             8 => {
-                                let inner = (Decoder85(_input))?;
+                                let inner = (Decoder89(_input))?;
                                 Type73::rst7(inner)
                             }
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(16335009692206494675u64));
                             }
                         }
                     };
@@ -9662,178 +10111,6 @@ fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<Type74, ParseError> 
     })
 }
 
-fn Decoder90<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 192 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type68 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder91<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 193 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type68 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder92<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 194 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type68 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder93<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 195 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type68 {
-        marker,
-        length,
-        data,
-    })
-}
-
 fn Decoder94<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
     let marker = ((|| {
         PResult::Ok({
@@ -9843,29 +10120,29 @@ fn Decoder94<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 197 {
+                    if b == 192 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(8297024098414101254u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -9886,29 +10163,29 @@ fn Decoder95<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 198 {
+                    if b == 193 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(8756819601933520429u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -9929,29 +10206,29 @@ fn Decoder96<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 199 {
+                    if b == 194 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(11080817261996913520u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -9972,29 +10249,29 @@ fn Decoder97<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 201 {
+                    if b == 195 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(12909450577628061793u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10015,29 +10292,29 @@ fn Decoder98<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 202 {
+                    if b == 197 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(5274098556056955310u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10058,29 +10335,29 @@ fn Decoder99<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> 
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 203 {
+                    if b == 198 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(5472222913557901985u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10101,29 +10378,29 @@ fn Decoder100<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 205 {
+                    if b == 199 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(935456091642960999u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10144,29 +10421,29 @@ fn Decoder101<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 206 {
+                    if b == 201 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(17091795488609854789u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10187,29 +10464,29 @@ fn Decoder102<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 207 {
+                    if b == 202 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(14420220630934832328u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder103(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10221,16 +10498,188 @@ fn Decoder102<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError>
     })
 }
 
-fn Decoder103<'input>(_input: &mut Parser<'input>) -> Result<Type67, ParseError> {
+fn Decoder103<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 203 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10502663948806018262u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type68 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 205 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(5170411260421882161u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type68 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 206 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(8862644040087288472u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type68 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<Type68, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 207 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(6282714738219454149u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| PResult::Ok((Decoder107(_input))?))())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type68 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<Type67, ParseError> {
     let sample_precision = ((|| PResult::Ok((Decoder15(_input))?))())?;
-    let num_lines = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let num_samples_per_line = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let num_lines = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let num_samples_per_line = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let num_image_components = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let image_components = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..num_image_components {
-                accum.push((Decoder104(_input))?);
+                accum.push((Decoder108(_input))?);
             }
             accum
         })
@@ -10244,7 +10693,7 @@ fn Decoder103<'input>(_input: &mut Parser<'input>) -> Result<Type67, ParseError>
     })
 }
 
-fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<Type66, ParseError> {
+fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<Type66, ParseError> {
     let id = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let sampling_factor = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let quantization_table_id = ((|| PResult::Ok((Decoder15(_input))?))())?;
@@ -10255,7 +10704,7 @@ fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<Type66, ParseError>
     })
 }
 
-fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<Type62, ParseError> {
+fn Decoder109<'input>(_input: &mut Parser<'input>) -> Result<Type62, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10264,7 +10713,7 @@ fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<Type62, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -10274,19 +10723,19 @@ fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<Type62, ParseError>
                     if b == 219 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(11201713527929929098u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder127(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder131(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10298,7 +10747,7 @@ fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<Type62, ParseError>
     })
 }
 
-fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<Type60, ParseError> {
+fn Decoder110<'input>(_input: &mut Parser<'input>) -> Result<Type60, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10307,7 +10756,7 @@ fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<Type60, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -10317,19 +10766,19 @@ fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<Type60, ParseError>
                     if b == 196 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(13231341950566326183u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder126(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder130(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10341,7 +10790,7 @@ fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<Type60, ParseError>
     })
 }
 
-fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<Type58, ParseError> {
+fn Decoder111<'input>(_input: &mut Parser<'input>) -> Result<Type58, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10350,7 +10799,7 @@ fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<Type58, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -10360,19 +10809,19 @@ fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<Type58, ParseError>
                     if b == 204 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10217556179496943797u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder125(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder129(_input))?))())?;
             _input.end_slice()?;
             ret
         })
@@ -10384,7 +10833,7 @@ fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<Type58, ParseError>
     })
 }
 
-fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<Type64, ParseError> {
+fn Decoder112<'input>(_input: &mut Parser<'input>) -> Result<Type64, ParseError> {
     let marker = ((|| {
         PResult::Ok({
             let ff = ((|| {
@@ -10393,7 +10842,7 @@ fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<Type64, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
@@ -10403,284 +10852,24 @@ fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<Type64, ParseError>
                     if b == 221 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(8814285897505247341u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
             _input.start_slice(sz)?;
-            let ret = ((|| PResult::Ok((Decoder124(_input))?))())?;
+            let ret = ((|| PResult::Ok((Decoder128(_input))?))())?;
             _input.end_slice()?;
             ret
         })
     })())?;
     PResult::Ok(Type64 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder109<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 226 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| {
-                PResult::Ok({
-                    let mut accum = Vec::new();
-                    while _input.remaining() > 0 {
-                        let matching_ix = {
-                            _input.open_peek_context();
-                            _input.read_byte()?;
-                            {
-                                let ret = 0;
-                                _input.close_peek_context()?;
-                                ret
-                            }
-                        };
-                        if matching_ix == 0 {
-                            let next_elem = (Decoder15(_input))?;
-                            accum.push(next_elem);
-                        } else {
-                            break;
-                        }
-                    }
-                    accum
-                })
-            })())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type56 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder110<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 227 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| {
-                PResult::Ok({
-                    let mut accum = Vec::new();
-                    while _input.remaining() > 0 {
-                        let matching_ix = {
-                            _input.open_peek_context();
-                            _input.read_byte()?;
-                            {
-                                let ret = 0;
-                                _input.close_peek_context()?;
-                                ret
-                            }
-                        };
-                        if matching_ix == 0 {
-                            let next_elem = (Decoder15(_input))?;
-                            accum.push(next_elem);
-                        } else {
-                            break;
-                        }
-                    }
-                    accum
-                })
-            })())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type56 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder111<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 228 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| {
-                PResult::Ok({
-                    let mut accum = Vec::new();
-                    while _input.remaining() > 0 {
-                        let matching_ix = {
-                            _input.open_peek_context();
-                            _input.read_byte()?;
-                            {
-                                let ret = 0;
-                                _input.close_peek_context()?;
-                                ret
-                            }
-                        };
-                        if matching_ix == 0 {
-                            let next_elem = (Decoder15(_input))?;
-                            accum.push(next_elem);
-                        } else {
-                            break;
-                        }
-                    }
-                    accum
-                })
-            })())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type56 {
-        marker,
-        length,
-        data,
-    })
-}
-
-fn Decoder112<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
-    let marker = ((|| {
-        PResult::Ok({
-            let ff = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 255 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            let marker = ((|| {
-                PResult::Ok({
-                    let b = _input.read_byte()?;
-                    if b == 229 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch);
-                    }
-                })
-            })())?;
-            Type41 { ff, marker }
-        })
-    })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let data = ((|| {
-        PResult::Ok({
-            let sz = (length - 2u16) as usize;
-            _input.start_slice(sz)?;
-            let ret = ((|| {
-                PResult::Ok({
-                    let mut accum = Vec::new();
-                    while _input.remaining() > 0 {
-                        let matching_ix = {
-                            _input.open_peek_context();
-                            _input.read_byte()?;
-                            {
-                                let ret = 0;
-                                _input.close_peek_context()?;
-                                ret
-                            }
-                        };
-                        if matching_ix == 0 {
-                            let next_elem = (Decoder15(_input))?;
-                            accum.push(next_elem);
-                        } else {
-                            break;
-                        }
-                    }
-                    accum
-                })
-            })())?;
-            _input.end_slice()?;
-            ret
-        })
-    })())?;
-    PResult::Ok(Type56 {
         marker,
         length,
         data,
@@ -10696,24 +10885,24 @@ fn Decoder113<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 230 {
+                    if b == 226 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(12140482413237234104u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -10761,24 +10950,24 @@ fn Decoder114<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 231 {
+                    if b == 227 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(2795443158724701367u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -10826,24 +11015,24 @@ fn Decoder115<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 232 {
+                    if b == 228 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(3355559118720108211u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -10891,24 +11080,24 @@ fn Decoder116<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 233 {
+                    if b == 229 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(14742198720488010940u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -10956,24 +11145,24 @@ fn Decoder117<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 234 {
+                    if b == 230 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6277645557415946825u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11021,24 +11210,24 @@ fn Decoder118<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 235 {
+                    if b == 231 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(2176159342917065583u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11086,24 +11275,24 @@ fn Decoder119<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 236 {
+                    if b == 232 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6957547562921215229u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11151,24 +11340,24 @@ fn Decoder120<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 237 {
+                    if b == 233 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(3756953894146529854u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11216,24 +11405,24 @@ fn Decoder121<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 238 {
+                    if b == 234 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(12608692552323012024u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11281,24 +11470,24 @@ fn Decoder122<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 239 {
+                    if b == 235 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(2716996167109240019u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11346,24 +11535,24 @@ fn Decoder123<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
                     if b == 255 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
                     }
                 })
             })())?;
             let marker = ((|| {
                 PResult::Ok({
                     let b = _input.read_byte()?;
-                    if b == 254 {
+                    if b == 236 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6641423197242755780u64));
                     }
                 })
             })())?;
             Type41 { ff, marker }
         })
     })())?;
-    let length = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
             let sz = (length - 2u16) as usize;
@@ -11402,12 +11591,272 @@ fn Decoder123<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError>
     })
 }
 
-fn Decoder124<'input>(_input: &mut Parser<'input>) -> Result<Type63, ParseError> {
-    let restart_interval = ((|| PResult::Ok((Decoder41(_input))?))())?;
+fn Decoder124<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 237 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(4000866269867594892u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let mut accum = Vec::new();
+                    while _input.remaining() > 0 {
+                        let matching_ix = {
+                            _input.open_peek_context();
+                            _input.read_byte()?;
+                            {
+                                let ret = 0;
+                                _input.close_peek_context()?;
+                                ret
+                            }
+                        };
+                        if matching_ix == 0 {
+                            let next_elem = (Decoder15(_input))?;
+                            accum.push(next_elem);
+                        } else {
+                            break;
+                        }
+                    }
+                    accum
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type56 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder125<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 238 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(7832938568744868798u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let mut accum = Vec::new();
+                    while _input.remaining() > 0 {
+                        let matching_ix = {
+                            _input.open_peek_context();
+                            _input.read_byte()?;
+                            {
+                                let ret = 0;
+                                _input.close_peek_context()?;
+                                ret
+                            }
+                        };
+                        if matching_ix == 0 {
+                            let next_elem = (Decoder15(_input))?;
+                            accum.push(next_elem);
+                        } else {
+                            break;
+                        }
+                    }
+                    accum
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type56 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder126<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 239 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(52255437925028600u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let mut accum = Vec::new();
+                    while _input.remaining() > 0 {
+                        let matching_ix = {
+                            _input.open_peek_context();
+                            _input.read_byte()?;
+                            {
+                                let ret = 0;
+                                _input.close_peek_context()?;
+                                ret
+                            }
+                        };
+                        if matching_ix == 0 {
+                            let next_elem = (Decoder15(_input))?;
+                            accum.push(next_elem);
+                        } else {
+                            break;
+                        }
+                    }
+                    accum
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type56 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder127<'input>(_input: &mut Parser<'input>) -> Result<Type56, ParseError> {
+    let marker = ((|| {
+        PResult::Ok({
+            let ff = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 255 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(10618271977672484401u64));
+                    }
+                })
+            })())?;
+            let marker = ((|| {
+                PResult::Ok({
+                    let b = _input.read_byte()?;
+                    if b == 254 {
+                        b
+                    } else {
+                        return Err(ParseError::ExcludedBranch(5705528789532761578u64));
+                    }
+                })
+            })())?;
+            Type41 { ff, marker }
+        })
+    })())?;
+    let length = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let data = ((|| {
+        PResult::Ok({
+            let sz = (length - 2u16) as usize;
+            _input.start_slice(sz)?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let mut accum = Vec::new();
+                    while _input.remaining() > 0 {
+                        let matching_ix = {
+                            _input.open_peek_context();
+                            _input.read_byte()?;
+                            {
+                                let ret = 0;
+                                _input.close_peek_context()?;
+                                ret
+                            }
+                        };
+                        if matching_ix == 0 {
+                            let next_elem = (Decoder15(_input))?;
+                            accum.push(next_elem);
+                        } else {
+                            break;
+                        }
+                    }
+                    accum
+                })
+            })())?;
+            _input.end_slice()?;
+            ret
+        })
+    })())?;
+    PResult::Ok(Type56 {
+        marker,
+        length,
+        data,
+    })
+}
+
+fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<Type63, ParseError> {
+    let restart_interval = ((|| PResult::Ok((Decoder44(_input))?))())?;
     PResult::Ok(Type63 { restart_interval })
 }
 
-fn Decoder125<'input>(_input: &mut Parser<'input>) -> Result<Type57, ParseError> {
+fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<Type57, ParseError> {
     let class_table_id = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let value = ((|| PResult::Ok((Decoder15(_input))?))())?;
     PResult::Ok(Type57 {
@@ -11416,7 +11865,7 @@ fn Decoder125<'input>(_input: &mut Parser<'input>) -> Result<Type57, ParseError>
     })
 }
 
-fn Decoder126<'input>(_input: &mut Parser<'input>) -> Result<Type59, ParseError> {
+fn Decoder130<'input>(_input: &mut Parser<'input>) -> Result<Type59, ParseError> {
     let class_table_id = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let num_codes = ((|| {
         PResult::Ok({
@@ -11457,7 +11906,7 @@ fn Decoder126<'input>(_input: &mut Parser<'input>) -> Result<Type59, ParseError>
     })
 }
 
-fn Decoder127<'input>(_input: &mut Parser<'input>) -> Result<Type61, ParseError> {
+fn Decoder131<'input>(_input: &mut Parser<'input>) -> Result<Type61, ParseError> {
     let precision_table_id = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let elements = ((|| {
         PResult::Ok({
@@ -11488,18 +11937,18 @@ fn Decoder127<'input>(_input: &mut Parser<'input>) -> Result<Type61, ParseError>
     })
 }
 
-fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<Type53, ParseError> {
-    let identifier = ((|| PResult::Ok((Decoder129(_input))?))())?;
+fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type53, ParseError> {
+    let identifier = ((|| PResult::Ok((Decoder133(_input))?))())?;
     let data = ((|| {
         PResult::Ok(match identifier.clone().string.as_slice() {
             [69, 120, 105, 102] => {
-                let inner = (Decoder130(_input))?;
+                let inner = (Decoder134(_input))?;
                 Type52::exif(inner)
             }
 
             [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] =>
             {
-                let inner = (Decoder131(_input))?;
+                let inner = (Decoder135(_input))?;
                 Type52::xmp(inner)
             }
 
@@ -11532,7 +11981,7 @@ fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<Type53, ParseError>
     PResult::Ok(Type53 { identifier, data })
 }
 
-fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+fn Decoder133<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -11547,7 +11996,7 @@ fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -11560,7 +12009,7 @@ fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -11577,29 +12026,29 @@ fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
             if b == 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
             }
         })
     })())?;
     PResult::Ok(Type21 { string, null })
 }
 
-fn Decoder130<'input>(_input: &mut Parser<'input>) -> Result<Type50, ParseError> {
+fn Decoder134<'input>(_input: &mut Parser<'input>) -> Result<Type50, ParseError> {
     let padding = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
             }
         })
     })())?;
-    let exif = ((|| PResult::Ok((Decoder132(_input))?))())?;
+    let exif = ((|| PResult::Ok((Decoder136(_input))?))())?;
     PResult::Ok(Type50 { padding, exif })
 }
 
-fn Decoder131<'input>(_input: &mut Parser<'input>) -> Result<Type51, ParseError> {
+fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<Type51, ParseError> {
     let xmp = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -11626,7 +12075,7 @@ fn Decoder131<'input>(_input: &mut Parser<'input>) -> Result<Type51, ParseError>
     PResult::Ok(Type51 { xmp })
 }
 
-fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError> {
+fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError> {
     let byte_order = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -11639,7 +12088,7 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                         77u8 => 1,
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(2568666803637249590u64));
                         }
                     };
                     _input.close_peek_context()?;
@@ -11654,7 +12103,7 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                             if b == 73 {
                                 b
                             } else {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(17197161005512507961u64));
                             }
                         })
                     })())?;
@@ -11664,7 +12113,7 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                             if b == 73 {
                                 b
                             } else {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(17197161005512507961u64));
                             }
                         })
                     })())?;
@@ -11678,7 +12127,7 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                             if b == 77 {
                                 b
                             } else {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(1661485880725065159u64));
                             }
                         })
                     })())?;
@@ -11688,7 +12137,7 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                             if b == 77 {
                                 b
                             } else {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(1661485880725065159u64));
                             }
                         })
                     })())?;
@@ -11696,16 +12145,16 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                 }
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(8662494850867647108u64));
                 }
             }
         })
     })())?;
     let magic = ((|| {
         PResult::Ok(match byte_order {
-            Type46::le(..) => (Decoder133(_input))?,
+            Type46::le(..) => (Decoder137(_input))?,
 
-            Type46::be(..) => (Decoder41(_input))?,
+            Type46::be(..) => (Decoder44(_input))?,
         })
     })())?;
     let offset = ((|| {
@@ -11722,14 +12171,14 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
             let ret = ((|| {
                 PResult::Ok(match byte_order {
                     Type46::le(..) => {
-                        let num_fields = ((|| PResult::Ok((Decoder133(_input))?))())?;
+                        let num_fields = ((|| PResult::Ok((Decoder137(_input))?))())?;
                         let fields = ((|| {
                             PResult::Ok({
                                 let mut accum = Vec::new();
                                 for _ in 0..num_fields {
                                     accum.push({
-                                        let tag = ((|| PResult::Ok((Decoder133(_input))?))())?;
-                                        let r#type = ((|| PResult::Ok((Decoder133(_input))?))())?;
+                                        let tag = ((|| PResult::Ok((Decoder137(_input))?))())?;
+                                        let r#type = ((|| PResult::Ok((Decoder137(_input))?))())?;
                                         let length = ((|| PResult::Ok((Decoder22(_input))?))())?;
                                         let offset_or_data =
                                             ((|| PResult::Ok((Decoder22(_input))?))())?;
@@ -11777,14 +12226,14 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
                     }
 
                     Type46::be(..) => {
-                        let num_fields = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                        let num_fields = ((|| PResult::Ok((Decoder44(_input))?))())?;
                         let fields = ((|| {
                             PResult::Ok({
                                 let mut accum = Vec::new();
                                 for _ in 0..num_fields {
                                     accum.push({
-                                        let tag = ((|| PResult::Ok((Decoder41(_input))?))())?;
-                                        let r#type = ((|| PResult::Ok((Decoder41(_input))?))())?;
+                                        let tag = ((|| PResult::Ok((Decoder44(_input))?))())?;
+                                        let r#type = ((|| PResult::Ok((Decoder44(_input))?))())?;
                                         let length = ((|| PResult::Ok((Decoder31(_input))?))())?;
                                         let offset_or_data =
                                             ((|| PResult::Ok((Decoder31(_input))?))())?;
@@ -11844,7 +12293,7 @@ fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<Type49, ParseError>
     })
 }
 
-fn Decoder133<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
+fn Decoder137<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
     let inner = {
         let field0 = ((|| PResult::Ok((Decoder15(_input))?))())?;
         let field1 = ((|| PResult::Ok((Decoder15(_input))?))())?;
@@ -11853,12 +12302,12 @@ fn Decoder133<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
     PResult::Ok(((|x: (u8, u8)| PResult::Ok(u16le(x)))(inner))?)
 }
 
-fn Decoder134<'input>(_input: &mut Parser<'input>) -> Result<Type44, ParseError> {
-    let identifier = ((|| PResult::Ok((Decoder135(_input))?))())?;
+fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<Type44, ParseError> {
+    let identifier = ((|| PResult::Ok((Decoder139(_input))?))())?;
     let data = ((|| {
         PResult::Ok(match identifier.clone().string.as_slice() {
             [74, 70, 73, 70] => {
-                let inner = (Decoder136(_input))?;
+                let inner = (Decoder140(_input))?;
                 Type43::jfif(inner)
             }
 
@@ -11891,7 +12340,7 @@ fn Decoder134<'input>(_input: &mut Parser<'input>) -> Result<Type44, ParseError>
     PResult::Ok(Type44 { identifier, data })
 }
 
-fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+fn Decoder139<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -11906,7 +12355,7 @@ fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -11919,7 +12368,7 @@ fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -11936,19 +12385,19 @@ fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
             if b == 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
             }
         })
     })())?;
     PResult::Ok(Type21 { string, null })
 }
 
-fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<Type42, ParseError> {
+fn Decoder140<'input>(_input: &mut Parser<'input>) -> Result<Type42, ParseError> {
     let version_major = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let version_minor = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let density_units = ((|| PResult::Ok((Decoder15(_input))?))())?;
-    let density_x = ((|| PResult::Ok((Decoder41(_input))?))())?;
-    let density_y = ((|| PResult::Ok((Decoder41(_input))?))())?;
+    let density_x = ((|| PResult::Ok((Decoder44(_input))?))())?;
+    let density_y = ((|| PResult::Ok((Decoder44(_input))?))())?;
     let thumbnail_width = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let thumbnail_height = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let thumbnail_pixels = ((|| {
@@ -11958,7 +12407,7 @@ fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<Type42, ParseError>
                 accum.push({
                     let mut accum = Vec::new();
                     for _ in 0..thumbnail_width {
-                        accum.push((Decoder137(_input))?);
+                        accum.push((Decoder141(_input))?);
                     }
                     accum
                 });
@@ -11978,14 +12427,14 @@ fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<Type42, ParseError>
     })
 }
 
-fn Decoder137<'input>(_input: &mut Parser<'input>) -> Result<Type2, ParseError> {
+fn Decoder141<'input>(_input: &mut Parser<'input>) -> Result<Type2, ParseError> {
     let r = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let g = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let b = ((|| PResult::Ok((Decoder15(_input))?))())?;
     PResult::Ok(Type2 { r, g, b })
 }
 
-fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<Type20, ParseError> {
+fn Decoder142<'input>(_input: &mut Parser<'input>) -> Result<Type20, ParseError> {
     let magic = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -11994,7 +12443,7 @@ fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<Type20, ParseError>
                     if b == 31 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6728817869016996251u64));
                     }
                 })
             })())?;
@@ -12004,7 +12453,7 @@ fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<Type20, ParseError>
                     if b == 139 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(12646530475123667541u64));
                     }
                 })
             })())?;
@@ -12026,16 +12475,16 @@ fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<Type20, ParseError>
     })
 }
 
-fn Decoder139<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
-    PResult::Ok((Decoder149(_input))?)
+fn Decoder143<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+    PResult::Ok((Decoder153(_input))?)
 }
 
-fn Decoder140<'input>(_input: &mut Parser<'input>) -> Result<Type38, ParseError> {
+fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<Type38, ParseError> {
     let blocks = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
             loop {
-                let elem = (Decoder142(_input))?;
+                let elem = (Decoder146(_input))?;
                 if ((|x: &Type37| PResult::Ok(x.clone().r#final == 1u8))(&elem))? {
                     accum.push(elem);
                     break;
@@ -12093,19 +12542,19 @@ fn Decoder140<'input>(_input: &mut Parser<'input>) -> Result<Type38, ParseError>
     })
 }
 
-fn Decoder141<'input>(_input: &mut Parser<'input>) -> Result<Type39, ParseError> {
+fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type39, ParseError> {
     let crc = ((|| PResult::Ok((Decoder22(_input))?))())?;
     let length = ((|| PResult::Ok((Decoder22(_input))?))())?;
     PResult::Ok(Type39 { crc, length })
 }
 
-fn Decoder142<'input>(_input: &mut Parser<'input>) -> Result<Type37, ParseError> {
-    let r#final = ((|| PResult::Ok((Decoder143(_input))?))())?;
+fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type37, ParseError> {
+    let r#final = ((|| PResult::Ok((Decoder147(_input))?))())?;
     let r#type = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                 (field0, field1)
             };
             ((|bits: (u8, u8)| PResult::Ok(bits.clone().1 << 1u8 | bits.clone().0))(inner))?
@@ -12114,17 +12563,17 @@ fn Decoder142<'input>(_input: &mut Parser<'input>) -> Result<Type37, ParseError>
     let data = ((|| {
         PResult::Ok(match r#type {
             0 => {
-                let inner = (Decoder144(_input))?;
+                let inner = (Decoder148(_input))?;
                 Type36::uncompressed(inner)
             }
 
             1 => {
-                let inner = (Decoder145(_input))?;
+                let inner = (Decoder149(_input))?;
                 Type36::fixed_huffman(inner)
             }
 
             2 => {
-                let inner = (Decoder146(_input))?;
+                let inner = (Decoder150(_input))?;
                 Type36::dynamic_huffman(inner)
             }
 
@@ -12142,32 +12591,32 @@ fn Decoder142<'input>(_input: &mut Parser<'input>) -> Result<Type37, ParseError>
     })
 }
 
-fn Decoder143<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder147<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     let b = _input.read_byte()?;
     PResult::Ok(b)
 }
 
-fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<Type35, ParseError> {
+fn Decoder148<'input>(_input: &mut Parser<'input>) -> Result<Type35, ParseError> {
     let align = ((|| PResult::Ok(_input.skip_align(8)?))())?;
     let len = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field9 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field10 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field11 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field12 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field13 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field14 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field15 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field9 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field10 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field11 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field12 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field13 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field14 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field15 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                 (
                     field0, field1, field2, field3, field4, field5, field6, field7, field8, field9,
                     field10, field11, field12, field13, field14, field15,
@@ -12215,22 +12664,22 @@ fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<Type35, ParseError>
     let nlen = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field9 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field10 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field11 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field12 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field13 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field14 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field15 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field9 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field10 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field11 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field12 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field13 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field14 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field15 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                 (
                     field0, field1, field2, field3, field4, field5, field6, field7, field8, field9,
                     field10, field11, field12, field13, field14, field15,
@@ -12281,14 +12730,14 @@ fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<Type35, ParseError>
             for _ in 0..len {
                 accum.push({
                     let inner = {
-                        let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                        let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                         (
                             field0, field1, field2, field3, field4, field5, field6, field7,
                         )
@@ -12326,7 +12775,7 @@ fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<Type35, ParseError>
     })
 }
 
-fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError> {
+fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError> {
     let codes = ((|| {
         PResult::Ok({
             let format = parse_huffman(
@@ -12368,15 +12817,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12391,7 +12840,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12413,15 +12862,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12436,7 +12885,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12458,15 +12907,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12481,7 +12930,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12503,15 +12952,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12526,7 +12975,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12548,15 +12997,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12571,7 +13020,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12593,15 +13042,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12616,7 +13065,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12638,15 +13087,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12661,7 +13110,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12683,15 +13132,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12706,7 +13155,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12725,7 +13174,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -12738,15 +13187,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12761,7 +13210,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12780,7 +13229,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -12793,15 +13242,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12816,7 +13265,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12835,7 +13284,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -12848,15 +13297,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12871,7 +13320,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12890,7 +13339,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -12903,15 +13352,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12926,7 +13375,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -12945,9 +13394,9 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -12962,15 +13411,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -12985,7 +13434,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13004,9 +13453,9 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -13021,15 +13470,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13044,7 +13493,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13063,9 +13512,9 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -13080,15 +13529,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13103,7 +13552,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13122,9 +13571,9 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -13139,15 +13588,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13162,7 +13611,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13181,11 +13630,11 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -13204,15 +13653,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13227,7 +13676,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13246,11 +13695,11 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -13269,15 +13718,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13292,7 +13741,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13311,11 +13760,11 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -13334,15 +13783,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13357,7 +13806,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13376,11 +13825,11 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -13399,15 +13848,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13422,7 +13871,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13441,13 +13890,13 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -13467,15 +13916,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13490,7 +13939,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13509,13 +13958,13 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -13535,15 +13984,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13558,7 +14007,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13577,13 +14026,13 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -13603,15 +14052,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13626,7 +14075,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13645,13 +14094,13 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -13671,15 +14120,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13694,7 +14143,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13713,15 +14162,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13742,15 +14191,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13765,7 +14214,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13784,15 +14233,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13813,15 +14262,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13836,7 +14285,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13855,15 +14304,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13884,15 +14333,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13907,7 +14356,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -13926,15 +14375,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13955,15 +14404,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -13978,7 +14427,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -14000,15 +14449,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -14023,7 +14472,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                                         })
                                     })())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code as u16))?)
+                                        PResult::Ok((Decoder151(_input, distance_code as u16))?)
                                     })(
                                     ))?;
                                     Type31 {
@@ -14068,7 +14517,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14080,7 +14529,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14092,7 +14541,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14104,7 +14553,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14116,7 +14565,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14128,7 +14577,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14140,7 +14589,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14152,7 +14601,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14164,7 +14613,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14176,7 +14625,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14188,7 +14637,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14200,7 +14649,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14212,7 +14661,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14224,7 +14673,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14236,7 +14685,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14248,7 +14697,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14260,7 +14709,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14272,7 +14721,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14284,7 +14733,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14296,7 +14745,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14308,7 +14757,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14320,7 +14769,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14332,7 +14781,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14344,7 +14793,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14356,7 +14805,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14368,7 +14817,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14380,7 +14829,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14392,7 +14841,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14404,7 +14853,7 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(3837024443630474590u64));
                         }
                     },
 
@@ -14419,15 +14868,15 @@ fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<Type34, ParseError>
     })
 }
 
-fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError> {
+fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError> {
     let hlit = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                 (field0, field1, field2, field3, field4)
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -14444,11 +14893,11 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
     let hdist = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                 (field0, field1, field2, field3, field4)
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -14465,10 +14914,10 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
     let hclen = ((|| {
         PResult::Ok({
             let inner = {
-                let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                 (field0, field1, field2, field3)
             };
             ((|bits: (u8, u8, u8, u8)| {
@@ -14487,9 +14936,9 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
             for _ in 0..hclen + 4u8 {
                 accum.push({
                     let inner = {
-                        let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                        let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                        let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                        let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                         (field0, field1, field2)
                     };
                     ((|bits: (u8, u8, u8)| {
@@ -14520,8 +14969,8 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         PResult::Ok(match code as u8 {
                             16 => {
                                 let inner = {
-                                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                                     (field0, field1)
                                 };
                                 ((|bits: (u8, u8)| {
@@ -14531,9 +14980,9 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
 
                             17 => {
                                 let inner = {
-                                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                                     (field0, field1, field2)
                                 };
                                 ((|bits: (u8, u8, u8)| {
@@ -14547,13 +14996,13 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
 
                             18 => {
                                 let inner = {
-                                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                                     (field0, field1, field2, field3, field4, field5, field6)
                                 };
                                 ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
@@ -14581,19 +15030,21 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                             y.iter().cloned(),
                             {
                                 ();
-                                Type193::none
+                                Type199::none
                             },
-                            |x: (Type193, Type23)| {
+                            |x: (Type199, Type23)| {
                                 PResult::Ok(match x.clone().1.code as u8 {
                                     16 => (
                                         x.clone().0,
                                         dup32(
                                             (x.clone().1.extra + 3u8) as u32,
                                             match x.clone().0 {
-                                                Type193::some(y) => y.clone(),
+                                                Type199::some(y) => y.clone(),
 
                                                 _ => {
-                                                    return Err(ParseError::ExcludedBranch);
+                                                    return Err(ParseError::ExcludedBranch(
+                                                        15488148895825521580u64,
+                                                    ));
                                                 }
                                             },
                                         ),
@@ -14607,7 +15058,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         (x.clone().0, dup32((x.clone().1.extra + 11u8) as u32, 0u8))
                                     }
 
-                                    v => (Type193::some(v), [v.clone()].to_vec()),
+                                    v => (Type199::some(v), [v.clone()].to_vec()),
                                 })
                             },
                         ))?
@@ -14630,19 +15081,21 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                     .cloned(),
                 {
                     ();
-                    Type193::none
+                    Type199::none
                 },
-                |x: (Type193, Type23)| {
+                |x: (Type199, Type23)| {
                     PResult::Ok(match x.clone().1.code as u8 {
                         16 => (
                             x.clone().0,
                             dup32(
                                 (x.clone().1.extra + 3u8) as u32,
                                 match x.clone().0 {
-                                    Type193::some(y) => y.clone(),
+                                    Type199::some(y) => y.clone(),
 
                                     _ => {
-                                        return Err(ParseError::ExcludedBranch);
+                                        return Err(ParseError::ExcludedBranch(
+                                            15488148895825521580u64,
+                                        ));
                                     }
                                 },
                             ),
@@ -14652,7 +15105,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
 
                         18 => (x.clone().0, dup32((x.clone().1.extra + 11u8) as u32, 0u8)),
 
-                        v => (Type193::some(v), [v.clone()].to_vec()),
+                        v => (Type199::some(v), [v.clone()].to_vec()),
                     })
                 },
             ))?,
@@ -14696,7 +15149,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14717,7 +15170,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14738,7 +15191,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14759,7 +15212,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14780,7 +15233,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14801,7 +15254,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14822,7 +15275,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14843,7 +15296,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14862,7 +15315,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -14874,7 +15327,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14893,7 +15346,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -14905,7 +15358,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14924,7 +15377,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -14936,7 +15389,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14955,7 +15408,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0,)
                                             };
                                             ((|bits: (u8,)| PResult::Ok(bits.clone().0))(inner))?
@@ -14967,7 +15420,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -14986,9 +15439,9 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -15002,7 +15455,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15021,9 +15474,9 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -15037,7 +15490,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15056,9 +15509,9 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -15072,7 +15525,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15091,9 +15544,9 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
@@ -15107,7 +15560,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15126,11 +15579,11 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -15148,7 +15601,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15167,11 +15620,11 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -15189,7 +15642,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15208,11 +15661,11 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -15230,7 +15683,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15249,11 +15702,11 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2)
                                             };
                                             ((|bits: (u8, u8, u8)| {
@@ -15271,7 +15724,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15290,13 +15743,13 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -15315,7 +15768,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15334,13 +15787,13 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -15359,7 +15812,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15378,13 +15831,13 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -15403,7 +15856,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15422,13 +15875,13 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3)
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
@@ -15447,7 +15900,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15466,15 +15919,15 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -15494,7 +15947,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15513,15 +15966,15 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -15541,7 +15994,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15560,15 +16013,15 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -15588,7 +16041,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15607,15 +16060,15 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                         PResult::Ok({
                                             let inner = {
                                                 let field0 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field1 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field2 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field3 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 let field4 =
-                                                    ((|| PResult::Ok((Decoder143(_input))?))())?;
+                                                    ((|| PResult::Ok((Decoder147(_input))?))())?;
                                                 (field0, field1, field2, field3, field4)
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
@@ -15635,7 +16088,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15656,7 +16109,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                                     let distance_code =
                                         ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
                                     let distance_record = ((|| {
-                                        PResult::Ok((Decoder147(_input, distance_code.clone()))?)
+                                        PResult::Ok((Decoder151(_input, distance_code.clone()))?)
                                     })(
                                     ))?;
                                     Type25 {
@@ -15701,7 +16154,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15713,7 +16166,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15725,7 +16178,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15737,7 +16190,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15749,7 +16202,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15761,7 +16214,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15773,7 +16226,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15785,7 +16238,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15797,7 +16250,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15809,7 +16262,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15821,7 +16274,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15833,7 +16286,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15845,7 +16298,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15857,7 +16310,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15869,7 +16322,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15881,7 +16334,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15893,7 +16346,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15905,7 +16358,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15917,7 +16370,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15929,7 +16382,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15941,7 +16394,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15953,7 +16406,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15965,7 +16418,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15977,7 +16430,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -15989,7 +16442,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -16001,7 +16454,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -16013,7 +16466,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -16025,7 +16478,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -16037,7 +16490,7 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
                         .to_vec(),
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(13749635282143713177u64));
                         }
                     },
 
@@ -16060,70 +16513,70 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<Type30, ParseError>
     })
 }
 
-fn Decoder147<'input>(
+fn Decoder151<'input>(
     _input: &mut Parser<'input>,
     distance_code: u16,
 ) -> Result<Type24, ParseError> {
     PResult::Ok(match distance_code as u8 {
-        0 => (Decoder148(_input, 0u8, 1u16))?,
+        0 => (Decoder152(_input, 0u8, 1u16))?,
 
-        1 => (Decoder148(_input, 0u8, 2u16))?,
+        1 => (Decoder152(_input, 0u8, 2u16))?,
 
-        2 => (Decoder148(_input, 0u8, 3u16))?,
+        2 => (Decoder152(_input, 0u8, 3u16))?,
 
-        3 => (Decoder148(_input, 0u8, 4u16))?,
+        3 => (Decoder152(_input, 0u8, 4u16))?,
 
-        4 => (Decoder148(_input, 1u8, 5u16))?,
+        4 => (Decoder152(_input, 1u8, 5u16))?,
 
-        5 => (Decoder148(_input, 1u8, 7u16))?,
+        5 => (Decoder152(_input, 1u8, 7u16))?,
 
-        6 => (Decoder148(_input, 2u8, 9u16))?,
+        6 => (Decoder152(_input, 2u8, 9u16))?,
 
-        7 => (Decoder148(_input, 2u8, 13u16))?,
+        7 => (Decoder152(_input, 2u8, 13u16))?,
 
-        8 => (Decoder148(_input, 3u8, 17u16))?,
+        8 => (Decoder152(_input, 3u8, 17u16))?,
 
-        9 => (Decoder148(_input, 3u8, 25u16))?,
+        9 => (Decoder152(_input, 3u8, 25u16))?,
 
-        10 => (Decoder148(_input, 4u8, 33u16))?,
+        10 => (Decoder152(_input, 4u8, 33u16))?,
 
-        11 => (Decoder148(_input, 4u8, 49u16))?,
+        11 => (Decoder152(_input, 4u8, 49u16))?,
 
-        12 => (Decoder148(_input, 5u8, 65u16))?,
+        12 => (Decoder152(_input, 5u8, 65u16))?,
 
-        13 => (Decoder148(_input, 5u8, 97u16))?,
+        13 => (Decoder152(_input, 5u8, 97u16))?,
 
-        14 => (Decoder148(_input, 6u8, 129u16))?,
+        14 => (Decoder152(_input, 6u8, 129u16))?,
 
-        15 => (Decoder148(_input, 6u8, 193u16))?,
+        15 => (Decoder152(_input, 6u8, 193u16))?,
 
-        16 => (Decoder148(_input, 7u8, 257u16))?,
+        16 => (Decoder152(_input, 7u8, 257u16))?,
 
-        17 => (Decoder148(_input, 7u8, 385u16))?,
+        17 => (Decoder152(_input, 7u8, 385u16))?,
 
-        18 => (Decoder148(_input, 8u8, 513u16))?,
+        18 => (Decoder152(_input, 8u8, 513u16))?,
 
-        19 => (Decoder148(_input, 8u8, 769u16))?,
+        19 => (Decoder152(_input, 8u8, 769u16))?,
 
-        20 => (Decoder148(_input, 9u8, 1025u16))?,
+        20 => (Decoder152(_input, 9u8, 1025u16))?,
 
-        21 => (Decoder148(_input, 9u8, 1537u16))?,
+        21 => (Decoder152(_input, 9u8, 1537u16))?,
 
-        22 => (Decoder148(_input, 10u8, 2049u16))?,
+        22 => (Decoder152(_input, 10u8, 2049u16))?,
 
-        23 => (Decoder148(_input, 10u8, 3073u16))?,
+        23 => (Decoder152(_input, 10u8, 3073u16))?,
 
-        24 => (Decoder148(_input, 11u8, 4097u16))?,
+        24 => (Decoder152(_input, 11u8, 4097u16))?,
 
-        25 => (Decoder148(_input, 11u8, 6145u16))?,
+        25 => (Decoder152(_input, 11u8, 6145u16))?,
 
-        26 => (Decoder148(_input, 12u8, 8193u16))?,
+        26 => (Decoder152(_input, 12u8, 8193u16))?,
 
-        27 => (Decoder148(_input, 12u8, 12289u16))?,
+        27 => (Decoder152(_input, 12u8, 12289u16))?,
 
-        28 => (Decoder148(_input, 13u8, 16385u16))?,
+        28 => (Decoder152(_input, 13u8, 16385u16))?,
 
-        29 => (Decoder148(_input, 13u8, 24577u16))?,
+        29 => (Decoder152(_input, 13u8, 24577u16))?,
 
         _other => {
             unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
@@ -16131,7 +16584,7 @@ fn Decoder147<'input>(
     })
 }
 
-fn Decoder148<'input>(
+fn Decoder152<'input>(
     _input: &mut Parser<'input>,
     extra_bits: u8,
     start: u16,
@@ -16142,7 +16595,7 @@ fn Decoder148<'input>(
 
             1 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0,)
                 };
                 ((|bits: (u8,)| PResult::Ok(bits.clone().0 as u16))(inner))?
@@ -16150,8 +16603,8 @@ fn Decoder148<'input>(
 
             2 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0, field1)
                 };
                 ((|bits: (u8, u8)| {
@@ -16161,9 +16614,9 @@ fn Decoder148<'input>(
 
             3 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0, field1, field2)
                 };
                 ((|bits: (u8, u8, u8)| {
@@ -16177,10 +16630,10 @@ fn Decoder148<'input>(
 
             4 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0, field1, field2, field3)
                 };
                 ((|bits: (u8, u8, u8, u8)| {
@@ -16195,11 +16648,11 @@ fn Decoder148<'input>(
 
             5 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0, field1, field2, field3, field4)
                 };
                 ((|bits: (u8, u8, u8, u8, u8)| {
@@ -16215,12 +16668,12 @@ fn Decoder148<'input>(
 
             6 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0, field1, field2, field3, field4, field5)
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8)| {
@@ -16237,13 +16690,13 @@ fn Decoder148<'input>(
 
             7 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (field0, field1, field2, field3, field4, field5, field6)
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
@@ -16261,14 +16714,14 @@ fn Decoder148<'input>(
 
             8 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (
                         field0, field1, field2, field3, field4, field5, field6, field7,
                     )
@@ -16289,15 +16742,15 @@ fn Decoder148<'input>(
 
             9 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (
                         field0, field1, field2, field3, field4, field5, field6, field7, field8,
                     )
@@ -16319,16 +16772,16 @@ fn Decoder148<'input>(
 
             10 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field9 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field9 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (
                         field0, field1, field2, field3, field4, field5, field6, field7, field8,
                         field9,
@@ -16352,17 +16805,17 @@ fn Decoder148<'input>(
 
             11 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field9 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field10 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field9 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field10 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (
                         field0, field1, field2, field3, field4, field5, field6, field7, field8,
                         field9, field10,
@@ -16387,18 +16840,18 @@ fn Decoder148<'input>(
 
             12 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field9 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field10 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field11 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field9 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field10 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field11 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (
                         field0, field1, field2, field3, field4, field5, field6, field7, field8,
                         field9, field10, field11,
@@ -16424,19 +16877,19 @@ fn Decoder148<'input>(
 
             13 => {
                 let inner = {
-                    let field0 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field1 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field2 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field3 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field4 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field5 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field6 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field7 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field8 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field9 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field10 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field11 = ((|| PResult::Ok((Decoder143(_input))?))())?;
-                    let field12 = ((|| PResult::Ok((Decoder143(_input))?))())?;
+                    let field0 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field1 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field2 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field3 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field4 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field5 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field6 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field7 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field8 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field9 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field10 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field11 = ((|| PResult::Ok((Decoder147(_input))?))())?;
+                    let field12 = ((|| PResult::Ok((Decoder147(_input))?))())?;
                     (
                         field0, field1, field2, field3, field4, field5, field6, field7, field8,
                         field9, field10, field11, field12,
@@ -16475,7 +16928,7 @@ fn Decoder148<'input>(
     })
 }
 
-fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
+fn Decoder153<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -16490,7 +16943,7 @@ fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -16503,7 +16956,7 @@ fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
                         if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -16520,14 +16973,14 @@ fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<Type21, ParseError>
             if b == 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
             }
         })
     })())?;
     PResult::Ok(Type21 { string, null })
 }
 
-fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<Type0, ParseError> {
+fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<Type0, ParseError> {
     let signature = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -16536,7 +16989,7 @@ fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<Type0, ParseError> 
                     if b == 71 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(690880023569680479u64));
                     }
                 })
             })())?;
@@ -16546,7 +16999,7 @@ fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<Type0, ParseError> 
                     if b == 73 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(17197161005512507961u64));
                     }
                 })
             })())?;
@@ -16556,7 +17009,7 @@ fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<Type0, ParseError> 
                     if b == 70 {
                         b
                     } else {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(14049552398800766371u64));
                     }
                 })
             })())?;
@@ -16575,15 +17028,15 @@ fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<Type0, ParseError> 
     PResult::Ok(Type0 { signature, version })
 }
 
-fn Decoder151<'input>(_input: &mut Parser<'input>) -> Result<Type4, ParseError> {
-    let descriptor = ((|| PResult::Ok((Decoder167(_input))?))())?;
+fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<Type4, ParseError> {
+    let descriptor = ((|| PResult::Ok((Decoder171(_input))?))())?;
     let global_color_table = ((|| {
         PResult::Ok(match descriptor.clone().flags & 128u8 != 0u8 {
             true => {
                 let inner = {
                     let mut accum = Vec::new();
                     for _ in 0..2u8 << (descriptor.clone().flags & 7u8) {
-                        accum.push((Decoder165(_input))?);
+                        accum.push((Decoder169(_input))?);
                     }
                     accum
                 };
@@ -16602,7 +17055,7 @@ fn Decoder151<'input>(_input: &mut Parser<'input>) -> Result<Type4, ParseError> 
     })
 }
 
-fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<Type17, ParseError> {
+fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type17, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -16620,7 +17073,7 @@ fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<Type17, ParseError>
                         254u8 => 1,
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(5009412587336832230u64));
                         }
                     }
                 }
@@ -16628,7 +17081,7 @@ fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<Type17, ParseError>
                 44u8 => 0,
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(3181733884495644307u64));
                 }
             };
             _input.close_peek_context()?;
@@ -16637,36 +17090,36 @@ fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<Type17, ParseError>
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder154(_input))?;
+            let inner = (Decoder158(_input))?;
             Type17::graphic_block(inner)
         }
 
         1 => {
-            let inner = (Decoder155(_input))?;
+            let inner = (Decoder159(_input))?;
             Type17::special_purpose_block(inner)
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(14056621334159770744u64));
         }
     })
 }
 
-fn Decoder153<'input>(_input: &mut Parser<'input>) -> Result<Type18, ParseError> {
+fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type18, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 59 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(15783818897979407630u64));
             }
         })
     })())?;
     PResult::Ok(Type18 { separator })
 }
 
-fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<Type13, ParseError> {
+fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<Type13, ParseError> {
     let graphic_control_extension = ((|| {
         PResult::Ok({
             let tree_index = {
@@ -16682,7 +17135,9 @@ fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<Type13, ParseError>
                                 1u8 => 1,
 
                                 _ => {
-                                    return Err(ParseError::ExcludedBranch);
+                                    return Err(ParseError::ExcludedBranch(
+                                        16676828686615745155u64,
+                                    ));
                                 }
                             }
                         }
@@ -16690,7 +17145,7 @@ fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<Type13, ParseError>
                         44u8 => 1,
 
                         _ => {
-                            return Err(ParseError::ExcludedBranch);
+                            return Err(ParseError::ExcludedBranch(4699571722508458381u64));
                         }
                     };
                     _input.close_peek_context()?;
@@ -16699,7 +17154,7 @@ fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<Type13, ParseError>
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder160(_input))?;
+                    let inner = (Decoder164(_input))?;
                     Type6::some(inner)
                 }
 
@@ -16709,19 +17164,19 @@ fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<Type13, ParseError>
                 }
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(15496895076277599409u64));
                 }
             }
         })
     })())?;
-    let graphic_rendering_block = ((|| PResult::Ok((Decoder161(_input))?))())?;
+    let graphic_rendering_block = ((|| PResult::Ok((Decoder165(_input))?))())?;
     PResult::Ok(Type13 {
         graphic_control_extension,
         graphic_rendering_block,
     })
 }
 
-fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<Type16, ParseError> {
+fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<Type16, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -16734,11 +17189,11 @@ fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<Type16, ParseError>
                     254u8 => 1,
 
                     _ => {
-                        return Err(ParseError::ExcludedBranch);
+                        return Err(ParseError::ExcludedBranch(6088842714593122773u64));
                     }
                 }
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(8240896963323767603u64));
             };
             _input.close_peek_context()?;
             ret
@@ -16746,29 +17201,29 @@ fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<Type16, ParseError>
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder156(_input))?;
+            let inner = (Decoder160(_input))?;
             Type16::application_extension(inner)
         }
 
         1 => {
-            let inner = (Decoder157(_input))?;
+            let inner = (Decoder161(_input))?;
             Type16::comment_extension(inner)
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(7565262198115782210u64));
         }
     })
 }
 
-fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError> {
+fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 33 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(12638618761954708471u64));
             }
         })
     })())?;
@@ -16778,7 +17233,7 @@ fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError>
             if b == 255 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(10618271977672484401u64));
             }
         })
     })())?;
@@ -16788,7 +17243,7 @@ fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError>
             if b == 11 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(16286797724653440122u64));
             }
         })
     })())?;
@@ -16824,7 +17279,7 @@ fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -16832,7 +17287,7 @@ fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError>
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder158(_input))?;
+                    let next_elem = (Decoder162(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -16841,7 +17296,7 @@ fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError>
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder159(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder163(_input))?))())?;
     PResult::Ok(Type14 {
         separator,
         label,
@@ -16853,14 +17308,14 @@ fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Type14, ParseError>
     })
 }
 
-fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError> {
+fn Decoder161<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 33 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(12638618761954708471u64));
             }
         })
     })())?;
@@ -16870,7 +17325,7 @@ fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError>
             if b == 254 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(5705528789532761578u64));
             }
         })
     })())?;
@@ -16888,7 +17343,7 @@ fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -16896,7 +17351,7 @@ fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError>
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder158(_input))?;
+                    let next_elem = (Decoder162(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -16905,7 +17360,7 @@ fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError>
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder159(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder163(_input))?))())?;
     PResult::Ok(Type15 {
         separator,
         label,
@@ -16914,14 +17369,14 @@ fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Type15, ParseError>
     })
 }
 
-fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<Type7, ParseError> {
+fn Decoder162<'input>(_input: &mut Parser<'input>) -> Result<Type7, ParseError> {
     let len_bytes = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b != 0 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(8606461246239977862u64));
             }
         })
     })())?;
@@ -16937,23 +17392,23 @@ fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<Type7, ParseError> 
     PResult::Ok(Type7 { len_bytes, data })
 }
 
-fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     let b = _input.read_byte()?;
     PResult::Ok(if b == 0 {
         b
     } else {
-        return Err(ParseError::ExcludedBranch);
+        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
     })
 }
 
-fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Type5, ParseError> {
+fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<Type5, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 33 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(12638618761954708471u64));
             }
         })
     })())?;
@@ -16963,7 +17418,7 @@ fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Type5, ParseError> 
             if b == 249 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(2007898731924533432u64));
             }
         })
     })())?;
@@ -16973,14 +17428,14 @@ fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Type5, ParseError> 
             if b == 4 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(12797785829236001664u64));
             }
         })
     })())?;
     let flags = ((|| PResult::Ok((Decoder15(_input))?))())?;
-    let delay_time = ((|| PResult::Ok((Decoder133(_input))?))())?;
+    let delay_time = ((|| PResult::Ok((Decoder137(_input))?))())?;
     let transparent_color_index = ((|| PResult::Ok((Decoder15(_input))?))())?;
-    let terminator = ((|| PResult::Ok((Decoder159(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder163(_input))?))())?;
     PResult::Ok(Type5 {
         separator,
         label,
@@ -16992,7 +17447,7 @@ fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Type5, ParseError> 
     })
 }
 
-fn Decoder161<'input>(_input: &mut Parser<'input>) -> Result<Type12, ParseError> {
+fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<Type12, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -17003,7 +17458,7 @@ fn Decoder161<'input>(_input: &mut Parser<'input>) -> Result<Type12, ParseError>
                 33u8 => 1,
 
                 _ => {
-                    return Err(ParseError::ExcludedBranch);
+                    return Err(ParseError::ExcludedBranch(2513620722346358705u64));
                 }
             };
             _input.close_peek_context()?;
@@ -17012,30 +17467,30 @@ fn Decoder161<'input>(_input: &mut Parser<'input>) -> Result<Type12, ParseError>
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder162(_input))?;
+            let inner = (Decoder166(_input))?;
             Type12::table_based_image(inner)
         }
 
         1 => {
-            let inner = (Decoder163(_input))?;
+            let inner = (Decoder167(_input))?;
             Type12::plain_text_extension(inner)
         }
 
         _ => {
-            return Err(ParseError::ExcludedBranch);
+            return Err(ParseError::ExcludedBranch(14120387546690436687u64));
         }
     })
 }
 
-fn Decoder162<'input>(_input: &mut Parser<'input>) -> Result<Type11, ParseError> {
-    let descriptor = ((|| PResult::Ok((Decoder164(_input))?))())?;
+fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Type11, ParseError> {
+    let descriptor = ((|| PResult::Ok((Decoder168(_input))?))())?;
     let local_color_table = ((|| {
         PResult::Ok(match descriptor.clone().flags & 128u8 != 0u8 {
             true => {
                 let inner = {
                     let mut accum = Vec::new();
                     for _ in 0..2u8 << (descriptor.clone().flags & 7u8) {
-                        accum.push((Decoder165(_input))?);
+                        accum.push((Decoder169(_input))?);
                     }
                     accum
                 };
@@ -17048,7 +17503,7 @@ fn Decoder162<'input>(_input: &mut Parser<'input>) -> Result<Type11, ParseError>
             }
         })
     })())?;
-    let data = ((|| PResult::Ok((Decoder166(_input))?))())?;
+    let data = ((|| PResult::Ok((Decoder170(_input))?))())?;
     PResult::Ok(Type11 {
         descriptor,
         local_color_table,
@@ -17056,14 +17511,14 @@ fn Decoder162<'input>(_input: &mut Parser<'input>) -> Result<Type11, ParseError>
     })
 }
 
-fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> {
+fn Decoder167<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 33 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(12638618761954708471u64));
             }
         })
     })())?;
@@ -17073,7 +17528,7 @@ fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> 
             if b == 1 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(2974505448909915409u64));
             }
         })
     })())?;
@@ -17083,14 +17538,14 @@ fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> 
             if b == 12 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(15268554964885899593u64));
             }
         })
     })())?;
-    let text_grid_left_position = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let text_grid_top_position = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let text_grid_width = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let text_grid_height = ((|| PResult::Ok((Decoder133(_input))?))())?;
+    let text_grid_left_position = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let text_grid_top_position = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let text_grid_width = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let text_grid_height = ((|| PResult::Ok((Decoder137(_input))?))())?;
     let character_cell_width = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let character_cell_height = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let text_foreground_color_index = ((|| PResult::Ok((Decoder15(_input))?))())?;
@@ -17109,7 +17564,7 @@ fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> 
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -17117,7 +17572,7 @@ fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> 
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder158(_input))?;
+                    let next_elem = (Decoder162(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -17126,7 +17581,7 @@ fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> 
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder159(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder163(_input))?))())?;
     PResult::Ok(Type8 {
         separator,
         label,
@@ -17144,21 +17599,21 @@ fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Type8, ParseError> 
     })
 }
 
-fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<Type9, ParseError> {
+fn Decoder168<'input>(_input: &mut Parser<'input>) -> Result<Type9, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
             if b == 44 {
                 b
             } else {
-                return Err(ParseError::ExcludedBranch);
+                return Err(ParseError::ExcludedBranch(957865226307229178u64));
             }
         })
     })())?;
-    let image_left_position = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let image_top_position = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let image_width = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let image_height = ((|| PResult::Ok((Decoder133(_input))?))())?;
+    let image_left_position = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let image_top_position = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let image_width = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let image_height = ((|| PResult::Ok((Decoder137(_input))?))())?;
     let flags = ((|| PResult::Ok((Decoder15(_input))?))())?;
     PResult::Ok(Type9 {
         separator,
@@ -17170,14 +17625,14 @@ fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<Type9, ParseError> 
     })
 }
 
-fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<Type2, ParseError> {
+fn Decoder169<'input>(_input: &mut Parser<'input>) -> Result<Type2, ParseError> {
     let r = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let g = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let b = ((|| PResult::Ok((Decoder15(_input))?))())?;
     PResult::Ok(Type2 { r, g, b })
 }
 
-fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Type10, ParseError> {
+fn Decoder170<'input>(_input: &mut Parser<'input>) -> Result<Type10, ParseError> {
     let lzw_min_code_size = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let image_data = ((|| {
         PResult::Ok({
@@ -17193,7 +17648,7 @@ fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Type10, ParseError>
                             0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch);
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -17201,7 +17656,7 @@ fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Type10, ParseError>
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder158(_input))?;
+                    let next_elem = (Decoder162(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -17210,7 +17665,7 @@ fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Type10, ParseError>
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder159(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder163(_input))?))())?;
     PResult::Ok(Type10 {
         lzw_min_code_size,
         image_data,
@@ -17218,9 +17673,9 @@ fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Type10, ParseError>
     })
 }
 
-fn Decoder167<'input>(_input: &mut Parser<'input>) -> Result<Type1, ParseError> {
-    let screen_width = ((|| PResult::Ok((Decoder133(_input))?))())?;
-    let screen_height = ((|| PResult::Ok((Decoder133(_input))?))())?;
+fn Decoder171<'input>(_input: &mut Parser<'input>) -> Result<Type1, ParseError> {
+    let screen_width = ((|| PResult::Ok((Decoder137(_input))?))())?;
+    let screen_height = ((|| PResult::Ok((Decoder137(_input))?))())?;
     let flags = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let bg_color_index = ((|| PResult::Ok((Decoder15(_input))?))())?;
     let pixel_aspect_ratio = ((|| PResult::Ok((Decoder15(_input))?))())?;

@@ -4,6 +4,11 @@ use super::*;
 
 type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
+// Stablization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
+type Top = Type198;
+type TarBlock = Type196;
+type PngData = Type187;
+
 #[test]
 fn test_decoder_26() {
     // PNG signature
@@ -19,7 +24,7 @@ fn test_decoder_gif() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::gif(dat) => println!("{:?}", dat),
+        Top::gif(dat) => println!("{:?}", dat),
         other => unreachable!("expected gif, found {other:?}"),
     }
     Ok(())
@@ -32,7 +37,7 @@ mod gzip {
         let mut input = Parser::new(&buffer);
         let oput = Decoder1(&mut input)?.data;
         match oput {
-            Type192::gzip(dat) => println!("{:?}", &dat[0].header),
+            Top::gzip(dat) => println!("{:?}", &dat[0].header),
             other => unreachable!("expected gzip, found {other:?}"),
         }
         Ok(())
@@ -71,7 +76,7 @@ mod jpeg {
         let mut input = Parser::new(&buffer);
         let oput = Decoder1(&mut input)?.data;
         match oput {
-            Type192::jpeg(dat) => println!("{:?}", dat.frame.header),
+            Top::jpeg(dat) => println!("{:?}", dat.frame.header),
             other => unreachable!("expected jpeg, found {other:?}"),
         }
         Ok(())
@@ -94,7 +99,7 @@ fn test_decoder_mpeg4() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::mpeg4(dat) => println!("{:?}", dat),
+        Top::mpeg4(dat) => println!("{:?}", dat),
         other => unreachable!("expected mpeg4, found {other:?}"),
     }
     Ok(())
@@ -106,7 +111,7 @@ fn test_decoder_png() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::png(dat) => println!("{:?}", dat),
+        Top::png(dat) => println!("{:?}", dat),
         other => unreachable!("expected png, found {other:?}"),
     }
     Ok(())
@@ -118,7 +123,7 @@ fn test_decoder_riff() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::riff(dat) => println!("{:?}", dat),
+        Top::riff(dat) => println!("{:?}", dat),
         other => unreachable!("expected riff, found {other:?}"),
     }
     Ok(())
@@ -130,7 +135,7 @@ fn test_decoder_tar() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder13(&mut input)?;
     match oput {
-        Type190 {
+        TarBlock {
             header,
             file,
             __padding,
@@ -148,7 +153,7 @@ fn test_decoder_text_ascii() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::text(chars) => {
+        Top::text(chars) => {
             assert_eq!(
                 chars,
                 String::from_utf8(buffer)?.chars().collect::<Vec<char>>()
@@ -165,7 +170,7 @@ fn test_decoder_text_utf8() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::text(chars) => {
+        Top::text(chars) => {
             assert_eq!(
                 chars,
                 String::from_utf8(buffer)?.chars().collect::<Vec<char>>()
@@ -182,7 +187,7 @@ fn test_decoder_text_mixed() -> TestResult {
     let mut input = Parser::new(&buffer);
     let oput = Decoder1(&mut input)?.data;
     match oput {
-        Type192::text(chars) => {
+        Top::text(chars) => {
             assert_eq!(
                 chars,
                 String::from_utf8(buffer)?.chars().collect::<Vec<char>>()
@@ -197,25 +202,17 @@ mod test_files {
     use super::*;
 
     fn mk_sig_hex(sig: (u8, u8, u8, u8, u8, u8, u8, u8)) -> String {
-        format!("{:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}",
-            sig.0,
-            sig.1,
-            sig.2,
-            sig.3,
-            sig.4,
-            sig.5,
-            sig.6,
-            sig.7
+        format!(
+            "{:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}",
+            sig.0, sig.1, sig.2, sig.3, sig.4, sig.5, sig.6, sig.7
         )
     }
 
-    fn print_png_breadcrumb(png_data: Type181) {
+    fn print_png_breadcrumb(png_data: PngData) {
         let sig_hex = mk_sig_hex(png_data.signature);
-        println!("SIG ({}) | IHDR (len: {} | h {}px * w {}px)",
-            sig_hex,
-            png_data.ihdr.length,
-            png_data.ihdr.data.height,
-            png_data.ihdr.data.width,
+        println!(
+            "SIG ({}) | IHDR (len: {} | h {}px * w {}px)",
+            sig_hex, png_data.ihdr.length, png_data.ihdr.data.height, png_data.ihdr.data.width,
         );
     }
 
@@ -225,10 +222,15 @@ mod test_files {
         print!("[{filename}]: ");
         let oput = Decoder1(&mut input)?.data;
         match oput {
-            Type192::png(dat) => print_png_breadcrumb(dat),
+            Top::png(dat) => print_png_breadcrumb(dat),
             other => unreachable!("{filename}: expected png, found {other:?}"),
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_errant_png() -> TestResult {
+        check_png("test-images/ArcTriomphe-cHRM-red-green-swap.png")
     }
 
     #[test]
@@ -245,5 +247,4 @@ mod test_files {
         }
         Ok(())
     }
-
 }

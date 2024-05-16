@@ -32,7 +32,10 @@ pub enum Value {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ParseLoc {
-    InBuffer { offset: usize, length: usize },
+    InBuffer {
+        offset: usize,
+        length: usize,
+    },
     #[default]
     Synthesized,
 }
@@ -46,12 +49,19 @@ impl PartialOrd for ParseLoc {
 impl Ord for ParseLoc {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (&ParseLoc::InBuffer { offset: o0, length: l0 }, &ParseLoc::InBuffer { offset: o1, length: l1 }) => {
-                match o0.cmp(&o1) {
-                    Ordering::Equal => l0.cmp(&l1),
-                    other => other,
-                }
-            }
+            (
+                &ParseLoc::InBuffer {
+                    offset: o0,
+                    length: l0,
+                },
+                &ParseLoc::InBuffer {
+                    offset: o1,
+                    length: l1,
+                },
+            ) => match o0.cmp(&o1) {
+                Ordering::Equal => l0.cmp(&l1),
+                other => other,
+            },
             // NOTE - this ensures that Iterator::min will naturally settle on the 'earliest' in-buffer location even if Synthesized locations are found along the way
             (&ParseLoc::InBuffer { .. }, ParseLoc::Synthesized) => Ordering::Less,
             (ParseLoc::Synthesized, ParseLoc::InBuffer { .. }) => Ordering::Greater,
@@ -100,9 +110,14 @@ impl ParseLoc {
             ParseLoc::Synthesized => return self,
             ParseLoc::InBuffer { offset, length } => match self {
                 ParseLoc::Synthesized => return other,
-                ParseLoc::InBuffer { offset: offset0, length: length0 } =>
-                    ParseLoc::InBuffer { offset: Ord::min(offset0, offset), length: length0 + length }
-            }
+                ParseLoc::InBuffer {
+                    offset: offset0,
+                    length: length0,
+                } => ParseLoc::InBuffer {
+                    offset: Ord::min(offset0, offset),
+                    length: length0 + length,
+                },
+            },
         }
     }
 
@@ -144,8 +159,6 @@ impl<T: Clone> AsRef<T> for Parsed<T> {
     }
 }
 
-
-
 #[derive(Clone, Debug)]
 pub enum ParsedValue {
     /// Flat parses of the sub-set of `Value` variants that do not contain any embedded `Value` terms
@@ -179,7 +192,10 @@ impl ParsedValue {
 
     /// Helper function to construct a `Value::UNIT` of specific length starting at a given offset.
     const fn unit_spanning(offset: usize, length: usize) -> ParsedValue {
-        ParsedValue::Tuple(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner: Vec::new() })
+        ParsedValue::Tuple(Parsed {
+            loc: ParseLoc::InBuffer { offset, length },
+            inner: Vec::new(),
+        })
     }
 
     /// Constructs a new `ParsedValue` from a `Value` with a provided offset and length.
@@ -188,7 +204,10 @@ impl ParsedValue {
     /// there is an implicit expectation that the `Value` being passed in is 'flat', i.e. contains no embedded `Value`s.
     /// If this expectation is violated, there may be complications down the line.
     pub const fn new_flat(inner: Value, offset: usize, length: usize) -> ParsedValue {
-        ParsedValue::Flat(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner })
+        ParsedValue::Flat(Parsed {
+            loc: ParseLoc::InBuffer { offset, length },
+            inner,
+        })
     }
 
     pub fn wrap_variant(lab: Label, v: ParsedValue) -> ParsedValue {
@@ -196,11 +215,17 @@ impl ParsedValue {
     }
 
     fn new_tuple(v: Vec<ParsedValue>, offset: usize, length: usize) -> ParsedValue {
-        ParsedValue::Tuple(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner: v })
+        ParsedValue::Tuple(Parsed {
+            loc: ParseLoc::InBuffer { offset, length },
+            inner: v,
+        })
     }
 
     fn new_seq(v: Vec<ParsedValue>, offset: usize, length: usize) -> ParsedValue {
-        ParsedValue::Seq(Parsed { loc: ParseLoc::InBuffer { offset, length }, inner: v })
+        ParsedValue::Seq(Parsed {
+            loc: ParseLoc::InBuffer { offset, length },
+            inner: v,
+        })
     }
 
     /// Helper function that constructs a Synthesized `ParsedValue` as appropriate and immediately
@@ -231,17 +256,23 @@ impl From<ParsedValue> for Value {
     fn from(value: ParsedValue) -> Self {
         match value {
             ParsedValue::Flat(v) => v.inner,
-            ParsedValue::Tuple(ts) => Value::Tuple(Vec::from_iter(ts.inner.into_iter().map(Value::from))),
-            ParsedValue::Seq(elts) => Value::Seq(Vec::from_iter(elts.inner.into_iter().map(Value::from))),
-            ParsedValue::Record(fs) => Value::Record(Vec::from_iter(fs.inner.into_iter().map(|(lab, f)| (lab, f.into())))),
+            ParsedValue::Tuple(ts) => {
+                Value::Tuple(Vec::from_iter(ts.inner.into_iter().map(Value::from)))
+            }
+            ParsedValue::Seq(elts) => {
+                Value::Seq(Vec::from_iter(elts.inner.into_iter().map(Value::from)))
+            }
+            ParsedValue::Record(fs) => Value::Record(Vec::from_iter(
+                fs.inner.into_iter().map(|(lab, f)| (lab, f.into())),
+            )),
             ParsedValue::Variant(lab, inner) => Value::Variant(lab, Box::new((*inner).into())),
-            ParsedValue::Mapped(orig, image) => Value::Mapped(Box::new((*orig).into()), Box::new((*image).into())),
+            ParsedValue::Mapped(orig, image) => {
+                Value::Mapped(Box::new((*orig).into()), Box::new((*image).into()))
+            }
             ParsedValue::Branch(ix, inner) => Value::Branch(ix, Box::new((*inner).into())),
         }
     }
 }
-
-
 
 pub trait ValueLike: Clone {
     fn into_cow_value<'a>(&'a self) -> Cow<'a, Value>;
@@ -254,7 +285,11 @@ pub trait ValueLike: Clone {
         self.into_cow_value().as_ref().clone()
     }
 
-    fn matches<'a>(&self, scope: &'a Scope<'a, Self>, pattern: &Pattern) -> Option<MultiScope<'a, Self>> {
+    fn matches<'a>(
+        &self,
+        scope: &'a Scope<'a, Self>,
+        pattern: &Pattern,
+    ) -> Option<MultiScope<'a, Self>> {
         let mut pattern_scope = MultiScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
@@ -361,17 +396,19 @@ impl ValueLike for Value {
 impl ValueLike for ParsedValue {
     fn into_cow_value<'a>(&'a self) -> Cow<'a, Value> {
         match self {
-            ParsedValue::Flat(Parsed { inner, ..  }) => Cow::Borrowed(inner),
+            ParsedValue::Flat(Parsed { inner, .. }) => Cow::Borrowed(inner),
             _ => Cow::Owned(self.clone().into()),
         }
     }
 
     fn record_proj(&self, label: &str) -> &Self {
         match self {
-            ParsedValue::Record(Parsed { inner: fields, .. }) => match fields.iter().find(|(l, _)| label == l) {
-                Some((_, v)) => v,
-                None => panic!("{label} not found in record"),
-            },
+            ParsedValue::Record(Parsed { inner: fields, .. }) => {
+                match fields.iter().find(|(l, _)| label == l) {
+                    Some((_, v)) => v,
+                    None => panic!("{label} not found in record"),
+                }
+            }
             _ => panic!("expected record, found {self:?}"),
         }
     }
@@ -379,12 +416,25 @@ impl ValueLike for ParsedValue {
     fn clone_into_value(&self) -> Value {
         match self {
             ParsedValue::Flat(Parsed { inner, .. }) => inner.clone(),
-            ParsedValue::Tuple(ts) => Value::Tuple(Vec::from_iter(ts.inner.iter().cloned().map(Value::from))),
-            ParsedValue::Seq(elts) => Value::Seq(Vec::from_iter(elts.inner.iter().cloned().map(Value::from))),
-            ParsedValue::Record(fs) => Value::Record(Vec::from_iter(fs.inner.iter().cloned().map(|(lab, f)| (lab, f.into())))),
-            ParsedValue::Variant(lab, inner) => Value::Variant(lab.clone(), Box::new((**inner).clone().into())),
-            ParsedValue::Mapped(orig, image) => Value::Mapped(Box::new((**orig).clone().into()), Box::new((**image).clone().into())),
-            ParsedValue::Branch(ix, inner) => Value::Branch(*ix, Box::new((**inner).clone().into())),
+            ParsedValue::Tuple(ts) => {
+                Value::Tuple(Vec::from_iter(ts.inner.iter().cloned().map(Value::from)))
+            }
+            ParsedValue::Seq(elts) => {
+                Value::Seq(Vec::from_iter(elts.inner.iter().cloned().map(Value::from)))
+            }
+            ParsedValue::Record(fs) => Value::Record(Vec::from_iter(
+                fs.inner.iter().cloned().map(|(lab, f)| (lab, f.into())),
+            )),
+            ParsedValue::Variant(lab, inner) => {
+                Value::Variant(lab.clone(), Box::new((**inner).clone().into()))
+            }
+            ParsedValue::Mapped(orig, image) => Value::Mapped(
+                Box::new((**orig).clone().into()),
+                Box::new((**image).clone().into()),
+            ),
+            ParsedValue::Branch(ix, inner) => {
+                Value::Branch(*ix, Box::new((**inner).clone().into()))
+            }
         }
     }
 
@@ -395,13 +445,50 @@ impl ValueLike for ParsedValue {
                 true
             }
             (Pattern::Wildcard, _) => true,
-            (Pattern::Bool(b0), ParsedValue::Flat(Parsed { inner: Value::Bool(b1), .. })) => b0 == b1,
-            (Pattern::U8(i0), ParsedValue::Flat(Parsed { inner: Value::U8(i1), .. })) => i0 == i1,
-            (Pattern::U16(i0), ParsedValue::Flat(Parsed { inner: Value::U16(i1), .. })) => i0 == i1,
-            (Pattern::U32(i0), ParsedValue::Flat(Parsed { inner: Value::U32(i1), .. })) => i0 == i1,
-            (Pattern::U64(i0), ParsedValue::Flat(Parsed { inner: Value::U64(i1), .. })) => i0 == i1,
-            (Pattern::Char(c0), ParsedValue::Flat(Parsed { inner: Value::Char(c1), .. })) => c0 == c1,
-            (Pattern::Tuple(ps), ParsedValue::Tuple(vs)) | (Pattern::Seq(ps), ParsedValue::Seq(vs))
+            (
+                Pattern::Bool(b0),
+                ParsedValue::Flat(Parsed {
+                    inner: Value::Bool(b1),
+                    ..
+                }),
+            ) => b0 == b1,
+            (
+                Pattern::U8(i0),
+                ParsedValue::Flat(Parsed {
+                    inner: Value::U8(i1),
+                    ..
+                }),
+            ) => i0 == i1,
+            (
+                Pattern::U16(i0),
+                ParsedValue::Flat(Parsed {
+                    inner: Value::U16(i1),
+                    ..
+                }),
+            ) => i0 == i1,
+            (
+                Pattern::U32(i0),
+                ParsedValue::Flat(Parsed {
+                    inner: Value::U32(i1),
+                    ..
+                }),
+            ) => i0 == i1,
+            (
+                Pattern::U64(i0),
+                ParsedValue::Flat(Parsed {
+                    inner: Value::U64(i1),
+                    ..
+                }),
+            ) => i0 == i1,
+            (
+                Pattern::Char(c0),
+                ParsedValue::Flat(Parsed {
+                    inner: Value::Char(c1),
+                    ..
+                }),
+            ) => c0 == c1,
+            (Pattern::Tuple(ps), ParsedValue::Tuple(vs))
+            | (Pattern::Seq(ps), ParsedValue::Seq(vs))
                 if ps.len() == vs.inner.len() =>
             {
                 for (p, v) in Iterator::zip(ps.iter(), vs.inner.iter()) {
@@ -426,7 +513,10 @@ impl ValueLike for ParsedValue {
     }
 
     fn collect_fields(fields: Vec<(Label, Self)>) -> Self {
-        assert!(!fields.is_empty(), "ParsedValue::record_from_entries found empty vector");
+        assert!(
+            !fields.is_empty(),
+            "ParsedValue::record_from_entries found empty vector"
+        );
         let loc = ParseLoc::accum(fields.iter().map(|(_lab, fld)| fld.get_loc()));
         ParsedValue::Record(Parsed { loc, inner: fields })
     }
@@ -441,29 +531,48 @@ impl ValueLike for ParsedValue {
 
     fn from_evaluated(expr_value: Value) -> Self {
         match expr_value {
-            Value::Bool(_) | Value::U8(_) | Value::U16(_) | Value::U32(_) | Value::U64(_) | Value::Char(_) => ParsedValue::Flat(Parsed { loc: ParseLoc::Synthesized, inner: expr_value }),
+            Value::Bool(_)
+            | Value::U8(_)
+            | Value::U16(_)
+            | Value::U32(_)
+            | Value::U64(_)
+            | Value::Char(_) => ParsedValue::Flat(Parsed {
+                loc: ParseLoc::Synthesized,
+                inner: expr_value,
+            }),
             Value::Tuple(vs) => {
                 let mut p_vs = Vec::with_capacity(vs.len());
                 for v in vs.into_iter() {
                     p_vs.push(ParsedValue::from_evaluated(v));
                 }
-                ParsedValue::Tuple(Parsed { loc: ParseLoc::Synthesized, inner: p_vs })
+                ParsedValue::Tuple(Parsed {
+                    loc: ParseLoc::Synthesized,
+                    inner: p_vs,
+                })
             }
             Value::Record(fs) => {
                 let mut p_fs = Vec::with_capacity(fs.len());
                 for (lab, v) in fs.into_iter() {
                     p_fs.push((lab, ParsedValue::from_evaluated(v)));
                 }
-                ParsedValue::Record(Parsed { loc: ParseLoc::Synthesized, inner: p_fs })
+                ParsedValue::Record(Parsed {
+                    loc: ParseLoc::Synthesized,
+                    inner: p_fs,
+                })
             }
             Value::Seq(elts) => {
                 let mut p_elts = Vec::with_capacity(elts.len());
                 for elt in elts.into_iter() {
                     p_elts.push(ParsedValue::from_evaluated(elt));
                 }
-                ParsedValue::Seq(Parsed { loc: ParseLoc::Synthesized, inner: p_elts })
+                ParsedValue::Seq(Parsed {
+                    loc: ParseLoc::Synthesized,
+                    inner: p_elts,
+                })
             }
-            Value::Variant(lab, inner) => ParsedValue::Variant(lab, Box::new(ParsedValue::from_evaluated(*inner))),
+            Value::Variant(lab, inner) => {
+                ParsedValue::Variant(lab, Box::new(ParsedValue::from_evaluated(*inner)))
+            }
             Value::Mapped(orig, image) => {
                 let orig = Box::new(ParsedValue::from_evaluated(*orig));
                 let image = Box::new(ParsedValue::from_evaluated(*image));
@@ -477,7 +586,10 @@ impl ValueLike for ParsedValue {
     }
 
     fn from_evaluated_seq(elts: Vec<Self>) -> Self {
-        ParsedValue::Seq(Parsed { loc: ParseLoc::Synthesized, inner: elts })
+        ParsedValue::Seq(Parsed {
+            loc: ParseLoc::Synthesized,
+            inner: elts,
+        })
     }
 
     fn get_sequence(&self) -> Option<&Vec<Self>> {
@@ -503,8 +615,6 @@ impl Value {
     pub fn variant(label: impl IntoLabel, value: impl Into<Box<Value>>) -> Value {
         Value::Variant(label.into(), value.into())
     }
-
-
 
     fn unwrap_usize(self) -> usize {
         match self {
@@ -537,11 +647,13 @@ impl Value {
             _ => panic!("value is not a char"),
         }
     }
-
 }
 
 impl Expr {
-    pub fn eval<'a, V>(&'a self, scope: &'a Scope<'a, V>) -> Cow<'a, V> where V: ValueLike {
+    pub fn eval<'a, V>(&'a self, scope: &'a Scope<'a, V>) -> Cow<'a, V>
+    where
+        V: ValueLike,
+    {
         match self {
             Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
             Expr::Bool(b) => Cow::Owned(V::from_evaluated(Value::Bool(*b))),
@@ -555,19 +667,24 @@ impl Expr {
             Expr::TupleProj(head, index) => match head.eval(scope) {
                 Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
                 Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
-            }
+            },
             Expr::Record(fields) => Cow::Owned(V::from_evaluated(Value::record(
                 fields
                     .iter()
                     .map(|(label, expr)| (label.clone(), expr.eval_value(scope))),
             ))),
             Expr::RecordProj(head, label) => match head.eval(scope) {
-                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().record_proj(label.as_ref()).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().record_proj(label.as_ref())),
-            }
-            Expr::Variant(label, expr) => {
-                Cow::Owned(V::from_evaluated(Value::variant(label.clone(), expr.eval_value(scope))))
-            }
+                Cow::Owned(v) => {
+                    Cow::Owned(v.coerce_mapped_value().record_proj(label.as_ref()).clone())
+                }
+                Cow::Borrowed(v) => {
+                    Cow::Borrowed(v.coerce_mapped_value().record_proj(label.as_ref()))
+                }
+            },
+            Expr::Variant(label, expr) => Cow::Owned(V::from_evaluated(Value::variant(
+                label.clone(),
+                expr.eval_value(scope),
+            ))),
             Expr::Seq(exprs) => Cow::Owned(V::from_evaluated(Value::Seq(
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             ))),
@@ -583,125 +700,125 @@ impl Expr {
             }
             Expr::Lambda(_, _) => panic!("cannot eval lambda"),
 
-            Expr::IntRel(IntRel::Eq, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+            Expr::IntRel(IntRel::Eq, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x == y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x == y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x == y),
                     (Value::U64(x), Value::U64(y)) => Value::Bool(x == y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::IntRel(IntRel::Ne, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::IntRel(IntRel::Ne, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x != y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x != y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x != y),
                     (Value::U64(x), Value::U64(y)) => Value::Bool(x != y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::IntRel(IntRel::Lt, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::IntRel(IntRel::Lt, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x < y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x < y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x < y),
                     (Value::U64(x), Value::U64(y)) => Value::Bool(x < y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::IntRel(IntRel::Gt, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::IntRel(IntRel::Gt, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x > y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x > y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x > y),
                     (Value::U64(x), Value::U64(y)) => Value::Bool(x > y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::IntRel(IntRel::Lte, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::IntRel(IntRel::Lte, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x <= y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x <= y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x <= y),
                     (Value::U64(x), Value::U64(y)) => Value::Bool(x <= y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::IntRel(IntRel::Gte, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::IntRel(IntRel::Gte, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::Bool(x >= y),
                     (Value::U16(x), Value::U16(y)) => Value::Bool(x >= y),
                     (Value::U32(x), Value::U32(y)) => Value::Bool(x >= y),
                     (Value::U64(x), Value::U64(y)) => Value::Bool(x >= y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Add, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Add, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_add(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_add(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_add(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_add(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Sub, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Sub, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_sub(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_sub(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_sub(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_sub(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Mul, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Mul, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_mul(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_mul(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_mul(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_mul(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Div, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Div, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_div(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_div(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_div(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_div(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Rem, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Rem, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(u8::checked_rem(x, y).unwrap()),
                     (Value::U16(x), Value::U16(y)) => Value::U16(u16::checked_rem(x, y).unwrap()),
                     (Value::U32(x), Value::U32(y)) => Value::U32(u32::checked_rem(x, y).unwrap()),
                     (Value::U64(x), Value::U64(y)) => Value::U64(u64::checked_rem(x, y).unwrap()),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::BitAnd, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::BitAnd, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(x & y),
                     (Value::U16(x), Value::U16(y)) => Value::U16(x & y),
                     (Value::U32(x), Value::U32(y)) => Value::U32(x & y),
                     (Value::U64(x), Value::U64(y)) => Value::U64(x & y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::BitOr, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::BitOr, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => Value::U8(x | y),
                     (Value::U16(x), Value::U16(y)) => Value::U16(x | y),
                     (Value::U32(x), Value::U32(y)) => Value::U32(x | y),
                     (Value::U64(x), Value::U64(y)) => Value::U64(x | y),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Shl, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Shl, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => {
                         Value::U8(u8::checked_shl(x, u32::from(y)).unwrap())
                     }
@@ -713,10 +830,10 @@ impl Expr {
                         Value::U64(u64::checked_shl(x, u32::try_from(y).unwrap()).unwrap())
                     }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
-            Expr::Arith(Arith::Shr, x, y) => {
-                Cow::Owned(V::from_evaluated(match (x.eval_value(scope), y.eval_value(scope)) {
+                },
+            )),
+            Expr::Arith(Arith::Shr, x, y) => Cow::Owned(V::from_evaluated(
+                match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::U8(x), Value::U8(y)) => {
                         Value::U8(u8::checked_shr(x, u32::from(y)).unwrap())
                     }
@@ -728,8 +845,8 @@ impl Expr {
                         Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
                     }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
-                }))
-            }
+                },
+            )),
 
             Expr::AsU8(x) => Cow::Owned(V::from_evaluated(match x.eval_value(scope) {
                 Value::U8(x) => Value::U8(x),
@@ -762,25 +879,33 @@ impl Expr {
 
             Expr::U16Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(hi), Value::U8(lo)] => {
-                    Cow::Owned(V::from_evaluated(Value::U16(u16::from_be_bytes([*hi, *lo]))))
+                    Cow::Owned(V::from_evaluated(Value::U16(u16::from_be_bytes([
+                        *hi, *lo,
+                    ]))))
                 }
                 _ => panic!("U16Be: expected (U8, U8)"),
             },
             Expr::U16Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(lo), Value::U8(hi)] => {
-                    Cow::Owned(V::from_evaluated(Value::U16(u16::from_le_bytes([*lo, *hi]))))
+                    Cow::Owned(V::from_evaluated(Value::U16(u16::from_le_bytes([
+                        *lo, *hi,
+                    ]))))
                 }
                 _ => panic!("U16Le: expected (U8, U8)"),
             },
             Expr::U32Be(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                    Cow::Owned(V::from_evaluated(Value::U32(u32::from_be_bytes([*a, *b, *c, *d]))))
+                    Cow::Owned(V::from_evaluated(Value::U32(u32::from_be_bytes([
+                        *a, *b, *c, *d,
+                    ]))))
                 }
                 _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
             },
             Expr::U32Le(bytes) => match bytes.eval_value(scope).unwrap_tuple().as_slice() {
                 [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                    Cow::Owned(V::from_evaluated(Value::U32(u32::from_le_bytes([*a, *b, *c, *d]))))
+                    Cow::Owned(V::from_evaluated(Value::U32(u32::from_le_bytes([
+                        *a, *b, *c, *d,
+                    ]))))
                 }
                 _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
             },
@@ -815,42 +940,47 @@ impl Expr {
                 _ => panic!("AsChar: expected U8, U16, U32, or U64"),
             })),
             Expr::SeqLength(seq) => match seq.eval(scope).coerce_mapped_value().get_sequence() {
-               Some(values) => {
+                Some(values) => {
                     let len = values.len();
                     Cow::Owned(V::from_evaluated(Value::U32(len as u32)))
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
-            Expr::SubSeq(seq, start, length) => match seq.eval(scope).coerce_mapped_value().get_sequence() {
-                Some(values) => {
-                    let start = start.eval_value(scope).unwrap_usize();
-                    let length = length.eval_value(scope).unwrap_usize();
-                    let values = &values[start..];
-                    let values = &values[..length];
-                    Cow::Owned(V::from_evaluated_seq(values.to_vec()))
-                }
-                _ => panic!("SubSeq: expected Seq"),
-            },
-            Expr::FlatMap(expr, seq) => match seq.eval(scope).coerce_mapped_value().get_sequence() {
-                Some(values) => {
-                    let mut vs = Vec::new();
-                    for v in values {
-                        if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
-                            vs.extend(vn);
-                        } else {
-                            panic!("FlatMap: expected Seq");
-                        }
+            Expr::SubSeq(seq, start, length) => {
+                match seq.eval(scope).coerce_mapped_value().get_sequence() {
+                    Some(values) => {
+                        let start = start.eval_value(scope).unwrap_usize();
+                        let length = length.eval_value(scope).unwrap_usize();
+                        let values = &values[start..];
+                        let values = &values[..length];
+                        Cow::Owned(V::from_evaluated_seq(values.to_vec()))
                     }
-                    Cow::Owned(V::from_evaluated(Value::Seq(vs)))
+                    _ => panic!("SubSeq: expected Seq"),
                 }
-                _ => panic!("FlatMap: expected Seq"),
-            },
+            }
+            Expr::FlatMap(expr, seq) => {
+                match seq.eval(scope).coerce_mapped_value().get_sequence() {
+                    Some(values) => {
+                        let mut vs = Vec::new();
+                        for v in values {
+                            if let Value::Seq(vn) = expr.eval_lambda(scope, v) {
+                                vs.extend(vn);
+                            } else {
+                                panic!("FlatMap: expected Seq");
+                            }
+                        }
+                        Cow::Owned(V::from_evaluated(Value::Seq(vs)))
+                    }
+                    _ => panic!("FlatMap: expected Seq"),
+                }
+            }
             Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
                     let mut accum = accum.eval_value(scope);
                     let mut vs = Vec::new();
                     for v in values {
-                        let ret = expr.eval_lambda(scope, &V::from_evaluated(Value::Tuple(vec![accum, v])));
+                        let ret = expr
+                            .eval_lambda(scope, &V::from_evaluated(Value::Tuple(vec![accum, v])));
                         accum = match ret.unwrap_tuple().as_mut_slice() {
                             [accum, Value::Seq(vn)] => {
                                 vs.extend_from_slice(vn);
@@ -882,11 +1012,17 @@ impl Expr {
         }
     }
 
-    pub fn eval_value<'a, V>(&self, scope: &'a Scope<'a, V>) -> Value where V: ValueLike {
+    pub fn eval_value<'a, V>(&self, scope: &'a Scope<'a, V>) -> Value
+    where
+        V: ValueLike,
+    {
         self.eval(scope).coerce_mapped_value().clone_into_value()
     }
 
-    fn eval_lambda<'a, V>(&self, scope: &'a Scope<'a, V>, arg: &V) -> Value where V: ValueLike {
+    fn eval_lambda<'a, V>(&self, scope: &'a Scope<'a, V>, arg: &V) -> Value
+    where
+        V: ValueLike,
+    {
         match self {
             Expr::Lambda(name, expr) => {
                 let child_scope = SingleScope::new(scope, name, arg);
@@ -939,11 +1075,17 @@ impl Program {
         Program { decoders }
     }
 
-    pub fn run<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(Value, ReadCtxt<'input>), Value> {
+    pub fn run<'input>(
+        &self,
+        input: ReadCtxt<'input>,
+    ) -> ParseResult<(Value, ReadCtxt<'input>), Value> {
         self.decoders[0].0.parse(self, &Scope::Empty, input)
     }
 
-    pub fn run_ext<'input>(&self, input: ReadCtxt<'input>) -> ParseResult<(ParsedValue, ReadCtxt<'input>), ParsedValue> {
+    pub fn run_ext<'input>(
+        &self,
+        input: ReadCtxt<'input>,
+    ) -> ParseResult<(ParsedValue, ReadCtxt<'input>), ParsedValue> {
         self.decoders[0].0.parse_ext(self, &Scope::Empty, input)
     }
 }
@@ -1184,7 +1326,7 @@ pub enum ScopeEntry<V: Clone /*  = Value */> {
     Decoder(Decoder),
 }
 
-pub enum Scope<'a, V: Clone  /*= Value */> {
+pub enum Scope<'a, V: Clone /*= Value */> {
     Empty,
     Multi(&'a MultiScope<'a, V>),
     Single(SingleScope<'a, V>),
@@ -1237,8 +1379,6 @@ impl<'a, V: Clone> Scope<'a, V> {
     }
 }
 
-
-
 impl<'a, V: Clone> MultiScope<'a, V> {
     fn new(parent: &'a Scope<'a, V>) -> MultiScope<'a, V> {
         let entries = Vec::new();
@@ -1270,7 +1410,10 @@ impl<'a, V: Clone> MultiScope<'a, V> {
         self.parent.get_bindings(bindings);
     }
 
-    fn into_record(self) -> V where V: ValueLike {
+    fn into_record(self) -> V
+    where
+        V: ValueLike,
+    {
         V::collect_fields(self.entries)
     }
 }
@@ -1585,7 +1728,8 @@ impl Decoder {
         let start_offset = input.offset;
         match self {
             Decoder::Call(n, es) => {
-                let mut new_scope = MultiScope::<ParsedValue>::with_capacity(&Scope::Empty, es.len());
+                let mut new_scope =
+                    MultiScope::<ParsedValue>::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval(scope).as_ref().clone();
                     new_scope.push(name.clone(), v);
@@ -1652,7 +1796,8 @@ impl Decoder {
                 let mut input = input;
                 let mut record_scope = MultiScope::with_capacity(scope, fields.len());
                 for (name, f) in fields {
-                    let (vf, next_input) = f.parse_ext(program, &Scope::Multi(&record_scope), input)?;
+                    let (vf, next_input) =
+                        f.parse_ext(program, &Scope::Multi(&record_scope), input)?;
                     record_scope.push(name.clone(), vf);
                     input = next_input;
                 }

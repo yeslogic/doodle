@@ -1110,7 +1110,7 @@ struct MatchTreeLevel<'a> {
 type LevelBranch<'a> = HashSet<(usize, Rc<Next<'a>>)>;
 
 /// A byte-level prefix-tree evaluated to a fixed depth.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct MatchTree {
     accept: Option<usize>,
     branches: Vec<(ByteSet, MatchTree)>,

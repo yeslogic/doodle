@@ -9,7 +9,12 @@ use crate::{
     ValueType,
 };
 
-use std::{borrow::Cow, collections::HashMap, rc::Rc};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    rc::Rc,
+};
 
 use rust_ast::*;
 
@@ -22,6 +27,13 @@ use self::{
 
 pub(crate) mod ixlabel;
 pub(crate) use ixlabel::IxLabel;
+
+fn get_trace(state: &impl std::hash::Hash) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    state.hash(&mut hasher);
+    let ret = hasher.finish();
+    ret
+}
 
 pub struct NameGen {
     ctr: usize,
@@ -625,7 +637,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let rust_body = match ck {
                 Refutability::Refutable | Refutability::Indeterminate =>
                     RustMatchBody::Refutable(rust_cases, RustCatchAll::ReturnErrorValue {
-                        value: RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch")),
+                        value: RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch").call_with([RustExpr::u64lit(get_trace(&expr))])),
                     }),
                 Refutability::Irrefutable => RustMatchBody::Irrefutable(rust_cases),
             };
@@ -1198,7 +1210,10 @@ impl SimpleLogic<GTExpr> {
                     let b_true = vec![RustStmt::Return(ReturnKind::Implicit, RustExpr::local("b"))];
                     let b_false = vec![RustStmt::Return(
                         ReturnKind::Keyword,
-                        RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch")),
+                        RustExpr::err(
+                            RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                                .call_with([RustExpr::u64lit(get_trace(bs))]),
+                        ),
                     )];
                     RustExpr::Control(Box::new(RustControl::If(cond, b_true, Some(b_false))))
                 };
@@ -1328,7 +1343,8 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
             if let Some(ix) = tree.accept {
                 return (Vec::new(), Some(RustExpr::num_lit(ix)));
             } else {
-                let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch");
+                let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                    .call_with([RustExpr::u64lit(get_trace(&(tree, "empty-non-accepting")))]);
                 return (
                     vec![RustStmt::Return(
                         ReturnKind::Keyword,
@@ -1369,7 +1385,10 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                             RustExpr::num_lit(ix),
                         )]
                     } else {
-                        let err_val = RustExpr::scoped(["ParseError"], "ExcludedBranch");
+                        let err_val =
+                            RustExpr::scoped(["ParseError"], "ExcludedBranch").call_with([
+                                RustExpr::u64lit(get_trace(&(tree, "failed-descent-condition"))),
+                            ]);
                         vec![RustStmt::Return(
                             ReturnKind::Keyword,
                             RustExpr::err(err_val),
@@ -1413,7 +1432,10 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                 }
             }
         }
-        let value = RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch"));
+        let value = RustExpr::err(
+            RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                .call_with([RustExpr::u64lit(get_trace(&(tree, "catchall-nomatch")))]),
+        );
         let matchblock = RustControl::Match(
             RustExpr::local("b"),
             RustMatchBody::Refutable(cases, RustCatchAll::ReturnErrorValue { value }),
@@ -1425,7 +1447,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
         RustExpr::local(ctxt.input_varname.clone()).call_method("open_peek_context"),
     );
 
-    // this is a stub for non-ParseMonad models to replace the parser context with another
+    // this is a stub for alternate parsing models to replace the `Parser` argument in the context of the expansion
     let ll_context = ProdCtxt { ..ctxt };
 
     let (stmts, expr) = expand_matchtree(tree, ll_context);
@@ -1959,7 +1981,10 @@ where
                     ));
                 }
                 let bind = RustStmt::assign("tree_index", invoke_matchtree(tree, ctxt));
-                let fallthrough = RustExpr::err(RustExpr::scoped(["ParseError"], "ExcludedBranch"));
+                let fallthrough = RustExpr::err(
+                    RustExpr::scoped(["ParseError"], "ExcludedBranch")
+                        .call_with([RustExpr::u64lit(get_trace(&(tree, "fallthrough")))]),
+                );
                 let ret = RustExpr::Control(Box::new(RustControl::Match(
                     RustExpr::local("tree_index"),
                     RustMatchBody::Refutable(
@@ -2274,7 +2299,7 @@ where
                         RustType::borrow_of(
                             None,
                             Mut::Mutable,
-                            RustType::verbatim("ParseMonad", Some(params)),
+                            RustType::verbatim("Parser", Some(params)),
                         )
                     };
                     (name, ty)

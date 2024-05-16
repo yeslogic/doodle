@@ -1718,7 +1718,10 @@ mod test {
     use super::*;
 
     fn expect_fragment(value: &impl ToFragmentExt, expected: &str) {
-        assert_eq!(&format!("{}", value.to_fragment_precedence(Precedence::TOP)), expected)
+        assert_eq!(
+            &format!("{}", value.to_fragment_precedence(Precedence::TOP)),
+            expected
+        )
     }
 
     #[test]
