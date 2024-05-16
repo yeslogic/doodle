@@ -374,6 +374,16 @@ impl Codegen {
                         Box::new(self.translate(single.get_dec()))
                     )
                 ),
+            TypedDecoder::RepeatBetween(_gt, tree, expr_min, expr_max, single) => {
+                CaseLogic::Repeat(
+                    RepeatLogic::BetweenCounts(
+                        tree.clone(),
+                        embed_expr_dft(expr_min),
+                        embed_expr_dft(expr_max),
+                        Box::new(self.translate(single.get_dec()))
+                    )
+                )
+            }
             TypedDecoder::RepeatUntilLast(_gt, pred_terminal, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ConditionTerminal(
@@ -1653,11 +1663,18 @@ where
 /// Cases where a constant block of logic is repeated (0 or more times)
 #[derive(Clone, Debug)]
 enum RepeatLogic<ExprT> {
-    Repeat0ContinueOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and continues if it is matched
-    Repeat1BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>), // evaluates a matchtree and breaks if it is matched
-    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),           // repeats a specific numnber of times
-    ConditionTerminal(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'terminal element' is satisfied
-    ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>), // stops when a predicate for 'complete sequence' is satisfied
+    /// Evaluates a matchtree and continues if it is matched
+    Repeat0ContinueOnMatch(MatchTree, Box<CaseLogic<ExprT>>),
+    /// evaluates a matchtree and breaks if it is matched
+    Repeat1BreakOnMatch(MatchTree, Box<CaseLogic<ExprT>>),
+    /// repeats a specific numnber of times
+    ExactCount(RustExpr, Box<CaseLogic<ExprT>>),
+    /// Repeats between N and M times
+    BetweenCounts(MatchTree, RustExpr, RustExpr, Box<CaseLogic<ExprT>>),
+    /// Repetition stops after a predicate for 'terminal element' is satisfied
+    ConditionTerminal(RustExpr, Box<CaseLogic<ExprT>>),
+    /// Repetition stops after a predicate for 'complete sequence' is satisfied (post-append)
+    ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 pub(crate) trait ToAst {
@@ -1720,10 +1737,8 @@ where
 
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
+                stmts.push(RustStmt::assign_mut(
+                    "accum",
                     RustExpr::scoped(["Vec"], "new").call(),
                 ));
                 let ctrl = {
@@ -1758,6 +1773,58 @@ where
                             RustExpr::num_lit(0usize),
                         ),
                         vec![bind_ix, RustStmt::Control(escape_clause)],
+                    ))
+                };
+                stmts.push(ctrl);
+                (stmts, Some(RustExpr::local("accum")))
+            }
+            RepeatLogic::BetweenCounts(btree, expr_min, expr_max, elt) => {
+                let mut stmts = Vec::new();
+
+                let elt_expr = elt.to_ast(ctxt).into();
+                stmts.push(RustStmt::assign_mut(
+                    "accum",
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
+                let ctrl = {
+                    let tree_index_expr: RustExpr = invoke_matchtree(btree, ctxt);
+                    let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
+                    let cond = {
+                        let tree_cond =
+                            RustExpr::infix(
+                                RustExpr::local("matching_ix"),
+                                Operator::Eq,
+                                RustExpr::num_lit(0usize),
+                        );
+                        let min_cond = RustExpr::infix(
+                            RustExpr::local("accum").call_method("len"),
+                            Operator::Gte,
+                            expr_min.clone(),
+                        );
+                        let max_cond = RustExpr::infix(
+                            RustExpr::local("accum").call_method("len"),
+                            Operator::Eq,
+                            expr_max.clone(),
+                        );
+                        // Workaround for lack of boolean operations in RustOp
+                        RustExpr::local("repeat_between_finished").call_with([tree_cond, min_cond, max_cond]).wrap_try()
+                    };
+                    let b_continue = [
+                        RustStmt::assign("next_elem", elt_expr),
+                        RustStmt::Expr(
+                            RustExpr::local("accum")
+                                .call_method_with("push", [RustExpr::local("next_elem")]),
+                        )
+                    ].to_vec();
+                    let b_stop = vec![RustStmt::Control(RustControl::Break)];
+                    let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
+                    RustStmt::Control(RustControl::While(
+                        RustExpr::infix(
+                            RustExpr::local(ctxt.input_varname.clone()),
+                            Operator::Gt,
+                            RustExpr::num_lit(0usize),
+                        ),
+                        vec![bind_ix, RustStmt::Control(escape_clause)]
                     ))
                 };
                 stmts.push(ctrl);
@@ -2638,6 +2705,14 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
+            }
+            Format::RepeatBetween(min_expr, max_expr, inner) => {
+                let index = self.get_and_increment_index();
+                let t_min_expr = self.elaborate_expr(min_expr);
+                let t_max_expr = self.elaborate_expr(max_expr);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::RepeatBetween(gt, t_min_expr, t_max_expr, Box::new(t_inner))
             }
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();

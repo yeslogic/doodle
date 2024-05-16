@@ -61,6 +61,7 @@ pub enum TypedFormat<TypeRep> {
     Repeat(TypeRep, Box<TypedFormat<TypeRep>>),
     Repeat1(TypeRep, Box<TypedFormat<TypeRep>>),
     RepeatCount(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    RepeatBetween(TypeRep, TypedExpr<TypeRep>, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     RepeatUntilLast(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     RepeatUntilSeq(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     Peek(TypeRep, Box<TypedFormat<TypeRep>>),
@@ -125,6 +126,9 @@ impl TypedFormat<GenType> {
                 .unwrap_or(Bounds::exact(0)),
 
             TypedFormat::RepeatCount(_, t_exp, f) => f.lookahead_bounds() * t_exp.bounds(),
+            TypedFormat::RepeatBetween(_, t_min, t_max, f) => {
+                f.lookahead_bounds() * Bounds::union(t_min.bounds(), t_max.bounds())
+            }
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
                 f.lookahead_bounds() * Bounds::new(1, None)
@@ -186,6 +190,7 @@ impl TypedFormat<GenType> {
                 .unwrap_or(Bounds::exact(0)),
 
             TypedFormat::RepeatCount(_, t_exp, f) => f.match_bounds() * t_exp.bounds(),
+            TypedFormat::RepeatBetween(_, t_min, t_max, f) => f.match_bounds() * Bounds::union(t_min.bounds(), t_max.bounds()),
 
             TypedFormat::Repeat1(_, f) | TypedFormat::RepeatUntilLast(_, _, f) => {
                 f.match_bounds() * Bounds::new(1, None)
@@ -248,6 +253,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Repeat(gt, ..)
             | TypedFormat::Repeat1(gt, ..)
             | TypedFormat::RepeatCount(gt, ..)
+            | TypedFormat::RepeatBetween(gt, ..)
             | TypedFormat::RepeatUntilLast(gt, ..)
             | TypedFormat::RepeatUntilSeq(gt, ..)
             | TypedFormat::Peek(gt, ..)
@@ -534,6 +540,9 @@ mod __impls {
                 TypedFormat::Repeat1(_, inner) => Format::Repeat1(rebox(inner)),
                 TypedFormat::RepeatCount(_, count, inner) => {
                     Format::RepeatCount(Expr::from(count), rebox(inner))
+                }
+                TypedFormat::RepeatBetween(_, min, max, inner) => {
+                    Format::RepeatBetween(Expr::from(min), Expr::from(max), rebox(inner))
                 }
                 TypedFormat::RepeatUntilLast(_, lambda, inner) => {
                     Format::RepeatUntilLast(Expr::from(lambda), rebox(inner))

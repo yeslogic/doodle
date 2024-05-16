@@ -1062,6 +1062,7 @@ pub enum Decoder {
     Match(Expr, Vec<(Pattern, Decoder)>),
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
+    RepeatBetween(MatchTree, Expr, Expr, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
@@ -1252,6 +1253,30 @@ impl<'a> Compiler<'a> {
                 // FIXME probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatCount(expr.clone(), da))
+            }
+            Format::RepeatBetween(xmin, xmax, a) => {
+                // FIXME - preliminary support only for exact-bound limit values
+                let Some(min) = xmin.bounds().is_exact() else { unimplemented!("RepeatBetween on inexact bounds-expr") };
+                let Some(max) = xmax.bounds().is_exact() else { unimplemented!("RepeatBetween on inexact bounds-expr") };
+
+
+                let da = self.compile_format(
+                    a,
+                    Rc::new(Next::RepeatBetween(min.saturating_sub(1), max.saturating_sub(1), MaybeTyped::Untyped(a), next.clone()))
+                )?;
+
+                let tree = {
+                    let mut branches: Vec<Format> = Vec::new();
+                    branches.push(Format::EMPTY);
+                    // FIXME: this is inefficient but probably works
+                    for count in min..=max {
+                        let f_count = Format::RepeatCount(Expr::U32(count as u32), a.clone());
+                        branches.push(f_count);
+                    }
+                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else { panic!("cannot build match tree for {:?}", format) };
+                    tree
+                };
+                Ok(Decoder::RepeatBetween(tree, xmin.clone(), xmax.clone(), Box::new(da)))
             }
             Format::RepeatUntilLast(expr, a) => {
                 // FIXME probably not right
@@ -1591,6 +1616,24 @@ impl Decoder {
                 }
                 Ok((Value::Seq(v), input))
             }
+            Decoder::RepeatBetween(tree, min, max, a) => {
+                let mut input = input;
+                let min = min.eval_value(scope).unwrap_usize();
+                let max = max.eval_value(scope).unwrap_usize();
+                let mut v = Vec::new();
+                loop {
+                    if tree.matches(input).ok_or(ParseError::NoValidBranch { offset: input.offset })? == 0 || v.len() == max {
+                        if v.len() < min {
+                            unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
+                        }
+                        break;
+                    }
+                    let (va, next_input) = a.parse(program, scope, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                Ok((Value::Seq(v), input))
+            }
             Decoder::RepeatUntilLast(expr, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
@@ -1839,6 +1882,25 @@ impl Decoder {
                 let count = expr.eval_value(scope).unwrap_usize();
                 let mut v = Vec::with_capacity(count);
                 for _ in 0..count {
+                    let (va, next_input) = a.parse_ext(program, scope, input)?;
+                    input = next_input;
+                    v.push(va);
+                }
+                let totlen = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+            }
+            Decoder::RepeatBetween(tree, min, max, a) => {
+                let mut input = input;
+                let min = min.eval_value(scope).unwrap_usize();
+                let max = max.eval_value(scope).unwrap_usize();
+                let mut v = Vec::new();
+                loop {
+                    if tree.matches(input).ok_or(ParseError::NoValidBranch { offset: input.offset })? == 0 || v.len() == max {
+                        if v.len() < min {
+                            unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
+                        }
+                        break;
+                    }
                     let (va, next_input) = a.parse_ext(program, scope, input)?;
                     input = next_input;
                     v.push(va);
