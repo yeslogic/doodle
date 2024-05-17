@@ -321,9 +321,8 @@ impl<'a> GTCompiler<'a> {
 
                 let tree = {
                     let mut branches: Vec<Format> = Vec::new();
-                    branches.push(Format::EMPTY);
                     // FIXME: this is inefficient but probably works
-                    for count in min..=max {
+                    for count in 0..=max {
                         let f_count = TypedFormat::RepeatCount(gt.clone(), TypedExpr::U32(count as u32), a.clone());
                         branches.push(f_count.into());
                     }

@@ -1267,9 +1267,8 @@ impl<'a> Compiler<'a> {
 
                 let tree = {
                     let mut branches: Vec<Format> = Vec::new();
-                    branches.push(Format::EMPTY);
                     // FIXME: this is inefficient but probably works
-                    for count in min..=max {
+                    for count in 0..=max {
                         let f_count = Format::RepeatCount(Expr::U32(count as u32), a.clone());
                         branches.push(f_count);
                     }
@@ -2875,5 +2874,13 @@ mod tests {
         let any_byte = Format::Byte(ByteSet::full());
         let f = Format::Tuple(vec![peek_not, repeat1(any_byte)]);
         assert!(Compiler::compile_one(&f).is_err());
+    }
+
+    #[test]
+    fn compile_repeat_between() {
+        let repeat_between = Format::RepeatBetween(Expr::U16(0u16), Expr::U16(2u16), Box::new(is_byte(0)));
+        let trailer = is_byte(1);
+        let f = Format::Tuple(vec![repeat_between, trailer]);
+        assert!(Compiler::compile_one(&f).is_ok());
     }
 }
