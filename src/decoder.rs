@@ -1256,13 +1256,21 @@ impl<'a> Compiler<'a> {
             }
             Format::RepeatBetween(xmin, xmax, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = xmin.bounds().is_exact() else { unimplemented!("RepeatBetween on inexact bounds-expr") };
-                let Some(max) = xmax.bounds().is_exact() else { unimplemented!("RepeatBetween on inexact bounds-expr") };
-
+                let Some(min) = xmin.bounds().is_exact() else {
+                    unimplemented!("RepeatBetween on inexact bounds-expr")
+                };
+                let Some(max) = xmax.bounds().is_exact() else {
+                    unimplemented!("RepeatBetween on inexact bounds-expr")
+                };
 
                 let da = self.compile_format(
                     a,
-                    Rc::new(Next::RepeatBetween(min.saturating_sub(1), max.saturating_sub(1), MaybeTyped::Untyped(a), next.clone()))
+                    Rc::new(Next::RepeatBetween(
+                        min.saturating_sub(1),
+                        max.saturating_sub(1),
+                        MaybeTyped::Untyped(a),
+                        next.clone(),
+                    )),
                 )?;
 
                 let tree = {
@@ -1272,10 +1280,17 @@ impl<'a> Compiler<'a> {
                         let f_count = Format::RepeatCount(Expr::U32(count as u32), a.clone());
                         branches.push(f_count);
                     }
-                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else { panic!("cannot build match tree for {:?}", format) };
+                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
+                        panic!("cannot build match tree for {:?}", format)
+                    };
                     tree
                 };
-                Ok(Decoder::RepeatBetween(tree, xmin.clone(), xmax.clone(), Box::new(da)))
+                Ok(Decoder::RepeatBetween(
+                    tree,
+                    xmin.clone(),
+                    xmax.clone(),
+                    Box::new(da),
+                ))
             }
             Format::RepeatUntilLast(expr, a) => {
                 // FIXME probably not right
@@ -1621,7 +1636,11 @@ impl Decoder {
                 let max = max.eval_value(scope).unwrap_usize();
                 let mut v = Vec::new();
                 loop {
-                    if tree.matches(input).ok_or(ParseError::NoValidBranch { offset: input.offset })? == 0 || v.len() == max {
+                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                        offset: input.offset,
+                    })? == 0
+                        || v.len() == max
+                    {
                         if v.len() < min {
                             unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
                         }
@@ -1894,7 +1913,11 @@ impl Decoder {
                 let max = max.eval_value(scope).unwrap_usize();
                 let mut v = Vec::new();
                 loop {
-                    if tree.matches(input).ok_or(ParseError::NoValidBranch { offset: input.offset })? == 0 || v.len() == max {
+                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                        offset: input.offset,
+                    })? == 0
+                        || v.len() == max
+                    {
                         if v.len() < min {
                             unreachable!("incoherent bounds for RepeatBetween(_, {min}, {max}, _)");
                         }
@@ -2878,7 +2901,8 @@ mod tests {
 
     #[test]
     fn compile_repeat_between() {
-        let repeat_between = Format::RepeatBetween(Expr::U16(0u16), Expr::U16(2u16), Box::new(is_byte(0)));
+        let repeat_between =
+            Format::RepeatBetween(Expr::U16(0u16), Expr::U16(2u16), Box::new(is_byte(0)));
         let trailer = is_byte(1);
         let f = Format::Tuple(vec![repeat_between, trailer]);
         assert!(Compiler::compile_one(&f).is_ok());

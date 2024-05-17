@@ -1,7 +1,15 @@
 use crate::format::BaseModule;
 use doodle::byte_set::ByteSet;
-use doodle::{byte_set, helper::*, Expr};
-use doodle::{Format, FormatModule, FormatRef, Pattern};
+use doodle::helper::*;
+use doodle::{Format, FormatModule, FormatRef, Pattern, Expr};
+
+fn null_terminated(f: Format) -> Format {
+    map(
+        tuple(vec![f, is_byte(0)]),
+        lambda("x", Expr::TupleProj(Box::new(var("x")), 0))
+    )
+}
+
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
@@ -113,17 +121,29 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "png.keyword",
         // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
         // FIXME - this is incorrect, and we have to fix it using new primitives
-        Format::Slice(
-            Expr::U16(79u16),
-            Box::new(repeat1(byte_in(ByteSet::union(
+            repeat_between(
+            Expr::U32(1),
+            Expr::U32(79),
+            repeat1(byte_in(ByteSet::union(
                 &ByteSet::from(32..=126),
                 &ByteSet::from(161..=255),
-            )))),
+            ))),
         ),
     );
 
+    let itxt_data = record([
+        ("keyword", null_terminated(keyword.call())),
+        ("compression-flag", byte_in([0, 1])),
+        ("compression-method", is_byte(0)),
+        ("language-tag", base.asciiz_string()), // REVIEW - there are specific rules to this (1-8 character asciii words separated by hyphens)
+        ("translated-keyword", base.asciiz_string()),
+        ("text", map(repeat(base.u8()), lambda("x", Expr::Match(Box::new(var("compression-flag")), vec![(Pattern::U8(0), var("x")), (Pattern::U8(1), Expr::Inflate(Box::new(var("x"))))])))),
+    ]);
+
+    let itxt = module.define_format("png.itxt", chunk(is_bytes(b"iTXt"), itxt_data));
+
     let iccp_data = record(vec![
-        ("profile-name", keyword.call()),
+        ("profile-name", null_terminated(keyword.call())),
         ("compression-method", is_byte(0)), // FIXME: technically the value is unrestricted but 0 := deflate is the only defined value
         ("compressed-profile", repeat(base.u8())),
     ]);
@@ -142,7 +162,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let plte = module.define_format("png.plte", chunk(is_bytes(b"PLTE"), plte_data));
 
     let text_data = record([
-        ("keyword", base.asciiz_string()),
+        ("keyword", null_terminated(keyword.call())),
         ("text", repeat(base.ascii_char())),
     ]);
 
@@ -188,6 +208,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         chunk(is_bytes(b"tRNS"), trns_data),
     );
 
+    let ztxt_data = record([
+        ("keyword", null_terminated(keyword.call())),
+        ("compression-method", is_byte(0)),
+        ("compressed-text", map(repeat(base.u8()), lambda("x", Expr::Inflate(Box::new(var("x")))))),
+    ]);
+
+    let ztxt = module.define_format("png.ztxt", chunk(is_bytes(b"zTXt"), ztxt_data));
+
     let png_chunk = module.define_format_args(
         "png.chunk",
         vec![("ihdr".into(), ihdr_type)],
@@ -195,12 +223,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("bKGD", bkgd.call_args(vec![var("ihdr")])),
             ("cHRM", chrm.call()),
             ("iCCP", iccp.call()),
+            ("iTXt", itxt.call()),
             ("gAMA", gama.call()),
             ("pHYs", phys.call()),
             ("PLTE", plte.call()),
             ("tEXt", text.call()),
             ("tIME", time.call()),
             ("tRNS", trns.call_args(vec![var("ihdr")])),
+            ("zTXt", ztxt.call()),
             // FIXME other tags excluding IHDR/IDAT/IEND
         ]),
     );

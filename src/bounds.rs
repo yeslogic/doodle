@@ -44,7 +44,7 @@ impl Bounds {
                 (Some(m1), Some(m2)) => Some(usize::min(m1, m2)),
                 (Some(m1), None) => Some(m1),
                 _ => rhs.max,
-            }
+            },
         }
     }
 

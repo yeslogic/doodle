@@ -5,9 +5,9 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
 // Stablization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
-type Top = Type198;
-type TarBlock = Type196;
-type PngData = Type187;
+type Top = Type200;
+type TarBlock = Type198;
+type PngData = Type189;
 
 #[test]
 fn test_decoder_26() {
@@ -94,6 +94,19 @@ mod jpeg {
 }
 
 #[test]
+fn test_decoder_peano() -> TestResult {
+    let buffer = std::fs::read(std::path::Path::new("test.peano"))?;
+    let mut input = Parser::new(&buffer);
+    let oput = Decoder1(&mut input)?.data;
+    match oput {
+        Top::peano(x) => println!("PEANO: {x:#?}"),
+        other => unreachable!("expected peano, found {other:?}"),
+    }
+    Ok(())
+
+}
+
+#[test]
 fn test_decoder_mpeg4() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.mp4"))?;
     let mut input = Parser::new(&buffer);
@@ -133,7 +146,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.tar"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder13(&mut input)?;
+    let oput = Decoder14(&mut input)?;
     match oput {
         TarBlock {
             header,

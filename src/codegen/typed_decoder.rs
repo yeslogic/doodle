@@ -62,7 +62,13 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Repeat0While(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     Repeat1Until(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     RepeatCount(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
-    RepeatBetween(TypeRep, MatchTree, TypedExpr<TypeRep>, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    RepeatBetween(
+        TypeRep,
+        MatchTree,
+        TypedExpr<TypeRep>,
+        TypedExpr<TypeRep>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     RepeatUntilLast(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
     RepeatUntilSeq(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
     Peek(TypeRep, Box<TypedDecoderExt<TypeRep>>),
@@ -309,27 +315,47 @@ impl<'a> GTCompiler<'a> {
             }
             GTFormat::RepeatBetween(gt, min_expr, max_expr, a) => {
                 // FIXME - preliminary support only for exact-bound limit values
-                let Some(min) = min_expr.bounds().is_exact() else { unimplemented!("RepeatBetween on inexact bounds-expr") };
-                let Some(max) = max_expr.bounds().is_exact() else { unimplemented!("RepeatBetween on inexact bounds-expr") };
-
+                let Some(min) = min_expr.bounds().is_exact() else {
+                    unimplemented!("RepeatBetween on inexact bounds-expr")
+                };
+                let Some(max) = max_expr.bounds().is_exact() else {
+                    unimplemented!("RepeatBetween on inexact bounds-expr")
+                };
 
                 let da = self.compile_gt_format(
                     a,
                     None,
-                    Rc::new(Next::RepeatBetween(min.saturating_sub(1), max.saturating_sub(1), MaybeTyped::Typed(a), next.clone()))
+                    Rc::new(Next::RepeatBetween(
+                        min.saturating_sub(1),
+                        max.saturating_sub(1),
+                        MaybeTyped::Typed(a),
+                        next.clone(),
+                    )),
                 )?;
 
                 let tree = {
                     let mut branches: Vec<Format> = Vec::new();
                     // FIXME: this is inefficient but probably works
                     for count in 0..=max {
-                        let f_count = TypedFormat::RepeatCount(gt.clone(), TypedExpr::U32(count as u32), a.clone());
+                        let f_count = TypedFormat::RepeatCount(
+                            gt.clone(),
+                            TypedExpr::U32(count as u32),
+                            a.clone(),
+                        );
                         branches.push(f_count.into());
                     }
-                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else { panic!("cannot build match tree for {:?}", format) };
+                    let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
+                        panic!("cannot build match tree for {:?}", format)
+                    };
                     tree
                 };
-                Ok(TypedDecoder::RepeatBetween(gt.clone(), tree, min_expr.clone(), max_expr.clone(), Box::new(da)))
+                Ok(TypedDecoder::RepeatBetween(
+                    gt.clone(),
+                    tree,
+                    min_expr.clone(),
+                    max_expr.clone(),
+                    Box::new(da),
+                ))
             }
             GTFormat::RepeatUntilLast(gt, expr, a) => {
                 // FIXME probably not right

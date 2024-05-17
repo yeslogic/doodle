@@ -1790,41 +1790,49 @@ where
                     let tree_index_expr: RustExpr = invoke_matchtree(btree, ctxt);
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = {
-                        let tree_cond =
-                            RustExpr::infix(
-                                RustExpr::local("matching_ix"),
-                                Operator::Eq,
-                                RustExpr::num_lit(0usize),
+                        let tree_cond = RustExpr::infix(
+                            RustExpr::local("matching_ix"),
+                            Operator::Eq,
+                            RustExpr::num_lit(0usize),
                         );
                         let min_cond = RustExpr::infix(
                             RustExpr::local("accum").call_method("len"),
                             Operator::Gte,
-                            expr_min.clone(),
+                            RustExpr::Operation(RustOp::AsCast(
+                                Box::new(expr_min.clone()),
+                                RustType::from(PrimType::Usize),
+                            )),
                         );
                         let max_cond = RustExpr::infix(
                             RustExpr::local("accum").call_method("len"),
                             Operator::Eq,
-                            expr_max.clone(),
+                            RustExpr::Operation(RustOp::AsCast(
+                                Box::new(expr_max.clone()),
+                                RustType::from(PrimType::Usize),
+                            )),
                         );
                         // Workaround for lack of boolean operations in RustOp
-                        RustExpr::local("repeat_between_finished").call_with([tree_cond, min_cond, max_cond]).wrap_try()
+                        RustExpr::local("repeat_between_finished")
+                            .call_with([tree_cond, min_cond, max_cond])
+                            .wrap_try()
                     };
                     let b_continue = [
                         RustStmt::assign("next_elem", elt_expr),
                         RustStmt::Expr(
                             RustExpr::local("accum")
                                 .call_method_with("push", [RustExpr::local("next_elem")]),
-                        )
-                    ].to_vec();
+                        ),
+                    ]
+                    .to_vec();
                     let b_stop = vec![RustStmt::Control(RustControl::Break)];
                     let escape_clause = RustControl::If(cond, b_stop, Some(b_continue));
                     RustStmt::Control(RustControl::While(
                         RustExpr::infix(
-                            RustExpr::local(ctxt.input_varname.clone()),
+                            RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
                             Operator::Gt,
                             RustExpr::num_lit(0usize),
                         ),
-                        vec![bind_ix, RustStmt::Control(escape_clause)]
+                        vec![bind_ix, RustStmt::Control(escape_clause)],
                     ))
                 };
                 stmts.push(ctrl);

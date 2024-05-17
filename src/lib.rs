@@ -685,7 +685,9 @@ impl Format {
             Format::Repeat(_) => Bounds::new(0, None),
             Format::Repeat1(f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatCount(expr, f) => f.match_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds())),
+            Format::RepeatBetween(xmin, xmax, f) => {
+                f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds()))
+            }
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(_) => Bounds::exact(0),
@@ -733,7 +735,9 @@ impl Format {
             Format::Repeat(_) => Bounds::new(0, None),
             Format::Repeat1(f) => f.lookahead_bounds(module) * Bounds::new(1, None),
             Format::RepeatCount(expr, f) => f.lookahead_bounds(module) * expr.bounds(),
-            Format::RepeatBetween(xmin, xmax, f) => f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds()),
+            Format::RepeatBetween(xmin, xmax, f) => {
+                f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds())
+            }
             Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::new(1, None),
             Format::RepeatUntilSeq(_, _f) => Bounds::new(0, None),
             Format::Peek(f) => f.lookahead_bounds(module),
@@ -1289,21 +1293,40 @@ impl<'a> MatchTreeStep<'a> {
     /// The format in quiestion will  an arbitrary number of times between `min` and `max`, where `minmax ::= (min, max)`
     ///
     /// Presupposes that the invariant `max >= min` is upheld.
-    fn from_repeat_between(module: &'a FormatModule, minmax: (usize, usize), format: &'a Format, next: Rc<Next<'a>>) -> MatchTreeStep<'a> {
+    fn from_repeat_between(
+        module: &'a FormatModule,
+        minmax: (usize, usize),
+        format: &'a Format,
+        next: Rc<Next<'a>>,
+    ) -> MatchTreeStep<'a> {
         let (min, max) = minmax;
-        assert!(min <= max, "min-max pair ({}, {}) incoherent (min > max)", min, max);
+        assert!(
+            min <= max,
+            "min-max pair ({}, {}) incoherent (min > max)",
+            min,
+            max
+        );
         if min == max {
             Self::from_repeat_count(module, min, format, next)
         } else if min > 0 {
             Self::from_format(
                 module,
                 format,
-                Rc::new(Next::RepeatBetween(min - 1, max - 1, MaybeTyped::Untyped(format), next))
+                Rc::new(Next::RepeatBetween(
+                    min - 1,
+                    max - 1,
+                    MaybeTyped::Untyped(format),
+                    next,
+                )),
             )
         } else {
             Self::from_next(
                 module,
-                Rc::new(Next::RepeatMax(max, MaybeTyped::Untyped(format), next.clone())),
+                Rc::new(Next::RepeatMax(
+                    max,
+                    MaybeTyped::Untyped(format),
+                    next.clone(),
+                )),
             )
         }
     }
@@ -1400,7 +1423,11 @@ impl<'a> MatchTreeStep<'a> {
                     unreachable!("RepeatBetween(x, y, ..) precludes x == y");
                 }
                 if min > 0 {
-                    Self::from_mt_format(module, *a, Rc::new(Next::RepeatBetween(min - 1, max - 1, *a, next0.clone())))
+                    Self::from_mt_format(
+                        module,
+                        *a,
+                        Rc::new(Next::RepeatBetween(min - 1, max - 1, *a, next0.clone())),
+                    )
                 } else {
                     Self::from_next(module, Rc::new(Next::RepeatMax(max, *a, next0.clone())))
                 }
@@ -1411,7 +1438,11 @@ impl<'a> MatchTreeStep<'a> {
                     Self::from_next(module, next0.clone())
                 } else {
                     let tree0 = MatchTreeStep::<'a>::from_next(module, next0.clone());
-                    tree0.union(MatchTreeStep::<'a>::from_mt_format(module, *a, Rc::new(Next::RepeatMax(n - 1, *a, next0.clone()))))
+                    tree0.union(MatchTreeStep::<'a>::from_mt_format(
+                        module,
+                        *a,
+                        Rc::new(Next::RepeatMax(n - 1, *a, next0.clone())),
+                    ))
                 }
             }
             Next::RepeatCount(n, a, next0) => {
@@ -1535,40 +1566,53 @@ impl<'a> MatchTreeStep<'a> {
                 }
             }
             TypedFormat::RepeatBetween(_, xmin, xmax, a) => {
-                 let min_bounds = xmin.bounds();
+                let min_bounds = xmin.bounds();
                 let max_bounds = xmax.bounds();
                 match (min_bounds.is_exact(), max_bounds.is_exact()) {
-                    (Some(min), Some(max)) => {
-                        match min.cmp(&max) {
-                            Ordering::Less => {
-                                if min > 0 {
-                                    Self::from_gt_format(
-                                        module,
-                                        &**a,
-                                        Rc::new(Next::RepeatBetween(min - 1, max - 1, MaybeTyped::Typed(&**a), next))
-                                    )
-                                } else {
-                                    Self::from_next(
-                                        module,
-                                        Rc::new(Next::RepeatMax(max, MaybeTyped::Typed(&**a), next.clone())),
-                                    )
-                                }
+                    (Some(min), Some(max)) => match min.cmp(&max) {
+                        Ordering::Less => {
+                            if min > 0 {
+                                Self::from_gt_format(
+                                    module,
+                                    &**a,
+                                    Rc::new(Next::RepeatBetween(
+                                        min - 1,
+                                        max - 1,
+                                        MaybeTyped::Typed(&**a),
+                                        next,
+                                    )),
+                                )
+                            } else {
+                                Self::from_next(
+                                    module,
+                                    Rc::new(Next::RepeatMax(
+                                        max,
+                                        MaybeTyped::Typed(&**a),
+                                        next.clone(),
+                                    )),
+                                )
                             }
-                            Ordering::Equal => {
-                                let next = next.clone();
-                                if min > 0 {
-                                    Self::from_gt_format(
-                                        module,
-                                        &**a,
-                                        Rc::new(Next::RepeatCount(min - 1, MaybeTyped::Typed(&**a), next)),
-                                    )
-                                } else {
-                                    Self::from_next(module, next)
-                                }
-                            }
-                            Ordering::Greater => panic!("incoherent repeat-between: min {} > max {}", min, max),
                         }
-                    }
+                        Ordering::Equal => {
+                            let next = next.clone();
+                            if min > 0 {
+                                Self::from_gt_format(
+                                    module,
+                                    &**a,
+                                    Rc::new(Next::RepeatCount(
+                                        min - 1,
+                                        MaybeTyped::Typed(&**a),
+                                        next,
+                                    )),
+                                )
+                            } else {
+                                Self::from_next(module, next)
+                            }
+                        }
+                        Ordering::Greater => {
+                            panic!("incoherent repeat-between: min {} > max {}", min, max)
+                        }
+                    },
                     _ => {
                         unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
                     }
@@ -1694,17 +1738,15 @@ impl<'a> MatchTreeStep<'a> {
                 let min_bounds = xmin.bounds();
                 let max_bounds = xmax.bounds();
                 match (min_bounds.is_exact(), max_bounds.is_exact()) {
-                    (Some(min), Some(max)) => {
-                        match min.cmp(&max) {
-                            Ordering::Less => {
-                                Self::from_repeat_between(module, (min, max), a, next.clone())
-                            }
-                            Ordering::Equal => {
-                                Self::from_repeat_count(module, min, a, next.clone())
-                            }
-                            Ordering::Greater => panic!("incoherent repeat-between: min {} > max {}", min, max),
+                    (Some(min), Some(max)) => match min.cmp(&max) {
+                        Ordering::Less => {
+                            Self::from_repeat_between(module, (min, max), a, next.clone())
                         }
-                    }
+                        Ordering::Equal => Self::from_repeat_count(module, min, a, next.clone()),
+                        Ordering::Greater => {
+                            panic!("incoherent repeat-between: min {} > max {}", min, max)
+                        }
+                    },
                     _ => {
                         unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
                     }
@@ -1778,7 +1820,6 @@ impl<'a> MatchTreeStep<'a> {
             Format::Apply(_name) => Self::accept(),
         }
     }
-
 }
 
 impl<'a> MatchTreeLevel<'a> {
