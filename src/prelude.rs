@@ -235,7 +235,7 @@ pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {
 #[inline]
 pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> PResult<bool> {
     if next_match && !ge_min {
-        return Err(ParseError::InsufficientRepeats)
+        return Err(ParseError::InsufficientRepeats);
     };
     Ok(next_match || eq_max)
 }
