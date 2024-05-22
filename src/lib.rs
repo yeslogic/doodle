@@ -1970,7 +1970,7 @@ impl MatchTree {
         for (i, f) in branches.iter().enumerate() {
             nexts.insert((i, Rc::new(Next::Cat(MaybeTyped::Untyped(f), next.clone()))));
         }
-        const MAX_DEPTH: usize = 32;
+        const MAX_DEPTH: usize = 80;
         MatchTreeLevel::grow(module, nexts, MAX_DEPTH)
     }
 }
