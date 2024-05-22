@@ -4,14 +4,14 @@ use super::*;
 
 type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
-// Stablization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
+// Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
 type Top = Type204;
 type TarBlock = Type202;
 type PngData = Type193;
 type JpegData = Type80;
 
 #[test]
-fn test_pngsig_decoder() {
+fn test_png_signature_decoder() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parser = Parser::new(input);
@@ -23,8 +23,8 @@ fn test_pngsig_decoder() {
 fn test_decoder_gif() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.gif"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::gif(dat) => println!("{:?}", dat),
         other => unreachable!("expected gif, found {other:?}"),
     }
@@ -33,11 +33,11 @@ fn test_decoder_gif() -> TestResult {
 
 mod gzip {
     use super::*;
-    fn test_decoder_gzip(testfile: &str) -> TestResult {
-        let buffer = std::fs::read(std::path::Path::new(testfile))?;
+    fn test_decoder_gzip(test_file: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
-        let oput = Decoder1(&mut input)?.data;
-        match oput {
+        let parsed_data = Decoder1(&mut input)?.data;
+        match parsed_data {
             Top::gzip(dat) => println!("{:?}", &dat[0].header),
             other => unreachable!("expected gzip, found {other:?}"),
         }
@@ -72,11 +72,11 @@ mod gzip {
 
 mod jpeg {
     use super::*;
-    fn test_decoder_jpeg(testfile: &str) -> TestResult {
-        let buffer = std::fs::read(std::path::Path::new(testfile))?;
+    fn test_decoder_jpeg(test_file: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
-        let oput = Decoder1(&mut input)?.data;
-        match oput {
+        let parsed_data = Decoder1(&mut input)?.data;
+        match parsed_data {
             Top::jpeg(dat) => println!("{:?}", dat.frame.header),
             other => unreachable!("expected jpeg, found {other:?}"),
         }
@@ -98,8 +98,8 @@ mod jpeg {
 fn test_decoder_peano() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.peano"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::peano(x) => println!("PEANO: {x:#?}"),
         other => unreachable!("expected peano, found {other:?}"),
     }
@@ -110,8 +110,8 @@ fn test_decoder_peano() -> TestResult {
 fn test_decoder_mpeg4() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.mp4"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::mpeg4(dat) => println!("{:?}", dat),
         other => unreachable!("expected mpeg4, found {other:?}"),
     }
@@ -122,8 +122,8 @@ fn test_decoder_mpeg4() -> TestResult {
 fn test_decoder_png() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.png"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::png(dat) => println!("{:?}", dat),
         other => unreachable!("expected png, found {other:?}"),
     }
@@ -134,8 +134,8 @@ fn test_decoder_png() -> TestResult {
 fn test_decoder_riff() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.webp"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::riff(dat) => println!("{:?}", dat),
         other => unreachable!("expected riff, found {other:?}"),
     }
@@ -146,8 +146,8 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.tar"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder14(&mut input)?;
-    match oput {
+    let parsed_data = Decoder14(&mut input)?;
+    match parsed_data {
         TarBlock {
             header,
             file,
@@ -164,8 +164,8 @@ fn test_decoder_tar() -> TestResult {
 fn test_decoder_text_ascii() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.txt"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::text(chars) => {
             assert_eq!(
                 chars,
@@ -181,8 +181,8 @@ fn test_decoder_text_ascii() -> TestResult {
 fn test_decoder_text_utf8() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.utf8"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::text(chars) => {
             assert_eq!(
                 chars,
@@ -198,8 +198,8 @@ fn test_decoder_text_utf8() -> TestResult {
 fn test_decoder_text_mixed() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("mixed.utf8"))?;
     let mut input = Parser::new(&buffer);
-    let oput = Decoder1(&mut input)?.data;
-    match oput {
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
         Top::text(chars) => {
             assert_eq!(
                 chars,
@@ -224,8 +224,8 @@ mod test_files {
     fn print_png_breadcrumb(png_data: PngData) {
         let sig_hex = mk_sig_hex(png_data.signature);
         println!(
-            "SIG ({}) | IHDR (len: {} | h {}px * w {}px)",
-            sig_hex, png_data.ihdr.length, png_data.ihdr.data.height, png_data.ihdr.data.width,
+            "SIG ({}) | IHDR (h {}px * w {}px)",
+            sig_hex, png_data.ihdr.data.height, png_data.ihdr.data.width,
         );
     }
 
@@ -246,7 +246,7 @@ mod test_files {
                         density_y,
                         ..
                     }) => {
-                        // 0 = unitless, 1 = ppi, 2 = ppcm
+                        // 0 = density ratio w/o units, 1 = pixels per inch, 2 = pixels per cm
                         let density = match density_units {
                             0 => format!("{}:{}", density_x, density_y),
                             1 => format!("{}x{} ppi", density_x, density_y),
@@ -299,6 +299,7 @@ mod test_files {
             match () {
                 _ if name.contains("broken.png") => {
                     assert!(check_png(format!("test-images/{}", name).as_str()).is_err());
+                    println!("Broken PNG (expected)");
                 }
                 _ if name.ends_with(".png") => {
                     check_png(format!("test-images/{}", name).as_str())?;

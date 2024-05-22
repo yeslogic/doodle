@@ -7,13 +7,13 @@ pub enum ParseError {
     FailToken,
     /// For Repeat1, RepeatCount, or RepeatUntil*, indicates that an inadequate number of values were read before encountering end-of-buffer or end-of-slice.
     InsufficientRepeats,
-    /// Indicates a succesful parse within a negated context, as in the case of PeekNot
+    /// Indicates a successful parse within a negated context, as in the case of PeekNot
     NegatedSuccess,
     /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent; u64 value is a trace mechanic for determining which error was triggered
     ExcludedBranch(u64),
     /// Attempted read would overrun either the overall buffer, or a context-local `Format::Slice`.
     Overrun(OverrunKind),
-    /// A `Format::EndOfInput` token occuring anywhere except the final offset of a Slice or the overall buffer.
+    /// A `Format::EndOfInput` token occurring anywhere except the final offset of a Slice or the overall buffer.
     IncompleteParse { bytes_remaining: usize },
     /// Any unrecoverable error in the state of the Parser itself.
     InternalError(StateError),

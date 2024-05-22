@@ -15,7 +15,7 @@ pub(crate) enum Precedence {
     ArithInfix(ArithLevel),
     /// Infix bitwise operation of the designated bitwise sub-precedence
     BitwiseInfix(BitwiseLevel),
-    /// Unchainable quantiative comparison, such as inequality and equality operations
+    /// Unchainable quantitative comparison, such as inequality and equality operations
     Comparison(CompareLevel),
     /// Functional abstractions such as `match` expressions and closures
     Calculus,

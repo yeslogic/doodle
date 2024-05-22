@@ -1288,18 +1288,18 @@ impl<'a> MatchTreeStep<'a> {
         }
     }
 
-    /// Constructs a [MatchTreeStep] that accepts a repetition whose count is bounded above and below, with a trailing sequence of partially-consuemd formats ([`Next`]s)
+    /// Constructs a [MatchTreeStep] that accepts a repetition whose count is bounded above and below, with a trailing sequence of partially-consumed formats ([`Next`]s)
     ///
-    /// The format in quiestion will  an arbitrary number of times between `min` and `max`, where `minmax ::= (min, max)`
+    /// The format in question will repeat an arbitrary number of times between `min` and `max`, where `min_max ::= (min, max)`
     ///
     /// Presupposes that the invariant `max >= min` is upheld.
     fn from_repeat_between(
         module: &'a FormatModule,
-        minmax: (usize, usize),
+        min_max: (usize, usize),
         format: &'a Format,
         next: Rc<Next<'a>>,
     ) -> MatchTreeStep<'a> {
-        let (min, max) = minmax;
+        let (min, max) = min_max;
         assert!(
             min <= max,
             "min-max pair ({}, {}) incoherent (min > max)",
@@ -1748,6 +1748,7 @@ impl<'a> MatchTreeStep<'a> {
                         }
                     },
                     _ => {
+                        // FIXME: if there is a cleaner way to address this case, attempt to apply it
                         unreachable!("inexact repeat-between bounds (not technically a problem but not what the combinator was designed for...");
                     }
                 }

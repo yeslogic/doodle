@@ -10,7 +10,7 @@ fn null_terminated(f: Format) -> Format {
     )
 }
 
-pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule, _deflate: FormatRef, base: &BaseModule) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
             ("length", base.u32be()), // FIXME < 2^31
@@ -19,6 +19,28 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
             ("crc", base.u32be()), // FIXME check this
         ])
     };
+
+    // FIXME: implement an actual zlib-style DEFLATE specification once we know how to do that
+    let zlib = module.define_format("png.zlib", repeat(base.u8()));
+
+    // PNG keyword for iTXt, zTXt, tEXt, and other contexts
+    //   - Length >= 1, < 80 characters
+    //   - Consists only of Latin-1 characters and spaces: 32..=126 | 161..=255
+    //   - No leading or trailing spaces, nor consecutive spaces
+    //   - Non-breaking space (160) not permitted in particular
+    let keyword = module.define_format(
+        "png.keyword",
+        // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
+        // FIXME - this is incorrect, and we have to fix it using new primitives
+        repeat_between(
+            Expr::U32(1),
+            Expr::U32(79),
+            byte_in(ByteSet::union(
+                &ByteSet::from(32..=126),
+                &ByteSet::from(161..=255),
+            )),
+        ),
+    );
 
     // let any_tag = module.define_format(
     //     "png.any-tag",
@@ -104,9 +126,6 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         ("blue-y", base.u32be()),
     ]);
 
-    // FIXME: implement an actual zlib-style DEFLATE specification once we know how to do that
-    let zlib = module.define_format("png.zlib", repeat(base.u8()));
-
     let chrm = module.define_format("png.chrm", chunk(is_bytes(b"cHRM"), chrm_data));
 
     // FIXME: do we want to map the value to its intended scale (y := x / 100_000)?
@@ -114,30 +133,11 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
 
     let gama = module.define_format("png.gama", chunk(is_bytes(b"gAMA"), gama_data));
 
-    // PNG keyword for iTXt, zTXt, tEXt, and other contexts
-    //   - Length >= 1, < 80 characters
-    //   - Consists only of Latin-1 characters and spaces: 32..=126 | 161..=255
-    //   - No leading or trailing spaces, nor consecutive spaces
-    //   - Non-breaking space (160) not permitted in particular
-    let keyword = module.define_format(
-        "png.keyword",
-        // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
-        // FIXME - this is incorrect, and we have to fix it using new primitives
-        repeat_between(
-            Expr::U32(1),
-            Expr::U32(79),
-            byte_in(ByteSet::union(
-                &ByteSet::from(32..=126),
-                &ByteSet::from(161..=255),
-            )),
-        ),
-    );
-
     let itxt_data = record([
         ("keyword", null_terminated(keyword.call())),
         ("compression-flag", byte_in([0, 1])),
         ("compression-method", is_byte(0)),
-        ("language-tag", base.asciiz_string()), // REVIEW - there are specific rules to this (1-8 character asciii words separated by hyphens)
+        ("language-tag", base.asciiz_string()), // REVIEW - there are specific rules to this (1-8--character ascii-only words separated by hyphens)
         ("translated-keyword", base.asciiz_string()),
         (
             "text",
@@ -148,6 +148,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
                     Box::new(Expr::U8(1)),
                 ),
                 zlib.call(),
+                // FIXME - replace with UTF8-compatible text format (e.g. text.rs)
                 repeat(base.u8()),
             ),
         ),

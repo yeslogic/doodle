@@ -29,6 +29,10 @@ impl GenType {
     //     }
     // }
 
+    /// Attempt to extract the type-index and corresponding name (`Label`) from `self`.
+    ///
+    /// Returns `None` if the type in question is not itself a concrete definition (`GenType::Def`)
+    /// or an abstract reference to a locally-defined adhoc type (`GenType::Inline` of nested `LocalType::LocalDef`).
     pub(crate) fn try_as_adhoc(&self) -> Option<(usize, &Label)> {
         match self {
             GenType::Def((ix, lbl), ..)
