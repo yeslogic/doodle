@@ -1,17 +1,16 @@
 use crate::format::BaseModule;
 use doodle::byte_set::ByteSet;
 use doodle::helper::*;
-use doodle::{Format, FormatModule, FormatRef, Pattern, Expr};
+use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
 fn null_terminated(f: Format) -> Format {
     map(
         tuple(vec![f, is_byte(0)]),
-        lambda("x", Expr::TupleProj(Box::new(var("x")), 0))
+        lambda("x", Expr::TupleProj(Box::new(var("x")), 0)),
     )
 }
 
-
-pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
             ("length", base.u32be()), // FIXME < 2^31
@@ -105,6 +104,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("blue-y", base.u32be()),
     ]);
 
+    // FIXME: implement an actual zlib-style DEFLATE specification once we know how to do that
+    let zlib = module.define_format("png.zlib", repeat(base.u8()));
+
     let chrm = module.define_format("png.chrm", chunk(is_bytes(b"cHRM"), chrm_data));
 
     // FIXME: do we want to map the value to its intended scale (y := x / 100_000)?
@@ -121,13 +123,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "png.keyword",
         // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
         // FIXME - this is incorrect, and we have to fix it using new primitives
-            repeat_between(
+        repeat_between(
             Expr::U32(1),
             Expr::U32(79),
-            repeat1(byte_in(ByteSet::union(
+            byte_in(ByteSet::union(
                 &ByteSet::from(32..=126),
                 &ByteSet::from(161..=255),
-            ))),
+            )),
         ),
     );
 
@@ -137,7 +139,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("compression-method", is_byte(0)),
         ("language-tag", base.asciiz_string()), // REVIEW - there are specific rules to this (1-8 character asciii words separated by hyphens)
         ("translated-keyword", base.asciiz_string()),
-        ("text", map(repeat(base.u8()), lambda("x", Expr::Match(Box::new(var("compression-flag")), vec![(Pattern::U8(0), var("x")), (Pattern::U8(1), Expr::Inflate(Box::new(var("x"))))])))),
+        (
+            "text",
+            if_then_else(
+                Expr::IntRel(
+                    doodle::IntRel::Eq,
+                    Box::new(var("compression-flag")),
+                    Box::new(Expr::U8(1)),
+                ),
+                zlib.call(),
+                repeat(base.u8()),
+            ),
+        ),
     ]);
 
     let itxt = module.define_format("png.itxt", chunk(is_bytes(b"iTXt"), itxt_data));
@@ -145,7 +158,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let iccp_data = record(vec![
         ("profile-name", null_terminated(keyword.call())),
         ("compression-method", is_byte(0)), // FIXME: technically the value is unrestricted but 0 := deflate is the only defined value
-        ("compressed-profile", repeat(base.u8())),
+        ("compressed-profile", zlib.call()),
     ]);
 
     let iccp = module.define_format("png.iccp", chunk(is_bytes(b"iCCP"), iccp_data));
@@ -211,7 +224,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let ztxt_data = record([
         ("keyword", null_terminated(keyword.call())),
         ("compression-method", is_byte(0)),
-        ("compressed-text", map(repeat(base.u8()), lambda("x", Expr::Inflate(Box::new(var("x")))))),
+        ("compressed-text", zlib.call()),
     ]);
 
     let ztxt = module.define_format("png.ztxt", chunk(is_bytes(b"zTXt"), ztxt_data));

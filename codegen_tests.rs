@@ -5,16 +5,17 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
 // Stablization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
-type Top = Type200;
-type TarBlock = Type198;
-type PngData = Type189;
+type Top = Type204;
+type TarBlock = Type202;
+type PngData = Type193;
+type JpegData = Type80;
 
 #[test]
-fn test_decoder_26() {
+fn test_pngsig_decoder() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parser = Parser::new(input);
-    let ret = Decoder26(&mut parser);
+    let ret = Decoder27(&mut parser);
     assert!(ret.is_ok());
 }
 
@@ -103,7 +104,6 @@ fn test_decoder_peano() -> TestResult {
         other => unreachable!("expected peano, found {other:?}"),
     }
     Ok(())
-
 }
 
 #[test]
@@ -229,21 +229,67 @@ mod test_files {
         );
     }
 
+    fn print_jpeg_breadcrumb(jpg_data: JpegData) {
+        let (k, app01) = mk_app01(jpg_data.frame.initial_segment);
+        println!("APP{k} ({})", app01);
+    }
+
+    fn mk_app01(seg: Type55) -> (u8, String) {
+        match seg {
+            Type55::app0(dat0) => {
+                match dat0.data.data {
+                    Type43::jfif(Type42 {
+                        version_major,
+                        version_minor,
+                        density_units,
+                        density_x,
+                        density_y,
+                        ..
+                    }) => {
+                        // 0 = unitless, 1 = ppi, 2 = ppcm
+                        let density = match density_units {
+                            0 => format!("{}:{}", density_x, density_y),
+                            1 => format!("{}x{} ppi", density_x, density_y),
+                            2 => format!("{}x{} ppcm", density_x, density_y),
+                            _other => unreachable!("bad density units (!= 0, 1, 2): {_other}"),
+                        };
+                        (
+                            0,
+                            format!("JFIF v{}.{:02} | {density} ", version_major, version_minor),
+                        )
+                    }
+                    Type43::other(_other) => (0, String::from("Other <...>")),
+                }
+            }
+            Type55::app1(dat1) => match dat1.data.data {
+                Type52::exif(Type50 { exif: _exif, .. }) => (1, String::from("EXIF <...>")),
+                Type52::xmp(Type51 { xmp: _xmp, .. }) => (1, String::from("XMP <...>")),
+                Type52::other(_) => (1, String::from("Other <...>")),
+            },
+        }
+    }
+
     fn check_png(filename: &str) -> TestResult {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let oput = Decoder1(&mut input)?.data;
-        match oput {
-            Top::png(dat) => print_png_breadcrumb(dat),
-            other => unreachable!("{filename}: expected png, found {other:?}"),
-        }
+        let dat = Decoder7(&mut input)?;
+        print_png_breadcrumb(dat);
+        Ok(())
+    }
+
+    fn check_jpeg(filename: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(filename))?;
+        let mut input = Parser::new(&buffer);
+        print!("[{filename}]: ");
+        let dat = Decoder5(&mut input)?;
+        print_jpeg_breadcrumb(dat);
         Ok(())
     }
 
     #[test]
     fn test_errant_png() -> TestResult {
-        check_png("test-images/ArcTriomphe-cHRM-red-green-swap.png")
+        check_png("test-images/broken.png")
     }
 
     #[test]
@@ -251,8 +297,14 @@ mod test_files {
         for entry in std::fs::read_dir("test-images")?.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             match () {
+                _ if name.contains("broken.png") => {
+                    assert!(check_png(format!("test-images/{}", name).as_str()).is_err());
+                }
                 _ if name.ends_with(".png") => {
                     check_png(format!("test-images/{}", name).as_str())?;
+                }
+                _ if name.ends_with(".jpg") || name.ends_with(".jpeg") => {
+                    check_jpeg(format!("test-images/{}", name).as_str())?;
                 }
                 // FIXME: add more cases as we add handlers for each image type
                 _ => continue,
