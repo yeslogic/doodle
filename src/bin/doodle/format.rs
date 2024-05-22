@@ -93,7 +93,7 @@ mod test {
                 ),
             ),
         ]);
-        let fref = module.define_format("test.lenpref_wro_mask", f);
+        let forward_ref = module.define_format("test.wro_mask", f);
         let mut data = Vec::with_capacity(37); // 4 (len) + 32 (data) + 1 (mask)
         let len_bytes = [0, 0, 0, 32];
         let mask = 0x7F;
@@ -104,7 +104,7 @@ mod test {
         }
         data.push(mask);
 
-        let program = doodle::decoder::Compiler::compile_program(&module, &fref.call())
+        let program = doodle::decoder::Compiler::compile_program(&module, &forward_ref.call())
             .unwrap_or_else(|msg| panic!("Failed to compile: {msg}"));
         let (output, _) = program.run(ReadCtxt::new(&data))?;
         match output {

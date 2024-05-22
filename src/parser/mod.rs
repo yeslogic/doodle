@@ -37,7 +37,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    /// Attempts to advance ther buffer by one after capturing the value of the byte at the current logical
+    /// Attempts to advance the buffer by one after capturing the value of the byte at the current logical
     /// offset into the buffer.
     ///
     /// In bits-mode, this will be a sub-indexed 0-or-1-valued `u8` of the bit in question,
@@ -126,7 +126,7 @@ impl<'a> Parser<'a> {
         self.offset.escape_bits_mode()
     }
 
-    /// Returns the number of bits that have been read thusfar in the current
+    /// Returns the number of bits that have been read thus-far in the current
     /// bits-mode context.
     ///
     /// Will return `None` instead if we are not in bits-mode.
@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Attempts to close the most recently-opened slice, skipping to the end of the slice
-    /// if succesful.
+    /// if successful.
     ///
     /// Will only fail if there are no slices to close, or if the current offset-value somehow
     /// exceeded the slice end-point unexpectedly. In either case, the error cannot be recovered
@@ -180,7 +180,7 @@ impl<'a> Parser<'a> {
     /// Opens a new PeekNot context, marking the current offset and its modality to be recover3d
     /// when the matching [`Parser::close_peek_not_context`] call is reached.
     pub fn open_peek_not_context(&mut self) {
-        self.offset.open_peeknot()
+        self.offset.open_peek_not()
     }
 
     /// Closes the most recently-opened PeekNot context, recovering the offset and its modality
@@ -200,7 +200,7 @@ impl<'a> Parser<'a> {
         self.offset.open_parallel()
     }
 
-    /// Rewinds to the branch-point of the latest 'Alts' context (e.g. after an individual branch could not be parsed succesfully).
+    /// Rewinds to the branch-point of the latest 'Alts' context (e.g. after an individual branch could not be parsed successfully).
     ///
     /// According to the `is_last` parameter, may also re-create the branch-point to allow chaining with future branches.
     ///

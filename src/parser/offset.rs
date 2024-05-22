@@ -450,7 +450,7 @@ impl BufferOffset {
     }
 
     /// Creates and pushes a new [`Lens::PeekNot`] to the internal `ViewStack`.
-    pub(crate) fn open_peeknot(&mut self) {
+    pub(crate) fn open_peek_not(&mut self) {
         let checkpoint = self.current_offset;
         let peeknot = Lens::PeekNot { checkpoint };
         self.view_stack.push_lens(peeknot);
