@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::output::{Fragment, FragmentBuilder};
@@ -322,6 +323,16 @@ impl RustType {
             Box::new(err_type),
         )))
     }
+
+    fn try_as_primtype(&self) -> Option<PrimType> {
+        match self {
+            RustType::Atom(at) => match at {
+                AtomType::Prim(pt) => Some(*pt),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
 }
 
 impl ToFragment for RustType {
@@ -428,9 +439,7 @@ pub(crate) enum RustVariant {
 impl RustVariant {
     pub(crate) fn get_label(&self) -> &Label {
         match self {
-            RustVariant::Unit(lab) | RustVariant::Tuple(lab, _) => {
-                lab
-            }
+            RustVariant::Unit(lab) | RustVariant::Tuple(lab, _) => lab,
         }
     }
 }
@@ -503,6 +512,35 @@ pub(crate) enum PrimType {
     Bool,
     Char,
     Usize,
+}
+
+impl PrimType {
+    fn is_numeric(&self) -> bool {
+        matches!(
+            self,
+            PrimType::U8 | PrimType::U16 | PrimType::U32 | PrimType::U64 | PrimType::Usize
+        )
+    }
+
+    fn compare_width(pt0: PrimType, pt1: PrimType) -> Option<Ordering> {
+        match (pt0, pt1) {
+            (PrimType::Unit, _) | (_, PrimType::Unit) => None,
+            (PrimType::Char, _) | (_, PrimType::Char) => None,
+            (PrimType::Bool, _) | (_, PrimType::Bool) => None,
+            (PrimType::U8, PrimType::U8) => Some(Ordering::Equal),
+            (PrimType::U8, _) => Some(Ordering::Less),
+            (_, PrimType::U8) => Some(Ordering::Greater),
+            (PrimType::U16, PrimType::U16) => Some(Ordering::Equal),
+            (PrimType::U16, _) => Some(Ordering::Less),
+            (_, PrimType::U16) => Some(Ordering::Greater),
+            (PrimType::U32, PrimType::U32) => Some(Ordering::Equal),
+            (PrimType::U32, _) => Some(Ordering::Less),
+            (_, PrimType::U32) => Some(Ordering::Greater),
+            (PrimType::U64 | PrimType::Usize, PrimType::U64 | PrimType::Usize) => {
+                Some(Ordering::Equal)
+            }
+        }
+    }
 }
 
 impl From<BaseType> for PrimType {
@@ -903,6 +941,45 @@ impl Operator {
             Operator::BitAnd => Precedence::BITAND,
         }
     }
+
+    pub(crate) fn out_type(&self, lhs_type: PrimType, rhs_type: PrimType) -> Option<PrimType> {
+        match self {
+            Operator::Eq | Operator::Neq => {
+                if lhs_type == rhs_type {
+                    Some(PrimType::Bool)
+                } else {
+                    None
+                }
+            }
+            Operator::Lt | Operator::Lte | Operator::Gt | Operator::Gte => {
+                if lhs_type == rhs_type && lhs_type.is_numeric() {
+                    Some(PrimType::Bool)
+                } else {
+                    None
+                }
+            }
+            Operator::BitOr
+            | Operator::BitAnd
+            | Operator::Div
+            | Operator::Rem
+            | Operator::Add
+            | Operator::Sub
+            | Operator::Mul => {
+                if lhs_type == rhs_type && lhs_type.is_numeric() {
+                    Some(lhs_type)
+                } else {
+                    None
+                }
+            }
+            Operator::Shl | Operator::Shr => {
+                if lhs_type.is_numeric() && rhs_type.is_numeric() {
+                    Some(lhs_type)
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 impl Operator {
@@ -945,15 +1022,24 @@ impl RustOp {
     /// Basic heuristic to determine whether a given operation is 'sound' at the type-level, i.e.
     /// that the operation in question is defined on the type of the operands and that the operands conform
     /// to the expectations of the operation, and are homogenous if that is required.
+    ///
+    /// If the operation might be unsound, may conservatively return false even if soundness is not ruled out.
     pub fn is_sound(&self) -> bool {
         match self {
             RustOp::InfixOp(op, lhs, rhs) => {
                 match (op, lhs.try_get_primtype(), rhs.try_get_primtype()) {
-                    (_, Some(ltype), Some(rtype)) => todo!(),
-                    _ => todo!(),
+                    (Operator::Eq | Operator::Neq, Some(ltype), Some(rtype)) => ltype == rtype,
+                    (_, Some(ltype), Some(rtype)) => ltype == rtype && ltype.is_numeric(),
+                    (_, None, _) | (_, _, None) => false,
                 }
             }
-            RustOp::AsCast(_, _) => todo!(),
+            RustOp::AsCast(expr, typ) => match (expr.try_get_primtype(), typ.try_as_primtype()) {
+                (Some(pt0), Some(pt1)) => match PrimType::compare_width(pt0, pt1) {
+                    None | Some(Ordering::Greater) => false,
+                    _ => true,
+                },
+                _ => false,
+            },
         }
     }
 }
@@ -1135,21 +1221,35 @@ impl RustExpr {
                 _ => None,
             },
             RustExpr::Borrow(_) | RustExpr::BorrowMut(_) => None,
-            RustExpr::Try(expr) => None, /* match &**expr {
-            RustExpr::FunctionCall(operator, operands) => match &**operator {
-            RustExpr::Entity(ent) => match ent {
-            RustEntity::Local(name) | RustEntity::Scoped(_, name) => if matches!(&**name, "Ok" | "Some")
-            RustEntity::SelfEntity => unreachable!("expecting Try-compatible constructor, found Self"),
-            }
-            _ =>
-            }
-            } */
-            RustExpr::Operation(_) => todo!(),
-            RustExpr::BlockScope(_, _) => todo!(),
-            RustExpr::Control(_) => todo!(),
-            RustExpr::Closure(_) => todo!(),
-            RustExpr::Slice(_, _, _) => todo!(),
-            RustExpr::RangeExclusive(_, _) => todo!(),
+            RustExpr::Try(..) => None,
+            RustExpr::Operation(op) => match op {
+                RustOp::InfixOp(op, lhs, rhs) => {
+                    match (lhs.try_get_primtype(), rhs.try_get_primtype()) {
+                        (Some(lhs_type), Some(rhs_type)) => op.out_type(lhs_type, rhs_type),
+                        _ => None,
+                    }
+                }
+                RustOp::AsCast(expr, typ) => {
+                    let Some(out_typ) = typ.try_as_primtype() else {
+                        return None;
+                    };
+                    if expr
+                        .try_get_primtype()
+                        .as_ref()
+                        .map_or(false, PrimType::is_numeric)
+                        && out_typ.is_numeric()
+                    {
+                        Some(out_typ)
+                    } else {
+                        None
+                    }
+                }
+            },
+            RustExpr::BlockScope(_stmts, ret) => ret.try_get_primtype(),
+            RustExpr::Control(..)
+            | RustExpr::Closure(..)
+            | RustExpr::Slice(..)
+            | RustExpr::RangeExclusive(..) => None,
         }
     }
 
@@ -1167,23 +1267,24 @@ impl RustExpr {
             RustExpr::Struct(_, assigns) => assigns
                 .iter()
                 .all(|(_, val)| val.as_deref().map_or(true, Self::is_pure)),
-            | RustExpr::Deref(expr)
-            | RustExpr::Borrow(expr)
-            | RustExpr::BorrowMut(expr) => expr.is_pure(),
+            RustExpr::Deref(expr) | RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
+                expr.is_pure()
+            }
             // NOTE - Without static analysis to determine whether the value is always Some(x) where x is a pure calculation, try can always cause the block-scope to short-circuit to Err and therefore is impure by default
             RustExpr::Try(..) => false,
             RustExpr::Operation(op) => match op {
-                // TODO - mixed-type operations might be a problem here so we cannot expect things to be pure without more complex static analysis
                 RustOp::InfixOp(.., lhs, rhs) => lhs.is_pure() && rhs.is_pure() && op.is_sound(),
                 // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
-                // NOTE - there may be certain cases where we can rule this out based on widening conversions but that would be overkill
-                RustOp::AsCast(..) => false,
+                RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
             },
-            RustExpr::BlockScope(_, _) => todo!(),
-            RustExpr::Control(_) => todo!(),
-            RustExpr::Closure(_) => todo!(),
-            RustExpr::Slice(_, _, _) => todo!(),
-            RustExpr::RangeExclusive(_, _) => todo!(),
+            RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
+            // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
+            RustExpr::Control(..) => false,
+            RustExpr::Closure(..) => false,
+            // NOTE - slices exprs can always be out-of-bounds so they cannot be elided without changing program behavior
+            RustExpr::Slice(..) => false,
+            // NOTE - ranges can be inverted
+            RustExpr::RangeExclusive(..) => false,
         }
     }
 }
