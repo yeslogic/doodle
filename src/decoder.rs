@@ -640,6 +640,7 @@ impl Value {
         }
     }
 
+    /// FIXME - do we really need this?
     #[allow(dead_code)]
     fn unwrap_char(self) -> char {
         match self {

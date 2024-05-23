@@ -1,6 +1,9 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
+
+mod codegen_tests;
+
 use doodle::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -22829,5 +22832,3 @@ return Err(ParseError::ExcludedBranch(8001216093308031977u64));
     };
     PResult::Ok(((|x: (Vec<u8>, u8)| PResult::Ok((x.clone().0.len()) as u32))(inner))?)
 }
-
-mod codegen_tests;
