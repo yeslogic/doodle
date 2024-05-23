@@ -6,8 +6,10 @@ use crate::output::{Fragment, FragmentBuilder};
 use crate::precedence::{cond_paren, Precedence};
 use crate::{BaseType, IntoLabel, Label, ValueType};
 
+/// Enum-type (currently degenerate) for specifying the visibility of a top-level item
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub(crate) enum Visibility {
+    /// Equivalent to leaving out any visibility keywords (i.e. as if `pub(self)`)
     #[default]
     Implicit,
 }
@@ -20,7 +22,63 @@ impl Visibility {
     }
 }
 
+// FIXME - this shouldn't be open-coded but it will do for now
+pub(crate) struct AllowAttr(Label);
+
+impl From<Label> for AllowAttr {
+    fn from(value: Label) -> Self {
+        AllowAttr(value)
+    }
+}
+
+impl ToFragment for AllowAttr {
+    fn to_fragment(&self) -> Fragment {
+        Fragment::cat(
+            Fragment::string("allow"),
+            Fragment::string(self.0.clone()).delimit(Fragment::Char('('), Fragment::Char(')')),
+        )
+    }
+}
+
+pub(crate) enum ModuleAttr {
+    Allow(AllowAttr),
+}
+
+impl ToFragment for ModuleAttr {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            ModuleAttr::Allow(allow_attr) => Fragment::string("#!").cat(
+                allow_attr
+                    .to_fragment()
+                    .delimit(Fragment::Char('['), Fragment::Char(']')),
+            ),
+        }
+    }
+}
+
+pub(crate) struct RustSubmodule(Visibility, Label);
+
+impl RustSubmodule {
+    pub fn new(label: impl IntoLabel) -> Self {
+        RustSubmodule(Visibility::default(), label.into())
+    }
+}
+
+impl ToFragment for RustSubmodule {
+    fn to_fragment(&self) -> Fragment {
+        self.0
+            .add_vis(Fragment::cat(
+                Fragment::string("mod "),
+                self.1.to_fragment(),
+            ))
+            .cat(Fragment::Char(';'))
+    }
+}
+
+#[derive(Default)]
 pub(crate) struct RustProgram {
+    mod_level_attrs: Vec<ModuleAttr>,
+    submodules: Vec<RustSubmodule>,
     imports: Vec<RustImport>,
     items: Vec<RustItem>,
 }
@@ -30,11 +88,29 @@ impl FromIterator<RustItem> for RustProgram {
         Self {
             imports: Vec::new(),
             items: Vec::from_iter(iter),
+            ..Default::default()
         }
     }
 }
 
 impl RustProgram {
+    pub fn new() -> Self {
+        RustProgram {
+            mod_level_attrs: Vec::new(),
+            submodules: Vec::new(),
+            imports: Vec::new(),
+            items: Vec::new(),
+        }
+    }
+
+    pub fn add_module_attr(&mut self, attr: ModuleAttr) {
+        self.mod_level_attrs.push(attr)
+    }
+
+    pub fn add_submodule(&mut self, submodule: RustSubmodule) {
+        self.submodules.push(submodule)
+    }
+
     pub fn add_import(&mut self, import: RustImport) {
         self.imports.push(import)
     }
@@ -43,6 +119,19 @@ impl RustProgram {
 impl ToFragment for RustProgram {
     fn to_fragment(&self) -> Fragment {
         let mut frags = FragmentBuilder::new();
+        for mod_level_attr in self.mod_level_attrs.iter() {
+            frags.push(mod_level_attr.to_fragment().cat_break());
+        }
+        if !self.mod_level_attrs.is_empty() {
+            frags.push(Fragment::Empty.cat_break());
+        }
+        for submodule in self.submodules.iter() {
+            frags.push(submodule.to_fragment().cat_break());
+        }
+        if !self.submodules.is_empty() {
+            frags.push(Fragment::Empty.cat_break());
+        }
+
         for import in self.imports.iter() {
             frags.push(import.to_fragment().cat_break());
         }
@@ -80,10 +169,10 @@ impl ToFragment for RustImport {
     }
 }
 
+/// Representation for the specifications of what items should be imported from a module in a top-level or block-local `use` expression.
 pub(crate) enum RustImportItems {
+    /// Glob-imports from a single module
     Wildcard,
-    // One(Label),
-    // Group(Vec<Label>),
 }
 
 impl ToFragment for RustImportItems {
@@ -94,13 +183,14 @@ impl ToFragment for RustImportItems {
     }
 }
 
-/// Top Level Item
+/// Top-level declared item (e.g. struct definitions and functions)
 pub(crate) struct RustItem {
     vis: Visibility,
     decl: RustDecl,
 }
 
 impl RustItem {
+    /// Promotes a standalone declaration to a top-level item with implicitly 'default' visibility (i.e. `pub(self)`).
     pub fn from_decl(decl: RustDecl) -> Self {
         Self {
             vis: Default::default(),
@@ -111,35 +201,61 @@ impl RustItem {
 
 impl RustItem {
     pub fn to_fragment(&self) -> Fragment {
-        let it_frag = self.decl.to_fragment();
-        self.vis.add_vis(it_frag)
+        self.vis.add_vis(self.decl.to_fragment())
+    }
+}
+
+type TraitName = Label;
+
+#[derive(Clone, Debug)]
+pub(crate) struct DeclDerives(Vec<TraitName>);
+
+impl ToFragment for DeclDerives {
+    fn to_fragment(&self) -> Fragment {
+        let DeclDerives(traits) = self;
+        if traits.is_empty() {
+            Fragment::Empty
+        } else {
+            ToFragment::paren_list(traits)
+                .delimit(Fragment::string("#[derive"), Fragment::Char(']'))
+        }
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) enum RustDecl {
-    TypeDef(Label, RustTypeDef),
+    TypeDef(DeclDerives, Label, RustTypeDef),
     Function(RustFn),
 }
 
 impl RustDecl {
-    pub fn to_fragment(&self) -> Fragment {
+    /// FIXME - allow for more bespoke customization of what traits are derived.
+    pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
+        Self::TypeDef(
+            DeclDerives(vec![Label::from("Debug"), Label::from("Clone")]),
+            lab.into(),
+            def,
+        )
+    }
+}
+
+impl ToFragment for RustDecl {
+    fn to_fragment(&self) -> Fragment {
         match self {
-            RustDecl::TypeDef(name, tdef) => {
+            RustDecl::TypeDef(derives, name, tdef) => {
                 let frag_key = Fragment::string(tdef.keyword_for());
                 let def = Fragment::intervene(frag_key, Fragment::Char(' '), name.to_fragment())
                     .intervene(Fragment::Char(' '), tdef.to_fragment());
-                // FIXME - this is a hack to allow debug in adhoc-typed non-exhaustive matches
-                Fragment::intervene(
-                    Fragment::string("#[derive(Debug, Clone)]"),
-                    Fragment::Char('\n'),
-                    def,
-                )
+                // FIXME - avoid hardcoding this, and instead allow the code-generator to specify a list of derivable traits to insert here
+                Fragment::intervene(derives.to_fragment(), Fragment::Char('\n'), def)
             }
-            RustDecl::Function(fdef) => fdef.to_fragment(),
+            RustDecl::Function(fn_def) => fn_def.to_fragment(),
         }
     }
 }
+
+/// Generic representation for a list of lifetime- and type-parameters, generic over the types used to represent
+/// each of those two components
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RustParams<Lt, Ty> {
     lt_params: Vec<Lt>,
@@ -155,7 +271,9 @@ impl<Lt, Ty> Default for RustParams<Lt, Ty> {
     }
 }
 
+/// Representation of the abstract, name-only parameters used in the definition of a type or function
 pub(crate) type DefParams = RustParams<Label, Label>;
+/// Representation of the concrete, specific parameters used when locally invoking a function or qualifying a type
 pub(crate) type UseParams = RustParams<RustLt, RustType>;
 
 impl<Lt, Ty> RustParams<Lt, Ty> {
@@ -193,9 +311,12 @@ impl ToFragment for RustParams<RustLt, RustType> {
     }
 }
 
+/// Representation for the signature, both arguments and return type, for a non-closure function
 #[derive(Clone, Debug)]
 pub(crate) struct FnSig {
+    /// List of arguments with accompanying type annotations
     args: Vec<(Label, RustType)>,
+    /// Return type (assumed to be unit if omitted)
     ret: Option<RustType>,
 }
 
@@ -222,11 +343,16 @@ impl ToFragment for FnSig {
     }
 }
 
+/// Representation for standalone functions declared either inline or top-level in Rust
 #[derive(Clone, Debug)]
 pub(crate) struct RustFn {
+    /// Function name
     name: Label,
+    /// Optional list of generic lifetimes and types for the function declaration
     params: Option<DefParams>,
+    /// Signature, including both input parameters and return type
     sig: FnSig,
+    /// List of statements comprising the body of the function
     body: Vec<RustStmt>,
 }
 
@@ -256,6 +382,7 @@ impl ToFragment for RustFn {
     }
 }
 
+/// Representation for both `struct` and `enum`-keyword declarations.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum RustTypeDef {
     Enum(Vec<RustVariant>),
@@ -282,11 +409,14 @@ impl RustTypeDef {
     }
 }
 
+/// Entry-type for representing type-level constructions in Rust, for use in function signatures and return types,
+/// the field-types of struct definitions, and expression-level type annotations.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum RustType {
     Atom(AtomType),
     AnonTuple(Vec<RustType>),
-    Verbatim(Label, UseParams), // Catch-all for generics that we may not be able or willing to hardcode
+    /// Catch-all for generics that we may not be able or willing to hardcode
+    Verbatim(Label, UseParams),
 }
 
 impl RustType {
@@ -297,26 +427,35 @@ impl RustType {
         Self::Atom(AtomType::TypeRef(LocalType::External(name.into())))
     }
 
+    /// Returns the RustType representation of a locally-defined type whose index in the code-generation table
+    /// is `ix` and whose identifier is `name`.
     pub fn defined(ix: usize, name: impl Into<Label>) -> Self {
         Self::Atom(AtomType::TypeRef(LocalType::LocalDef(ix, name.into())))
     }
 
+    /// Maps the provided RustType according to the transformation `T -> Vec<T>`
     pub fn vec_of(inner: Self) -> Self {
         Self::Atom(AtomType::Comp(CompType::Vec(Box::new(inner))))
     }
 
+    /// Constructs an anonymous tuple-type representative over an iterable collection of RustType elements.
     pub fn anon_tuple(elts: impl IntoIterator<Item = Self>) -> Self {
         Self::AnonTuple(elts.into_iter().collect())
     }
 
+    /// Returns a RustType given a verbatim string-form of the type-level constructor to use,
+    /// with an optional list of generic arguments to parameterize it with.
     pub fn verbatim(con: impl Into<Label>, params: Option<UseParams>) -> Self {
         Self::Verbatim(con.into(), params.unwrap_or_default())
     }
 
+    /// Constructs a `RustType` representing `&'a (mut|) T` from parameters representing `'a` (optional),
+    /// the mutability of the reference, and `T`, respectively.
     pub fn borrow_of(lt: Option<RustLt>, m: Mut, ty: RustType) -> Self {
         Self::Atom(AtomType::Comp(CompType::Borrow(lt, m, Box::new(ty))))
     }
 
+    /// Constructs a `RustType` representing `Result<T, E>` from parameters representing `T` and `E`, respectively.
     pub fn result_of(ok_type: RustType, err_type: RustType) -> RustType {
         Self::Atom(AtomType::Comp(CompType::Result(
             Box::new(ok_type),
@@ -376,11 +515,17 @@ impl ToFragment for RustStruct {
 }
 
 impl ToFragment for Label {
+    /// Special-case for sanitization of labels-as-identifiers rather than a direct identity-function.
     fn to_fragment(&self) -> Fragment {
         Fragment::String(sanitize_label(self))
     }
 }
 
+/// Sanitizes a label such that it can be used as an identifier.
+///
+/// Crucially, this function is invariant and deterministic, so any two instances
+/// of a common pre-image will always yield identical images, both within each
+/// run of the code-generation phase and between such runs.
 pub(crate) fn sanitize_label(label: &Label) -> Label {
     if label.chars().enumerate().all(|(ix, c)| is_valid(ix, c)) {
         remap(label.clone())
@@ -389,6 +534,7 @@ pub(crate) fn sanitize_label(label: &Label) -> Label {
     }
 }
 
+/// Adds a `r#` prefix to any reserved Rust keywords that would be invalid as identifiers.
 fn remap(input: Label) -> Label {
     match input.as_ref() {
         "as" | "async" | "await" | "break" | "const" | "continue" | "crate" | "dyn" | "else"
@@ -403,6 +549,7 @@ fn remap(input: Label) -> Label {
     }
 }
 
+/// Returns `true` if the given character at the given index is valid in Rust-compatible identifiers
 fn is_valid(ix: usize, c: char) -> bool {
     match c {
         '-' | '.' | ' ' | '\t' => false,
@@ -411,6 +558,8 @@ fn is_valid(ix: usize, c: char) -> bool {
     }
 }
 
+/// Sanitizes a given identifier by replacing all runs of one or more disallowed characters with a single underscore,
+/// and preceding any initial ASCII digits with a leading underscore
 fn replace_bad(input: &str) -> String {
     let mut ret = String::new();
     let mut dashed = false;

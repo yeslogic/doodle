@@ -148,7 +148,6 @@ impl IntransitiveOrd for Precedence {
 }
 
 impl Precedence {
-    #![allow(dead_code)]
     pub(crate) const TOP: Self = Precedence::Top;
     pub(crate) const ARROW: Self = Precedence::Calculus;
     pub(crate) const MATCH: Self = Precedence::Calculus;
@@ -167,7 +166,6 @@ impl Precedence {
     pub(crate) const ATOM: Self = Precedence::Atomic;
 
     pub(crate) const FORMAT_COMPOUND: Self = Self::Top;
-    pub(crate) const FORMAT_ATOM: Self = Self::Atomic;
 
     pub(crate) fn bump_format(&self) -> Self {
         match self {

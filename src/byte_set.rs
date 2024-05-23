@@ -138,7 +138,7 @@ impl ByteSet {
         });
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn remove(&mut self, b: u8) {
         self.set_bit_with(b, |byte, i| {
             *byte &= !(1 << i);

@@ -800,7 +800,7 @@ fn refutability_check<A: std::fmt::Debug>(
                             match lt {
                                 LocalType::LocalDef(ix, lbl) =>
                                     unreachable!(
-                                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Defined instead"
+                                        "inline LocalDef ({ix}, {lbl}) cannot be resolved abstractly, use GenType::Def instead"
                                     ),
                                 LocalType::External(t) =>
                                     unreachable!(
@@ -2163,7 +2163,7 @@ pub fn print_generated_code(
     } = Generator::compile(module, top_format);
     let tdefs = Vec::from_iter(elaborator.codegen.defined_types.iter());
     for (ix, tdef) in tdefs.into_iter().enumerate() {
-        let it = RustItem::from_decl(RustDecl::TypeDef(IxLabel::from(ix).into(), tdef.clone()));
+        let it = RustItem::from_decl(RustDecl::type_def(IxLabel::from(ix), tdef.clone()));
         items.push(it);
     }
 
@@ -2178,20 +2178,13 @@ pub fn print_generated_code(
         path: vec!["doodle".into(), "prelude".into()],
         uses: RustImportItems::Wildcard,
     });
+    for attr_string in ["non_camel_case_types", "non_snake_case", "dead_code"].into_iter() {
+        content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
+    }
+    content.add_submodule(RustSubmodule::new("codegen_tests"));
 
     fn write_to(mut f: impl std::io::Write, content: impl ToFragment) -> std::io::Result<()> {
-        let extra = r#"mod codegen_tests;"#;
-        write!(
-            f,
-            r#"#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(dead_code)]
-{}
-{}"#,
-            content.to_fragment(),
-            extra
-        )?;
-        Ok(())
+        write!(f, "{}", content.to_fragment())
     }
 
     match dest {
@@ -3086,12 +3079,6 @@ type GTFormat = TypedFormat<GenType>;
 type GTExpr = TypedExpr<GenType>;
 type GTPattern = TypedPattern<GenType>;
 
-// #[derive(Clone, PartialEq, Debug)]
-// enum GenScope<'a> {
-//     Empty,
-//     Value(&'a GenScope<'a>, &'a str, Rc<GTExpr>),
-// }
-
 type GTDynFormat = TypedDynFormat<GenType>;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -3209,12 +3196,7 @@ mod tests {
     #[test]
     fn test_popcheck_adt_simple() {
         let f = Format::Union(vec![
-            Format::Variant(
-                "s
-            ome"
-                .into(),
-                Box::new(Format::Byte(ByteSet::full())),
-            ),
+            Format::Variant("some".into(), Box::new(Format::Byte(ByteSet::full()))),
             Format::Variant("none".into(), Box::new(Format::EMPTY)),
         ]);
 

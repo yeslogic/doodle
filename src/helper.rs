@@ -87,12 +87,10 @@ pub fn repeat_between(min: Expr, max: Expr, format: Format) -> Format {
     Format::RepeatBetween(min, max, Box::new(format))
 }
 
-#[allow(dead_code)]
 pub fn repeat_until_last(cond: Expr, format: Format) -> Format {
     Format::RepeatUntilLast(cond, Box::new(format))
 }
 
-#[allow(dead_code)]
 pub fn repeat_until_seq(cond: Expr, format: Format) -> Format {
     Format::RepeatUntilSeq(cond, Box::new(format))
 }
