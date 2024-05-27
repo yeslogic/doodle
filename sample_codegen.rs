@@ -20663,7 +20663,7 @@ fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<main_gif_logical_sc
             true => {
                 let inner = {
                     let mut accum = Vec::new();
-                    for _ in 0..2u8 << (descriptor.clone().flags & 7u8) {
+                    for _ in 0..2u16 << ((descriptor.clone().flags & 7u8) as u16) {
                         accum.push((Decoder179(_input))?);
                     }
                     accum
@@ -21132,7 +21132,7 @@ fn Decoder176<'input>(
             true => {
                 let inner = {
                     let mut accum = Vec::new();
-                    for _ in 0..2u8 << (descriptor.clone().flags & 7u8) {
+                    for _ in 0..2u16 << ((descriptor.clone().flags & 7u8) as u16) {
                         accum.push((Decoder179(_input))?);
                     }
                     accum

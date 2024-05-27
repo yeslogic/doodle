@@ -15,6 +15,8 @@ type App0Data = main_jpeg_frame_initial_segment_app0_data_data;
 type App1Data = main_jpeg_frame_initial_segment_app1_data_data;
 type ExifData = main_jpeg_frame_initial_segment_app1_data_data_exif;
 type XmpData = main_jpeg_frame_initial_segment_app1_data_data_xmp;
+type GifData = main_gif;
+type GifLogicalScreenDesc = main_gif_logical_screen_descriptor;
 
 #[test]
 fn test_png_signature_decoder() {
@@ -240,6 +242,15 @@ mod test_files {
         println!("APP{k} ({})", app01);
     }
 
+    fn print_gif_breadcrumb(gif_data: GifData) {
+        let GifLogicalScreenDesc {
+            screen_width,
+            screen_height,
+            ..
+        } = gif_data.logical_screen.descriptor;
+        println!("GIF ({}w x {}h)", screen_width, screen_height);
+    }
+
     fn mk_app01(seg: JpegApp01) -> (u8, String) {
         match seg {
             JpegApp01::app0(dat0) => {
@@ -293,6 +304,15 @@ mod test_files {
         Ok(())
     }
 
+    fn check_gif(filename: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(filename))?;
+        let mut input = Parser::new(&buffer);
+        print!("[{filename}]: ");
+        let dat = Decoder3(&mut input)?;
+        print_gif_breadcrumb(dat);
+        Ok(())
+    }
+
     #[test]
     fn test_errant_png() -> TestResult {
         check_png("test-images/broken.png")
@@ -312,6 +332,9 @@ mod test_files {
                 }
                 _ if name.ends_with(".jpg") || name.ends_with(".jpeg") => {
                     check_jpeg(format!("test-images/{}", name).as_str())?;
+                }
+                _ if name.ends_with(".gif") => {
+                    check_gif(format!("test-images/{}", name).as_str())?;
                 }
                 // FIXME: add more cases as we add handlers for each image type
                 _ => continue,
