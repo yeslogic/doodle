@@ -11,12 +11,15 @@ type PngData = main_png;
 type JpegData = main_jpeg;
 type JpegApp01 = main_jpeg_frame_initial_segment;
 type JfifData = main_jpeg_frame_initial_segment_app0_data_data_jfif;
+type TiffData = main_jpeg_frame_initial_segment_app1_data_data_exif_exif;
 type App0Data = main_jpeg_frame_initial_segment_app0_data_data;
 type App1Data = main_jpeg_frame_initial_segment_app1_data_data;
 type ExifData = main_jpeg_frame_initial_segment_app1_data_data_exif;
 type XmpData = main_jpeg_frame_initial_segment_app1_data_data_xmp;
 type GifData = main_gif;
 type GifLogicalScreenDesc = main_gif_logical_screen_descriptor;
+type RiffData = main_riff;
+type ExifByteOrder = main_jpeg_frame_initial_segment_app1_data_data_exif_exif_byte_order;
 
 #[test]
 fn test_png_signature_decoder() {
@@ -154,7 +157,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new("test.tar"))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder14(&mut input)?;
+    let parsed_data = Decoder15(&mut input)?;
     match parsed_data {
         TarBlock {
             header,
@@ -251,6 +254,26 @@ mod test_files {
         println!("GIF ({}w x {}h)", screen_width, screen_height);
     }
 
+    fn print_riff_breadcrumb(dat: RiffData) {
+        let RiffData { length, data, .. } = dat;
+        let sub_tag = match data.tag {
+            (hh, hl, lh, ll) => String::from_utf8_lossy(&[hh, hl, lh, ll]).into_owned(),
+        };
+        println!(
+            "RIFF Container (length: {} bytes, data tag: `{}`)",
+            length, sub_tag
+        );
+    }
+
+    fn print_tiff_breadcrumb(tiff_data: TiffData) {
+        let TiffData { byte_order, .. } = tiff_data;
+        let bc_byte_order = match byte_order {
+            ExifByteOrder::be(..) => "Big-Endian",
+            ExifByteOrder::le(..) => "Little-Endian",
+        };
+        println!("TIFF ({})", bc_byte_order);
+    }
+
     fn mk_app01(seg: JpegApp01) -> (u8, String) {
         match seg {
             JpegApp01::app0(dat0) => {
@@ -313,6 +336,24 @@ mod test_files {
         Ok(())
     }
 
+    fn check_tiff(filename: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(filename))?;
+        let mut input = Parser::new(&buffer);
+        print!("[{filename}]: ");
+        let dat = Decoder9(&mut input)?;
+        print_tiff_breadcrumb(dat);
+        Ok(())
+    }
+
+    fn check_riff(filename: &str) -> TestResult {
+        let buffer = std::fs::read(std::path::Path::new(filename))?;
+        let mut input = Parser::new(&buffer);
+        print!("[{filename}]: ");
+        let dat = Decoder8(&mut input)?;
+        print_riff_breadcrumb(dat);
+        Ok(())
+    }
+
     #[test]
     fn test_errant_png() -> TestResult {
         check_png("test-images/broken.png")
@@ -320,6 +361,7 @@ mod test_files {
 
     #[test]
     fn test_all_extra_images() -> TestResult {
+        let mut residue = Vec::new();
         for entry in std::fs::read_dir("test-images")?.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             match () {
@@ -336,9 +378,24 @@ mod test_files {
                 _ if name.ends_with(".gif") => {
                     check_gif(format!("test-images/{}", name).as_str())?;
                 }
+                _ if name.ends_with(".tif") => {
+                    check_tiff(format!("test-images/{}", name).as_str())?;
+                }
+                _ if name.ends_with(".webp") => {
+                    check_riff(format!("test-images/{}", name).as_str())?;
+                }
                 // FIXME: add more cases as we add handlers for each image type
-                _ => continue,
+                _ => {
+                    residue.push(format!("[test_images/{}]: Skipping...", name));
+                }
             }
+        }
+        if !residue.is_empty() {
+            for mesg in residue {
+                eprintln!("{}", mesg);
+            }
+        } else {
+            println!("==== ALL FILES COVERED ====");
         }
         Ok(())
     }

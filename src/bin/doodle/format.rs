@@ -44,6 +44,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("mpeg4", mpeg4.call()),
                     ("png", png.call()),
                     ("riff", riff.call()),
+                    ("tiff", tiff.call()),
                     ("tar", tar.call()),
                     ("text", text.call()),
                 ]),
