@@ -1,6 +1,7 @@
 pub(crate) mod rust_ast;
 pub mod typed_decoder;
 pub mod typed_format;
+mod name;
 
 use crate::{
     byte_set::ByteSet,
