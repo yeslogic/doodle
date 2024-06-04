@@ -94,14 +94,14 @@ impl FromIterator<RustItem> for RustProgram {
 }
 
 impl RustProgram {
-    pub fn new() -> Self {
-        RustProgram {
-            mod_level_attrs: Vec::new(),
-            submodules: Vec::new(),
-            imports: Vec::new(),
-            items: Vec::new(),
-        }
-    }
+    // pub fn new() -> Self {
+    //     RustProgram {
+    //         mod_level_attrs: Vec::new(),
+    //         submodules: Vec::new(),
+    //         imports: Vec::new(),
+    //         items: Vec::new(),
+    //     }
+    // }
 
     pub fn add_module_attr(&mut self, attr: ModuleAttr) {
         self.mod_level_attrs.push(attr)
