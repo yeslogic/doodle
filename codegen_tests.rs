@@ -5,10 +5,16 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
 // Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
-type Top = Type204;
-type TarBlock = Type202;
-type PngData = Type193;
-type JpegData = Type80;
+type Top = main;
+type TarBlock = main_tar_index0_contents_denest_seq;
+type PngData = main_png_index0;
+type JpegData = main_jpeg_index0;
+type JpegApp01 = main_jpeg_index0_frame_initial_segment;
+type JfifData = main_jpeg_index0_frame_initial_segment_app0_index0_data_data_jfif_index0;
+type App0Data = main_jpeg_index0_frame_initial_segment_app0_index0_data_data;
+type App1Data = main_jpeg_index0_frame_initial_segment_app1_index0_data_data;
+type ExifData = main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0;
+type XmpData = main_jpeg_index0_frame_initial_segment_app1_index0_data_data_xmp_index0;
 
 #[test]
 fn test_png_signature_decoder() {
@@ -234,11 +240,11 @@ mod test_files {
         println!("APP{k} ({})", app01);
     }
 
-    fn mk_app01(seg: Type55) -> (u8, String) {
+    fn mk_app01(seg: JpegApp01) -> (u8, String) {
         match seg {
-            Type55::app0(dat0) => {
+            JpegApp01::app0(dat0) => {
                 match dat0.data.data {
-                    Type43::jfif(Type42 {
+                    App0Data::jfif(JfifData {
                         version_major,
                         version_minor,
                         density_units,
@@ -258,13 +264,13 @@ mod test_files {
                             format!("JFIF v{}.{:02} | {density} ", version_major, version_minor),
                         )
                     }
-                    Type43::other(_other) => (0, String::from("Other <...>")),
+                    App0Data::other(_other) => (0, String::from("Other <...>")),
                 }
             }
-            Type55::app1(dat1) => match dat1.data.data {
-                Type52::exif(Type50 { exif: _exif, .. }) => (1, String::from("EXIF <...>")),
-                Type52::xmp(Type51 { xmp: _xmp, .. }) => (1, String::from("XMP <...>")),
-                Type52::other(_) => (1, String::from("Other <...>")),
+            JpegApp01::app1(dat1) => match dat1.data.data {
+                App1Data::exif(ExifData { exif: _exif, .. }) => (1, String::from("EXIF <...>")),
+                App1Data::xmp(XmpData { xmp: _xmp, .. }) => (1, String::from("XMP <...>")),
+                App1Data::other(_) => (1, String::from("Other <...>")),
             },
         }
     }

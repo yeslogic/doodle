@@ -34,8 +34,6 @@ pub(crate) enum NameAtom {
     Positional(usize),
     /// Any type-entity accessed via a field of a record
     RecordField(Label),
-    /// Type-Entity accessed via an index-labeled branch of an abstract union-type
-    BranchIx(usize),
     /// Type-Entity that is embedded within a variant of an existing enum
     Variant(Label),
     /// Type-Entity accessed via one of the [`WrapperKind`] constants defined above
@@ -48,7 +46,6 @@ impl std::fmt::Display for NameAtom {
             NameAtom::Explicit(name) => write!(f, "{}", name),
             NameAtom::Positional(pos) => write!(f, "index{}", pos),
             NameAtom::RecordField(fld) => write!(f, "{}", fld),
-            NameAtom::BranchIx(ix) => write!(f, "case{}", ix),
             NameAtom::Variant(vn) => write!(f, "{}", vn),
             NameAtom::Wrapped(wk) => write!(f, "denest_{}", wk.describe()),
         }
@@ -178,18 +175,22 @@ impl NameCtxt {
         Some(self)
     }
 
-    /// Returns an owned copy (clone) of the current stack as a PathLabel.
+    /// Returns a reference to the current stack as a borrowed PathLabel.
     pub fn get_loc(&self) -> &PathLabel {
         &self.stack
     }
 
     /// Unconditionally pops the top-of-stack [`NameAtom`]
     ///
-    /// Returns a reborrow of the receiver if successful, for chaining with other operations.
+    /// Returns a re-borrow of the receiver if successful, for chaining with other operations.
     ///
     /// Panics if there is no element to pop.
     pub fn escape(&mut self) -> &mut Self {
-        self.try_escape().expect("cannot escape a nonexistent NameAtom")
+        // eprintln!("[escape]: {:?}", self.stack.split_last().unwrap());
+        match self.try_escape() {
+            Some(this) => this,
+            None => unreachable!("escape attempted on empty stack-NameCtxt"),
+        }
     }
 
     /// Co-recursive equality test that short-circuits on first discrepancy or unfalsifiable equivalence between two borrowed [`NameCtxt`] values.
@@ -301,7 +302,6 @@ mod tests {
         let root_data_body1 = ctxt.increment_index().produce_name();
         let root_data_footer = ctxt.escape().escape().push_atom(NameAtom::RecordField(Label::Borrowed("footer"))).produce_name();
         let root_extra = ctxt.escape().escape().push_atom(NameAtom::RecordField("extra".into())).produce_name();
-        let root_extra_branch0 = ctxt.push_atom(NameAtom::BranchIx(0)).produce_name();
         let root_extra_varyes = ctxt.escape().push_atom(NameAtom::Variant("Yes".into())).produce_name();
         let root_extra_varno = ctxt.escape().push_atom(NameAtom::Variant("No".into())).produce_name();
         assert_eq!(ctxt.find_name_for(&root).unwrap(), "root");
@@ -313,7 +313,6 @@ mod tests {
         assert_eq!(ctxt.find_name_for(&root_data_body1).unwrap(), "root_data_body_index1");
         assert_eq!(ctxt.find_name_for(&root_data_footer).unwrap(), "root_data_footer");
         assert_eq!(ctxt.find_name_for(&root_extra).unwrap(), "root_extra");
-        assert_eq!(ctxt.find_name_for(&root_extra_branch0).unwrap(), "root_extra_case0");
         assert_eq!(ctxt.find_name_for(&root_extra_varyes).unwrap(), "root_extra_Yes");
         assert_eq!(ctxt.find_name_for(&root_extra_varno).unwrap(), "root_extra_No");
     }
