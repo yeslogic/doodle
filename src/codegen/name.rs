@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::fmt::Write;
 use std::collections::{HashMap, HashSet};
 
 use anyhow::anyhow;
@@ -12,15 +11,12 @@ use crate::Label;
 pub(crate) enum WrapperKind {
     /// ParentType :~ Vec<LocalType>
     Sequence,
-    /// ParentType :~ Option<LocalType>
-    Option,
 }
 
 impl WrapperKind {
     pub fn describe(&self) -> &'static str {
         match self {
-            WrapperKind::Sequence => "seq",
-            WrapperKind::Option => "opt",
+            WrapperKind::Sequence => "Seq",
         }
     }
 }
@@ -44,37 +40,15 @@ impl std::fmt::Display for NameAtom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NameAtom::Explicit(name) => write!(f, "{}", name),
-            NameAtom::Positional(pos) => write!(f, "index{}", pos),
+            NameAtom::Positional(pos) => write!(f, "ix{}", pos),
             NameAtom::RecordField(fld) => write!(f, "{}", fld),
             NameAtom::Variant(vn) => write!(f, "{}", vn),
-            NameAtom::Wrapped(wk) => write!(f, "denest_{}", wk.describe()),
+            NameAtom::Wrapped(wk) => write!(f, "in{}", wk.describe()),
         }
     }
 }
 
 pub type PathLabel = Vec<NameAtom>;
-
-
-pub(crate) struct OnDemand<T, Arg = ()>
-{
-    elem: T,
-    thunk: Box<dyn FnOnce(Arg)>
-}
-
-impl<'a, T, Arg> OnDemand<T, Arg> {
-    pub fn new(elem: T, thunk: Box<dyn FnOnce(Arg)>) -> Self {
-        Self { elem, thunk }
-    }
-
-    pub fn pure(elem: T) -> OnDemand<T, Arg> {
-        OnDemand { elem, thunk: Box::new(|_| {}) }
-    }
-
-    pub fn extract(self, arg: Arg) -> T {
-        (self.thunk)(arg);
-        self.elem
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct NameCtxt {
@@ -82,17 +56,25 @@ pub(crate) struct NameCtxt {
     table: HashMap<Label, RefCell<PHeap<PathLabel>>>,
 }
 
+/// Priority Heap: a loose collection of 'candidates' that are initially unsorted, but can be later promoted to the next available priority-slot,
+/// which are immutable once assigned.
 #[derive(Debug)]
 struct PHeap<T: Eq + std::hash::Hash> {
     fixed: Vec<T>,
-    floating: std::collections::hash_set::HashSet<T>,
+    floating: HashSet<T>,
 }
 
 impl<T: Eq + std::hash::Hash> PHeap<T> {
+    /// Construts a new, initially-empty PHeap
     pub fn new() -> Self {
         Self { fixed: Vec::new(), floating: HashSet::new() }
     }
 
+    /// Given a value already in the `PHeap`, promotes it to the next available priority-slot and returns the corresponding
+    /// index of said position.
+    ///
+    /// Idempotent, in that if the value already has a priority, this will not change and the same value will be returned as
+    /// when it was originally promoted.
     pub fn fix(&mut self, elem: T) -> Result<usize, anyhow::Error> {
         for (i, elt0) in self.fixed.iter().enumerate() {
             if elt0 == &elem {
@@ -109,14 +91,11 @@ impl<T: Eq + std::hash::Hash> PHeap<T> {
         }
     }
 
+    /// Push a new candidate to the `PHeap`, without assigning it a priority-slot
     pub fn insert(&mut self, elem: T) {
         if !self.fixed.contains(&elem) {
             self.floating.insert(elem);
         }
-    }
-
-    fn get_fixed(&self, elem: &T) -> Option<usize> {
-        self.fixed.iter().enumerate().find_map(|(ix, elt0)| (elt0 == elem).then_some(ix))
     }
 }
 
@@ -126,29 +105,12 @@ impl NameCtxt {
         NameCtxt { stack: Vec::new(), table: HashMap::new() }
     }
 
-    /// Unwraps the provided (or instantiates a novel) [`NameCtxt`] from a parameter of type `Option<NameCtxt>`,
-    /// as appropriate.
-    pub fn renew(this: Option<Self>) -> Self {
-        this.unwrap_or_else(|| Self::new())
-    }
-
     /// Pushes a given [`NameAtom`] to the top (i.e. deepest element) of the [`NameCtxt`] and returns the
     /// reborrowed receiver, for chaining with other operations
     pub fn push_atom(&mut self, atom: NameAtom) -> &mut Self {
         // eprintln!("{:?} + {:?}", self.stack, &atom);
         self.stack.push(atom);
         self
-    }
-
-    /// Takes two [`NameCtxt`]s and returns a new one, with the location of the former
-    /// and the union of their two tables of established atom-chain<->string pairings.
-    ///
-    /// Left-biased in the path, and right-biased in the association table.
-    pub fn merge(self, other: Self) -> Self {
-        Self {
-            stack: self.stack,
-            table: other.table,
-        }
     }
 
     /// Increments the index of the top-of-stack [`NameAtom::Positional`] by one,
@@ -186,7 +148,6 @@ impl NameCtxt {
     ///
     /// Panics if there is no element to pop.
     pub fn escape(&mut self) -> &mut Self {
-        // eprintln!("[escape]: {:?}", self.stack.split_last().unwrap());
         match self.try_escape() {
             Some(this) => this,
             None => unreachable!("escape attempted on empty stack-NameCtxt"),
@@ -201,11 +162,12 @@ impl NameCtxt {
     ///
     /// If two [`NameAtom::Explicit`] atoms are encountered at the same depth, ignores any later elements and determines equality
     /// based on the equality of the explicated names.
+    #[allow(dead_code)]
     pub fn eq_path(stack0: &[NameAtom], stack1: &[NameAtom]) -> bool {
         if stack0.len() != stack1.len() {
             return false;
         }
-        // NOTE - compare in reverse order because
+        // NOTE - compare in reverse order because we want to encounter the deepest explicated label before anything prior
         for (elt0, elt1) in Iterator::zip(stack0.iter().rev(), stack1.iter().rev()) {
             match (elt0, elt1) {
                 (NameAtom::Explicit(name0), NameAtom::Explicit(name1)) => return name0 == name1,
@@ -216,12 +178,13 @@ impl NameCtxt {
         true
     }
 
+    /// Inserts a delayed-priority association between `identifier` and `location` into `table`
     fn resolve(table: &mut HashMap<Label, RefCell<PHeap<PathLabel>>>, identifier: Label, location: &PathLabel) {
         table.entry(identifier).or_insert_with(|| RefCell::new(PHeap::new())).borrow_mut().insert(location.clone());
     }
 
 
-    /// Constructs a locally-unique identifier-string from a path of atoms.
+    /// Constructs a locally-unique identifier-string from a `PathLabel`
     pub(crate) fn generate_name(location: &PathLabel) -> Label {
         let mut buffer = Fragment::Empty;
         for atom in location.iter().rev() {
@@ -237,6 +200,10 @@ impl NameCtxt {
         Label::Owned(ret)
     }
 
+    /// Returns a globally-unique fixed-priority name for a given `PathLabel`
+    ///
+    /// The order in which competing candidates for a given name are passed into this method affects deduplication strategies
+    /// and resulting identifiers, but otherwise the generation process for names is invariant.
     pub(crate) fn find_name_for(&self, loc: &PathLabel) -> Result<Label, anyhow::Error> {
         let rawname = Self::generate_name(loc);
         match self.table.get(&rawname) {
@@ -250,8 +217,8 @@ impl NameCtxt {
         }
     }
 
-    /// Returns a raw name and the current PathLabel to disambiguate between multiple options in the resolved
-    /// PHeap registered with the raw name.
+    /// Registers the current PathLabel on-stack into the appropriate [`PHeap`] in the association-table,
+    /// returning it for later promotion using [`NameCtxt::find_name_for`]
     pub fn produce_name<'a>(&mut self) -> PathLabel {
         let identifier = Self::generate_name(&self.stack);
         Self::resolve(&mut self.table, identifier.clone(), &self.stack);
@@ -267,6 +234,7 @@ fn dedup(rawname: Label, ix: usize) -> Label {
     }
 }
 
+// prefixes a given string-tail with an intervening underscore, but leaves that separator out if either is the empty-string
 fn underscore_join(tail: &mut Fragment, prefix: impl std::fmt::Display) {
     let tmp = std::mem::replace(tail, Fragment::Empty);
     *tail = Fragment::intervene(Fragment::String(Label::Owned(format!("{}", prefix))), Fragment::Char('_'), tmp);
