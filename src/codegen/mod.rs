@@ -87,6 +87,7 @@ mod path_names {
 }
 
 mod ix_names {
+    #![allow(dead_code)]
     use super::IxLabel;
     use super::RustTypeDef;
     use crate::Label;
@@ -157,19 +158,24 @@ impl CodeGen {
                     return RustType::AnonTuple(Vec::new()).into();
                 }
                 let mut buf = Vec::with_capacity(vs.len());
+                // FIXME - hard-coded path_names version
                 self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                 for v in vs.iter() {
                     buf.push(self.lift_type(v).to_rust_type());
+                    // FIXME - hardcoded path_names version
                     self.name_gen.ctxt.increment_index();
                 }
+                // FIXME - hard-coded path_names version
                 self.name_gen.ctxt.escape();
                 RustType::AnonTuple(buf).into()
             }
             ValueType::Seq(t) => {
+                // FIXME - hard-coded path_names version
                 self.name_gen
                     .ctxt
                     .push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let inner = self.lift_type(t.as_ref()).to_rust_type();
+                // FIXME - hard-coded path_names version
                 self.name_gen.ctxt.escape();
                 CompType::Vec(Box::new(inner)).into()
             }
@@ -177,11 +183,13 @@ impl CodeGen {
             ValueType::Record(fields) => {
                 let mut rt_fields = Vec::new();
                 for (lab, ty) in fields.iter() {
+                    // FIXME - hard-coded path_names version
                     self.name_gen
                         .ctxt
                         .push_atom(NameAtom::RecordField(lab.clone()));
                     let rt_field = self.lift_type(ty);
                     rt_fields.push((lab.clone(), rt_field.to_rust_type()));
+                    // FIXME - hard-coded path_names version
                     self.name_gen.ctxt.escape();
                 }
                 let rt_def = RustTypeDef::Struct(RustStruct::Record(rt_fields));
@@ -194,6 +202,7 @@ impl CodeGen {
             ValueType::Union(vars) => {
                 let mut rt_vars = Vec::new();
                 for (name, def) in vars.iter() {
+                    // FIXME - hardcoded path_names version
                     self.name_gen
                         .ctxt
                         .push_atom(NameAtom::Variant(name.clone()));
@@ -205,30 +214,29 @@ impl CodeGen {
                                 RustVariant::Unit(name)
                             } else {
                                 let mut v_args = Vec::new();
+                                // FIXME - hardcoded path_names version
                                 self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                                 for arg in args {
                                     v_args.push(self.lift_type(arg).to_rust_type());
+                                    // FIXME - hardcoded path_names version
                                     self.name_gen.ctxt.increment_index();
                                 }
+                                // FIXME - hardcoded path_names version
                                 self.name_gen.ctxt.escape();
                                 RustVariant::Tuple(name, v_args)
                             }
                         }
-                        /* ValueType::Record(fields) => {
-                            let mut rt_fields = Vec::new();
-                            for (f_lab, f_ty) in fields.iter() {
-                                rt_fields.push((f_lab.clone(), self.lift_type(f_ty)));
-                            }
-                            RustVariant::Record(name, rt_fields)
-                        } */
                         other => {
+                            // FIXME - hardcoded path_names version
                             self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                             let inner = self.lift_type(other).to_rust_type();
+                            // FIXME - hardcoded path_names version
                             self.name_gen.ctxt.escape();
                             RustVariant::Tuple(name, vec![inner])
                         }
                     };
                     rt_vars.push(var);
+                    // FIXME - hardcoded path_names version
                     self.name_gen.ctxt.escape();
                 }
                 let rtdef = RustTypeDef::Enum(rt_vars);
@@ -2676,13 +2684,10 @@ impl<'a> Elaborator<'a> {
                 GTFormat::Repeat1(gt, Box::new(t_inner))
             }
             Format::RepeatCount(expr, inner) => {
-                // FIXME - hieronym hardcode
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                // FIXME - hieronym hardcode
-                self.codegen.name_gen.ctxt.escape();
                 GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
             }
             Format::RepeatBetween(min_expr, max_expr, inner) => {
@@ -2691,8 +2696,6 @@ impl<'a> Elaborator<'a> {
                 let t_max_expr = self.elaborate_expr(max_expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                // FIXME - hieronym hardcode
-                self.codegen.name_gen.ctxt.escape();
                 GTFormat::RepeatBetween(gt, t_min_expr, t_max_expr, Box::new(t_inner))
             }
             Format::RepeatUntilLast(lambda, inner) => {
