@@ -7,13 +7,13 @@ mod codegen_tests;
 use doodle::prelude::*;
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_header {
 signature: (u8, u8, u8),
 version: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_logical_screen_descriptor {
 screen_width: u16,
 screen_height: u16,
 flags: u8,
@@ -22,23 +22,23 @@ pixel_aspect_ratio: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq {
 r: u8,
 g: u8,
 b: u8
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no, yes(Vec<main_data>) }
+enum main_gif_index0_logical_screen_global_color_table { no, yes(Vec<main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-descriptor: main_data,
-global_color_table: main_data
+struct main_gif_index0_logical_screen {
+descriptor: main_gif_index0_logical_screen_descriptor,
+global_color_table: main_gif_index0_logical_screen_global_color_table
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension_some_index0 {
 separator: u8,
 label: u8,
 block_size: u8,
@@ -49,16 +49,16 @@ terminator: u8
 }
 
 #[derive(Debug, Clone)]
-enum main_data { none, some(main_data) }
+enum main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension { none, some(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension_some_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq {
 len_bytes: u8,
 data: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0 {
 separator: u8,
 label: u8,
 block_size: u8,
@@ -70,12 +70,12 @@ character_cell_width: u8,
 character_cell_height: u8,
 text_foreground_color_index: u8,
 text_background_color_index: u8,
-plain_text_data: Vec<main_data>,
+plain_text_data: Vec<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq>,
 terminator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_descriptor {
 separator: u8,
 image_left_position: u16,
 image_top_position: u16,
@@ -85,68 +85,68 @@ flags: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_data {
 lzw_min_code_size: u8,
-image_data: Vec<main_data>,
+image_data: Vec<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq>,
 terminator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-descriptor: main_data,
-local_color_table: main_data,
-data: main_data
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0 {
+descriptor: main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_descriptor,
+local_color_table: main_gif_index0_logical_screen_global_color_table,
+data: main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { plain_text_extension(main_data), table_based_image(main_data) }
+enum main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block { plain_text_extension(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0), table_based_image(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-graphic_control_extension: main_data,
-graphic_rendering_block: main_data
+struct main_gif_index0_blocks_denest_seq_graphic_block_index0 {
+graphic_control_extension: main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension,
+graphic_rendering_block: main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_special_purpose_block_index0_application_extension_index0 {
 separator: u8,
 label: u8,
 block_size: u8,
 identifier: Vec<u8>,
 authentication_code: Vec<u8>,
-application_data: Vec<main_data>,
+application_data: Vec<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq>,
 terminator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_blocks_denest_seq_special_purpose_block_index0_comment_extension_index0 {
 separator: u8,
 label: u8,
-comment_data: Vec<main_data>,
+comment_data: Vec<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq>,
 terminator: u8
 }
 
 #[derive(Debug, Clone)]
-enum main_data { application_extension(main_data), comment_extension(main_data) }
+enum main_gif_index0_blocks_denest_seq_special_purpose_block_index0 { application_extension(main_gif_index0_blocks_denest_seq_special_purpose_block_index0_application_extension_index0), comment_extension(main_gif_index0_blocks_denest_seq_special_purpose_block_index0_comment_extension_index0) }
 
 #[derive(Debug, Clone)]
-enum main_data { graphic_block(main_data), special_purpose_block(main_data) }
+enum main_gif_index0_blocks_denest_seq { graphic_block(main_gif_index0_blocks_denest_seq_graphic_block_index0), special_purpose_block(main_gif_index0_blocks_denest_seq_special_purpose_block_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gif_index0_trailer {
 separator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-header: main_data,
-logical_screen: main_data,
-blocks: Vec<main_data>,
-trailer: main_data
+struct main_gif_index0 {
+header: main_gif_index0_header,
+logical_screen: main_gif_index0_logical_screen,
+blocks: Vec<main_gif_index0_blocks_denest_seq>,
+trailer: main_gif_index0_trailer
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_header {
 magic: (u8, u8),
 method: u8,
 file_flags: u8,
@@ -156,137 +156,137 @@ os_id: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_fname_yes_index0 {
 string: Vec<u8>,
 null: u8
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no, yes(main_data) }
+enum main_gzip_index0_denest_seq_fname { no, yes(main_gzip_index0_denest_seq_fname_yes_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_literal_length_distance_alphabet_code_lengths_denest_seq {
 code: u16,
 extra: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0_distance_record {
 distance_extra_bits: u16,
 distance: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 {
 length_extra_bits: u8,
 length: u16,
 distance_code: u16,
-distance_record: main_data
+distance_record: main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0_distance_record
 }
 
 #[derive(Debug, Clone)]
-enum main_data { none, some(main_data) }
+enum main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra { none, some(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq {
 code: u16,
-extra: main_data
+extra: main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 {
 length: u16,
 distance: u16
 }
 
 #[derive(Debug, Clone)]
-enum main_data { literal(u8), reference(main_data) }
+enum main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq { literal(u8), reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0 {
 hlit: u8,
 hdist: u8,
 hclen: u8,
 code_length_alphabet_code_lengths: Vec<u8>,
-literal_length_distance_alphabet_code_lengths: Vec<main_data>,
+literal_length_distance_alphabet_code_lengths: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_literal_length_distance_alphabet_code_lengths_denest_seq>,
 literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
-codes: Vec<main_data>,
-codes_values: Vec<main_data>
+codes: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq>,
+codes_values: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 {
 length_extra_bits: u8,
 length: u16,
 distance_code: u8,
-distance_record: main_data
+distance_record: main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0_distance_record
 }
 
 #[derive(Debug, Clone)]
-enum main_data { none, some(main_data) }
+enum main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra { none, some(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq {
 code: u16,
-extra: main_data
+extra: main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-codes: Vec<main_data>,
-codes_values: Vec<main_data>
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0 {
+codes: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq>,
+codes_values: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq_data_uncompressed_index0 {
 align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<main_data>
+codes_values: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { dynamic_huffman(main_data), fixed_huffman(main_data), uncompressed(main_data) }
+enum main_gzip_index0_denest_seq_data_blocks_denest_seq_data { dynamic_huffman(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0), fixed_huffman(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0), uncompressed(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_uncompressed_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_data_blocks_denest_seq {
 r#final: u8,
 r#type: u8,
-data: main_data
+data: main_gzip_index0_denest_seq_data_blocks_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-blocks: Vec<main_data>,
-codes: Vec<main_data>,
+struct main_gzip_index0_denest_seq_data {
+blocks: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq>,
+codes: Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq>,
 inflate: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_gzip_index0_denest_seq_footer {
 crc: u32,
 length: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-header: main_data,
-fname: main_data,
-data: main_data,
-footer: main_data
+struct main_gzip_index0_denest_seq {
+header: main_gzip_index0_denest_seq_header,
+fname: main_gzip_index0_denest_seq_fname,
+data: main_gzip_index0_denest_seq_data,
+footer: main_gzip_index0_denest_seq_footer
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_soi {
 ff: u8,
 marker: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_initial_segment_app0_index0_data_data_jfif_index0 {
 version_major: u8,
 version_minor: u8,
 density_units: u8,
@@ -294,30 +294,30 @@ density_x: u16,
 density_y: u16,
 thumbnail_width: u8,
 thumbnail_height: u8,
-thumbnail_pixels: Vec<Vec<main_data>>
+thumbnail_pixels: Vec<Vec<main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq>>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { jfif(main_data), other(Vec<u8>) }
+enum main_jpeg_index0_frame_initial_segment_app0_index0_data_data { jfif(main_jpeg_index0_frame_initial_segment_app0_index0_data_data_jfif_index0), other(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-identifier: main_data,
-data: main_data
+struct main_jpeg_index0_frame_initial_segment_app0_index0_data {
+identifier: main_gzip_index0_denest_seq_fname_yes_index0,
+data: main_jpeg_index0_frame_initial_segment_app0_index0_data_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_initial_segment_app0_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_initial_segment_app0_index0_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { be(u8, u8), le(u8, u8) }
+enum main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order { be(u8, u8), le(u8, u8) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd_fields_denest_seq {
 tag: u16,
 r#type: u16,
 length: u32,
@@ -325,218 +325,218 @@ offset_or_data: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd {
 num_fields: u16,
-fields: Vec<main_data>,
+fields: Vec<main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd_fields_denest_seq>,
 next_ifd_offset: u32,
 next_ifd: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-byte_order: main_data,
+struct main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif {
+byte_order: main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order,
 magic: u16,
 offset: u32,
-ifd: main_data
+ifd: main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0 {
 padding: u8,
-exif: main_data
+exif: main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_initial_segment_app1_index0_data_data_xmp_index0 {
 xmp: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { exif(main_data), other(Vec<u8>), xmp(main_data) }
+enum main_jpeg_index0_frame_initial_segment_app1_index0_data_data { exif(main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0), other(Vec<u8>), xmp(main_jpeg_index0_frame_initial_segment_app1_index0_data_data_xmp_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-identifier: main_data,
-data: main_data
+struct main_jpeg_index0_frame_initial_segment_app1_index0_data {
+identifier: main_gzip_index0_denest_seq_fname_yes_index0,
+data: main_jpeg_index0_frame_initial_segment_app1_index0_data_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_initial_segment_app1_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_initial_segment_app1_index0_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { app0(main_data), app1(main_data) }
+enum main_jpeg_index0_frame_initial_segment { app0(main_jpeg_index0_frame_initial_segment_app0_index0), app1(main_jpeg_index0_frame_initial_segment_app1_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_segments_denest_seq_app10_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
 data: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_segments_denest_seq_dac_index0_data {
 class_table_id: u8,
 value: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_segments_denest_seq_dac_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_segments_denest_seq_dac_index0_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_segments_denest_seq_dht_index0_data {
 class_table_id: u8,
 num_codes: Vec<u8>,
 values: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_segments_denest_seq_dht_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_segments_denest_seq_dht_index0_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_segments_denest_seq_dqt_index0_data {
 precision_table_id: u8,
 elements: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_segments_denest_seq_dqt_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_segments_denest_seq_dqt_index0_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_segments_denest_seq_dri_index0_data {
 restart_interval: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_segments_denest_seq_dri_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_segments_denest_seq_dri_index0_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { app0(main_data), app1(main_data), app10(main_data), app11(main_data), app12(main_data), app13(main_data), app14(main_data), app15(main_data), app2(main_data), app3(main_data), app4(main_data), app5(main_data), app6(main_data), app7(main_data), app8(main_data), app9(main_data), com(main_data), dac(main_data), dht(main_data), dqt(main_data), dri(main_data) }
+enum main_jpeg_index0_frame_segments_denest_seq { app0(main_jpeg_index0_frame_initial_segment_app0_index0), app1(main_jpeg_index0_frame_initial_segment_app1_index0), app10(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app11(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app12(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app13(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app14(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app15(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app2(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app3(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app4(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app5(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app6(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app7(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app8(main_jpeg_index0_frame_segments_denest_seq_app10_index0), app9(main_jpeg_index0_frame_segments_denest_seq_app10_index0), com(main_jpeg_index0_frame_segments_denest_seq_app10_index0), dac(main_jpeg_index0_frame_segments_denest_seq_dac_index0), dht(main_jpeg_index0_frame_segments_denest_seq_dht_index0), dqt(main_jpeg_index0_frame_segments_denest_seq_dqt_index0), dri(main_jpeg_index0_frame_segments_denest_seq_dri_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_header_sof0_index0_data_image_components_denest_seq {
 id: u8,
 sampling_factor: u8,
 quantization_table_id: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_header_sof0_index0_data {
 sample_precision: u8,
 num_lines: u16,
 num_samples_per_line: u16,
 num_image_components: u8,
-image_components: Vec<main_data>
+image_components: Vec<main_jpeg_index0_frame_header_sof0_index0_data_image_components_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_header_sof0_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_header_sof0_index0_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { sof0(main_data), sof1(main_data), sof10(main_data), sof11(main_data), sof13(main_data), sof14(main_data), sof15(main_data), sof2(main_data), sof3(main_data), sof5(main_data), sof6(main_data), sof7(main_data), sof9(main_data) }
+enum main_jpeg_index0_frame_header { sof0(main_jpeg_index0_frame_header_sof0_index0), sof1(main_jpeg_index0_frame_header_sof0_index0), sof10(main_jpeg_index0_frame_header_sof0_index0), sof11(main_jpeg_index0_frame_header_sof0_index0), sof13(main_jpeg_index0_frame_header_sof0_index0), sof14(main_jpeg_index0_frame_header_sof0_index0), sof15(main_jpeg_index0_frame_header_sof0_index0), sof2(main_jpeg_index0_frame_header_sof0_index0), sof3(main_jpeg_index0_frame_header_sof0_index0), sof5(main_jpeg_index0_frame_header_sof0_index0), sof6(main_jpeg_index0_frame_header_sof0_index0), sof7(main_jpeg_index0_frame_header_sof0_index0), sof9(main_jpeg_index0_frame_header_sof0_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_scan_sos_data_image_components_denest_seq {
 component_selector: u8,
 entropy_coding_table_ids: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_scan_sos_data {
 num_image_components: u8,
-image_components: Vec<main_data>,
+image_components: Vec<main_jpeg_index0_frame_scan_sos_data_image_components_denest_seq>,
 start_spectral_selection: u8,
 end_spectral_selection: u8,
 approximation_bit_position: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_scan_sos {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_scan_sos_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { mcu(u8), rst0(main_data), rst1(main_data), rst2(main_data), rst3(main_data), rst4(main_data), rst5(main_data), rst6(main_data), rst7(main_data) }
+enum main_jpeg_index0_frame_scan_data_scan_data_denest_seq { mcu(u8), rst0(main_jpeg_index0_soi), rst1(main_jpeg_index0_soi), rst2(main_jpeg_index0_soi), rst3(main_jpeg_index0_soi), rst4(main_jpeg_index0_soi), rst5(main_jpeg_index0_soi), rst6(main_jpeg_index0_soi), rst7(main_jpeg_index0_soi) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-scan_data: Vec<main_data>,
+struct main_jpeg_index0_frame_scan_data {
+scan_data: Vec<main_jpeg_index0_frame_scan_data_scan_data_denest_seq>,
 scan_data_stream: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-segments: Vec<main_data>,
-sos: main_data,
-data: main_data
+struct main_jpeg_index0_frame_scan {
+segments: Vec<main_jpeg_index0_frame_segments_denest_seq>,
+sos: main_jpeg_index0_frame_scan_sos,
+data: main_jpeg_index0_frame_scan_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_jpeg_index0_frame_dnl_some_index0_data {
 num_lines: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-marker: main_data,
+struct main_jpeg_index0_frame_dnl_some_index0 {
+marker: main_jpeg_index0_soi,
 length: u16,
-data: main_data
+data: main_jpeg_index0_frame_dnl_some_index0_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { none, some(main_data) }
+enum main_jpeg_index0_frame_dnl { none, some(main_jpeg_index0_frame_dnl_some_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
-initial_segment: main_data,
-segments: Vec<main_data>,
-header: main_data,
-scan: main_data,
-dnl: main_data,
-scans: Vec<main_data>
+struct main_jpeg_index0_frame {
+initial_segment: main_jpeg_index0_frame_initial_segment,
+segments: Vec<main_jpeg_index0_frame_segments_denest_seq>,
+header: main_jpeg_index0_frame_header,
+scan: main_jpeg_index0_frame_scan,
+dnl: main_jpeg_index0_frame_dnl,
+scans: Vec<main_jpeg_index0_frame_scan>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-soi: main_data,
-frame: main_data,
-eoi: main_data
+struct main_jpeg_index0 {
+soi: main_jpeg_index0_soi,
+frame: main_jpeg_index0_frame,
+eoi: main_jpeg_index0_soi
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_ftyp_index0 {
 major_brand: (u8, u8, u8, u8),
 minor_version: u32,
 compatible_brands: Vec<(u8, u8, u8, u8)>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0_data_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
@@ -544,116 +544,116 @@ data: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0 {
 version: u8,
 flags: (u8, u8, u8),
 number_of_entries: u32,
-data: Vec<main_data>
+data: Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0_data_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { dref(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data { dref(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_hdlr_index0 {
 version: u8,
 flags: (u8, u8, u8),
 predefined: u32,
 handler_type: (u8, u8, u8, u8),
 reserved: (u32, u32, u32),
-name: main_data
+name: main_gzip_index0_denest_seq_fname_yes_index0
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-content_type: main_data
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields_mime_index0 {
+content_type: main_gzip_index0_denest_seq_fname_yes_index0
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-item_uri_type: main_data
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields_uri_index0 {
+item_uri_type: main_gzip_index0_denest_seq_fname_yes_index0
 }
 
 #[derive(Debug, Clone)]
-enum main_data { mime(main_data), unknown, uri(main_data) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields { mime(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields_mime_index0), unknown, uri(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields_uri_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0 {
 item_ID: u32,
 item_protection_index: u16,
 item_type: (u8, u8, u8, u8),
-item_name: main_data,
-extra_fields: main_data
+item_name: main_gzip_index0_denest_seq_fname_yes_index0,
+extra_fields: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_yes_index0 {
 item_ID: u16,
 item_protection_index: u16,
-item_name: main_data,
-content_type: main_data,
-content_encoding: main_data
+item_name: main_gzip_index0_denest_seq_fname_yes_index0,
+content_type: main_gzip_index0_denest_seq_fname_yes_index0,
+content_encoding: main_gzip_index0_denest_seq_fname_yes_index0
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no(main_data), yes(main_data) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields { no(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0), yes(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_yes_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0 {
 version: u8,
 flags: (u8, u8, u8),
-fields: main_data
+fields: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields
 }
 
 #[derive(Debug, Clone)]
-enum main_data { infe(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data { infe(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
-item_info_entry: Vec<main_data>
+item_info_entry: Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no, yes(u16) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_construction_method { no, yes(u16) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_extents_denest_seq {
 extent_index: u64,
 extent_offset: u64,
 extent_length: u64
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq {
 item_ID: u32,
-construction_method: main_data,
+construction_method: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_construction_method,
 data_reference_index: u16,
 base_offset: u64,
 extent_count: u16,
-extents: Vec<main_data>
+extents: Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_extents_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0 {
 version: u8,
 flags: (u8, u8, u8),
 offset_size_length_size: u8,
@@ -663,101 +663,101 @@ length_size: u8,
 base_offset_size: u8,
 index_size: u8,
 item_count: u32,
-items: Vec<main_data>
+items: Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data_data_index0 {
 type_indicator: u32,
 locale_indicator: u32,
 value: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { data(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data { data(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data_data_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { tool(Vec<main_data>), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data { tool(Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq>), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_large_index0_denest_seq_data {
 from_item_ID: u32,
 reference_count: u16,
 to_item_ID: Vec<u32>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_large_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_large_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_small_index0_denest_seq_data {
 from_item_ID: u16,
 reference_count: u16,
 to_item_ID: Vec<u16>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_small_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_small_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { large(Vec<main_data>), small(Vec<main_data>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference { large(Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_large_index0_denest_seq>), small(Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_small_index0_denest_seq>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0 {
 version: u8,
 flags: (u8, u8, u8),
-single_item_reference: main_data
+single_item_reference: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no(u32), yes(u16) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0_item_ID { no(u32), yes(u16) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0 {
 version: u8,
 flags: (u8, u8, u8),
-item_ID: main_data
+item_ID: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0_item_ID
 }
 
 #[derive(Debug, Clone)]
-enum main_data { dinf(Vec<main_data>), hdlr(main_data), idat(Vec<u8>), iinf(main_data), iloc(main_data), ilst(Vec<main_data>), iref(main_data), pitm(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data { dinf(Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq>), hdlr(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_hdlr_index0), idat(Vec<u8>), iinf(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0), iloc(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0), ilst(Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq>), iref(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0), pitm(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version0_index0 {
 creation_time: u32,
 modification_time: u32,
 timescale: u32,
@@ -765,7 +765,7 @@ duration: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version1_index0 {
 creation_time: u64,
 modification_time: u64,
 timescale: u32,
@@ -773,13 +773,13 @@ duration: u64
 }
 
 #[derive(Debug, Clone)]
-enum main_data { version0(main_data), version1(main_data) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields { version0(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version0_index0), version1(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version1_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0 {
 version: u8,
 flags: (u8, u8, u8),
-fields: main_data,
+fields: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields,
 rate: u32,
 volume: u16,
 reserved1: u16,
@@ -790,33 +790,33 @@ next_track_ID: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data_elst_index0_edit_list_table_denest_seq {
 track_duration: u32,
 media_time: u32,
 media_rate: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data_elst_index0 {
 version: u8,
 flags: (u8, u8, u8),
 number_of_entries: u32,
-edit_list_table: Vec<main_data>
+edit_list_table: Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data_elst_index0_edit_list_table_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { elst(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data { elst(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data_elst_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_hdlr_index0 {
 version: u8,
 flags: (u8, u8, u8),
 component_type: u32,
@@ -824,20 +824,20 @@ component_subtype: (u8, u8, u8, u8),
 component_manufacturer: u32,
 component_flags: u32,
 component_flags_mask: u32,
-component_name: main_data
+component_name: main_gzip_index0_denest_seq_fname_yes_index0
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_mdhd_index0 {
 version: u8,
 flags: (u8, u8, u8),
-fields: main_data,
+fields: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields,
 language: u16,
 pre_defined: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_smhd_index0 {
 version: u8,
 flags: (u8, u8, u8),
 balance: u16,
@@ -845,7 +845,7 @@ reserved: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_co64_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
@@ -853,56 +853,56 @@ chunk_offset: Vec<u64>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_ctts_index0_sample_entries_denest_seq {
 sample_count: u32,
 sample_offset: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_ctts_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
-sample_entries: Vec<main_data>
+sample_entries: Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_ctts_index0_sample_entries_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no, yes(u32) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_grouping_type_parameter { no, yes(u32) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_sample_groups_denest_seq {
 sample_count: u32,
 group_description_index: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0 {
 version: u8,
 flags: (u8, u8, u8),
 grouping_type: u32,
-grouping_type_parameter: main_data,
+grouping_type_parameter: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_grouping_type_parameter,
 entry_count: u32,
-sample_groups: Vec<main_data>
+sample_groups: Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_sample_groups_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sgpd_index0_sample_groups_denest_seq {
 description_length: u32,
 sample_group_entry: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sgpd_index0 {
 version: u8,
 flags: (u8, u8, u8),
 grouping_type: u32,
 default_length: u32,
 entry_count: u32,
-sample_groups: Vec<main_data>
+sample_groups: Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sgpd_index0_sample_groups_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stco_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
@@ -910,30 +910,30 @@ chunk_offset: Vec<u32>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsc_index0_chunk_entries_denest_seq {
 first_chunk: u32,
 samples_per_chunk: u32,
 sample_description_index: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsc_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
-chunk_entries: Vec<main_data>
+chunk_entries: Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsc_index0_chunk_entries_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsd_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
-sample_entries: Vec<main_data>
+sample_entries: Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0_data_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stss_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
@@ -941,44 +941,44 @@ sample_number: Vec<u32>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no, yes(Vec<u32>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0_entry_size { no, yes(Vec<u32>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0 {
 version: u8,
 flags: (u8, u8, u8),
 sample_size: u32,
 sample_count: u32,
-entry_size: main_data
+entry_size: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0_entry_size
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stts_index0_sample_entries_denest_seq {
 sample_count: u32,
 sample_delta: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stts_index0 {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
-sample_entries: Vec<main_data>
+sample_entries: Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stts_index0_sample_entries_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { co64(main_data), ctts(main_data), sbgp(main_data), sgpd(main_data), stco(main_data), stsc(main_data), stsd(main_data), stss(main_data), stsz(main_data), stts(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data { co64(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_co64_index0), ctts(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_ctts_index0), sbgp(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0), sgpd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sgpd_index0), stco(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stco_index0), stsc(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsc_index0), stsd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsd_index0), stss(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stss_index0), stsz(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0), stts(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stts_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_vmhd_index0 {
 version: u8,
 flags: (u8, u8, u8),
 graphicsmode: u16,
@@ -986,29 +986,29 @@ opcolor: Vec<u16>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { dinf(Vec<main_data>), smhd(main_data), stbl(Vec<main_data>), unknown(Vec<u8>), vmhd(main_data) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data { dinf(Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq>), smhd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_smhd_index0), stbl(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq>), unknown(Vec<u8>), vmhd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_vmhd_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { hdlr(main_data), mdhd(main_data), minf(Vec<main_data>), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data { hdlr(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_hdlr_index0), mdhd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_mdhd_index0), minf(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq>), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields_version0_index0 {
 creation_time: u32,
 modification_time: u32,
 track_ID: u32,
@@ -1017,7 +1017,7 @@ duration: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields_version1_index0 {
 creation_time: u64,
 modification_time: u64,
 track_ID: u32,
@@ -1026,13 +1026,13 @@ duration: u64
 }
 
 #[derive(Debug, Clone)]
-enum main_data { version0(main_data), version1(main_data) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields { version0(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields_version0_index0), version1(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields_version1_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0 {
 version: u8,
 flags: (u8, u8, u8),
-fields: main_data,
+fields: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields,
 reserved2: (u32, u32),
 layer: u16,
 alternate_group: u16,
@@ -1044,56 +1044,56 @@ height: u32
 }
 
 #[derive(Debug, Clone)]
-enum main_data { edts(Vec<main_data>), mdia(Vec<main_data>), tkhd(main_data), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data { edts(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq>), mdia(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq>), tkhd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { meta(u32, Vec<main_data>), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq_data { meta(u32, Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq>), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { mvhd(main_data), trak(Vec<main_data>), udta(Vec<main_data>), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data { mvhd(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0), trak(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq>), udta(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq>), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_data { free, ftyp(main_data), mdat, meta(u32, Vec<main_data>), moov(Vec<main_data>), unknown(Vec<u8>) }
+enum main_mpeg4_index0_atoms_denest_seq_data { free, ftyp(main_mpeg4_index0_atoms_denest_seq_data_ftyp_index0), mdat, meta(u32, Vec<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq>), moov(Vec<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq>), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_mpeg4_index0_atoms_denest_seq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
-data: main_data
+data: main_mpeg4_index0_atoms_denest_seq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-atoms: Vec<main_data>
+struct main_mpeg4_index0 {
+atoms: Vec<main_mpeg4_index0_atoms_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_ihdr_data {
 width: u32,
 height: u32,
 bit_depth: u8,
@@ -1104,51 +1104,51 @@ interlace_method: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_ihdr {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_ihdr_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_PLTE_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: Vec<main_data>,
+data: Vec<main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq>,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0 {
 greyscale: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0 {
 red: u16,
 green: u16,
 blue: u16
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_3_index0 {
 palette_index: u8
 }
 
 #[derive(Debug, Clone)]
-enum main_data { color_type_0(main_data), color_type_2(main_data), color_type_3(main_data), color_type_4(main_data), color_type_6(main_data) }
+enum main_png_index0_chunks_denest_seq_bKGD_index0_data { color_type_0(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0), color_type_2(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0), color_type_3(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_3_index0), color_type_4(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0), color_type_6(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_bKGD_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_bKGD_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_cHRM_index0_data {
 whitepoint_x: u32,
 whitepoint_y: u32,
 red_x: u32,
@@ -1160,90 +1160,90 @@ blue_y: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_cHRM_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_cHRM_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_gAMA_index0_data {
 gamma: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_gAMA_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_gAMA_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_iCCP_index0_data {
 profile_name: Vec<u8>,
 compression_method: u8,
 compressed_profile: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_iCCP_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_iCCP_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_iTXt_index0_data {
 keyword: Vec<u8>,
 compression_flag: u8,
 compression_method: u8,
-language_tag: main_data,
-translated_keyword: main_data,
+language_tag: main_gzip_index0_denest_seq_fname_yes_index0,
+translated_keyword: main_gzip_index0_denest_seq_fname_yes_index0,
 text: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_iTXt_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_iTXt_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_pHYs_index0_data {
 pixels_per_unit_x: u32,
 pixels_per_unit_y: u32,
 unit_specifier: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_pHYs_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_pHYs_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_tEXt_index0_data {
 keyword: Vec<u8>,
 text: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_tEXt_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_tEXt_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_tIME_index0_data {
 year: u16,
 month: u8,
 day: u8,
@@ -1253,44 +1253,44 @@ second: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_tIME_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_tIME_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-enum main_data { color_type_0(main_data), color_type_2(main_data), color_type_3(Vec<main_data>) }
+enum main_png_index0_chunks_denest_seq_tRNS_index0_data { color_type_0(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0), color_type_2(main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0), color_type_3(Vec<main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_3_index0>) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_tRNS_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_tRNS_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_zTXt_index0_data {
 keyword: Vec<u8>,
 compression_method: u8,
 compressed_text: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_chunks_denest_seq_zTXt_index0 {
 length: u32,
 tag: (u8, u8, u8, u8),
-data: main_data,
+data: main_png_index0_chunks_denest_seq_zTXt_index0_data,
 crc: u32
 }
 
 #[derive(Debug, Clone)]
-enum main_data { PLTE(main_data), bKGD(main_data), cHRM(main_data), gAMA(main_data), iCCP(main_data), iTXt(main_data), pHYs(main_data), tEXt(main_data), tIME(main_data), tRNS(main_data), zTXt(main_data) }
+enum main_png_index0_chunks_denest_seq { PLTE(main_png_index0_chunks_denest_seq_PLTE_index0), bKGD(main_png_index0_chunks_denest_seq_bKGD_index0), cHRM(main_png_index0_chunks_denest_seq_cHRM_index0), gAMA(main_png_index0_chunks_denest_seq_gAMA_index0), iCCP(main_png_index0_chunks_denest_seq_iCCP_index0), iTXt(main_png_index0_chunks_denest_seq_iTXt_index0), pHYs(main_png_index0_chunks_denest_seq_pHYs_index0), tEXt(main_png_index0_chunks_denest_seq_tEXt_index0), tIME(main_png_index0_chunks_denest_seq_tIME_index0), tRNS(main_png_index0_chunks_denest_seq_tRNS_index0), zTXt(main_png_index0_chunks_denest_seq_zTXt_index0) }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_idat_denest_seq {
 length: u32,
 tag: (u8, u8, u8, u8),
 data: Vec<u8>,
@@ -1298,7 +1298,7 @@ crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0_iend {
 length: u32,
 tag: (u8, u8, u8, u8),
 data: (),
@@ -1306,102 +1306,102 @@ crc: u32
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_png_index0 {
 signature: (u8, u8, u8, u8, u8, u8, u8, u8),
-ihdr: main_data,
-chunks: Vec<main_data>,
-idat: Vec<main_data>,
-more_chunks: Vec<main_data>,
-iend: main_data
+ihdr: main_png_index0_ihdr,
+chunks: Vec<main_png_index0_chunks_denest_seq>,
+idat: Vec<main_png_index0_idat_denest_seq>,
+more_chunks: Vec<main_png_index0_chunks_denest_seq>,
+iend: main_png_index0_iend
 }
 
 #[derive(Debug, Clone)]
-enum main_data { no(u8), yes }
+enum main_riff_index0_data_chunks_denest_seq_pad { no(u8), yes }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_riff_index0_data_chunks_denest_seq {
 tag: (u8, u8, u8, u8),
 length: u32,
 data: Vec<u8>,
-pad: main_data
+pad: main_riff_index0_data_chunks_denest_seq_pad
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_riff_index0_data {
 tag: (u8, u8, u8, u8),
-chunks: Vec<main_data>
+chunks: Vec<main_riff_index0_data_chunks_denest_seq>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_riff_index0 {
 tag: (u8, u8, u8, u8),
 length: u32,
-data: main_data,
-pad: main_data
+data: main_riff_index0_data,
+pad: main_riff_index0_data_chunks_denest_seq_pad
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_tar_index0_contents_denest_seq_header_name {
 string: Vec<u8>,
 __padding: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_tar_index0_contents_denest_seq_header_mode {
 string: Vec<u8>,
 __nul_or_wsp: u8,
 __padding: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
+struct main_tar_index0_contents_denest_seq_header_uname {
 string: Vec<u8>,
 padding: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-name: main_data,
-mode: main_data,
-uid: main_data,
-gid: main_data,
+struct main_tar_index0_contents_denest_seq_header {
+name: main_tar_index0_contents_denest_seq_header_name,
+mode: main_tar_index0_contents_denest_seq_header_mode,
+uid: main_tar_index0_contents_denest_seq_header_mode,
+gid: main_tar_index0_contents_denest_seq_header_mode,
 size: u32,
-mtime: main_data,
-chksum: main_data,
+mtime: main_tar_index0_contents_denest_seq_header_mode,
+chksum: main_tar_index0_contents_denest_seq_header_mode,
 typeflag: u8,
-linkname: main_data,
+linkname: main_tar_index0_contents_denest_seq_header_name,
 magic: (u8, u8, u8, u8, u8, u8),
 version: (u8, u8),
-uname: main_data,
-gname: main_data,
-devmajor: main_data,
-devminor: main_data,
-prefix: main_data,
+uname: main_tar_index0_contents_denest_seq_header_uname,
+gname: main_tar_index0_contents_denest_seq_header_uname,
+devmajor: main_tar_index0_contents_denest_seq_header_mode,
+devminor: main_tar_index0_contents_denest_seq_header_mode,
+prefix: main_tar_index0_contents_denest_seq_header_name,
 pad: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-header: main_data,
+struct main_tar_index0_contents_denest_seq {
+header: main_tar_index0_contents_denest_seq_header,
 file: Vec<u8>,
 __padding: ()
 }
 
 #[derive(Debug, Clone)]
-struct main_data {
-contents: Vec<main_data>,
+struct main_tar_index0 {
+contents: Vec<main_tar_index0_contents_denest_seq>,
 __padding: Vec<u8>,
 __trailing: Vec<u8>
 }
 
 #[derive(Debug, Clone)]
-enum main_data { gif(main_data), gzip(Vec<main_data>), jpeg(main_data), mpeg4(main_data), peano(Vec<u32>), png(main_data), riff(main_data), tar(main_data), text(Vec<char>) }
+enum main { gif(main_gif_index0), gzip(Vec<main_gzip_index0_denest_seq>), jpeg(main_jpeg_index0), mpeg4(main_mpeg4_index0), peano(Vec<u32>), png(main_png_index0), riff(main_riff_index0), tar(main_tar_index0), text(Vec<char>) }
 
 #[derive(Debug, Clone)]
-enum deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq { none, some(u8) }
+enum base_bit_index0 { none, some(u8) }
 
 #[derive(Debug, Clone)]
-struct tar_header_size {
+struct tar_padding_char {
 oA: u8,
 o9: u8,
 o8: u8,
@@ -1418,22 +1418,22 @@ value: u32
 }
 
 #[derive(Debug, Clone)]
-struct main {
-data: main_data,
+struct utf8_byte_trailing {
+data: main,
 end: ()
 }
 
-fn Decoder0<'input>(_input: &mut Parser<'input>) -> Result<main, ParseError> {
+fn Decoder0<'input>(_input: &mut Parser<'input>) -> Result<utf8_byte_trailing, ParseError> {
 PResult::Ok((Decoder1(_input))?)
 }
 
-fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<main, ParseError> {
+fn Decoder1<'input>(_input: &mut Parser<'input>) -> Result<utf8_byte_trailing, ParseError> {
 let data = ((|| {
 _input.start_alt();
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder2(_input))?;
-main_data::peano(inner)
+main::peano(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1448,7 +1448,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder3(_input))?;
-main_data::gif(inner)
+main::gif(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1463,7 +1463,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder4(_input))?;
-main_data::gzip(inner)
+main::gzip(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1478,7 +1478,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder5(_input))?;
-main_data::jpeg(inner)
+main::jpeg(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1493,7 +1493,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder6(_input))?;
-main_data::mpeg4(inner)
+main::mpeg4(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1508,7 +1508,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder7(_input))?;
-main_data::png(inner)
+main::png(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1523,7 +1523,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder8(_input))?;
-main_data::riff(inner)
+main::riff(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1538,7 +1538,7 @@ _input.next_alt(false)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder9(_input))?;
-main_data::tar(inner)
+main::tar(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1553,7 +1553,7 @@ _input.next_alt(true)?;
 {
 let mut f_tmp = || PResult::Ok({
 let inner = (Decoder10(_input))?;
-main_data::text(inner)
+main::text(inner)
 });
 match f_tmp() {
 Ok(inner) => {
@@ -1567,7 +1567,7 @@ return Err(_e);
 };
 })())?;
 let end = ((|| PResult::Ok(_input.finish()?))())?;
-PResult::Ok(main { data, end })
+PResult::Ok(utf8_byte_trailing { data, end })
 }
 
 fn Decoder2<'input>(_input: &mut Parser<'input>) -> Result<Vec<u32>, ParseError> {
@@ -1608,7 +1608,7 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0, ParseError> {
 let header = ((|| PResult::Ok((Decoder164(_input))?))())?;
 let logical_screen = ((|| PResult::Ok((Decoder165(_input))?))())?;
 let blocks = ((|| PResult::Ok({
@@ -1649,10 +1649,10 @@ break
 accum
 }))())?;
 let trailer = ((|| PResult::Ok((Decoder167(_input))?))())?;
-PResult::Ok(main_data { header, logical_screen, blocks, trailer })
+PResult::Ok(main_gif_index0 { header, logical_screen, blocks, trailer })
 }
 
-fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_data>, ParseError> {
+fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_gzip_index0_denest_seq>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -1680,11 +1680,11 @@ let header = ((|| PResult::Ok((Decoder152(_input))?))())?;
 let fname = ((|| PResult::Ok(match header.clone().file_flags & 8u8 != 0u8 {
 true => {
 let inner = (Decoder153(_input))?;
-main_data::yes(inner)
+main_gzip_index0_denest_seq_fname::yes(inner)
 },
 
 false => {
-main_data::no
+main_gzip_index0_denest_seq_fname::no
 }
 }))())?;
 let data = ((|| PResult::Ok({
@@ -1694,7 +1694,7 @@ let _bits_read = _input.escape_bits_mode()?;
 ret
 }))())?;
 let footer = ((|| PResult::Ok((Decoder155(_input))?))())?;
-main_data { header, fname, data, footer }
+main_gzip_index0_denest_seq { header, fname, data, footer }
 };
 accum.push(next_elem);
 }
@@ -1702,14 +1702,14 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0, ParseError> {
 let soi = ((|| PResult::Ok((Decoder79(_input))?))())?;
 let frame = ((|| PResult::Ok((Decoder80(_input))?))())?;
 let eoi = ((|| PResult::Ok((Decoder81(_input))?))())?;
-PResult::Ok(main_data { soi, frame, eoi })
+PResult::Ok(main_jpeg_index0 { soi, frame, eoi })
 }
 
-fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0, ParseError> {
 let atoms = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -1731,10 +1731,10 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { atoms })
+PResult::Ok(main_mpeg4_index0 { atoms })
 }
 
-fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder7<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0, ParseError> {
 let signature = ((|| PResult::Ok((Decoder27(_input))?))())?;
 let ihdr = ((|| PResult::Ok((Decoder28(_input))?))())?;
 let chunks = ((|| PResult::Ok({
@@ -1950,10 +1950,10 @@ break
 accum
 }))())?;
 let iend = ((|| PResult::Ok((Decoder31(_input))?))())?;
-PResult::Ok(main_data { signature, ihdr, chunks, idat, more_chunks, iend })
+PResult::Ok(main_png_index0 { signature, ihdr, chunks, idat, more_chunks, iend })
 }
 
-fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<main_riff_index0, ParseError> {
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -1999,7 +1999,7 @@ ret
 }))())?;
 let pad = ((|| PResult::Ok(match length % 2u32 == 0u32 {
 true => {
-main_data::yes
+main_riff_index0_data_chunks_denest_seq_pad::yes
 },
 
 false => {
@@ -2011,13 +2011,13 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 };
-main_data::no(inner)
+main_riff_index0_data_chunks_denest_seq_pad::no(inner)
 }
 }))())?;
-PResult::Ok(main_data { tag, length, data, pad })
+PResult::Ok(main_riff_index0 { tag, length, data, pad })
 }
 
-fn Decoder9<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder9<'input>(_input: &mut Parser<'input>) -> Result<main_tar_index0, ParseError> {
 let contents = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -2101,7 +2101,7 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { contents, __padding, __trailing })
+PResult::Ok(main_tar_index0 { contents, __padding, __trailing })
 }
 
 fn Decoder10<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
@@ -2523,7 +2523,7 @@ return Err(ParseError::ExcludedBranch(15157310944304873712u64));
 PResult::Ok(((|raw: u8| PResult::Ok(raw & 63u8))(inner))?)
 }
 
-fn Decoder14<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder14<'input>(_input: &mut Parser<'input>) -> Result<main_tar_index0_contents_denest_seq, ParseError> {
 let header = ((|| PResult::Ok((Decoder15(_input))?))())?;
 let file = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -2533,10 +2533,10 @@ accum.push((Decoder16(_input))?);
 accum
 }))())?;
 let __padding = ((|| PResult::Ok(_input.skip_align(512)?))())?;
-PResult::Ok(main_data { header, file, __padding })
+PResult::Ok(main_tar_index0_contents_denest_seq { header, file, __padding })
 }
 
-fn Decoder15<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder15<'input>(_input: &mut Parser<'input>) -> Result<main_tar_index0_contents_denest_seq_header, ParseError> {
 let sz = 512u32 as usize<>;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
@@ -2617,7 +2617,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -2692,7 +2692,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -2767,7 +2767,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -2820,9 +2820,9 @@ let inner = (Decoder18(_input))?;
 }))())?;
 let __nil = ((|| PResult::Ok((Decoder19(_input))?))())?;
 let value = ((|| PResult::Ok((((0u8 as u32) << 3u32 | (oA as u32)) << 6u32 | (o9 as u32) << 3u32 | (o8 as u32)) << 24u32 | (((o7 as u32) << 3u32 | (o6 as u32)) << 6u32 | (o5 as u32) << 3u32 | (o4 as u32)) << 12u32 | ((o3 as u32) << 3u32 | (o2 as u32)) << 6u32 | (o1 as u32) << 3u32 | (o0 as u32)))())?;
-tar_header_size { oA, o9, o8, o7, o6, o5, o4, o3, o2, o1, o0, __nil, value }
+tar_padding_char { oA, o9, o8, o7, o6, o5, o4, o3, o2, o1, o0, __nil, value }
 };
-((|rec: tar_header_size| PResult::Ok(rec.clone().value))(inner))?
+((|rec: tar_padding_char| PResult::Ok(rec.clone().value))(inner))?
 }))())?;
 let mtime = ((|| PResult::Ok({
 let sz = 12u16 as usize<>;
@@ -2894,7 +2894,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -2969,7 +2969,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -3136,7 +3136,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -3211,7 +3211,7 @@ break
 }
 accum
 }))())?;
-main_data { string, __nul_or_wsp, __padding }
+main_tar_index0_contents_denest_seq_header_mode { string, __nul_or_wsp, __padding }
 }))())?;
 _input.end_slice()?;
 ret
@@ -3237,7 +3237,7 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 accum
 }))())?;
-main_data { name, mode, uid, gid, size, mtime, chksum, typeflag, linkname, magic, version, uname, gname, devmajor, devminor, prefix, pad }
+main_tar_index0_contents_denest_seq_header { name, mode, uid, gid, size, mtime, chksum, typeflag, linkname, magic, version, uname, gname, devmajor, devminor, prefix, pad }
 }))())?;
 _input.end_slice()?;
 PResult::Ok(ret)
@@ -3248,7 +3248,7 @@ let b = _input.read_byte()?;
 PResult::Ok(b)
 }
 
-fn Decoder17<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder17<'input>(_input: &mut Parser<'input>) -> Result<main_tar_index0_contents_denest_seq_header_name, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -3325,7 +3325,7 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { string, __padding })
+PResult::Ok(main_tar_index0_contents_denest_seq_header_name { string, __padding })
 }
 
 fn Decoder18<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
@@ -3351,7 +3351,7 @@ let b = _input.read_byte()?;
 PResult::Ok(b)
 }
 
-fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<main_tar_index0_contents_denest_seq_header_name, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -3424,10 +3424,10 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { string, __padding })
+PResult::Ok(main_tar_index0_contents_denest_seq_header_name { string, __padding })
 }
 
-fn Decoder22<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder22<'input>(_input: &mut Parser<'input>) -> Result<main_tar_index0_contents_denest_seq_header_uname, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -3504,7 +3504,7 @@ accum.push(next_elem);
 }
 accum
 }))())?;
-PResult::Ok(main_data { string, padding })
+PResult::Ok(main_tar_index0_contents_denest_seq_header_uname { string, padding })
 }
 
 fn Decoder23<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
@@ -3518,7 +3518,7 @@ let field3 = ((|| PResult::Ok((Decoder16(_input))?))())?;
 PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok(u32le(x)))(inner))?)
 }
 
-fn Decoder24<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder24<'input>(_input: &mut Parser<'input>) -> Result<main_riff_index0_data, ParseError> {
 let tag = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let chunks = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -3541,7 +3541,7 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { tag, chunks })
+PResult::Ok(main_riff_index0_data { tag, chunks })
 }
 
 fn Decoder25<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -3552,7 +3552,7 @@ let field3 = ((|| PResult::Ok((Decoder20(_input))?))())?;
 PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder26<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder26<'input>(_input: &mut Parser<'input>) -> Result<main_riff_index0_data_chunks_denest_seq, ParseError> {
 let tag = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -3584,7 +3584,7 @@ ret
 }))())?;
 let pad = ((|| PResult::Ok(match length % 2u32 == 0u32 {
 true => {
-main_data::yes
+main_riff_index0_data_chunks_denest_seq_pad::yes
 },
 
 false => {
@@ -3596,10 +3596,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 };
-main_data::no(inner)
+main_riff_index0_data_chunks_denest_seq_pad::no(inner)
 }
 }))())?;
-PResult::Ok(main_data { tag, length, data, pad })
+PResult::Ok(main_riff_index0_data_chunks_denest_seq { tag, length, data, pad })
 }
 
 fn Decoder27<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8, u8, u8, u8, u8), ParseError> {
@@ -3670,7 +3670,7 @@ return Err(ParseError::ExcludedBranch(4202505692043699682u64));
 PResult::Ok((field0, field1, field2, field3, field4, field5, field6, field7))
 }
 
-fn Decoder28<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder28<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_ihdr, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok((Decoder56(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -3681,10 +3681,10 @@ _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_ihdr { length, tag, data, crc })
 }
 
-fn Decoder29<'input>(_input: &mut Parser<'input>, ihdr: main_data) -> Result<main_data, ParseError> {
+fn Decoder29<'input>(_input: &mut Parser<'input>, ihdr: main_png_index0_ihdr) -> Result<main_png_index0_chunks_denest_seq, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 _input.read_byte()?;
@@ -3767,57 +3767,57 @@ ret
 PResult::Ok(match tree_index {
 0 => {
 let inner = (Decoder37(_input, ihdr.clone()))?;
-main_data::bKGD(inner)
+main_png_index0_chunks_denest_seq::bKGD(inner)
 },
 
 1 => {
 let inner = (Decoder38(_input))?;
-main_data::cHRM(inner)
+main_png_index0_chunks_denest_seq::cHRM(inner)
 },
 
 2 => {
 let inner = (Decoder39(_input))?;
-main_data::iCCP(inner)
+main_png_index0_chunks_denest_seq::iCCP(inner)
 },
 
 3 => {
 let inner = (Decoder40(_input))?;
-main_data::iTXt(inner)
+main_png_index0_chunks_denest_seq::iTXt(inner)
 },
 
 4 => {
 let inner = (Decoder41(_input))?;
-main_data::gAMA(inner)
+main_png_index0_chunks_denest_seq::gAMA(inner)
 },
 
 5 => {
 let inner = (Decoder42(_input))?;
-main_data::pHYs(inner)
+main_png_index0_chunks_denest_seq::pHYs(inner)
 },
 
 6 => {
 let inner = (Decoder43(_input))?;
-main_data::PLTE(inner)
+main_png_index0_chunks_denest_seq::PLTE(inner)
 },
 
 7 => {
 let inner = (Decoder44(_input))?;
-main_data::tEXt(inner)
+main_png_index0_chunks_denest_seq::tEXt(inner)
 },
 
 8 => {
 let inner = (Decoder45(_input))?;
-main_data::tIME(inner)
+main_png_index0_chunks_denest_seq::tIME(inner)
 },
 
 9 => {
 let inner = (Decoder46(_input, ihdr.clone()))?;
-main_data::tRNS(inner)
+main_png_index0_chunks_denest_seq::tRNS(inner)
 },
 
 10 => {
 let inner = (Decoder47(_input))?;
-main_data::zTXt(inner)
+main_png_index0_chunks_denest_seq::zTXt(inner)
 },
 
 _ => {
@@ -3826,7 +3826,7 @@ return Err(ParseError::ExcludedBranch(13044660050275045301u64));
 })
 }
 
-fn Decoder30<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder30<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_idat_denest_seq, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok((Decoder35(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -3837,10 +3837,10 @@ _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_idat_denest_seq { length, tag, data, crc })
 }
 
-fn Decoder31<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder31<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_iend, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok((Decoder33(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -3851,7 +3851,7 @@ _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_iend { length, tag, data, crc })
 }
 
 fn Decoder32<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
@@ -3963,7 +3963,7 @@ break
 PResult::Ok(accum)
 }
 
-fn Decoder37<'input>(_input: &mut Parser<'input>, ihdr: main_data) -> Result<main_data, ParseError> {
+fn Decoder37<'input>(_input: &mut Parser<'input>, ihdr: main_png_index0_ihdr) -> Result<main_png_index0_chunks_denest_seq_bKGD_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4007,17 +4007,17 @@ let ret = ((|| PResult::Ok(match ihdr.clone().data.color_type {
 0 => {
 let inner = {
 let greyscale = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { greyscale }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0 { greyscale }
 };
-main_data::color_type_0(inner)
+main_png_index0_chunks_denest_seq_bKGD_index0_data::color_type_0(inner)
 },
 
 4 => {
 let inner = {
 let greyscale = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { greyscale }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0 { greyscale }
 };
-main_data::color_type_4(inner)
+main_png_index0_chunks_denest_seq_bKGD_index0_data::color_type_4(inner)
 },
 
 2 => {
@@ -4025,9 +4025,9 @@ let inner = {
 let red = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let green = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let blue = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { red, green, blue }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0 { red, green, blue }
 };
-main_data::color_type_2(inner)
+main_png_index0_chunks_denest_seq_bKGD_index0_data::color_type_2(inner)
 },
 
 6 => {
@@ -4035,17 +4035,17 @@ let inner = {
 let red = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let green = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let blue = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { red, green, blue }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0 { red, green, blue }
 };
-main_data::color_type_6(inner)
+main_png_index0_chunks_denest_seq_bKGD_index0_data::color_type_6(inner)
 },
 
 3 => {
 let inner = {
 let palette_index = ((|| PResult::Ok((Decoder16(_input))?))())?;
-main_data { palette_index }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_3_index0 { palette_index }
 };
-main_data::color_type_3(inner)
+main_png_index0_chunks_denest_seq_bKGD_index0_data::color_type_3(inner)
 },
 
 _other => {
@@ -4056,10 +4056,10 @@ _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_bKGD_index0 { length, tag, data, crc })
 }
 
-fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_cHRM_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4108,16 +4108,16 @@ let green_x = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let green_y = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let blue_x = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let blue_y = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { whitepoint_x, whitepoint_y, red_x, red_y, green_x, green_y, blue_x, blue_y }
+main_png_index0_chunks_denest_seq_cHRM_index0_data { whitepoint_x, whitepoint_y, red_x, red_y, green_x, green_y, blue_x, blue_y }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_cHRM_index0 { length, tag, data, crc })
 }
 
-fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder39<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_iCCP_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4182,16 +4182,16 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
 let compressed_profile = ((|| PResult::Ok((Decoder49(_input))?))())?;
-main_data { profile_name, compression_method, compressed_profile }
+main_png_index0_chunks_denest_seq_iCCP_index0_data { profile_name, compression_method, compressed_profile }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_iCCP_index0 { length, tag, data, crc })
 }
 
-fn Decoder40<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder40<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_iTXt_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4292,16 +4292,16 @@ break
 accum
 }
 }))())?;
-main_data { keyword, compression_flag, compression_method, language_tag, translated_keyword, text }
+main_png_index0_chunks_denest_seq_iTXt_index0_data { keyword, compression_flag, compression_method, language_tag, translated_keyword, text }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_iTXt_index0 { length, tag, data, crc })
 }
 
-fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_gAMA_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4343,16 +4343,16 @@ let sz = length as usize<>;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok({
 let gamma = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { gamma }
+main_png_index0_chunks_denest_seq_gAMA_index0_data { gamma }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_gAMA_index0 { length, tag, data, crc })
 }
 
-fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_pHYs_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4396,16 +4396,16 @@ let ret = ((|| PResult::Ok({
 let pixels_per_unit_x = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let pixels_per_unit_y = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let unit_specifier = ((|| PResult::Ok((Decoder16(_input))?))())?;
-main_data { pixels_per_unit_x, pixels_per_unit_y, unit_specifier }
+main_png_index0_chunks_denest_seq_pHYs_index0_data { pixels_per_unit_x, pixels_per_unit_y, unit_specifier }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_pHYs_index0 { length, tag, data, crc })
 }
 
-fn Decoder43<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder43<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_PLTE_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4468,7 +4468,7 @@ let next_elem = {
 let r = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let g = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let b = ((|| PResult::Ok((Decoder16(_input))?))())?;
-main_data { r, g, b }
+main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq { r, g, b }
 };
 accum.push(next_elem);
 }
@@ -4479,10 +4479,10 @@ _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_PLTE_index0 { length, tag, data, crc })
 }
 
-fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder44<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_tEXt_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4559,16 +4559,16 @@ break
 }
 accum
 }))())?;
-main_data { keyword, text }
+main_png_index0_chunks_denest_seq_tEXt_index0_data { keyword, text }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_tEXt_index0 { length, tag, data, crc })
 }
 
-fn Decoder45<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder45<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_tIME_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4615,16 +4615,16 @@ let day = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let hour = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let minute = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let second = ((|| PResult::Ok((Decoder16(_input))?))())?;
-main_data { year, month, day, hour, minute, second }
+main_png_index0_chunks_denest_seq_tIME_index0_data { year, month, day, hour, minute, second }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_tIME_index0 { length, tag, data, crc })
 }
 
-fn Decoder46<'input>(_input: &mut Parser<'input>, ihdr: main_data) -> Result<main_data, ParseError> {
+fn Decoder46<'input>(_input: &mut Parser<'input>, ihdr: main_png_index0_ihdr) -> Result<main_png_index0_chunks_denest_seq_tRNS_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4668,9 +4668,9 @@ let ret = ((|| PResult::Ok(match ihdr.clone().data.color_type {
 0 => {
 let inner = {
 let greyscale = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { greyscale }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_0_index0 { greyscale }
 };
-main_data::color_type_0(inner)
+main_png_index0_chunks_denest_seq_tRNS_index0_data::color_type_0(inner)
 },
 
 2 => {
@@ -4678,9 +4678,9 @@ let inner = {
 let red = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let green = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let blue = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { red, green, blue }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_2_index0 { red, green, blue }
 };
-main_data::color_type_2(inner)
+main_png_index0_chunks_denest_seq_tRNS_index0_data::color_type_2(inner)
 },
 
 3 => {
@@ -4699,7 +4699,7 @@ ret
 if matching_ix == 0 {
 let next_elem = {
 let palette_index = ((|| PResult::Ok((Decoder16(_input))?))())?;
-main_data { palette_index }
+main_png_index0_chunks_denest_seq_bKGD_index0_data_color_type_3_index0 { palette_index }
 };
 accum.push(next_elem);
 } else {
@@ -4708,7 +4708,7 @@ break
 }
 accum
 };
-main_data::color_type_3(inner)
+main_png_index0_chunks_denest_seq_tRNS_index0_data::color_type_3(inner)
 },
 
 _other => {
@@ -4719,10 +4719,10 @@ _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_tRNS_index0 { length, tag, data, crc })
 }
 
-fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder47<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_chunks_denest_seq_zTXt_index0, ParseError> {
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let tag = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
@@ -4787,13 +4787,13 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
 let compressed_text = ((|| PResult::Ok((Decoder49(_input))?))())?;
-main_data { keyword, compression_method, compressed_text }
+main_png_index0_chunks_denest_seq_zTXt_index0_data { keyword, compression_method, compressed_text }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
 let crc = ((|| PResult::Ok((Decoder32(_input))?))())?;
-PResult::Ok(main_data { length, tag, data, crc })
+PResult::Ok(main_png_index0_chunks_denest_seq_zTXt_index0 { length, tag, data, crc })
 }
 
 fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
@@ -7992,7 +7992,7 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder53<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -8041,10 +8041,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder54<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -8093,7 +8093,7 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
 fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
@@ -9187,7 +9187,7 @@ return Err(ParseError::ExcludedBranch(4610689655322527862u64));
 PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<main_png_index0_ihdr_data, ParseError> {
 let width = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let height = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let bit_depth = ((|| PResult::Ok((Decoder16(_input))?))())?;
@@ -9195,10 +9195,10 @@ let color_type = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let compression_method = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let filter_method = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let interlace_method = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { width, height, bit_depth, color_type, compression_method, filter_method, interlace_method })
+PResult::Ok(main_png_index0_ihdr_data { width, height, bit_depth, color_type, compression_method, filter_method, interlace_method })
 }
 
-fn Decoder58<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder58<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -9244,17 +9244,17 @@ break
 }
 accum
 }))())?;
-main_data { major_brand, minor_version, compatible_brands }
+main_mpeg4_index0_atoms_denest_seq_data_ftyp_index0 { major_brand, minor_version, compatible_brands }
 };
-main_data::ftyp(inner)
+main_mpeg4_index0_atoms_denest_seq_data::ftyp(inner)
 },
 
 (102, 114, 101, 101) => {
-main_data::free
+main_mpeg4_index0_atoms_denest_seq_data::free
 },
 
 (109, 100, 97, 116) => {
-main_data::mdat
+main_mpeg4_index0_atoms_denest_seq_data::mdat
 },
 
 (109, 101, 116, 97) => {
@@ -9280,7 +9280,7 @@ break
 }
 accum
 }))())?;
-main_data::meta(field0, field1)
+main_mpeg4_index0_atoms_denest_seq_data::meta(field0, field1)
 },
 
 (109, 111, 111, 118) => {
@@ -9305,7 +9305,7 @@ break
 }
 accum
 };
-main_data::moov(inner)
+main_mpeg4_index0_atoms_denest_seq_data::moov(inner)
 },
 
 _ => {
@@ -9330,13 +9330,13 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq { size_field, r#type, size, data })
 }
 
 fn Decoder59<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
@@ -9362,7 +9362,7 @@ let field7 = ((|| PResult::Ok((Decoder16(_input))?))())?;
 PResult::Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(u64be(x)))(inner))?)
 }
 
-fn Decoder61<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder61<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -9405,7 +9405,7 @@ break
 }
 accum
 };
-main_data::dinf(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::dinf(inner)
 },
 
 (104, 100, 108, 114) => {
@@ -9426,9 +9426,9 @@ let field2 = ((|| PResult::Ok((Decoder32(_input))?))())?;
 (field0, field1, field2)
 }))())?;
 let name = ((|| PResult::Ok((Decoder67(_input))?))())?;
-main_data { version, flags, predefined, handler_type, reserved, name }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_hdlr_index0 { version, flags, predefined, handler_type, reserved, name }
 };
-main_data::hdlr(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::hdlr(inner)
 },
 
 (112, 105, 116, 109) => {
@@ -9443,17 +9443,17 @@ let field2 = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let item_ID = ((|| PResult::Ok(match version == 0u8 {
 true => {
 let inner = (Decoder50(_input))?;
-main_data::yes(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0_item_ID::yes(inner)
 },
 
 false => {
 let inner = (Decoder32(_input))?;
-main_data::no(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0_item_ID::no(inner)
 }
 }))())?;
-main_data { version, flags, item_ID }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_pitm_index0 { version, flags, item_ID }
 };
-main_data::pitm(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::pitm(inner)
 },
 
 (105, 105, 110, 102) => {
@@ -9482,9 +9482,9 @@ accum.push((Decoder71(_input))?);
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, item_info_entry }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0 { version, flags, entry_count, item_info_entry }
 };
-main_data::iinf(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::iinf(inner)
 },
 
 (105, 114, 101, 102) => {
@@ -9541,12 +9541,12 @@ accum.push((Decoder50(_input))?);
 }
 accum
 }))())?;
-main_data { from_item_ID, reference_count, to_item_ID }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_small_index0_denest_seq_data { from_item_ID, reference_count, to_item_ID }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-main_data { size_field, r#type, size, data }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_small_index0_denest_seq { size_field, r#type, size, data }
 };
 accum.push(next_elem);
 } else {
@@ -9555,7 +9555,7 @@ break
 }
 accum
 };
-main_data::small(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference::small(inner)
 },
 
 1 => {
@@ -9602,12 +9602,12 @@ accum.push((Decoder32(_input))?);
 }
 accum
 }))())?;
-main_data { from_item_ID, reference_count, to_item_ID }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_large_index0_denest_seq_data { from_item_ID, reference_count, to_item_ID }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-main_data { size_field, r#type, size, data }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference_large_index0_denest_seq { size_field, r#type, size, data }
 };
 accum.push(next_elem);
 } else {
@@ -9616,16 +9616,16 @@ break
 }
 accum
 };
-main_data::large(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0_single_item_reference::large(inner)
 },
 
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-main_data { version, flags, single_item_reference }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iref_index0 { version, flags, single_item_reference }
 };
-main_data::iref(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::iref(inner)
 },
 
 (105, 108, 111, 99) => {
@@ -9678,11 +9678,11 @@ false => {
 let construction_method = ((|| PResult::Ok(match version > 0u8 {
 true => {
 let inner = (Decoder50(_input))?;
-main_data::yes(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_construction_method::yes(inner)
 },
 
 false => {
-main_data::no
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_construction_method::no
 }
 }))())?;
 let data_reference_index = ((|| PResult::Ok((Decoder50(_input))?))())?;
@@ -9763,19 +9763,19 @@ _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-main_data { extent_index, extent_offset, extent_length }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq_extents_denest_seq { extent_index, extent_offset, extent_length }
 });
 }
 accum
 }))())?;
-main_data { item_ID, construction_method, data_reference_index, base_offset, extent_count, extents }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0_items_denest_seq { item_ID, construction_method, data_reference_index, base_offset, extent_count, extents }
 });
 }
 accum
 }))())?;
-main_data { version, flags, offset_size_length_size, base_offset_size_index_size, offset_size, length_size, base_offset_size, index_size, item_count, items }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iloc_index0 { version, flags, offset_size_length_size, base_offset_size_index_size, offset_size, length_size, base_offset_size, index_size, item_count, items }
 };
-main_data::iloc(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::iloc(inner)
 },
 
 (105, 108, 115, 116) => {
@@ -9800,7 +9800,7 @@ break
 }
 accum
 };
-main_data::ilst(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::ilst(inner)
 },
 
 (105, 100, 97, 116) => {
@@ -9825,7 +9825,7 @@ break
 }
 accum
 };
-main_data::idat(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::idat(inner)
 },
 
 _ => {
@@ -9850,16 +9850,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder62<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder62<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -9896,9 +9896,9 @@ let creation_time = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let modification_time = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let timescale = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let duration = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { creation_time, modification_time, timescale, duration }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version0_index0 { creation_time, modification_time, timescale, duration }
 };
-main_data::version0(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields::version0(inner)
 },
 
 1 => {
@@ -9907,9 +9907,9 @@ let creation_time = ((|| PResult::Ok((Decoder60(_input))?))())?;
 let modification_time = ((|| PResult::Ok((Decoder60(_input))?))())?;
 let timescale = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let duration = ((|| PResult::Ok((Decoder60(_input))?))())?;
-main_data { creation_time, modification_time, timescale, duration }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version1_index0 { creation_time, modification_time, timescale, duration }
 };
-main_data::version1(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields::version1(inner)
 },
 
 _other => {
@@ -9939,9 +9939,9 @@ accum.push((Decoder32(_input))?);
 accum
 }))())?;
 let next_track_ID = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { version, flags, fields, rate, volume, reserved1, reserved2, matrix, pre_defined, next_track_ID }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0 { version, flags, fields, rate, volume, reserved1, reserved2, matrix, pre_defined, next_track_ID }
 };
-main_data::mvhd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data::mvhd(inner)
 },
 
 (116, 114, 97, 107) => {
@@ -9966,7 +9966,7 @@ break
 }
 accum
 };
-main_data::trak(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data::trak(inner)
 },
 
 (117, 100, 116, 97) => {
@@ -9991,7 +9991,7 @@ break
 }
 accum
 };
-main_data::udta(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data::udta(inner)
 },
 
 _ => {
@@ -10016,16 +10016,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10063,9 +10063,9 @@ let modification_time = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let track_ID = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let reserved = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let duration = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { creation_time, modification_time, track_ID, reserved, duration }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields_version0_index0 { creation_time, modification_time, track_ID, reserved, duration }
 };
-main_data::version0(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields::version0(inner)
 },
 
 1 => {
@@ -10075,9 +10075,9 @@ let modification_time = ((|| PResult::Ok((Decoder60(_input))?))())?;
 let track_ID = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let reserved = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let duration = ((|| PResult::Ok((Decoder60(_input))?))())?;
-main_data { creation_time, modification_time, track_ID, reserved, duration }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields_version1_index0 { creation_time, modification_time, track_ID, reserved, duration }
 };
-main_data::version1(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0_fields::version1(inner)
 },
 
 _other => {
@@ -10102,9 +10102,9 @@ accum
 }))())?;
 let width = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let height = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { version, flags, fields, reserved2, layer, alternate_group, volume, reserved1, matrix, width, height }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_tkhd_index0 { version, flags, fields, reserved2, layer, alternate_group, volume, reserved1, matrix, width, height }
 };
-main_data::tkhd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data::tkhd(inner)
 },
 
 (101, 100, 116, 115) => {
@@ -10129,7 +10129,7 @@ break
 }
 accum
 };
-main_data::edts(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data::edts(inner)
 },
 
 (109, 100, 105, 97) => {
@@ -10154,7 +10154,7 @@ break
 }
 accum
 };
-main_data::mdia(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data::mdia(inner)
 },
 
 _ => {
@@ -10179,16 +10179,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10232,7 +10232,7 @@ break
 }
 accum
 }))())?;
-main_data::meta(field0, field1)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq_data::meta(field0, field1)
 },
 
 _ => {
@@ -10257,16 +10257,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_udta_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder65<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder65<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10304,14 +10304,14 @@ accum.push({
 let track_duration = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let media_time = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let media_rate = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { track_duration, media_time, media_rate }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data_elst_index0_edit_list_table_denest_seq { track_duration, media_time, media_rate }
 });
 }
 accum
 }))())?;
-main_data { version, flags, number_of_entries, edit_list_table }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data_elst_index0 { version, flags, number_of_entries, edit_list_table }
 };
-main_data::elst(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data::elst(inner)
 },
 
 _ => {
@@ -10336,16 +10336,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_edts_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder66<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10381,9 +10381,9 @@ let component_manufacturer = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let component_flags = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let component_flags_mask = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let component_name = ((|| PResult::Ok((Decoder67(_input))?))())?;
-main_data { version, flags, component_type, component_subtype, component_manufacturer, component_flags, component_flags_mask, component_name }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_hdlr_index0 { version, flags, component_type, component_subtype, component_manufacturer, component_flags, component_flags_mask, component_name }
 };
-main_data::hdlr(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data::hdlr(inner)
 },
 
 (109, 100, 104, 100) => {
@@ -10402,9 +10402,9 @@ let creation_time = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let modification_time = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let timescale = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let duration = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { creation_time, modification_time, timescale, duration }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version0_index0 { creation_time, modification_time, timescale, duration }
 };
-main_data::version0(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields::version0(inner)
 },
 
 1 => {
@@ -10413,9 +10413,9 @@ let creation_time = ((|| PResult::Ok((Decoder60(_input))?))())?;
 let modification_time = ((|| PResult::Ok((Decoder60(_input))?))())?;
 let timescale = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let duration = ((|| PResult::Ok((Decoder60(_input))?))())?;
-main_data { creation_time, modification_time, timescale, duration }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields_version1_index0 { creation_time, modification_time, timescale, duration }
 };
-main_data::version1(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_mvhd_index0_fields::version1(inner)
 },
 
 _other => {
@@ -10424,9 +10424,9 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }))())?;
 let language = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let pre_defined = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { version, flags, fields, language, pre_defined }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_mdhd_index0 { version, flags, fields, language, pre_defined }
 };
-main_data::mdhd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data::mdhd(inner)
 },
 
 (109, 105, 110, 102) => {
@@ -10451,7 +10451,7 @@ break
 }
 accum
 };
-main_data::minf(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data::minf(inner)
 },
 
 _ => {
@@ -10476,16 +10476,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder67<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder67<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -10534,10 +10534,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder68<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10575,9 +10575,9 @@ accum.push((Decoder50(_input))?);
 }
 accum
 }))())?;
-main_data { version, flags, graphicsmode, opcolor }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_vmhd_index0 { version, flags, graphicsmode, opcolor }
 };
-main_data::vmhd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data::vmhd(inner)
 },
 
 (115, 109, 104, 100) => {
@@ -10591,9 +10591,9 @@ let field2 = ((|| PResult::Ok((Decoder16(_input))?))())?;
 }))())?;
 let balance = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let reserved = ((|| PResult::Ok((Decoder50(_input))?))())?;
-main_data { version, flags, balance, reserved }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_smhd_index0 { version, flags, balance, reserved }
 };
-main_data::smhd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data::smhd(inner)
 },
 
 (100, 105, 110, 102) => {
@@ -10618,7 +10618,7 @@ break
 }
 accum
 };
-main_data::dinf(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data::dinf(inner)
 },
 
 (115, 116, 98, 108) => {
@@ -10643,7 +10643,7 @@ break
 }
 accum
 };
-main_data::stbl(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data::stbl(inner)
 },
 
 _ => {
@@ -10668,16 +10668,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10765,7 +10765,7 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-main_data { size_field, r#type, size, data }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0_data_denest_seq { size_field, r#type, size, data }
 };
 accum.push(next_elem);
 } else {
@@ -10774,9 +10774,9 @@ break
 }
 accum
 }))())?;
-main_data { version, flags, number_of_entries, data }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0 { version, flags, number_of_entries, data }
 };
-main_data::dref(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data::dref(inner)
 },
 
 _ => {
@@ -10801,16 +10801,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -10888,14 +10888,14 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-main_data { size_field, r#type, size, data }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_dinf_index0_denest_seq_data_dref_index0_data_denest_seq { size_field, r#type, size, data }
 });
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, sample_entries }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsd_index0 { version, flags, entry_count, sample_entries }
 };
-main_data::stsd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::stsd(inner)
 },
 
 (115, 116, 116, 115) => {
@@ -10914,14 +10914,14 @@ for _ in 0..entry_count {
 accum.push({
 let sample_count = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let sample_delta = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { sample_count, sample_delta }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stts_index0_sample_entries_denest_seq { sample_count, sample_delta }
 });
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, sample_entries }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stts_index0 { version, flags, entry_count, sample_entries }
 };
-main_data::stts(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::stts(inner)
 },
 
 (99, 116, 116, 115) => {
@@ -10940,14 +10940,14 @@ for _ in 0..entry_count {
 accum.push({
 let sample_count = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let sample_offset = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { sample_count, sample_offset }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_ctts_index0_sample_entries_denest_seq { sample_count, sample_offset }
 });
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, sample_entries }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_ctts_index0 { version, flags, entry_count, sample_entries }
 };
-main_data::ctts(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::ctts(inner)
 },
 
 (115, 116, 115, 115) => {
@@ -10967,9 +10967,9 @@ accum.push((Decoder32(_input))?);
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, sample_number }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stss_index0 { version, flags, entry_count, sample_number }
 };
-main_data::stss(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::stss(inner)
 },
 
 (115, 116, 115, 99) => {
@@ -10989,14 +10989,14 @@ accum.push({
 let first_chunk = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let samples_per_chunk = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let sample_description_index = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { first_chunk, samples_per_chunk, sample_description_index }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsc_index0_chunk_entries_denest_seq { first_chunk, samples_per_chunk, sample_description_index }
 });
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, chunk_entries }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsc_index0 { version, flags, entry_count, chunk_entries }
 };
-main_data::stsc(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::stsc(inner)
 },
 
 (115, 116, 115, 122) => {
@@ -11019,16 +11019,16 @@ accum.push((Decoder32(_input))?);
 }
 accum
 };
-main_data::yes(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0_entry_size::yes(inner)
 },
 
 false => {
-main_data::no
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0_entry_size::no
 }
 }))())?;
-main_data { version, flags, sample_size, sample_count, entry_size }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stsz_index0 { version, flags, sample_size, sample_count, entry_size }
 };
-main_data::stsz(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::stsz(inner)
 },
 
 (115, 116, 99, 111) => {
@@ -11048,9 +11048,9 @@ accum.push((Decoder32(_input))?);
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, chunk_offset }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_stco_index0 { version, flags, entry_count, chunk_offset }
 };
-main_data::stco(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::stco(inner)
 },
 
 (99, 111, 54, 52) => {
@@ -11070,9 +11070,9 @@ accum.push((Decoder60(_input))?);
 }
 accum
 }))())?;
-main_data { version, flags, entry_count, chunk_offset }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_co64_index0 { version, flags, entry_count, chunk_offset }
 };
-main_data::co64(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::co64(inner)
 },
 
 (115, 103, 112, 100) => {
@@ -11107,14 +11107,14 @@ accum.push((Decoder16(_input))?);
 }
 accum
 }))())?;
-main_data { description_length, sample_group_entry }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sgpd_index0_sample_groups_denest_seq { description_length, sample_group_entry }
 });
 }
 accum
 }))())?;
-main_data { version, flags, grouping_type, default_length, entry_count, sample_groups }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sgpd_index0 { version, flags, grouping_type, default_length, entry_count, sample_groups }
 };
-main_data::sgpd(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::sgpd(inner)
 },
 
 (115, 98, 103, 112) => {
@@ -11130,11 +11130,11 @@ let grouping_type = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let grouping_type_parameter = ((|| PResult::Ok(match version == 1u8 {
 true => {
 let inner = (Decoder32(_input))?;
-main_data::yes(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_grouping_type_parameter::yes(inner)
 },
 
 false => {
-main_data::no
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_grouping_type_parameter::no
 }
 }))())?;
 let entry_count = ((|| PResult::Ok((Decoder32(_input))?))())?;
@@ -11144,14 +11144,14 @@ for _ in 0..entry_count {
 accum.push({
 let sample_count = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let group_description_index = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { sample_count, group_description_index }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0_sample_groups_denest_seq { sample_count, group_description_index }
 });
 }
 accum
 }))())?;
-main_data { version, flags, grouping_type, grouping_type_parameter, entry_count, sample_groups }
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data_sbgp_index0 { version, flags, grouping_type, grouping_type_parameter, entry_count, sample_groups }
 };
-main_data::sbgp(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::sbgp(inner)
 },
 
 _ => {
@@ -11176,16 +11176,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_moov_index0_denest_seq_data_trak_index0_denest_seq_data_mdia_index0_denest_seq_data_minf_index0_denest_seq_data_stbl_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder71<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder71<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -11223,9 +11223,9 @@ let item_protection_index = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let item_name = ((|| PResult::Ok((Decoder74(_input))?))())?;
 let content_type = ((|| PResult::Ok((Decoder75(_input))?))())?;
 let content_encoding = ((|| PResult::Ok((Decoder76(_input))?))())?;
-main_data { item_ID, item_protection_index, item_name, content_type, content_encoding }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_yes_index0 { item_ID, item_protection_index, item_name, content_type, content_encoding }
 };
-main_data::yes(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields::yes(inner)
 },
 
 false => {
@@ -11247,31 +11247,31 @@ let extra_fields = ((|| PResult::Ok(match item_type {
 (109, 105, 109, 101) => {
 let inner = {
 let content_type = ((|| PResult::Ok((Decoder78(_input))?))())?;
-main_data { content_type }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields_mime_index0 { content_type }
 };
-main_data::mime(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields::mime(inner)
 },
 
 (117, 114, 105, 32) => {
 let inner = {
 let item_uri_type = ((|| PResult::Ok((Decoder78(_input))?))())?;
-main_data { item_uri_type }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields_uri_index0 { item_uri_type }
 };
-main_data::uri(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields::uri(inner)
 },
 
 _ => {
-main_data::unknown
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0_extra_fields::unknown
 }
 }))())?;
-main_data { item_ID, item_protection_index, item_type, item_name, extra_fields }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields_no_index0 { item_ID, item_protection_index, item_type, item_name, extra_fields }
 };
-main_data::no(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0_fields::no(inner)
 }
 }))())?;
-main_data { version, flags, fields }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data_infe_index0 { version, flags, fields }
 };
-main_data::infe(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data::infe(inner)
 },
 
 _ => {
@@ -11296,16 +11296,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_iinf_index0_item_info_entry_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -11348,7 +11348,7 @@ break
 }
 accum
 };
-main_data::tool(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data::tool(inner)
 },
 
 _ => {
@@ -11373,16 +11373,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder73<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder59(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
@@ -11428,9 +11428,9 @@ break
 }
 accum
 }))())?;
-main_data { type_indicator, locale_indicator, value }
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data_data_index0 { type_indicator, locale_indicator, value }
 };
-main_data::data(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data::data(inner)
 },
 
 _ => {
@@ -11455,16 +11455,16 @@ break
 }
 accum
 };
-main_data::unknown(inner)
+main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq_data::unknown(inner)
 }
 }))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { size_field, r#type, size, data })
+PResult::Ok(main_mpeg4_index0_atoms_denest_seq_data_meta_index1_denest_seq_data_ilst_index0_denest_seq_data_tool_index0_denest_seq { size_field, r#type, size, data })
 }
 
-fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder74<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -11513,10 +11513,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -11565,10 +11565,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder76<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -11617,10 +11617,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder77<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -11669,10 +11669,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder78<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder78<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -11721,10 +11721,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -11741,10 +11741,10 @@ b
 return Err(ParseError::ExcludedBranch(5637435011420551755u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame, ParseError> {
 let initial_segment = ((|| PResult::Ok({
 let tree_index = {
 _input.open_peek_context();
@@ -11775,12 +11775,12 @@ ret
 match tree_index {
 0 => {
 let inner = (Decoder82(_input))?;
-main_data::app0(inner)
+main_jpeg_index0_frame_initial_segment::app0(inner)
 },
 
 1 => {
 let inner = (Decoder83(_input))?;
-main_data::app1(inner)
+main_jpeg_index0_frame_initial_segment::app1(inner)
 },
 
 _ => {
@@ -12074,11 +12074,11 @@ ret
 match tree_index {
 0 => {
 let inner = (Decoder87(_input))?;
-main_data::some(inner)
+main_jpeg_index0_frame_dnl::some(inner)
 },
 
 1 => {
-main_data::none
+main_jpeg_index0_frame_dnl::none
 },
 
 _ => {
@@ -12208,10 +12208,10 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { initial_segment, segments, header, scan, dnl, scans })
+PResult::Ok(main_jpeg_index0_frame { initial_segment, segments, header, scan, dnl, scans })
 }
 
-fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -12228,10 +12228,10 @@ b
 return Err(ParseError::ExcludedBranch(16574347298383600551u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -12249,7 +12249,7 @@ b
 return Err(ParseError::ExcludedBranch(5346911683359312959u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -12259,10 +12259,10 @@ let ret = ((|| PResult::Ok((Decoder148(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app0_index0 { marker, length, data })
 }
 
-fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app1_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -12280,7 +12280,7 @@ b
 return Err(ParseError::ExcludedBranch(301524255299452508u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -12290,10 +12290,10 @@ let ret = ((|| PResult::Ok((Decoder142(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app1_index0 { marker, length, data })
 }
 
-fn Decoder84<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder84<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 let b = _input.read_byte()?;
@@ -12399,107 +12399,107 @@ ret
 PResult::Ok(match tree_index {
 0 => {
 let inner = (Decoder119(_input))?;
-main_data::dqt(inner)
+main_jpeg_index0_frame_segments_denest_seq::dqt(inner)
 },
 
 1 => {
 let inner = (Decoder120(_input))?;
-main_data::dht(inner)
+main_jpeg_index0_frame_segments_denest_seq::dht(inner)
 },
 
 2 => {
 let inner = (Decoder121(_input))?;
-main_data::dac(inner)
+main_jpeg_index0_frame_segments_denest_seq::dac(inner)
 },
 
 3 => {
 let inner = (Decoder122(_input))?;
-main_data::dri(inner)
+main_jpeg_index0_frame_segments_denest_seq::dri(inner)
 },
 
 4 => {
 let inner = (Decoder82(_input))?;
-main_data::app0(inner)
+main_jpeg_index0_frame_segments_denest_seq::app0(inner)
 },
 
 5 => {
 let inner = (Decoder83(_input))?;
-main_data::app1(inner)
+main_jpeg_index0_frame_segments_denest_seq::app1(inner)
 },
 
 6 => {
 let inner = (Decoder123(_input))?;
-main_data::app2(inner)
+main_jpeg_index0_frame_segments_denest_seq::app2(inner)
 },
 
 7 => {
 let inner = (Decoder124(_input))?;
-main_data::app3(inner)
+main_jpeg_index0_frame_segments_denest_seq::app3(inner)
 },
 
 8 => {
 let inner = (Decoder125(_input))?;
-main_data::app4(inner)
+main_jpeg_index0_frame_segments_denest_seq::app4(inner)
 },
 
 9 => {
 let inner = (Decoder126(_input))?;
-main_data::app5(inner)
+main_jpeg_index0_frame_segments_denest_seq::app5(inner)
 },
 
 10 => {
 let inner = (Decoder127(_input))?;
-main_data::app6(inner)
+main_jpeg_index0_frame_segments_denest_seq::app6(inner)
 },
 
 11 => {
 let inner = (Decoder128(_input))?;
-main_data::app7(inner)
+main_jpeg_index0_frame_segments_denest_seq::app7(inner)
 },
 
 12 => {
 let inner = (Decoder129(_input))?;
-main_data::app8(inner)
+main_jpeg_index0_frame_segments_denest_seq::app8(inner)
 },
 
 13 => {
 let inner = (Decoder130(_input))?;
-main_data::app9(inner)
+main_jpeg_index0_frame_segments_denest_seq::app9(inner)
 },
 
 14 => {
 let inner = (Decoder131(_input))?;
-main_data::app10(inner)
+main_jpeg_index0_frame_segments_denest_seq::app10(inner)
 },
 
 15 => {
 let inner = (Decoder132(_input))?;
-main_data::app11(inner)
+main_jpeg_index0_frame_segments_denest_seq::app11(inner)
 },
 
 16 => {
 let inner = (Decoder133(_input))?;
-main_data::app12(inner)
+main_jpeg_index0_frame_segments_denest_seq::app12(inner)
 },
 
 17 => {
 let inner = (Decoder134(_input))?;
-main_data::app13(inner)
+main_jpeg_index0_frame_segments_denest_seq::app13(inner)
 },
 
 18 => {
 let inner = (Decoder135(_input))?;
-main_data::app14(inner)
+main_jpeg_index0_frame_segments_denest_seq::app14(inner)
 },
 
 19 => {
 let inner = (Decoder136(_input))?;
-main_data::app15(inner)
+main_jpeg_index0_frame_segments_denest_seq::app15(inner)
 },
 
 20 => {
 let inner = (Decoder137(_input))?;
-main_data::com(inner)
+main_jpeg_index0_frame_segments_denest_seq::com(inner)
 },
 
 _ => {
@@ -12508,7 +12508,7 @@ return Err(ParseError::ExcludedBranch(5858366816005674364u64));
 })
 }
 
-fn Decoder85<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder85<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 let b = _input.read_byte()?;
@@ -12582,67 +12582,67 @@ ret
 PResult::Ok(match tree_index {
 0 => {
 let inner = (Decoder104(_input))?;
-main_data::sof0(inner)
+main_jpeg_index0_frame_header::sof0(inner)
 },
 
 1 => {
 let inner = (Decoder105(_input))?;
-main_data::sof1(inner)
+main_jpeg_index0_frame_header::sof1(inner)
 },
 
 2 => {
 let inner = (Decoder106(_input))?;
-main_data::sof2(inner)
+main_jpeg_index0_frame_header::sof2(inner)
 },
 
 3 => {
 let inner = (Decoder107(_input))?;
-main_data::sof3(inner)
+main_jpeg_index0_frame_header::sof3(inner)
 },
 
 4 => {
 let inner = (Decoder108(_input))?;
-main_data::sof5(inner)
+main_jpeg_index0_frame_header::sof5(inner)
 },
 
 5 => {
 let inner = (Decoder109(_input))?;
-main_data::sof6(inner)
+main_jpeg_index0_frame_header::sof6(inner)
 },
 
 6 => {
 let inner = (Decoder110(_input))?;
-main_data::sof7(inner)
+main_jpeg_index0_frame_header::sof7(inner)
 },
 
 7 => {
 let inner = (Decoder111(_input))?;
-main_data::sof9(inner)
+main_jpeg_index0_frame_header::sof9(inner)
 },
 
 8 => {
 let inner = (Decoder112(_input))?;
-main_data::sof10(inner)
+main_jpeg_index0_frame_header::sof10(inner)
 },
 
 9 => {
 let inner = (Decoder113(_input))?;
-main_data::sof11(inner)
+main_jpeg_index0_frame_header::sof11(inner)
 },
 
 10 => {
 let inner = (Decoder114(_input))?;
-main_data::sof13(inner)
+main_jpeg_index0_frame_header::sof13(inner)
 },
 
 11 => {
 let inner = (Decoder115(_input))?;
-main_data::sof14(inner)
+main_jpeg_index0_frame_header::sof14(inner)
 },
 
 12 => {
 let inner = (Decoder116(_input))?;
-main_data::sof15(inner)
+main_jpeg_index0_frame_header::sof15(inner)
 },
 
 _ => {
@@ -12651,7 +12651,7 @@ return Err(ParseError::ExcludedBranch(13734934310846663046u64));
 })
 }
 
-fn Decoder86<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder86<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan, ParseError> {
 let segments = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -12772,10 +12772,10 @@ accum
 }))())?;
 let sos = ((|| PResult::Ok((Decoder89(_input))?))())?;
 let data = ((|| PResult::Ok((Decoder103(_input))?))())?;
-PResult::Ok(main_data { segments, sos, data })
+PResult::Ok(main_jpeg_index0_frame_scan { segments, sos, data })
 }
 
-fn Decoder87<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder87<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_dnl_some_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -12793,7 +12793,7 @@ b
 return Err(ParseError::ExcludedBranch(2912073318189654678u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -12803,10 +12803,10 @@ let ret = ((|| PResult::Ok((Decoder102(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_dnl_some_index0 { marker, length, data })
 }
 
-fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan, ParseError> {
 let segments = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -12927,10 +12927,10 @@ accum
 }))())?;
 let sos = ((|| PResult::Ok((Decoder89(_input))?))())?;
 let data = ((|| PResult::Ok((Decoder90(_input))?))())?;
-PResult::Ok(main_data { segments, sos, data })
+PResult::Ok(main_jpeg_index0_frame_scan { segments, sos, data })
 }
 
-fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan_sos, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -12948,7 +12948,7 @@ b
 return Err(ParseError::ExcludedBranch(5297104498937034880u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -12958,10 +12958,10 @@ let ret = ((|| PResult::Ok((Decoder100(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_scan_sos { marker, length, data })
 }
 
-fn Decoder90<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder90<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan_data, ParseError> {
 let scan_data = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -13186,47 +13186,47 @@ ret
 match tree_index {
 0 => {
 let inner = (Decoder91(_input))?;
-main_data::mcu(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::mcu(inner)
 },
 
 1 => {
 let inner = (Decoder92(_input))?;
-main_data::rst0(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst0(inner)
 },
 
 2 => {
 let inner = (Decoder93(_input))?;
-main_data::rst1(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst1(inner)
 },
 
 3 => {
 let inner = (Decoder94(_input))?;
-main_data::rst2(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst2(inner)
 },
 
 4 => {
 let inner = (Decoder95(_input))?;
-main_data::rst3(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst3(inner)
 },
 
 5 => {
 let inner = (Decoder96(_input))?;
-main_data::rst4(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst4(inner)
 },
 
 6 => {
 let inner = (Decoder97(_input))?;
-main_data::rst5(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst5(inner)
 },
 
 7 => {
 let inner = (Decoder98(_input))?;
-main_data::rst6(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst6(inner)
 },
 
 8 => {
 let inner = (Decoder99(_input))?;
-main_data::rst7(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst7(inner)
 },
 
 _ => {
@@ -13241,44 +13241,44 @@ break
 }
 accum
 }))())?;
-let scan_data_stream = ((|| PResult::Ok((try_flat_map_vec(scan_data.iter().cloned(), |x: main_data| PResult::Ok(match x {
-main_data::mcu(v) => {
+let scan_data_stream = ((|| PResult::Ok((try_flat_map_vec(scan_data.iter().cloned(), |x: main_jpeg_index0_frame_scan_data_scan_data_denest_seq| PResult::Ok(match x {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::mcu(v) => {
 [v.clone()].to_vec()
 },
 
-main_data::rst0(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst0(..) => {
 [].to_vec()
 },
 
-main_data::rst1(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst1(..) => {
 [].to_vec()
 },
 
-main_data::rst2(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst2(..) => {
 [].to_vec()
 },
 
-main_data::rst3(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst3(..) => {
 [].to_vec()
 },
 
-main_data::rst4(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst4(..) => {
 [].to_vec()
 },
 
-main_data::rst5(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst5(..) => {
 [].to_vec()
 },
 
-main_data::rst6(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst6(..) => {
 [].to_vec()
 },
 
-main_data::rst7(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst7(..) => {
 [].to_vec()
 }
 })))?))())?;
-PResult::Ok(main_data { scan_data, scan_data_stream })
+PResult::Ok(main_jpeg_index0_frame_scan_data { scan_data, scan_data_stream })
 }
 
 fn Decoder91<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
@@ -13342,7 +13342,7 @@ return Err(ParseError::ExcludedBranch(4297833600800538456u64));
 })
 }
 
-fn Decoder92<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder92<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13359,10 +13359,10 @@ b
 return Err(ParseError::ExcludedBranch(5421268784727520761u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder93<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder93<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13379,10 +13379,10 @@ b
 return Err(ParseError::ExcludedBranch(10069632627653602280u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder94<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder94<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13399,10 +13399,10 @@ b
 return Err(ParseError::ExcludedBranch(7941505592535629367u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder95<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder95<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13419,10 +13419,10 @@ b
 return Err(ParseError::ExcludedBranch(4842764822111760355u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder96<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder96<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13439,10 +13439,10 @@ b
 return Err(ParseError::ExcludedBranch(172561454190383201u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder97<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder97<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13459,10 +13459,10 @@ b
 return Err(ParseError::ExcludedBranch(12052389963453405046u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder98<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder98<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13479,10 +13479,10 @@ b
 return Err(ParseError::ExcludedBranch(14545630498792155294u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder99<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder99<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_soi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -13499,10 +13499,10 @@ b
 return Err(ParseError::ExcludedBranch(10573988543901039080u64));
 }
 }))())?;
-PResult::Ok(main_data { ff, marker })
+PResult::Ok(main_jpeg_index0_soi { ff, marker })
 }
 
-fn Decoder100<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder100<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan_sos_data, ParseError> {
 let num_image_components = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let image_components = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -13514,21 +13514,21 @@ accum
 let start_spectral_selection = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let end_spectral_selection = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let approximation_bit_position = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { num_image_components, image_components, start_spectral_selection, end_spectral_selection, approximation_bit_position })
+PResult::Ok(main_jpeg_index0_frame_scan_sos_data { num_image_components, image_components, start_spectral_selection, end_spectral_selection, approximation_bit_position })
 }
 
-fn Decoder101<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder101<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan_sos_data_image_components_denest_seq, ParseError> {
 let component_selector = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let entropy_coding_table_ids = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { component_selector, entropy_coding_table_ids })
+PResult::Ok(main_jpeg_index0_frame_scan_sos_data_image_components_denest_seq { component_selector, entropy_coding_table_ids })
 }
 
-fn Decoder102<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder102<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_dnl_some_index0_data, ParseError> {
 let num_lines = ((|| PResult::Ok((Decoder50(_input))?))())?;
-PResult::Ok(main_data { num_lines })
+PResult::Ok(main_jpeg_index0_frame_dnl_some_index0_data { num_lines })
 }
 
-fn Decoder103<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder103<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_scan_data, ParseError> {
 let scan_data = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -13757,47 +13757,47 @@ ret
 match tree_index {
 0 => {
 let inner = (Decoder91(_input))?;
-main_data::mcu(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::mcu(inner)
 },
 
 1 => {
 let inner = (Decoder92(_input))?;
-main_data::rst0(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst0(inner)
 },
 
 2 => {
 let inner = (Decoder93(_input))?;
-main_data::rst1(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst1(inner)
 },
 
 3 => {
 let inner = (Decoder94(_input))?;
-main_data::rst2(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst2(inner)
 },
 
 4 => {
 let inner = (Decoder95(_input))?;
-main_data::rst3(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst3(inner)
 },
 
 5 => {
 let inner = (Decoder96(_input))?;
-main_data::rst4(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst4(inner)
 },
 
 6 => {
 let inner = (Decoder97(_input))?;
-main_data::rst5(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst5(inner)
 },
 
 7 => {
 let inner = (Decoder98(_input))?;
-main_data::rst6(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst6(inner)
 },
 
 8 => {
 let inner = (Decoder99(_input))?;
-main_data::rst7(inner)
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst7(inner)
 },
 
 _ => {
@@ -13812,47 +13812,47 @@ break
 }
 accum
 }))())?;
-let scan_data_stream = ((|| PResult::Ok((try_flat_map_vec(scan_data.iter().cloned(), |x: main_data| PResult::Ok(match x {
-main_data::mcu(v) => {
+let scan_data_stream = ((|| PResult::Ok((try_flat_map_vec(scan_data.iter().cloned(), |x: main_jpeg_index0_frame_scan_data_scan_data_denest_seq| PResult::Ok(match x {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::mcu(v) => {
 [v.clone()].to_vec()
 },
 
-main_data::rst0(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst0(..) => {
 [].to_vec()
 },
 
-main_data::rst1(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst1(..) => {
 [].to_vec()
 },
 
-main_data::rst2(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst2(..) => {
 [].to_vec()
 },
 
-main_data::rst3(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst3(..) => {
 [].to_vec()
 },
 
-main_data::rst4(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst4(..) => {
 [].to_vec()
 },
 
-main_data::rst5(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst5(..) => {
 [].to_vec()
 },
 
-main_data::rst6(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst6(..) => {
 [].to_vec()
 },
 
-main_data::rst7(..) => {
+main_jpeg_index0_frame_scan_data_scan_data_denest_seq::rst7(..) => {
 [].to_vec()
 }
 })))?))())?;
-PResult::Ok(main_data { scan_data, scan_data_stream })
+PResult::Ok(main_jpeg_index0_frame_scan_data { scan_data, scan_data_stream })
 }
 
-fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -13870,7 +13870,7 @@ b
 return Err(ParseError::ExcludedBranch(8297024098414101254u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -13880,10 +13880,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -13901,7 +13901,7 @@ b
 return Err(ParseError::ExcludedBranch(8756819601933520429u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -13911,10 +13911,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -13932,7 +13932,7 @@ b
 return Err(ParseError::ExcludedBranch(11080817261996913520u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -13942,10 +13942,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -13963,7 +13963,7 @@ b
 return Err(ParseError::ExcludedBranch(12909450577628061793u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -13973,10 +13973,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -13994,7 +13994,7 @@ b
 return Err(ParseError::ExcludedBranch(5274098556056955310u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14004,10 +14004,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder109<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder109<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14025,7 +14025,7 @@ b
 return Err(ParseError::ExcludedBranch(5472222913557901985u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14035,10 +14035,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder110<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder110<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14056,7 +14056,7 @@ b
 return Err(ParseError::ExcludedBranch(935456091642960999u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14066,10 +14066,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder111<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder111<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14087,7 +14087,7 @@ b
 return Err(ParseError::ExcludedBranch(17091795488609854789u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14097,10 +14097,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder112<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder112<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14118,7 +14118,7 @@ b
 return Err(ParseError::ExcludedBranch(14420220630934832328u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14128,10 +14128,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder113<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder113<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14149,7 +14149,7 @@ b
 return Err(ParseError::ExcludedBranch(10502663948806018262u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14159,10 +14159,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder114<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder114<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14180,7 +14180,7 @@ b
 return Err(ParseError::ExcludedBranch(5170411260421882161u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14190,10 +14190,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder115<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder115<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14211,7 +14211,7 @@ b
 return Err(ParseError::ExcludedBranch(8862644040087288472u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14221,10 +14221,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder116<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder116<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14242,7 +14242,7 @@ b
 return Err(ParseError::ExcludedBranch(6282714738219454149u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14252,10 +14252,10 @@ let ret = ((|| PResult::Ok((Decoder117(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0 { marker, length, data })
 }
 
-fn Decoder117<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder117<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0_data, ParseError> {
 let sample_precision = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let num_lines = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let num_samples_per_line = ((|| PResult::Ok((Decoder50(_input))?))())?;
@@ -14267,17 +14267,17 @@ accum.push((Decoder118(_input))?);
 }
 accum
 }))())?;
-PResult::Ok(main_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0_data { sample_precision, num_lines, num_samples_per_line, num_image_components, image_components })
 }
 
-fn Decoder118<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder118<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_header_sof0_index0_data_image_components_denest_seq, ParseError> {
 let id = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let sampling_factor = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let quantization_table_id = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { id, sampling_factor, quantization_table_id })
+PResult::Ok(main_jpeg_index0_frame_header_sof0_index0_data_image_components_denest_seq { id, sampling_factor, quantization_table_id })
 }
 
-fn Decoder119<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder119<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dqt_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14295,7 +14295,7 @@ b
 return Err(ParseError::ExcludedBranch(11201713527929929098u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14305,10 +14305,10 @@ let ret = ((|| PResult::Ok((Decoder141(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dqt_index0 { marker, length, data })
 }
 
-fn Decoder120<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder120<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dht_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14326,7 +14326,7 @@ b
 return Err(ParseError::ExcludedBranch(13231341950566326183u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14336,10 +14336,10 @@ let ret = ((|| PResult::Ok((Decoder140(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dht_index0 { marker, length, data })
 }
 
-fn Decoder121<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder121<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dac_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14357,7 +14357,7 @@ b
 return Err(ParseError::ExcludedBranch(10217556179496943797u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14367,10 +14367,10 @@ let ret = ((|| PResult::Ok((Decoder139(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dac_index0 { marker, length, data })
 }
 
-fn Decoder122<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder122<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dri_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14388,7 +14388,7 @@ b
 return Err(ParseError::ExcludedBranch(8814285897505247341u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14398,10 +14398,10 @@ let ret = ((|| PResult::Ok((Decoder138(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dri_index0 { marker, length, data })
 }
 
-fn Decoder123<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder123<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14419,7 +14419,7 @@ b
 return Err(ParseError::ExcludedBranch(12140482413237234104u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14449,10 +14449,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder124<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder124<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14470,7 +14470,7 @@ b
 return Err(ParseError::ExcludedBranch(2795443158724701367u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14500,10 +14500,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder125<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder125<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14521,7 +14521,7 @@ b
 return Err(ParseError::ExcludedBranch(3355559118720108211u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14551,10 +14551,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder126<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder126<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14572,7 +14572,7 @@ b
 return Err(ParseError::ExcludedBranch(14742198720488010940u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14602,10 +14602,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder127<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder127<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14623,7 +14623,7 @@ b
 return Err(ParseError::ExcludedBranch(6277645557415946825u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14653,10 +14653,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14674,7 +14674,7 @@ b
 return Err(ParseError::ExcludedBranch(2176159342917065583u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14704,10 +14704,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder129<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14725,7 +14725,7 @@ b
 return Err(ParseError::ExcludedBranch(6957547562921215229u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14755,10 +14755,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder130<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder130<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14776,7 +14776,7 @@ b
 return Err(ParseError::ExcludedBranch(3756953894146529854u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14806,10 +14806,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder131<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder131<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14827,7 +14827,7 @@ b
 return Err(ParseError::ExcludedBranch(12608692552323012024u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14857,10 +14857,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder132<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14878,7 +14878,7 @@ b
 return Err(ParseError::ExcludedBranch(2716996167109240019u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14908,10 +14908,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder133<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder133<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14929,7 +14929,7 @@ b
 return Err(ParseError::ExcludedBranch(6641423197242755780u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -14959,10 +14959,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder134<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder134<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -14980,7 +14980,7 @@ b
 return Err(ParseError::ExcludedBranch(4000866269867594892u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -15010,10 +15010,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -15031,7 +15031,7 @@ b
 return Err(ParseError::ExcludedBranch(7832938568744868798u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -15061,10 +15061,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -15082,7 +15082,7 @@ b
 return Err(ParseError::ExcludedBranch(52255437925028600u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -15112,10 +15112,10 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder137<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder137<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_app10_index0, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -15133,7 +15133,7 @@ b
 return Err(ParseError::ExcludedBranch(5705528789532761578u64));
 }
 }))())?;
-main_data { ff, marker }
+main_jpeg_index0_soi { ff, marker }
 }))())?;
 let length = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let data = ((|| PResult::Ok({
@@ -15163,21 +15163,21 @@ accum
 _input.end_slice()?;
 ret
 }))())?;
-PResult::Ok(main_data { marker, length, data })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_app10_index0 { marker, length, data })
 }
 
-fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dri_index0_data, ParseError> {
 let restart_interval = ((|| PResult::Ok((Decoder50(_input))?))())?;
-PResult::Ok(main_data { restart_interval })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dri_index0_data { restart_interval })
 }
 
-fn Decoder139<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder139<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dac_index0_data, ParseError> {
 let class_table_id = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let value = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { class_table_id, value })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dac_index0_data { class_table_id, value })
 }
 
-fn Decoder140<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder140<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dht_index0_data, ParseError> {
 let class_table_id = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let num_codes = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -15207,10 +15207,10 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { class_table_id, num_codes, values })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dht_index0_data { class_table_id, num_codes, values })
 }
 
-fn Decoder141<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder141<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_segments_denest_seq_dqt_index0_data, ParseError> {
 let precision_table_id = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let elements = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -15233,20 +15233,20 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { precision_table_id, elements })
+PResult::Ok(main_jpeg_index0_frame_segments_denest_seq_dqt_index0_data { precision_table_id, elements })
 }
 
-fn Decoder142<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder142<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app1_index0_data, ParseError> {
 let identifier = ((|| PResult::Ok((Decoder143(_input))?))())?;
 let data = ((|| PResult::Ok(match identifier.clone().string.as_slice() {
 [69, 120, 105, 102] => {
 let inner = (Decoder144(_input))?;
-main_data::exif(inner)
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data::exif(inner)
 },
 
 [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] => {
 let inner = (Decoder145(_input))?;
-main_data::xmp(inner)
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data::xmp(inner)
 },
 
 _ => {
@@ -15271,13 +15271,13 @@ break
 }
 accum
 };
-main_data::other(inner)
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data::other(inner)
 }
 }))())?;
-PResult::Ok(main_data { identifier, data })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app1_index0_data { identifier, data })
 }
 
-fn Decoder143<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder143<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -15326,10 +15326,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder144<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0, ParseError> {
 let padding = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -15339,10 +15339,10 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
 let exif = ((|| PResult::Ok((Decoder146(_input))?))())?;
-PResult::Ok(main_data { padding, exif })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0 { padding, exif })
 }
 
-fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder145<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app1_index0_data_data_xmp_index0, ParseError> {
 let xmp = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -15364,10 +15364,10 @@ break
 }
 accum
 }))())?;
-PResult::Ok(main_data { xmp })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app1_index0_data_data_xmp_index0 { xmp })
 }
 
-fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif, ParseError> {
 let byte_order = ((|| PResult::Ok({
 let tree_index = {
 _input.open_peek_context();
@@ -15408,7 +15408,7 @@ b
 return Err(ParseError::ExcludedBranch(17197161005512507961u64));
 }
 }))())?;
-main_data::le(field0, field1)
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::le(field0, field1)
 },
 
 1 => {
@@ -15428,7 +15428,7 @@ b
 return Err(ParseError::ExcludedBranch(1661485880725065159u64));
 }
 }))())?;
-main_data::be(field0, field1)
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::be(field0, field1)
 },
 
 _ => {
@@ -15437,20 +15437,20 @@ return Err(ParseError::ExcludedBranch(8662494850867647108u64));
 }
 }))())?;
 let magic = ((|| PResult::Ok(match byte_order {
-main_data::le(..) => {
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::le(..) => {
 (Decoder147(_input))?
 },
 
-main_data::be(..) => {
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::be(..) => {
 (Decoder50(_input))?
 }
 }))())?;
 let offset = ((|| PResult::Ok(match byte_order {
-main_data::le(..) => {
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::le(..) => {
 (Decoder23(_input))?
 },
 
-main_data::be(..) => {
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::be(..) => {
 (Decoder32(_input))?
 }
 }))())?;
@@ -15458,7 +15458,7 @@ let ifd = ((|| PResult::Ok({
 _input.open_peek_context();
 _input.advance_by(offset - 8u32)?;
 let ret = ((|| PResult::Ok(match byte_order {
-main_data::le(..) => {
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::le(..) => {
 let num_fields = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let fields = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -15468,7 +15468,7 @@ let tag = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let offset_or_data = ((|| PResult::Ok((Decoder23(_input))?))())?;
-main_data { tag, r#type, length, offset_or_data }
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd_fields_denest_seq { tag, r#type, length, offset_or_data }
 });
 }
 accum
@@ -15495,10 +15495,10 @@ break
 }
 accum
 }))())?;
-main_data { num_fields, fields, next_ifd_offset, next_ifd }
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd { num_fields, fields, next_ifd_offset, next_ifd }
 },
 
-main_data::be(..) => {
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_byte_order::be(..) => {
 let num_fields = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let fields = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -15508,7 +15508,7 @@ let tag = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder50(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder32(_input))?))())?;
 let offset_or_data = ((|| PResult::Ok((Decoder32(_input))?))())?;
-main_data { tag, r#type, length, offset_or_data }
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd_fields_denest_seq { tag, r#type, length, offset_or_data }
 });
 }
 accum
@@ -15535,13 +15535,13 @@ break
 }
 accum
 }))())?;
-main_data { num_fields, fields, next_ifd_offset, next_ifd }
+main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif_ifd { num_fields, fields, next_ifd_offset, next_ifd }
 }
 }))())?;
 _input.close_peek_context()?;
 ret
 }))())?;
-PResult::Ok(main_data { byte_order, magic, offset, ifd })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app1_index0_data_data_exif_index0_exif { byte_order, magic, offset, ifd })
 }
 
 fn Decoder147<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
@@ -15553,12 +15553,12 @@ let field1 = ((|| PResult::Ok((Decoder16(_input))?))())?;
 PResult::Ok(((|x: (u8, u8)| PResult::Ok(u16le(x)))(inner))?)
 }
 
-fn Decoder148<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder148<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app0_index0_data, ParseError> {
 let identifier = ((|| PResult::Ok((Decoder149(_input))?))())?;
 let data = ((|| PResult::Ok(match identifier.clone().string.as_slice() {
 [74, 70, 73, 70] => {
 let inner = (Decoder150(_input))?;
-main_data::jfif(inner)
+main_jpeg_index0_frame_initial_segment_app0_index0_data_data::jfif(inner)
 },
 
 _ => {
@@ -15583,13 +15583,13 @@ break
 }
 accum
 };
-main_data::other(inner)
+main_jpeg_index0_frame_initial_segment_app0_index0_data_data::other(inner)
 }
 }))())?;
-PResult::Ok(main_data { identifier, data })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app0_index0_data { identifier, data })
 }
 
-fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder149<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -15638,10 +15638,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder150<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_index0_frame_initial_segment_app0_index0_data_data_jfif_index0, ParseError> {
 let version_major = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let version_minor = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let density_units = ((|| PResult::Ok((Decoder16(_input))?))())?;
@@ -15662,17 +15662,17 @@ accum
 }
 accum
 }))())?;
-PResult::Ok(main_data { version_major, version_minor, density_units, density_x, density_y, thumbnail_width, thumbnail_height, thumbnail_pixels })
+PResult::Ok(main_jpeg_index0_frame_initial_segment_app0_index0_data_data_jfif_index0 { version_major, version_minor, density_units, density_x, density_y, thumbnail_width, thumbnail_height, thumbnail_pixels })
 }
 
-fn Decoder151<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder151<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq, ParseError> {
 let r = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let g = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let b = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { r, g, b })
+PResult::Ok(main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq { r, g, b })
 }
 
-fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_header, ParseError> {
 let magic = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -15697,19 +15697,19 @@ let file_flags = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let timestamp = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let compression_flags = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let os_id = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { magic, method, file_flags, timestamp, compression_flags, os_id })
+PResult::Ok(main_gzip_index0_denest_seq_header { magic, method, file_flags, timestamp, compression_flags, os_id })
 }
 
-fn Decoder153<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder153<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 PResult::Ok((Decoder163(_input))?)
 }
 
-fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_data, ParseError> {
 let blocks = ((|| PResult::Ok({
 let mut accum = Vec::new();
 loop {
 let elem = (Decoder156(_input))?;
-if ((|x: &main_data| PResult::Ok(x.clone().r#final == 1u8))(&elem))? {
+if ((|x: &main_gzip_index0_denest_seq_data_blocks_denest_seq| PResult::Ok(x.clone().r#final == 1u8))(&elem))? {
 accum.push(elem);
 break
 } else {
@@ -15718,29 +15718,29 @@ accum.push(elem);
 }
 accum
 }))())?;
-let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: main_data| PResult::Ok(match x.clone().data {
-main_data::uncompressed(y) => {
+let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: main_gzip_index0_denest_seq_data_blocks_denest_seq| PResult::Ok(match x.clone().data {
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data::uncompressed(y) => {
 y.clone().codes_values
 },
 
-main_data::fixed_huffman(y) => {
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data::fixed_huffman(y) => {
 y.clone().codes_values
 },
 
-main_data::dynamic_huffman(y) => {
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data::dynamic_huffman(y) => {
 y.clone().codes_values
 }
 })))?))())?;
 let inflate = ((|| PResult::Ok({
-fn inflate(codes: &Vec<main_data>) -> Vec<u8> {
+fn inflate(codes: &Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq>) -> Vec<u8> {
 let mut vs = Vec::new();
 for code in codes.iter() {
 match code {
-main_data::literal(v) => {
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::literal(v) => {
 vs.push(*v);
 },
 
-main_data::reference(fields) => {
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(fields) => {
 let length = fields.length as usize;
 let distance = fields.distance as usize;
 if distance > vs.len() {
@@ -15756,16 +15756,16 @@ vs
 }
 inflate(&codes)
 }))())?;
-PResult::Ok(main_data { blocks, codes, inflate })
+PResult::Ok(main_gzip_index0_denest_seq_data { blocks, codes, inflate })
 }
 
-fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_footer, ParseError> {
 let crc = ((|| PResult::Ok((Decoder23(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder23(_input))?))())?;
-PResult::Ok(main_data { crc, length })
+PResult::Ok(main_gzip_index0_denest_seq_footer { crc, length })
 }
 
-fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_data_blocks_denest_seq, ParseError> {
 let r#final = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let r#type = ((|| PResult::Ok({
 let inner = {
@@ -15778,24 +15778,24 @@ let field1 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0 => {
 let inner = (Decoder158(_input))?;
-main_data::uncompressed(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data::uncompressed(inner)
 },
 
 1 => {
 let inner = (Decoder159(_input))?;
-main_data::fixed_huffman(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data::fixed_huffman(inner)
 },
 
 2 => {
 let inner = (Decoder160(_input))?;
-main_data::dynamic_huffman(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data::dynamic_huffman(inner)
 },
 
 _other => {
 unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
 }
 }))())?;
-PResult::Ok(main_data { r#final, r#type, data })
+PResult::Ok(main_gzip_index0_denest_seq_data_blocks_denest_seq { r#final, r#type, data })
 }
 
 fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
@@ -15803,7 +15803,7 @@ let b = _input.read_byte()?;
 PResult::Ok(b)
 }
 
-fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_uncompressed_index0, ParseError> {
 let align = ((|| PResult::Ok(_input.skip_align(8)?))())?;
 let len = ((|| PResult::Ok({
 let inner = {
@@ -15869,11 +15869,11 @@ let field7 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([main_data::literal(x)].to_vec())))?))())?;
-PResult::Ok(main_data { align, len, nlen, bytes, codes_values })
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::literal(x)].to_vec())))?))())?;
+PResult::Ok(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_uncompressed_index0 { align, len, nlen, bytes, codes_values })
 }
 
-fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0, ParseError> {
 let codes = ((|| PResult::Ok({
 let format = parse_huffman([8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 9u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 7u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8, 8u8].to_vec(), None);
 let mut accum = Vec::new();
@@ -15897,9 +15897,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 258 => {
@@ -15918,9 +15918,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 259 => {
@@ -15939,9 +15939,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 260 => {
@@ -15960,9 +15960,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 261 => {
@@ -15981,9 +15981,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 262 => {
@@ -16002,9 +16002,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 263 => {
@@ -16023,9 +16023,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 264 => {
@@ -16044,9 +16044,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 265 => {
@@ -16071,9 +16071,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 266 => {
@@ -16098,9 +16098,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 267 => {
@@ -16125,9 +16125,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 268 => {
@@ -16152,9 +16152,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 269 => {
@@ -16180,9 +16180,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 270 => {
@@ -16208,9 +16208,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 271 => {
@@ -16236,9 +16236,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 272 => {
@@ -16264,9 +16264,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 273 => {
@@ -16293,9 +16293,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 274 => {
@@ -16322,9 +16322,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 275 => {
@@ -16351,9 +16351,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 276 => {
@@ -16380,9 +16380,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 277 => {
@@ -16410,9 +16410,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 278 => {
@@ -16440,9 +16440,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 279 => {
@@ -16470,9 +16470,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 280 => {
@@ -16500,9 +16500,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 281 => {
@@ -16531,9 +16531,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 282 => {
@@ -16562,9 +16562,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 283 => {
@@ -16593,9 +16593,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 284 => {
@@ -16624,9 +16624,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 285 => {
@@ -16645,18 +16645,18 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.clone().4 << 4u8 | bits.clone().3 << 3u8 | bits.clone().2 << 2u8 | bits.clone().1 << 1u8 | bits.clone().0))(inner))?
 }))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code as u16))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 _ => {
-main_data::none
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::none
 }
 }))())?;
-main_data { code, extra }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq { code, extra }
 };
-if ((|x: &main_data| PResult::Ok((x.clone().code as u16) == 256u16))(&elem))? {
+if ((|x: &main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq| PResult::Ok((x.clone().code as u16) == 256u16))(&elem))? {
 accum.push(elem);
 break
 } else {
@@ -16665,367 +16665,367 @@ accum.push(elem);
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x: main_data| PResult::Ok(match x.clone().code {
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x: main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq| PResult::Ok(match x.clone().code {
 256 => {
 [].to_vec()
 },
 
 257 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 258 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 259 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 260 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 261 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 262 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 263 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 264 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 265 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 266 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 267 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 268 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 269 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 270 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 271 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 272 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 273 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 274 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 275 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 276 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 277 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 278 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 279 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 280 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 281 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 282 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 283 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 284 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 285 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14530426097121235493u64));
+return Err(ParseError::ExcludedBranch(9552242072513461173u64));
 }
 }
 },
 
 _ => {
-[main_data::literal(x.clone().code as u8)].to_vec()
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::literal(x.clone().code as u8)].to_vec()
 }
 })))?))())?;
-PResult::Ok(main_data { codes, codes_values })
+PResult::Ok(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_fixed_huffman_index0 { codes, codes_values })
 }
 
-fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0, ParseError> {
 let hlit = ((|| PResult::Ok({
 let inner = {
 let field0 = ((|| PResult::Ok((Decoder157(_input))?))())?;
@@ -17117,21 +17117,21 @@ _ => {
 0u8
 }
 }))())?;
-main_data { code, extra }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_literal_length_distance_alphabet_code_lengths_denest_seq { code, extra }
 };
 accum.push(elem);
-if ((|y: &Vec<main_data>| PResult::Ok((((try_fold_map_curried(y.iter().cloned(), {
+if ((|y: &Vec<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_literal_length_distance_alphabet_code_lengths_denest_seq>| PResult::Ok((((try_fold_map_curried(y.iter().cloned(), {
 ();
-deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq::none
-}, |x: (deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq, main_data)| PResult::Ok(match x.clone().1.code as u8 {
+base_bit_index0::none
+}, |x: (base_bit_index0, main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_literal_length_distance_alphabet_code_lengths_denest_seq)| PResult::Ok(match x.clone().1.code as u8 {
 16 => {
 (x.clone().0, dup32((x.clone().1.extra + 3u8) as u32, match x.clone().0 {
-deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq::some(y) => {
+base_bit_index0::some(y) => {
 y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3187827975347532847u64));
+return Err(ParseError::ExcludedBranch(7687880740686452682u64));
 }
 }))
 },
@@ -17145,7 +17145,7 @@ return Err(ParseError::ExcludedBranch(3187827975347532847u64));
 },
 
 v => {
-(deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq::some(v), [v.clone()].to_vec())
+(base_bit_index0::some(v), [v.clone()].to_vec())
 }
 })))?.len()) as u32) >= ((hlit + hdist) as u32) + 258u32))(&accum))? {
 break
@@ -17155,16 +17155,16 @@ accum
 }))())?;
 let literal_length_distance_alphabet_code_lengths_value = ((|| PResult::Ok((try_fold_map_curried(literal_length_distance_alphabet_code_lengths.iter().cloned(), {
 ();
-deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq::none
-}, |x: (deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq, main_data)| PResult::Ok(match x.clone().1.code as u8 {
+base_bit_index0::none
+}, |x: (base_bit_index0, main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_literal_length_distance_alphabet_code_lengths_denest_seq)| PResult::Ok(match x.clone().1.code as u8 {
 16 => {
 (x.clone().0, dup32((x.clone().1.extra + 3u8) as u32, match x.clone().0 {
-deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq::some(y) => {
+base_bit_index0::some(y) => {
 y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(3187827975347532847u64));
+return Err(ParseError::ExcludedBranch(7687880740686452682u64));
 }
 }))
 },
@@ -17178,7 +17178,7 @@ return Err(ParseError::ExcludedBranch(3187827975347532847u64));
 },
 
 v => {
-(deflate_dynamic_huffman_literal_length_distance_alphabet_code_lengths_denest_seq::some(v), [v.clone()].to_vec())
+(base_bit_index0::some(v), [v.clone()].to_vec())
 }
 })))?))())?;
 let literal_length_alphabet_code_lengths_value = ((|| PResult::Ok({
@@ -17203,9 +17203,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(3u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 258 => {
@@ -17214,9 +17214,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(4u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 259 => {
@@ -17225,9 +17225,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(5u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 260 => {
@@ -17236,9 +17236,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(6u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 261 => {
@@ -17247,9 +17247,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(7u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 262 => {
@@ -17258,9 +17258,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(8u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 263 => {
@@ -17269,9 +17269,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(9u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 264 => {
@@ -17280,9 +17280,9 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(10u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 265 => {
@@ -17297,9 +17297,9 @@ let field0 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(11u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 266 => {
@@ -17314,9 +17314,9 @@ let field0 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(13u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 267 => {
@@ -17331,9 +17331,9 @@ let field0 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(15u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 268 => {
@@ -17348,9 +17348,9 @@ let field0 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(17u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 269 => {
@@ -17366,9 +17366,9 @@ let field1 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(19u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 270 => {
@@ -17384,9 +17384,9 @@ let field1 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(23u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 271 => {
@@ -17402,9 +17402,9 @@ let field1 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(27u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 272 => {
@@ -17420,9 +17420,9 @@ let field1 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(31u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 273 => {
@@ -17439,9 +17439,9 @@ let field2 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(35u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 274 => {
@@ -17458,9 +17458,9 @@ let field2 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(43u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 275 => {
@@ -17477,9 +17477,9 @@ let field2 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(51u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 276 => {
@@ -17496,9 +17496,9 @@ let field2 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(59u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 277 => {
@@ -17516,9 +17516,9 @@ let field3 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(67u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 278 => {
@@ -17536,9 +17536,9 @@ let field3 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(83u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 279 => {
@@ -17556,9 +17556,9 @@ let field3 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(99u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 280 => {
@@ -17576,9 +17576,9 @@ let field3 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(115u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 281 => {
@@ -17597,9 +17597,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(131u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 282 => {
@@ -17618,9 +17618,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(163u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 283 => {
@@ -17639,9 +17639,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(195u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 284 => {
@@ -17660,9 +17660,9 @@ let field4 = ((|| PResult::Ok((Decoder157(_input))?))())?;
 let length = ((|| PResult::Ok(227u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 285 => {
@@ -17671,18 +17671,18 @@ let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(258u16 + (length_extra_bits as u16)))())?;
 let distance_code = ((|| PResult::Ok((distance_alphabet_format(_input))?))())?;
 let distance_record = ((|| PResult::Ok((Decoder161(_input, distance_code.clone()))?))())?;
-main_data { length_extra_bits, length, distance_code, distance_record }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0 { length_extra_bits, length, distance_code, distance_record }
 };
-main_data::some(inner)
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(inner)
 },
 
 _ => {
-main_data::none
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::none
 }
 }))())?;
-main_data { code, extra }
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq { code, extra }
 };
-if ((|x: &main_data| PResult::Ok((x.clone().code as u16) == 256u16))(&elem))? {
+if ((|x: &main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq| PResult::Ok((x.clone().code as u16) == 256u16))(&elem))? {
 accum.push(elem);
 break
 } else {
@@ -17691,367 +17691,367 @@ accum.push(elem);
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x: main_data| PResult::Ok(match x.clone().code {
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x: main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq| PResult::Ok(match x.clone().code {
 256 => {
 [].to_vec()
 },
 
 257 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 258 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 259 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 260 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 261 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 262 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 263 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 264 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 265 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 266 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 267 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 268 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 269 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 270 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 271 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 272 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 273 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 274 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 275 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 276 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 277 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 278 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 279 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 280 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 281 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 282 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 283 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 284 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 285 => {
 match x.clone().extra {
-main_data::some(rec) => {
-[main_data::reference(main_data { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
+main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra::some(rec) => {
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::reference(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq_reference_index0 { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(11706052143427407410u64));
+return Err(ParseError::ExcludedBranch(12099980561846791576u64));
 }
 }
 },
 
 _ => {
-[main_data::literal(x.clone().code as u8)].to_vec()
+[main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_values_denest_seq::literal(x.clone().code as u8)].to_vec()
 }
 })))?))())?;
-PResult::Ok(main_data { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
+PResult::Ok(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0 { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
 }
 
-fn Decoder161<'input>(_input: &mut Parser<'input>, distance_code: u16) -> Result<main_data, ParseError> {
+fn Decoder161<'input>(_input: &mut Parser<'input>, distance_code: u16) -> Result<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0_distance_record, ParseError> {
 PResult::Ok(match distance_code as u8 {
 0 => {
 (Decoder162(_input, 0u8, 1u16))?
@@ -18179,7 +18179,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-fn Decoder162<'input>(_input: &mut Parser<'input>, extra_bits: u8, start: u16) -> Result<main_data, ParseError> {
+fn Decoder162<'input>(_input: &mut Parser<'input>, extra_bits: u8, start: u16) -> Result<main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0_distance_record, ParseError> {
 let distance_extra_bits = ((|| PResult::Ok(match extra_bits {
 0 => {
 0u16
@@ -18372,10 +18372,10 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }
 }))())?;
 let distance = ((|| PResult::Ok(start + distance_extra_bits))())?;
-PResult::Ok(main_data { distance_extra_bits, distance })
+PResult::Ok(main_gzip_index0_denest_seq_data_blocks_denest_seq_data_dynamic_huffman_index0_codes_denest_seq_extra_some_index0_distance_record { distance_extra_bits, distance })
 }
 
-fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_index0_denest_seq_fname_yes_index0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -18424,10 +18424,10 @@ b
 return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
-PResult::Ok(main_data { string, null })
+PResult::Ok(main_gzip_index0_denest_seq_fname_yes_index0 { string, null })
 }
 
-fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_header, ParseError> {
 let signature = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -18462,10 +18462,10 @@ accum.push((Decoder20(_input))?);
 }
 accum
 }))())?;
-PResult::Ok(main_data { signature, version })
+PResult::Ok(main_gif_index0_header { signature, version })
 }
 
-fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_logical_screen, ParseError> {
 let descriptor = ((|| PResult::Ok((Decoder181(_input))?))())?;
 let global_color_table = ((|| PResult::Ok(match descriptor.clone().flags & 128u8 != 0u8 {
 true => {
@@ -18476,17 +18476,17 @@ accum.push((Decoder179(_input))?);
 }
 accum
 };
-main_data::yes(inner)
+main_gif_index0_logical_screen_global_color_table::yes(inner)
 },
 
 false => {
-main_data::no
+main_gif_index0_logical_screen_global_color_table::no
 }
 }))())?;
-PResult::Ok(main_data { descriptor, global_color_table })
+PResult::Ok(main_gif_index0_logical_screen { descriptor, global_color_table })
 }
 
-fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 let b = _input.read_byte()?;
@@ -18532,12 +18532,12 @@ ret
 PResult::Ok(match tree_index {
 0 => {
 let inner = (Decoder168(_input))?;
-main_data::graphic_block(inner)
+main_gif_index0_blocks_denest_seq::graphic_block(inner)
 },
 
 1 => {
 let inner = (Decoder169(_input))?;
-main_data::special_purpose_block(inner)
+main_gif_index0_blocks_denest_seq::special_purpose_block(inner)
 },
 
 _ => {
@@ -18546,7 +18546,7 @@ return Err(ParseError::ExcludedBranch(14056621334159770744u64));
 })
 }
 
-fn Decoder167<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder167<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_trailer, ParseError> {
 let separator = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 59 {
@@ -18555,10 +18555,10 @@ b
 return Err(ParseError::ExcludedBranch(15783818897979407630u64));
 }
 }))())?;
-PResult::Ok(main_data { separator })
+PResult::Ok(main_gif_index0_trailer { separator })
 }
 
-fn Decoder168<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder168<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0, ParseError> {
 let graphic_control_extension = ((|| PResult::Ok({
 let tree_index = {
 _input.open_peek_context();
@@ -18597,11 +18597,11 @@ ret
 match tree_index {
 0 => {
 let inner = (Decoder174(_input))?;
-main_data::some(inner)
+main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension::some(inner)
 },
 
 1 => {
-main_data::none
+main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension::none
 },
 
 _ => {
@@ -18610,10 +18610,10 @@ return Err(ParseError::ExcludedBranch(15496895076277599409u64));
 }
 }))())?;
 let graphic_rendering_block = ((|| PResult::Ok((Decoder175(_input))?))())?;
-PResult::Ok(main_data { graphic_control_extension, graphic_rendering_block })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0 { graphic_control_extension, graphic_rendering_block })
 }
 
-fn Decoder169<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder169<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_special_purpose_block_index0, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 let b = _input.read_byte()?;
@@ -18643,12 +18643,12 @@ ret
 PResult::Ok(match tree_index {
 0 => {
 let inner = (Decoder170(_input))?;
-main_data::application_extension(inner)
+main_gif_index0_blocks_denest_seq_special_purpose_block_index0::application_extension(inner)
 },
 
 1 => {
 let inner = (Decoder171(_input))?;
-main_data::comment_extension(inner)
+main_gif_index0_blocks_denest_seq_special_purpose_block_index0::comment_extension(inner)
 },
 
 _ => {
@@ -18657,7 +18657,7 @@ return Err(ParseError::ExcludedBranch(7565262198115782210u64));
 })
 }
 
-fn Decoder170<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder170<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_special_purpose_block_index0_application_extension_index0, ParseError> {
 let separator = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 33 {
@@ -18730,10 +18730,10 @@ break
 accum
 }))())?;
 let terminator = ((|| PResult::Ok((Decoder173(_input))?))())?;
-PResult::Ok(main_data { separator, label, block_size, identifier, authentication_code, application_data, terminator })
+PResult::Ok(main_gif_index0_blocks_denest_seq_special_purpose_block_index0_application_extension_index0 { separator, label, block_size, identifier, authentication_code, application_data, terminator })
 }
 
-fn Decoder171<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder171<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_special_purpose_block_index0_comment_extension_index0, ParseError> {
 let separator = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 33 {
@@ -18784,10 +18784,10 @@ break
 accum
 }))())?;
 let terminator = ((|| PResult::Ok((Decoder173(_input))?))())?;
-PResult::Ok(main_data { separator, label, comment_data, terminator })
+PResult::Ok(main_gif_index0_blocks_denest_seq_special_purpose_block_index0_comment_extension_index0 { separator, label, comment_data, terminator })
 }
 
-fn Decoder172<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder172<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq, ParseError> {
 let len_bytes = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b != 0 {
@@ -18803,7 +18803,7 @@ accum.push((Decoder16(_input))?);
 }
 accum
 }))())?;
-PResult::Ok(main_data { len_bytes, data })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0_plain_text_data_denest_seq { len_bytes, data })
 }
 
 fn Decoder173<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
@@ -18815,7 +18815,7 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 })
 }
 
-fn Decoder174<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder174<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension_some_index0, ParseError> {
 let separator = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 33 {
@@ -18844,10 +18844,10 @@ let flags = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let delay_time = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let transparent_color_index = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let terminator = ((|| PResult::Ok((Decoder173(_input))?))())?;
-PResult::Ok(main_data { separator, label, block_size, flags, delay_time, transparent_color_index, terminator })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_control_extension_some_index0 { separator, label, block_size, flags, delay_time, transparent_color_index, terminator })
 }
 
-fn Decoder175<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder175<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 let b = _input.read_byte()?;
@@ -18872,12 +18872,12 @@ ret
 PResult::Ok(match tree_index {
 0 => {
 let inner = (Decoder176(_input))?;
-main_data::table_based_image(inner)
+main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block::table_based_image(inner)
 },
 
 1 => {
 let inner = (Decoder177(_input))?;
-main_data::plain_text_extension(inner)
+main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block::plain_text_extension(inner)
 },
 
 _ => {
@@ -18886,7 +18886,7 @@ return Err(ParseError::ExcludedBranch(14120387546690436687u64));
 })
 }
 
-fn Decoder176<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder176<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0, ParseError> {
 let descriptor = ((|| PResult::Ok((Decoder178(_input))?))())?;
 let local_color_table = ((|| PResult::Ok(match descriptor.clone().flags & 128u8 != 0u8 {
 true => {
@@ -18897,18 +18897,18 @@ accum.push((Decoder179(_input))?);
 }
 accum
 };
-main_data::yes(inner)
+main_gif_index0_logical_screen_global_color_table::yes(inner)
 },
 
 false => {
-main_data::no
+main_gif_index0_logical_screen_global_color_table::no
 }
 }))())?;
 let data = ((|| PResult::Ok((Decoder180(_input))?))())?;
-PResult::Ok(main_data { descriptor, local_color_table, data })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0 { descriptor, local_color_table, data })
 }
 
-fn Decoder177<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder177<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0, ParseError> {
 let separator = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 33 {
@@ -18975,10 +18975,10 @@ break
 accum
 }))())?;
 let terminator = ((|| PResult::Ok((Decoder173(_input))?))())?;
-PResult::Ok(main_data { separator, label, block_size, text_grid_left_position, text_grid_top_position, text_grid_width, text_grid_height, character_cell_width, character_cell_height, text_foreground_color_index, text_background_color_index, plain_text_data, terminator })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_plain_text_extension_index0 { separator, label, block_size, text_grid_left_position, text_grid_top_position, text_grid_width, text_grid_height, character_cell_width, character_cell_height, text_foreground_color_index, text_background_color_index, plain_text_data, terminator })
 }
 
-fn Decoder178<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder178<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_descriptor, ParseError> {
 let separator = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 44 {
@@ -18992,17 +18992,17 @@ let image_top_position = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let image_width = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let image_height = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let flags = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { separator, image_left_position, image_top_position, image_width, image_height, flags })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
 
-fn Decoder179<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder179<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq, ParseError> {
 let r = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let g = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let b = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { r, g, b })
+PResult::Ok(main_gif_index0_logical_screen_global_color_table_yes_index0_denest_seq { r, g, b })
 }
 
-fn Decoder180<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder180<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_data, ParseError> {
 let lzw_min_code_size = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let image_data = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -19038,16 +19038,16 @@ break
 accum
 }))())?;
 let terminator = ((|| PResult::Ok((Decoder173(_input))?))())?;
-PResult::Ok(main_data { lzw_min_code_size, image_data, terminator })
+PResult::Ok(main_gif_index0_blocks_denest_seq_graphic_block_index0_graphic_rendering_block_table_based_image_index0_data { lzw_min_code_size, image_data, terminator })
 }
 
-fn Decoder181<'input>(_input: &mut Parser<'input>) -> Result<main_data, ParseError> {
+fn Decoder181<'input>(_input: &mut Parser<'input>) -> Result<main_gif_index0_logical_screen_descriptor, ParseError> {
 let screen_width = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let screen_height = ((|| PResult::Ok((Decoder147(_input))?))())?;
 let flags = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let bg_color_index = ((|| PResult::Ok((Decoder16(_input))?))())?;
 let pixel_aspect_ratio = ((|| PResult::Ok((Decoder16(_input))?))())?;
-PResult::Ok(main_data { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
+PResult::Ok(main_gif_index0_logical_screen_descriptor { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
 }
 
 fn Decoder182<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
@@ -19208,4 +19208,3 @@ return Err(ParseError::ExcludedBranch(2948356503678068618u64));
 };
 PResult::Ok(((|x: (Vec<u8>, u8)| PResult::Ok((x.clone().0.len()) as u32))(inner))?)
 }
-
