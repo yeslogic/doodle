@@ -154,20 +154,23 @@ impl CodeGen {
             ValueType::Base(BaseType::U64) => PrimType::U64.into(),
             ValueType::Base(BaseType::Char) => PrimType::Char.into(),
             ValueType::Tuple(vs) => {
-                if vs.is_empty() {
-                    return RustType::AnonTuple(Vec::new()).into();
+                match &vs[..] {
+                    [] => RustType::AnonTuple(Vec::new()).into(),
+                    [v] => RustType::AnonTuple(vec![self.lift_type(v).to_rust_type()]).into(),
+                    _ => {
+                        let mut buf = Vec::with_capacity(vs.len());
+                        // FIXME - hard-coded path_names version
+                        self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                        for v in vs.iter() {
+                            buf.push(self.lift_type(v).to_rust_type());
+                            // FIXME - hardcoded path_names version
+                            self.name_gen.ctxt.increment_index();
+                        }
+                        // FIXME - hard-coded path_names version
+                        self.name_gen.ctxt.escape();
+                        RustType::AnonTuple(buf).into()
+                    }
                 }
-                let mut buf = Vec::with_capacity(vs.len());
-                // FIXME - hard-coded path_names version
-                self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                for v in vs.iter() {
-                    buf.push(self.lift_type(v).to_rust_type());
-                    // FIXME - hardcoded path_names version
-                    self.name_gen.ctxt.increment_index();
-                }
-                // FIXME - hard-coded path_names version
-                self.name_gen.ctxt.escape();
-                RustType::AnonTuple(buf).into()
             }
             ValueType::Seq(t) => {
                 // FIXME - hard-coded path_names version
@@ -210,28 +213,29 @@ impl CodeGen {
                     let var = match def {
                         ValueType::Empty => RustVariant::Unit(name),
                         ValueType::Tuple(args) => {
-                            if args.is_empty() {
-                                RustVariant::Unit(name)
-                            } else {
-                                let mut v_args = Vec::new();
-                                // FIXME - hardcoded path_names version
-                                self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
-                                for arg in args {
-                                    v_args.push(self.lift_type(arg).to_rust_type());
+                            match &args[..] {
+                                [] => RustVariant::Unit(name),
+                                [arg] => RustVariant::Tuple(
+                                    name,
+                                    vec![self.lift_type(arg).to_rust_type()],
+                                ),
+                                _ => {
+                                    let mut v_args = Vec::new();
                                     // FIXME - hardcoded path_names version
-                                    self.name_gen.ctxt.increment_index();
+                                    self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                                    for arg in args {
+                                        v_args.push(self.lift_type(arg).to_rust_type());
+                                        // FIXME - hardcoded path_names version
+                                        self.name_gen.ctxt.increment_index();
+                                    }
+                                    // FIXME - hardcoded path_names version
+                                    self.name_gen.ctxt.escape();
+                                    RustVariant::Tuple(name, v_args)
                                 }
-                                // FIXME - hardcoded path_names version
-                                self.name_gen.ctxt.escape();
-                                RustVariant::Tuple(name, v_args)
                             }
                         }
                         other => {
-                            // FIXME - hardcoded path_names version
-                            self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                             let inner = self.lift_type(other).to_rust_type();
-                            // FIXME - hardcoded path_names version
-                            self.name_gen.ctxt.escape();
                             RustVariant::Tuple(name, vec![inner])
                         }
                     };
@@ -2555,9 +2559,7 @@ impl<'a> Elaborator<'a> {
                     let t_inner = self.elaborate_format(inner, dyns);
                     GTFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner))
                 }
-                _ => {
-                    self.elaborate_format(branch, dyns)
-                }
+                _ => self.elaborate_format(branch, dyns),
             };
             t_branches.push(t_branch);
         }

@@ -6,15 +6,15 @@ type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
 // Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
 type Top = main;
-type TarBlock = main_tar_ix0_contents_inSeq;
-type PngData = main_png_ix0;
-type JpegData = main_jpeg_ix0;
-type JpegApp01 = main_jpeg_ix0_frame_initial_segment;
-type JfifData = main_jpeg_ix0_frame_initial_segment_app0_ix0_data_data_jfif_ix0;
-type App0Data = main_jpeg_ix0_frame_initial_segment_app0_ix0_data_data;
-type App1Data = main_jpeg_ix0_frame_initial_segment_app1_ix0_data_data;
-type ExifData = main_jpeg_ix0_frame_initial_segment_app1_ix0_data_data_exif_ix0;
-type XmpData = main_jpeg_ix0_frame_initial_segment_app1_ix0_data_data_xmp_ix0;
+type TarBlock = main_tar_contents_inSeq;
+type PngData = main_png;
+type JpegData = main_jpeg;
+type JpegApp01 = main_jpeg_frame_initial_segment;
+type JfifData = main_jpeg_frame_initial_segment_app0_data_data_jfif;
+type App0Data = main_jpeg_frame_initial_segment_app0_data_data;
+type App1Data = main_jpeg_frame_initial_segment_app1_data_data;
+type ExifData = main_jpeg_frame_initial_segment_app1_data_data_exif;
+type XmpData = main_jpeg_frame_initial_segment_app1_data_data_xmp;
 
 #[test]
 fn test_png_signature_decoder() {
