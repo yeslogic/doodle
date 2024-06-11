@@ -67,7 +67,10 @@ struct PHeap<T: Eq + std::hash::Hash> {
 impl<T: Eq + std::hash::Hash> PHeap<T> {
     /// Construts a new, initially-empty PHeap
     pub fn new() -> Self {
-        Self { fixed: Vec::new(), floating: HashSet::new() }
+        Self {
+            fixed: Vec::new(),
+            floating: HashSet::new(),
+        }
     }
 
     /// Given a value already in the `PHeap`, promotes it to the next available priority-slot and returns the corresponding
@@ -87,7 +90,9 @@ impl<T: Eq + std::hash::Hash> PHeap<T> {
             self.fixed.push(elem);
             Ok(ret)
         } else {
-            Err(anyhow!("cannot promote floating-to-fixed element that is not in the floating-set already"))
+            Err(anyhow!(
+                "cannot promote floating-to-fixed element that is not in the floating-set already"
+            ))
         }
     }
 
@@ -102,7 +107,10 @@ impl<T: Eq + std::hash::Hash> PHeap<T> {
 impl NameCtxt {
     /// Constructs a novel, neutral [`NameCtxt`] value.
     pub fn new() -> Self {
-        NameCtxt { stack: Vec::new(), table: HashMap::new() }
+        NameCtxt {
+            stack: Vec::new(),
+            table: HashMap::new(),
+        }
     }
 
     /// Pushes a given [`NameAtom`] to the top (i.e. deepest element) of the [`NameCtxt`] and returns the
@@ -179,10 +187,17 @@ impl NameCtxt {
     }
 
     /// Inserts a delayed-priority association between `identifier` and `location` into `table`
-    fn resolve(table: &mut HashMap<Label, RefCell<PHeap<PathLabel>>>, identifier: Label, location: &PathLabel) {
-        table.entry(identifier).or_insert_with(|| RefCell::new(PHeap::new())).borrow_mut().insert(location.clone());
+    fn resolve(
+        table: &mut HashMap<Label, RefCell<PHeap<PathLabel>>>,
+        identifier: Label,
+        location: &PathLabel,
+    ) {
+        table
+            .entry(identifier)
+            .or_insert_with(|| RefCell::new(PHeap::new()))
+            .borrow_mut()
+            .insert(location.clone());
     }
-
 
     /// Constructs a locally-unique identifier-string from a `PathLabel`
     pub(crate) fn generate_name(location: &PathLabel) -> Label {
@@ -208,12 +223,10 @@ impl NameCtxt {
         let rawname = Self::generate_name(loc);
         match self.table.get(&rawname) {
             None => Err(anyhow!("no raw-name found for {:?}", loc)),
-            Some(heap) => {
-                match heap.borrow_mut().fix(loc.to_vec()) {
-                    Ok(ix) => Ok(dedup(rawname, ix)),
-                    Err(e) => Err(anyhow!("error: {e}")),
-                }
-            }
+            Some(heap) => match heap.borrow_mut().fix(loc.to_vec()) {
+                Ok(ix) => Ok(dedup(rawname, ix)),
+                Err(e) => Err(anyhow!("error: {e}")),
+            },
         }
     }
 
@@ -237,7 +250,11 @@ fn dedup(rawname: Label, ix: usize) -> Label {
 // prefixes a given string-tail with an intervening underscore, but leaves that separator out if either is the empty-string
 fn underscore_join(tail: &mut Fragment, prefix: impl std::fmt::Display) {
     let tmp = std::mem::replace(tail, Fragment::Empty);
-    *tail = Fragment::intervene(Fragment::String(Label::Owned(format!("{}", prefix))), Fragment::Char('_'), tmp);
+    *tail = Fragment::intervene(
+        Fragment::String(Label::Owned(format!("{}", prefix))),
+        Fragment::Char('_'),
+        tmp,
+    );
 }
 
 #[cfg(test)]
@@ -247,7 +264,10 @@ mod tests {
     #[test]
     fn test_dedup() {
         let overlap0 = vec![NameAtom::Explicit(Label::from("foo_bar"))];
-        let overlap1 = vec![NameAtom::Explicit(Label::from("foo")), NameAtom::RecordField(Label::from("bar"))];
+        let overlap1 = vec![
+            NameAtom::Explicit(Label::from("foo")),
+            NameAtom::RecordField(Label::from("bar")),
+        ];
         let mut namectxt = NameCtxt::new();
         let _ = std::mem::replace(&mut namectxt.stack, overlap0.clone());
         let oput0 = namectxt.produce_name();
@@ -261,27 +281,74 @@ mod tests {
     #[test]
     fn test_record_tree() {
         let ref mut ctxt = NameCtxt::new();
-        let root = ctxt.push_atom(NameAtom::Explicit(Label::Borrowed("root"))).produce_name();
-        let root_data = ctxt.push_atom(NameAtom::RecordField(Label::Borrowed("data"))).produce_name();
-        let root_data_header = ctxt.push_atom(NameAtom::RecordField(Label::Borrowed("header"))).produce_name();
-        let data_header = ctxt.push_atom(NameAtom::Explicit(Label::Borrowed("data.header"))).produce_name();
-        let root_data_body = ctxt.escape().escape().push_atom(NameAtom::RecordField(Label::Borrowed("body"))).produce_name();
+        let root = ctxt
+            .push_atom(NameAtom::Explicit(Label::Borrowed("root")))
+            .produce_name();
+        let root_data = ctxt
+            .push_atom(NameAtom::RecordField(Label::Borrowed("data")))
+            .produce_name();
+        let root_data_header = ctxt
+            .push_atom(NameAtom::RecordField(Label::Borrowed("header")))
+            .produce_name();
+        let data_header = ctxt
+            .push_atom(NameAtom::Explicit(Label::Borrowed("data.header")))
+            .produce_name();
+        let root_data_body = ctxt
+            .escape()
+            .escape()
+            .push_atom(NameAtom::RecordField(Label::Borrowed("body")))
+            .produce_name();
         let root_data_body0 = ctxt.increment_index().produce_name();
         let root_data_body1 = ctxt.increment_index().produce_name();
-        let root_data_footer = ctxt.escape().escape().push_atom(NameAtom::RecordField(Label::Borrowed("footer"))).produce_name();
-        let root_extra = ctxt.escape().escape().push_atom(NameAtom::RecordField("extra".into())).produce_name();
-        let root_extra_varyes = ctxt.escape().push_atom(NameAtom::Variant("Yes".into())).produce_name();
-        let root_extra_varno = ctxt.escape().push_atom(NameAtom::Variant("No".into())).produce_name();
+        let root_data_footer = ctxt
+            .escape()
+            .escape()
+            .push_atom(NameAtom::RecordField(Label::Borrowed("footer")))
+            .produce_name();
+        let root_extra = ctxt
+            .escape()
+            .escape()
+            .push_atom(NameAtom::RecordField("extra".into()))
+            .produce_name();
+        let root_extra_varyes = ctxt
+            .escape()
+            .push_atom(NameAtom::Variant("Yes".into()))
+            .produce_name();
+        let root_extra_varno = ctxt
+            .escape()
+            .push_atom(NameAtom::Variant("No".into()))
+            .produce_name();
         assert_eq!(ctxt.find_name_for(&root).unwrap(), "root");
         assert_eq!(ctxt.find_name_for(&root_data).unwrap(), "root_data");
-        assert_eq!(ctxt.find_name_for(&root_data_header).unwrap(), "root_data_header");
+        assert_eq!(
+            ctxt.find_name_for(&root_data_header).unwrap(),
+            "root_data_header"
+        );
         assert_eq!(ctxt.find_name_for(&data_header).unwrap(), "data.header");
-        assert_eq!(ctxt.find_name_for(&root_data_body).unwrap(), "root_data_body");
-        assert_eq!(ctxt.find_name_for(&root_data_body0).unwrap(), "root_data_body_index0");
-        assert_eq!(ctxt.find_name_for(&root_data_body1).unwrap(), "root_data_body_index1");
-        assert_eq!(ctxt.find_name_for(&root_data_footer).unwrap(), "root_data_footer");
+        assert_eq!(
+            ctxt.find_name_for(&root_data_body).unwrap(),
+            "root_data_body"
+        );
+        assert_eq!(
+            ctxt.find_name_for(&root_data_body0).unwrap(),
+            "root_data_body_index0"
+        );
+        assert_eq!(
+            ctxt.find_name_for(&root_data_body1).unwrap(),
+            "root_data_body_index1"
+        );
+        assert_eq!(
+            ctxt.find_name_for(&root_data_footer).unwrap(),
+            "root_data_footer"
+        );
         assert_eq!(ctxt.find_name_for(&root_extra).unwrap(), "root_extra");
-        assert_eq!(ctxt.find_name_for(&root_extra_varyes).unwrap(), "root_extra_Yes");
-        assert_eq!(ctxt.find_name_for(&root_extra_varno).unwrap(), "root_extra_No");
+        assert_eq!(
+            ctxt.find_name_for(&root_extra_varyes).unwrap(),
+            "root_extra_Yes"
+        );
+        assert_eq!(
+            ctxt.find_name_for(&root_extra_varno).unwrap(),
+            "root_extra_No"
+        );
     }
 }
