@@ -1819,7 +1819,7 @@ impl TypeChecker {
 
     /// Attempt to substitute a variable for a VType with at least one more level of refinement
     ///
-    /// If there is no possible direct substitution for a VType (i.e. no known constriants),
+    /// If there is no possible direct substitution for a VType (i.e. no known constraints),
     /// or multiple possible non-base solutions that cannot be easily tiebroken, returns Ok(None).
     ///
     /// If the only possible refinement would be the identity transformation modulo aliasing, likewise returns
