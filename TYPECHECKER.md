@@ -34,10 +34,12 @@ For this document, we adopt the following notational conventions:
 - `Var(X)` and `X` are both written as `?X`, e.g. `?0` and `?N`
 - `Hole` is written as `??`, which is a placeholder that is erased as soon as it is unified with something other than another Hole.
 - `Base(T)` is written as T, e.g. `Base(Char)` is simply `Char`
-- `Tuple([T0, \ldots, TN])` is written as `(T0, ... TN)`, and the elements of $\mathtt{?X} \simeq (\mathtt{T_0}, ..., \mathtt{T_N})$ are written as `?X[i]` (signifying `Ti`)
-- `Record([(Lab0, T0), ..., (LabN, TN)])` is written as `{ Lab0: T0, ..., LabN: TN }`
+- `Tuple([T0, ..., TN])` is written as `(T0, ... TN)`
+  - The elements of $\mathtt{?X} \simeq (\mathtt{T_0}, ..., \mathtt{T_N})$ are written as `?X[i]` (signifying `Ti`)
+- `Record([(Lab0, T0), ..., (LabN, TN)])` is written as `{ Lab0: T0, ..., LabN: TN }`,
+  - The elements of $\mathtt{?X} \simeq \{ \mathtt{Lab_0}\mathop{:}\ \mathtt{T_0}, \ldots, \mathtt{Lab_N}\mathop{:}\ \mathtt{T_N} \}$ are written as `?X.Labi` (signifying `Ti`)
 - `Seq(T)` is written as `[T]`
-- `Empty` is written as $\varepsilon$
+- `Empty` is written as `!`
 
 ### Simple Constraints
 
@@ -78,7 +80,7 @@ primitives that might be added, with a description and example of how the rules
 for said primitive ought to be implemented, with an actual example from the
 source-code if one exists.
 
-(As patterns are low-level, there is a lot more context-sensitivitiy to implementing them, and so we focus mainly on `Expr` and `Format` in the first draft).
+(As patterns are low-level, there is a lot more context-sensitivity to implementing them, and so we focus mainly on `Expr` and `Format` in the first draft).
 
 - Extend `infer_var_XXX` where XXX is the appropriate one of `format`, `expr`, or `scope_pattern`, with a new match-case
 - Within the body of the match-case:
@@ -109,12 +111,12 @@ source-code if one exists.
     - Use BaseSet unifications for types that must be numeric in order to unify properly (either as `self.unify_utype_baseset` or `self.unify_var_constraint`)
 
     ```rust
-    let itype = self.infer_utype_expr(i, scope)?;
-    let jtype = self.infer_utype_expr(j, scope)?;
-    let ktype = self.infer_utype_expr(k, scope)?;
-    let _ = self.unify_utype_baseset(itype, BaseSet::UAny); // any member of U* (no default)
-    let _ = self.unify_utype_baseset(jtype, BaseSet::USome); // any member of U* (U32 by default)
-    let _ = self.unify_utype_baseset(ktype, BaseSet::U(UintSet::Short8)); // U8 or U16, U8 default
+    let it = self.infer_utype_expr(i, scope)?;
+    let jt = self.infer_utype_expr(j, scope)?;
+    let kt = self.infer_utype_expr(k, scope)?;
+    let _ = self.unify_utype_baseset(it, BaseSet::UAny)?;  // U8 | U16 | U32 | U64
+    let _ = self.unify_utype_baseset(jt, BaseSet::USome)?; // U8 | U16 | [U32] | U64
+    let _ = self.unify_utype_baseset(kt, BaseSet::U(UintSet::Short8))?; // U8 or U16, U8 default
     ```
 
     (If required by novel primitives, extending BaseSet or UintSet may be appropriate).
@@ -129,16 +131,20 @@ source-code if one exists.
     self.unify_var_utype(x, Rc::new(UType::Seq(Rc::new(UType::Var(z)))))?; // if ?X ~ [?Z]
     ```
 
-    - Generate ancillary variables as necessary to populate holes in shapeful types that require an extra constraint in terms of novel meta-variables.
+    (`unify_var_utype` can be applied to any equivalence, provided it doesn't create an infinite type)
+
+    - Generate ancillary variables as necessary to populate holes in 'shapeful' types whose constraints are unrelated to any directly scoped meta-variables.
 
     ```rust
-    let seq_var = self.inver_var_expr(seq, scope)?; //
-    let elem_var = self.get_new_utype();
-    self.unify_var_proj_elem(seq_var, elem_var)?;
+    let seq_var = self.infer_var_expr(seq, scope)?; // ?X ~ [??], where this ?? might be reified to a grounded UType already
+    let elem_var = self.get_new_utype(); // ?Y
+    self.unify_var_proj_elem(seq_var, elem_var)?; // ?X ~ [?Z] <=> ?Z ~ ?Y
+    /* or */
+    self.unify_var_utype(seq_var, Rc::new(UType::Seq(Rc::new(UType::Var(elem_var)))))?;
     ```
 
   - Always return `Ok(newvar)` at the end of the block
 
-- Respect the same order in the Elaboraator
+- Respect the same order in the Elaborator
   - Whenever `get_new_uvar()` is called, either directly or implicitly through an embedded call to `infer_var_XXX`, ensure the index is incremented accordingly (and in the same order)
   - Call `get_gt_from_index` on the indices as appropriate to generate the corresponding types for `TypedFormat`, `TypedExpr`, and `TypedPattern` primitives (which should be added as appropriate)
