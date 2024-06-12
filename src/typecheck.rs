@@ -817,7 +817,6 @@ impl TypeChecker {
         }
     }
 }
-
 // !SECTION
 
 // SECTION - checks and maintenance of invariants of the metacontext
