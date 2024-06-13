@@ -1518,8 +1518,27 @@ impl TypeChecker {
 
                 ys_var
             }
-            Expr::FlatMapList(_f_expr, _ret_type, _seq_expr) => {
-                unimplemented!();
+            Expr::FlatMapList(f_expr, ret_type, seq_expr) => {
+                // NOTE - (([y], x) -> [y]) -> Vt(y) -> [x] -> [y]
+                let ys_var = self.get_new_uvar();
+
+                let (init_x_var, tail_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
+                let xs_var = self.infer_var_expr(seq_expr, scope)?;
+                let x_var = self.get_new_uvar();
+                let y_var = self.get_new_uvar();
+
+                self.unify_var_proj_elem(ys_var, y_var)?;
+                self.unify_var_proj_elem(xs_var, x_var)?;
+                self.unify_var_valuetype(y_var, ret_type)?;
+                self.unify_var_pair(ys_var, tail_var)?;
+
+                // constrain the shape to be exactly the tuple we expect
+                self.unify_var_utype(
+                    init_x_var,
+                    Rc::new(UType::Tuple(vec![ys_var.into(), x_var.into()])),
+                )?;
+
+                ys_var
             }
             Expr::Dup(count, x) => {
                 let newvar = self.get_new_uvar();
