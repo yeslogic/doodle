@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::{Bound, RangeBounds};
 
 pub use crate::byte_set::ByteSet;
@@ -29,6 +30,19 @@ where
     }
     Ok(res)
 }
+
+pub fn try_flat_map_append_vec<T, U, E, F>(iter: impl Iterator<Item = T>, f: F) -> Result<Vec<U>, E>
+where
+    F: Fn((&Vec<U>, T)) -> Result<Vec<U>, E>,
+{
+    let mut res: Vec<U> = Vec::new();
+    for x in iter {
+        let mut y = f((&res, x))?;
+        res.append(&mut y);
+    }
+    Ok(res)
+}
+
 
 pub fn try_fold_map_curried<T, U, V, E, F>(
     iter: impl Iterator<Item = T>,
@@ -231,6 +245,27 @@ pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {
         }
     }
 }
+
+pub fn slice_ext<T: Copy>(vs: &Vec<T>, range: std::ops::Range<usize>) -> Cow<'_, [T]> {
+    match range.end_bound() {
+        Bound::Excluded(&rangemax) if rangemax <= vs.len() => Cow::Borrowed(&vs[range]),
+        Bound::Included(&lastix) if lastix < vs.len() => Cow::Borrowed(&vs[range]),
+        Bound::Unbounded => panic!("cannot extend indefinitely"),
+        _ => {
+            let mut ret = Vec::with_capacity(range.len());
+            for i in range {
+                if i >= vs.len() {
+                    let j = i - vs.len();
+                    ret.push(ret[j]);
+                } else {
+                    ret.push(vs[i]);
+                }
+            }
+            Cow::Owned(ret)
+        }
+    }
+}
+
 
 #[inline]
 pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> PResult<bool> {
