@@ -311,7 +311,6 @@ mod tests {
             .push_atom(NameAtom::RecordField("extra".into()))
             .produce_name();
         let root_extra_varyes = ctxt
-            .escape()
             .push_atom(NameAtom::Variant("Yes".into()))
             .produce_name();
         let root_extra_varno = ctxt
@@ -331,11 +330,11 @@ mod tests {
         );
         assert_eq!(
             ctxt.find_name_for(&root_data_body0).unwrap(),
-            "root_data_body_index0"
+            "root_data_body_ix0"
         );
         assert_eq!(
             ctxt.find_name_for(&root_data_body1).unwrap(),
-            "root_data_body_index1"
+            "root_data_body_ix1"
         );
         assert_eq!(
             ctxt.find_name_for(&root_data_footer).unwrap(),

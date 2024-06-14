@@ -11,7 +11,7 @@
 │       │   │   ├── bg-color-index <- base.u8 := 0
 │       │   │   └── pixel-aspect-ratio <- base.u8 := 0
 │       │   └── global-color-table <- match (descriptor.flags & 128 != 0) { ... } :=
-│       │       └── yes <- repeat-count (2 << (descriptor.flags & 7)) gif.color-table-entry :=
+│       │       └── yes <- repeat-count (2 << as-u16 (descriptor.flags & 7)) gif.color-table-entry :=
 │       │           └──    r   g   b
 │       │                  0   0   0
 │       │                162 161 162

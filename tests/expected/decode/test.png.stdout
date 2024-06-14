@@ -106,7 +106,7 @@
 │       │       │   ~
 │       │       │   └── 1167 := 50
 │       │       └── crc <- base.u32be := 3619834681
-│       ├── more-chunks <- repeat png.chunk := []
+│       ├── more-chunks <- repeat png.chunk(...) := []
 │       └── iend <- png.iend :=
 │           ├── length <- base.u32be := 0
 │           ├── tag <- png.iend-tag

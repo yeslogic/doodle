@@ -211,7 +211,7 @@ impl<'a> Parser<'a> {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```ignore
     /// // Format: Format::UnionNondet(vec![("A", A), ("B", B), ("C", C)])
     /// // Derived Logic (without nesting, the following is desirable)
     /// let mut p = Parser::new(&buf);
