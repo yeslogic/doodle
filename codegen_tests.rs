@@ -355,8 +355,9 @@ mod test_files {
     }
 
     #[test]
-    fn test_errant_png() -> TestResult {
-        check_png("test-images/broken.png")
+    #[should_panic]
+    fn test_errant_png() {
+        check_png("test-images/broken.png").unwrap()
     }
 
     #[test]
