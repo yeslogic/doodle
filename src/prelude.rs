@@ -43,7 +43,6 @@ where
     Ok(res)
 }
 
-
 pub fn try_fold_map_curried<T, U, V, E, F>(
     iter: impl Iterator<Item = T>,
     init: V,
@@ -265,7 +264,6 @@ pub fn slice_ext<T: Copy>(vs: &Vec<T>, range: std::ops::Range<usize>) -> Cow<'_,
         }
     }
 }
-
 
 #[inline]
 pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> PResult<bool> {
