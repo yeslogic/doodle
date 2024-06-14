@@ -1078,12 +1078,15 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                 ))
             }
             ClosureKind::PairBorrowOwned => {
-                let RustType::AnonTuple(args) = head_t.clone().to_rust_type() else { panic!("type {head_t:?} does not look like a tuple...")};
+                let RustType::AnonTuple(args) = head_t.clone().to_rust_type() else {
+                    panic!("type {head_t:?} does not look like a tuple...")
+                };
                 let point_t = match &args[..] {
-                    [fst, snd] => {
-                        RustType::AnonTuple(vec![RustType::borrow_of(None, Mut::Immutable, fst.clone()), snd.clone()])
-                    }
-                    other => unreachable!("tuple is not a pair: {other:?}")
+                    [fst, snd] => RustType::AnonTuple(vec![
+                        RustType::borrow_of(None, Mut::Immutable, fst.clone()),
+                        snd.clone(),
+                    ]),
+                    other => unreachable!("tuple is not a pair: {other:?}"),
                 };
                 let expansion = embed_expr(body, info);
                 RustExpr::Closure(RustClosure::new_transform(
@@ -3057,12 +3060,7 @@ impl<'a> Elaborator<'a> {
 
                 let gt = self.get_gt_from_index(index);
 
-                GTExpr::FlatMapList(
-                    gt,
-                    Box::new(t_lambda),
-                    _ret_type.clone(),
-                    Box::new(t_seq),
-                )
+                GTExpr::FlatMapList(gt, Box::new(t_lambda), _ret_type.clone(), Box::new(t_seq))
             }
             Expr::Dup(count, x) => {
                 let count_t = self.elaborate_expr(count);
