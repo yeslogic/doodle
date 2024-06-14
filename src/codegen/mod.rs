@@ -802,6 +802,22 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 )
             )
         }
+        TypedExpr::SubSeqInflate(_, seq, ix, len) => {
+            let start_expr = embed_expr_dft(ix);
+
+            let bind_ix = RustStmt::assign("ix", RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())));
+            let end_expr = RustExpr::infix(
+                RustExpr::local("ix"),
+                Operator::Add,
+                RustExpr::Operation(
+                    RustOp::AsCast(Box::new(embed_expr_dft(len)), PrimType::Usize.into())
+                )
+            );
+
+            let range = RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
+
+            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![RustExpr::Borrow(Box::new(embed_expr(seq, ExprInfo::Natural))), range]).call_method("to_vec")))
+        }
         TypedExpr::FlatMap(_, f, seq) =>
             RustExpr::local("try_flat_map_vec")
                 .call_with([
@@ -815,6 +831,13 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
                     embed_expr(acc_init, ExprInfo::EmbedCloned),
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
+                ])
+                .wrap_try(),
+        TypedExpr::FlatMapList(_, f, _ret_type, seq) =>
+            RustExpr::local("try_flat_map_append_vec")
+                .call_with([
+                    embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
+                    embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true),
                 ])
                 .wrap_try(),
         TypedExpr::Dup(_, n, expr) => {
@@ -1024,6 +1047,7 @@ fn contains_irrefutable_pattern<A>(head_cases: &[(TypedPattern<GenType>, A)]) ->
 pub(crate) enum ClosureKind {
     Predicate,
     Transform,
+    PairBorrowOwned,
 }
 
 fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo) -> RustExpr {
@@ -1046,6 +1070,25 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                 RustExpr::Closure(RustClosure::new_transform(
                     head.clone(),
                     Some(head_t.clone().to_rust_type()),
+                    if needs_ok {
+                        RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
+                    } else {
+                        expansion
+                    },
+                ))
+            }
+            ClosureKind::PairBorrowOwned => {
+                let RustType::AnonTuple(args) = head_t.clone().to_rust_type() else { panic!("type {head_t:?} does not look like a tuple...")};
+                let point_t = match &args[..] {
+                    [fst, snd] => {
+                        RustType::AnonTuple(vec![RustType::borrow_of(None, Mut::Immutable, fst.clone()), snd.clone()])
+                    }
+                    other => unreachable!("tuple is not a pair: {other:?}")
+                };
+                let expansion = embed_expr(body, info);
+                RustExpr::Closure(RustClosure::new_transform(
+                    head.clone(),
+                    Some(point_t),
                     if needs_ok {
                         RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
                     } else {
@@ -2965,7 +3008,13 @@ impl<'a> Elaborator<'a> {
                 GTExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
             Expr::SubSeqInflate(_seq, _start, _length) => {
-                unimplemented!();
+                let t_seq = self.elaborate_expr(_seq);
+                let t_start = self.elaborate_expr(_start);
+                let t_length = self.elaborate_expr(_length);
+                // NOTE - for element type of sequence
+                self.increment_index();
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::SubSeqInflate(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
             Expr::FlatMap(lambda, seq) => {
                 let t_lambda = self.elaborate_expr_lambda(lambda);
@@ -2997,7 +3046,23 @@ impl<'a> Elaborator<'a> {
                 )
             }
             Expr::FlatMapList(_lambda, _ret_type, _seq) => {
-                unimplemented!();
+                let t_lambda = self.elaborate_expr_lambda(_lambda);
+                let t_seq = self.elaborate_expr(_seq);
+
+                {
+                    // account for two extra variables we generate in current TC implementation
+                    self.increment_index();
+                    self.increment_index();
+                }
+
+                let gt = self.get_gt_from_index(index);
+
+                GTExpr::FlatMapList(
+                    gt,
+                    Box::new(t_lambda),
+                    _ret_type.clone(),
+                    Box::new(t_seq),
+                )
             }
             Expr::Dup(count, x) => {
                 let count_t = self.elaborate_expr(count);
@@ -3022,159 +3087,6 @@ impl<'a> Elaborator<'a> {
             _ => unreachable!("elaborate_expr_lambda: unexpected non-lambda {expr:?}"),
         }
     }
-}
-
-fn expect_variants<const N: usize>(actual: &Vec<RustVariant>, expected: &[RustVariant; N]) {
-    assert_eq!(actual.len(), expected.len());
-    for ix in 0..N {
-        assert!(
-            actual.contains(&expected[ix]),
-            "{:?} @{} does not appear in {:#?}",
-            &expected[ix],
-            ix,
-            actual
-        );
-    }
-}
-
-fn mk_inflate(adt: &GenType) -> RustFn {
-    let (rt, adt_name) = match adt {
-        GenType::Def((ix, lbl), rtd) => match rtd {
-            RustTypeDef::Enum(vars) => {
-                let lendist_var = vars
-                    .iter()
-                    .find(|var| var.get_label().as_ref() == "reference")
-                    .expect("could not find 'reference' tag in type {adt:?}");
-                let lendist = match lendist_var {
-                        RustVariant::Tuple(_, elts) if elts.len() == 1 => elts[0].clone(),
-                        other =>
-                            unreachable!(
-                                "variant 'reference' has unexpected shape (looking for 1-tuple, found {other:?})"
-                            ),
-                    };
-                let (ix0, lbl0) = match lendist {
-                        RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(ix0, lbl0))) =>
-                            (ix0, lbl0.clone()),
-                        other =>
-                            unreachable!(
-                                "argument type of variant 'reference' has unexpected form (looking for local definition, found {other:?}"
-                            ),
-                    };
-                expect_variants(
-                    &vars,
-                    &[
-                        RustVariant::Tuple(Label::from("literal"), vec![PrimType::U8.into()]),
-                        RustVariant::Tuple(
-                            Label::from("reference"),
-                            vec![AtomType::TypeRef(LocalType::LocalDef(ix0, lbl0.clone())).into()],
-                        ),
-                    ],
-                );
-                (
-                    RustType::Atom(AtomType::TypeRef(LocalType::LocalDef(*ix, lbl.clone()))),
-                    lbl.clone(),
-                )
-            }
-            RustTypeDef::Struct(_) => unreachable!("incoherent inflate method"),
-        },
-        _other => unreachable!("uneexpected non-def type: {_other:?}"),
-    };
-    let arg_type = RustType::borrow_of(None, Mut::Immutable, RustType::vec_of(rt));
-    let ret_type = RustType::vec_of(PrimType::U8.into());
-    let codesvar = Label::from("codes");
-    let body = {
-        let codevar = Label::from("code");
-        let loop_body = {
-            let lit_case = {
-                const BINDING: Label = Label::Borrowed("v");
-                let lit_pat = MatchCaseLHS::Pattern(RustPattern::Variant(
-                    Constructor::Compound(adt_name.clone(), Label::from("literal")),
-                    Box::new(RustPattern::CatchAll(Some(BINDING.clone()))),
-                ));
-                let lit_rhs = vec![RustStmt::Expr(RustExpr::local("vs").call_method_with(
-                    "push",
-                    [RustExpr::Deref(Box::new(RustExpr::local(BINDING.clone())))],
-                ))];
-                (lit_pat, lit_rhs)
-            };
-            let ref_case = {
-                const BINDING: Label = Label::Borrowed("fields");
-                let ref_pat = MatchCaseLHS::Pattern(RustPattern::Variant(
-                    Constructor::Compound(adt_name.clone(), Label::from("reference")),
-                    Box::new(RustPattern::CatchAll(Some(BINDING.clone()))),
-                ));
-                let sanity_check = RustStmt::Control(RustControl::If(
-                    RustExpr::infix(
-                        RustExpr::local("distance"),
-                        Operator::Gt,
-                        RustExpr::local("vs").call_method("len"),
-                    ),
-                    vec![RustStmt::Expr(RustExpr::local("panic!").call())],
-                    None,
-                ));
-                let ref_rhs = vec![
-                    RustStmt::assign(
-                        "length",
-                        RustExpr::Operation(RustOp::AsCast(
-                            Box::new(RustExpr::local(BINDING.clone()).field("length")),
-                            PrimType::Usize.into(),
-                        )),
-                    ),
-                    RustStmt::assign(
-                        "distance",
-                        RustExpr::Operation(RustOp::AsCast(
-                            Box::new(RustExpr::local(BINDING.clone()).field("distance")),
-                            PrimType::Usize.into(),
-                        )),
-                    ),
-                    sanity_check,
-                    RustStmt::assign(
-                        "start",
-                        RustExpr::infix(
-                            RustExpr::local("vs").call_method("len"),
-                            Operator::Sub,
-                            RustExpr::local("distance"),
-                        ),
-                    ),
-                    RustStmt::assign(
-                        "range",
-                        RustExpr::RangeExclusive(
-                            Box::new(RustExpr::local("start")),
-                            Box::new(RustExpr::infix(
-                                RustExpr::local("start"),
-                                Operator::Add,
-                                RustExpr::local("length"),
-                            )),
-                        ),
-                    ),
-                    RustStmt::Expr(RustExpr::local("extend_from_within_ext").call_with([
-                        RustExpr::BorrowMut(Box::new(RustExpr::local("vs"))),
-                        RustExpr::local("range"),
-                    ])),
-                ];
-                (ref_pat, ref_rhs)
-            };
-            vec![RustStmt::Control(RustControl::Match(
-                RustExpr::local(codevar.clone()),
-                RustMatchBody::Irrefutable(vec![lit_case, ref_case]),
-            ))]
-        };
-        vec![
-            RustStmt::assign_mut("vs", RustExpr::scoped(["Vec"], "new").call()),
-            RustStmt::Control(RustControl::ForIter(
-                codevar.clone(),
-                RustExpr::Entity(RustEntity::Local(codesvar.clone())).call_method("iter"),
-                loop_body,
-            )),
-            RustStmt::Return(ReturnKind::Implicit, RustExpr::local("vs")),
-        ]
-    };
-    RustFn::new(
-        Label::from("inflate"),
-        None,
-        FnSig::new(vec![(codesvar.clone(), arg_type)], Some(ret_type)),
-        body,
-    )
 }
 
 type GTFormat = TypedFormat<GenType>;

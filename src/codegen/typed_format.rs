@@ -342,10 +342,22 @@ pub enum TypedExpr<TypeRep> {
         Box<TypedExpr<TypeRep>>,
         Box<TypedExpr<TypeRep>>,
     ),
+    SubSeqInflate(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
     FlatMap(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
     FlatMapAccum(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        ValueType,
+        Box<TypedExpr<TypeRep>>,
+    ),
+    FlatMapList(
+        TypeRep,
         Box<TypedExpr<TypeRep>>,
         ValueType,
         Box<TypedExpr<TypeRep>>,
@@ -396,8 +408,10 @@ impl TypedExpr<GenType> {
             | TypedExpr::IntRel(gt, _, _, _)
             | TypedExpr::Arith(gt, _, _, _)
             | TypedExpr::SubSeq(gt, _, _, _)
+            | TypedExpr::SubSeqInflate(gt, _, _, _)
             | TypedExpr::FlatMap(gt, _, _)
             | TypedExpr::FlatMapAccum(gt, _, _, _, _)
+            | TypedExpr::FlatMapList(gt, _, _, _)
             | TypedExpr::Dup(gt, _, _) => Some(Cow::Borrowed(gt)),
         }
     }
@@ -511,9 +525,15 @@ mod __impls {
                 TypedExpr::SubSeq(_, seq, start, len) => {
                     Expr::SubSeq(rebox(seq), rebox(start), rebox(len))
                 }
+                TypedExpr::SubSeqInflate(_, seq, start, len) => {
+                    Expr::SubSeqInflate(rebox(seq), rebox(start), rebox(len))
+                }
                 TypedExpr::FlatMap(_, lambda, seq) => Expr::FlatMap(rebox(lambda), rebox(seq)),
                 TypedExpr::FlatMapAccum(_, lambda, acc, vt, seq) => {
                     Expr::FlatMapAccum(rebox(lambda), rebox(acc), vt, rebox(seq))
+                }
+                TypedExpr::FlatMapList(_, lambda, vt, seq) => {
+                    Expr::FlatMapList(rebox(lambda), vt, rebox(seq))
                 }
                 TypedExpr::Dup(_, count, x) => Expr::Dup(rebox(count), rebox(x)),
             }

@@ -434,6 +434,7 @@ impl RustType {
     }
 
     /// Maps the provided RustType according to the transformation `T -> Vec<T>`
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn vec_of(inner: Self) -> Self {
         Self::Atom(AtomType::Comp(CompType::Vec(Box::new(inner))))
     }
@@ -1568,7 +1569,7 @@ pub(crate) enum RustStmt {
     Expr(RustExpr),
     Return(ReturnKind, RustExpr), // bool: true for explicit return, false for implicit return
     Control(RustControl),
-    LocalFn(RustFn),
+    // LocalFn(RustFn),
 }
 
 impl RustStmt {
@@ -1821,7 +1822,7 @@ impl ToFragment for RustStmt {
                     .delimit(before, after)
             }
             RustStmt::Control(ctrl) => ctrl.to_fragment(),
-            RustStmt::LocalFn(f) => f.to_fragment(),
+            // RustStmt::LocalFn(f) => f.to_fragment(),
         }
     }
 }
