@@ -8,13 +8,13 @@ mod codegen_tests;
 use doodle::prelude::*;
 
 #[derive(Debug, Clone)]
-struct main_gif_header {
+pub struct main_gif_header {
     signature: (u8, u8, u8),
     version: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_logical_screen_descriptor {
+pub struct main_gif_logical_screen_descriptor {
     screen_width: u16,
     screen_height: u16,
     flags: u8,
@@ -23,26 +23,26 @@ struct main_gif_logical_screen_descriptor {
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_logical_screen_global_color_table_yes_inSeq {
+pub struct main_gif_logical_screen_global_color_table_yes_inSeq {
     r: u8,
     g: u8,
     b: u8,
 }
 
 #[derive(Debug, Clone)]
-enum main_gif_logical_screen_global_color_table {
+pub enum main_gif_logical_screen_global_color_table {
     no,
     yes(Vec<main_gif_logical_screen_global_color_table_yes_inSeq>),
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_logical_screen {
+pub struct main_gif_logical_screen {
     descriptor: main_gif_logical_screen_descriptor,
     global_color_table: main_gif_logical_screen_global_color_table,
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some {
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some {
     separator: u8,
     label: u8,
     block_size: u8,
@@ -53,20 +53,20 @@ struct main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some {
 }
 
 #[derive(Debug, Clone)]
-enum main_gif_blocks_inSeq_graphic_block_graphic_control_extension {
+pub enum main_gif_blocks_inSeq_graphic_block_graphic_control_extension {
     none,
     some(main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some),
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq
 {
     len_bytes: u8,
     data: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension {
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension {
 separator: u8,
 label: u8,
 block_size: u8,
@@ -83,7 +83,8 @@ terminator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor {
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor
+{
     separator: u8,
     image_left_position: u16,
     image_top_position: u16,
@@ -93,14 +94,14 @@ struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_i
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_data {
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_data {
 lzw_min_code_size: u8,
 image_data: Vec<main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq>,
 terminator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image {
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image {
     descriptor:
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor,
     local_color_table: main_gif_logical_screen_global_color_table,
@@ -108,7 +109,7 @@ struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_i
 }
 
 #[derive(Debug, Clone)]
-enum main_gif_blocks_inSeq_graphic_block_graphic_rendering_block {
+pub enum main_gif_blocks_inSeq_graphic_block_graphic_rendering_block {
     plain_text_extension(
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension,
     ),
@@ -118,13 +119,13 @@ enum main_gif_blocks_inSeq_graphic_block_graphic_rendering_block {
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_graphic_block {
+pub struct main_gif_blocks_inSeq_graphic_block {
     graphic_control_extension: main_gif_blocks_inSeq_graphic_block_graphic_control_extension,
     graphic_rendering_block: main_gif_blocks_inSeq_graphic_block_graphic_rendering_block,
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_special_purpose_block_application_extension {
+pub struct main_gif_blocks_inSeq_special_purpose_block_application_extension {
 separator: u8,
 label: u8,
 block_size: u8,
@@ -135,7 +136,7 @@ terminator: u8
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_blocks_inSeq_special_purpose_block_comment_extension {
+pub struct main_gif_blocks_inSeq_special_purpose_block_comment_extension {
 separator: u8,
 label: u8,
 comment_data: Vec<main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq>,
@@ -143,24 +144,24 @@ terminator: u8
 }
 
 #[derive(Debug, Clone)]
-enum main_gif_blocks_inSeq_special_purpose_block {
+pub enum main_gif_blocks_inSeq_special_purpose_block {
     application_extension(main_gif_blocks_inSeq_special_purpose_block_application_extension),
     comment_extension(main_gif_blocks_inSeq_special_purpose_block_comment_extension),
 }
 
 #[derive(Debug, Clone)]
-enum main_gif_blocks_inSeq {
+pub enum main_gif_blocks_inSeq {
     graphic_block(main_gif_blocks_inSeq_graphic_block),
     special_purpose_block(main_gif_blocks_inSeq_special_purpose_block),
 }
 
 #[derive(Debug, Clone)]
-struct main_gif_trailer {
+pub struct main_gif_trailer {
     separator: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_gif {
+pub struct main_gif {
     header: main_gif_header,
     logical_screen: main_gif_logical_screen,
     blocks: Vec<main_gif_blocks_inSeq>,
@@ -168,7 +169,7 @@ struct main_gif {
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_header {
+pub struct main_gzip_inSeq_header {
     magic: (u8, u8),
     method: u8,
     file_flags: u8,
@@ -178,33 +179,33 @@ struct main_gzip_inSeq_header {
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_fname_yes {
+pub struct main_gzip_inSeq_fname_yes {
     string: Vec<u8>,
     null: u8,
 }
 
 #[derive(Debug, Clone)]
-enum main_gzip_inSeq_fname {
+pub enum main_gzip_inSeq_fname {
     no,
     yes(main_gzip_inSeq_fname_yes),
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_literal_length_distance_alphabet_code_lengths_inSeq
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_literal_length_distance_alphabet_code_lengths_inSeq
 {
     code: u16,
     extra: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some_distance_record
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some_distance_record
 {
     distance_extra_bits: u16,
     distance: u16,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some {
 length_extra_bits: u8,
 length: u16,
 distance_code: u16,
@@ -212,31 +213,31 @@ distance_record: main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_in
 }
 
 #[derive(Debug, Clone)]
-enum main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra {
+pub enum main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra {
     none,
     some(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some),
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq {
     code: u16,
     extra: main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference {
     length: u16,
     distance: u16,
 }
 
 #[derive(Debug, Clone)]
-enum main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq {
+pub enum main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq {
     literal(u8),
     reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference),
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman {
 hlit: u8,
 hdist: u8,
 hclen: u8,
@@ -250,7 +251,7 @@ codes_values: Vec<main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_v
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some {
 length_extra_bits: u8,
 length: u16,
 distance_code: u8,
@@ -258,25 +259,25 @@ distance_record: main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_in
 }
 
 #[derive(Debug, Clone)]
-enum main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra {
+pub enum main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra {
     none,
     some(main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some),
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq {
     code: u16,
     extra: main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman {
     codes: Vec<main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq>,
     codes_values: Vec<main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq>,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq_data_uncompressed {
+pub struct main_gzip_inSeq_data_blocks_inSeq_data_uncompressed {
     align: (),
     len: u16,
     nlen: u16,
@@ -285,34 +286,34 @@ struct main_gzip_inSeq_data_blocks_inSeq_data_uncompressed {
 }
 
 #[derive(Debug, Clone)]
-enum main_gzip_inSeq_data_blocks_inSeq_data {
+pub enum main_gzip_inSeq_data_blocks_inSeq_data {
     dynamic_huffman(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman),
     fixed_huffman(main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman),
     uncompressed(main_gzip_inSeq_data_blocks_inSeq_data_uncompressed),
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data_blocks_inSeq {
+pub struct main_gzip_inSeq_data_blocks_inSeq {
     r#final: u8,
     r#type: u8,
     data: main_gzip_inSeq_data_blocks_inSeq_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_data {
+pub struct main_gzip_inSeq_data {
     blocks: Vec<main_gzip_inSeq_data_blocks_inSeq>,
     codes: Vec<main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq>,
     inflate: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq_footer {
+pub struct main_gzip_inSeq_footer {
     crc: u32,
     length: u32,
 }
 
 #[derive(Debug, Clone)]
-struct main_gzip_inSeq {
+pub struct main_gzip_inSeq {
     header: main_gzip_inSeq_header,
     fname: main_gzip_inSeq_fname,
     data: main_gzip_inSeq_data,
@@ -320,13 +321,13 @@ struct main_gzip_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_soi {
+pub struct main_jpeg_soi {
     ff: u8,
     marker: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app0_data_data_jfif {
+pub struct main_jpeg_frame_initial_segment_app0_data_data_jfif {
     version_major: u8,
     version_minor: u8,
     density_units: u8,
@@ -338,32 +339,32 @@ struct main_jpeg_frame_initial_segment_app0_data_data_jfif {
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_initial_segment_app0_data_data {
+pub enum main_jpeg_frame_initial_segment_app0_data_data {
     jfif(main_jpeg_frame_initial_segment_app0_data_data_jfif),
     other(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app0_data {
+pub struct main_jpeg_frame_initial_segment_app0_data {
     identifier: main_gzip_inSeq_fname_yes,
     data: main_jpeg_frame_initial_segment_app0_data_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app0 {
+pub struct main_jpeg_frame_initial_segment_app0 {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_initial_segment_app0_data,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_initial_segment_app1_data_data_exif_exif_byte_order {
+pub enum main_jpeg_frame_initial_segment_app1_data_data_exif_exif_byte_order {
     be(u8, u8),
     le(u8, u8),
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd_fields_inSeq {
+pub struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd_fields_inSeq {
     tag: u16,
     r#type: u16,
     length: u32,
@@ -371,7 +372,7 @@ struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd_fields_inSeq
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd {
+pub struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd {
     num_fields: u16,
     fields: Vec<main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd_fields_inSeq>,
     next_ifd_offset: u32,
@@ -379,7 +380,7 @@ struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif {
+pub struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif {
     byte_order: main_jpeg_frame_initial_segment_app1_data_data_exif_exif_byte_order,
     magic: u16,
     offset: u32,
@@ -387,103 +388,103 @@ struct main_jpeg_frame_initial_segment_app1_data_data_exif_exif {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1_data_data_exif {
+pub struct main_jpeg_frame_initial_segment_app1_data_data_exif {
     padding: u8,
     exif: main_jpeg_frame_initial_segment_app1_data_data_exif_exif,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1_data_data_xmp {
+pub struct main_jpeg_frame_initial_segment_app1_data_data_xmp {
     xmp: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_initial_segment_app1_data_data {
+pub enum main_jpeg_frame_initial_segment_app1_data_data {
     exif(main_jpeg_frame_initial_segment_app1_data_data_exif),
     other(Vec<u8>),
     xmp(main_jpeg_frame_initial_segment_app1_data_data_xmp),
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1_data {
+pub struct main_jpeg_frame_initial_segment_app1_data {
     identifier: main_gzip_inSeq_fname_yes,
     data: main_jpeg_frame_initial_segment_app1_data_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_initial_segment_app1 {
+pub struct main_jpeg_frame_initial_segment_app1 {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_initial_segment_app1_data,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_initial_segment {
+pub enum main_jpeg_frame_initial_segment {
     app0(main_jpeg_frame_initial_segment_app0),
     app1(main_jpeg_frame_initial_segment_app1),
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_app10 {
+pub struct main_jpeg_frame_segments_inSeq_app10 {
     marker: main_jpeg_soi,
     length: u16,
     data: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dac_data {
+pub struct main_jpeg_frame_segments_inSeq_dac_data {
     class_table_id: u8,
     value: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dac {
+pub struct main_jpeg_frame_segments_inSeq_dac {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_segments_inSeq_dac_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dht_data {
+pub struct main_jpeg_frame_segments_inSeq_dht_data {
     class_table_id: u8,
     num_codes: Vec<u8>,
     values: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dht {
+pub struct main_jpeg_frame_segments_inSeq_dht {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_segments_inSeq_dht_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dqt_data {
+pub struct main_jpeg_frame_segments_inSeq_dqt_data {
     precision_table_id: u8,
     elements: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dqt {
+pub struct main_jpeg_frame_segments_inSeq_dqt {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_segments_inSeq_dqt_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dri_data {
+pub struct main_jpeg_frame_segments_inSeq_dri_data {
     restart_interval: u16,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_segments_inSeq_dri {
+pub struct main_jpeg_frame_segments_inSeq_dri {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_segments_inSeq_dri_data,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_segments_inSeq {
+pub enum main_jpeg_frame_segments_inSeq {
     app0(main_jpeg_frame_initial_segment_app0),
     app1(main_jpeg_frame_initial_segment_app1),
     app10(main_jpeg_frame_segments_inSeq_app10),
@@ -508,14 +509,14 @@ enum main_jpeg_frame_segments_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_header_sof0_data_image_components_inSeq {
+pub struct main_jpeg_frame_header_sof0_data_image_components_inSeq {
     id: u8,
     sampling_factor: u8,
     quantization_table_id: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_header_sof0_data {
+pub struct main_jpeg_frame_header_sof0_data {
     sample_precision: u8,
     num_lines: u16,
     num_samples_per_line: u16,
@@ -524,14 +525,14 @@ struct main_jpeg_frame_header_sof0_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_header_sof0 {
+pub struct main_jpeg_frame_header_sof0 {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_header_sof0_data,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_header {
+pub enum main_jpeg_frame_header {
     sof0(main_jpeg_frame_header_sof0),
     sof1(main_jpeg_frame_header_sof0),
     sof10(main_jpeg_frame_header_sof0),
@@ -548,13 +549,13 @@ enum main_jpeg_frame_header {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_scan_sos_data_image_components_inSeq {
+pub struct main_jpeg_frame_scan_sos_data_image_components_inSeq {
     component_selector: u8,
     entropy_coding_table_ids: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_scan_sos_data {
+pub struct main_jpeg_frame_scan_sos_data {
     num_image_components: u8,
     image_components: Vec<main_jpeg_frame_scan_sos_data_image_components_inSeq>,
     start_spectral_selection: u8,
@@ -563,14 +564,14 @@ struct main_jpeg_frame_scan_sos_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_scan_sos {
+pub struct main_jpeg_frame_scan_sos {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_scan_sos_data,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_scan_data_scan_data_inSeq {
+pub enum main_jpeg_frame_scan_data_scan_data_inSeq {
     mcu(u8),
     rst0(main_jpeg_soi),
     rst1(main_jpeg_soi),
@@ -583,38 +584,38 @@ enum main_jpeg_frame_scan_data_scan_data_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_scan_data {
+pub struct main_jpeg_frame_scan_data {
     scan_data: Vec<main_jpeg_frame_scan_data_scan_data_inSeq>,
     scan_data_stream: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_scan {
+pub struct main_jpeg_frame_scan {
     segments: Vec<main_jpeg_frame_segments_inSeq>,
     sos: main_jpeg_frame_scan_sos,
     data: main_jpeg_frame_scan_data,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_dnl_some_data {
+pub struct main_jpeg_frame_dnl_some_data {
     num_lines: u16,
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame_dnl_some {
+pub struct main_jpeg_frame_dnl_some {
     marker: main_jpeg_soi,
     length: u16,
     data: main_jpeg_frame_dnl_some_data,
 }
 
 #[derive(Debug, Clone)]
-enum main_jpeg_frame_dnl {
+pub enum main_jpeg_frame_dnl {
     none,
     some(main_jpeg_frame_dnl_some),
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg_frame {
+pub struct main_jpeg_frame {
     initial_segment: main_jpeg_frame_initial_segment,
     segments: Vec<main_jpeg_frame_segments_inSeq>,
     header: main_jpeg_frame_header,
@@ -624,21 +625,21 @@ struct main_jpeg_frame {
 }
 
 #[derive(Debug, Clone)]
-struct main_jpeg {
+pub struct main_jpeg {
     soi: main_jpeg_soi,
     frame: main_jpeg_frame,
     eoi: main_jpeg_soi,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_ftyp {
+pub struct main_mpeg4_atoms_inSeq_data_ftyp {
     major_brand: (u8, u8, u8, u8),
     minor_version: u32,
     compatible_brands: Vec<(u8, u8, u8, u8)>,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref_data_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref_data_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -646,7 +647,7 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref_data
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref {
     version: u8,
     flags: (u8, u8, u8),
     number_of_entries: u32,
@@ -654,13 +655,13 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data {
     dref(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -668,7 +669,7 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_hdlr {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_hdlr {
     version: u8,
     flags: (u8, u8, u8),
     predefined: u32,
@@ -678,24 +679,24 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_hdlr {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_mime
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_mime
 {
     content_type: main_gzip_inSeq_fname_yes,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_uri
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_uri
 {
     item_uri_type: main_gzip_inSeq_fname_yes,
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields
 {
     mime(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_mime), unknown, uri(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_uri) }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no {
 item_ID: u32,
 item_protection_index: u16,
 item_type: (u8, u8, u8, u8),
@@ -704,7 +705,7 @@ extra_fields: main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_ent
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_yes
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_yes
 {
     item_ID: u16,
     item_protection_index: u16,
@@ -714,11 +715,12 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSe
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields
+{
     no(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no), yes(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_yes) }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe {
     version: u8,
     flags: (u8, u8, u8),
     fields:
@@ -726,13 +728,13 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSe
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data {
     infe(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -740,7 +742,7 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSe
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf {
     version: u8,
     flags: (u8, u8, u8),
     entry_count: u32,
@@ -749,20 +751,20 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method {
     no,
     yes(u16),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_extents_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_extents_inSeq {
     extent_index: u64,
     extent_offset: u64,
     extent_length: u64,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq {
     item_ID: u32,
     construction_method:
         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method,
@@ -773,7 +775,7 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc {
     version: u8,
     flags: (u8, u8, u8),
     offset_size_length_size: u8,
@@ -787,20 +789,20 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq_data_data {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq_data_data {
     type_indicator: u32,
     locale_indicator: u32,
     value: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq_data {
     data(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq_data_data),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -808,13 +810,13 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSe
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data {
     tool(Vec<main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq_data_tool_inSeq>),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -822,14 +824,15 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_ilst_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_large_inSeq_data {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_large_inSeq_data
+{
     from_item_ID: u32,
     reference_count: u16,
     to_item_ID: Vec<u32>,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_large_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_large_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -838,14 +841,15 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_referenc
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_small_inSeq_data {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_small_inSeq_data
+{
     from_item_ID: u16,
     reference_count: u16,
     to_item_ID: Vec<u16>,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_small_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_small_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -854,7 +858,7 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_referenc
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference {
     large(
         Vec<main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference_large_inSeq>,
     ),
@@ -864,7 +868,7 @@ enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference 
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref {
     version: u8,
     flags: (u8, u8, u8),
     single_item_reference:
@@ -872,20 +876,20 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_pitm_item_ID {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_pitm_item_ID {
     no(u32),
     yes(u16),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_pitm {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_pitm {
     version: u8,
     flags: (u8, u8, u8),
     item_ID: main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_pitm_item_ID,
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data {
     dinf(Vec<main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq>),
     hdlr(main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_hdlr),
     idat(Vec<u8>),
@@ -898,7 +902,7 @@ enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -906,7 +910,7 @@ struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version0 {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version0 {
     creation_time: u32,
     modification_time: u32,
     timescale: u32,
@@ -914,7 +918,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version0 {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version1 {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version1 {
     creation_time: u64,
     modification_time: u64,
     timescale: u32,
@@ -922,13 +926,13 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version1 {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields {
     version0(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version0),
     version1(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields_version1),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd {
     version: u8,
     flags: (u8, u8, u8),
     fields: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields,
@@ -942,7 +946,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data_elst_edit_list_table_inSeq
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data_elst_edit_list_table_inSeq
 {
     track_duration: u32,
     media_time: u32,
@@ -950,7 +954,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data_elst {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data_elst {
 version: u8,
 flags: (u8, u8, u8),
 number_of_entries: u32,
@@ -958,13 +962,13 @@ edit_list_table: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data {
     elst(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data_elst),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -972,7 +976,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_hdlr {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_hdlr {
     version: u8,
     flags: (u8, u8, u8),
     component_type: u32,
@@ -984,7 +988,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_mdhd {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_mdhd {
     version: u8,
     flags: (u8, u8, u8),
     fields: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields,
@@ -993,7 +997,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_smhd
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_smhd
 {
     version: u8,
     flags: (u8, u8, u8),
@@ -1002,7 +1006,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_co64
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_co64
 {
     version: u8,
     flags: (u8, u8, u8),
@@ -1011,14 +1015,14 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_ctts_sample_entries_inSeq
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_ctts_sample_entries_inSeq
 {
     sample_count: u32,
     sample_offset: u32,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_ctts {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_ctts {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
@@ -1026,21 +1030,21 @@ sample_entries: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_grouping_type_parameter
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_grouping_type_parameter
 {
     no,
     yes(u32),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_sample_groups_inSeq
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_sample_groups_inSeq
 {
     sample_count: u32,
     group_description_index: u32,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp {
 version: u8,
 flags: (u8, u8, u8),
 grouping_type: u32,
@@ -1050,14 +1054,14 @@ sample_groups: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_m
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sgpd_sample_groups_inSeq
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sgpd_sample_groups_inSeq
 {
     description_length: u32,
     sample_group_entry: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sgpd {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sgpd {
 version: u8,
 flags: (u8, u8, u8),
 grouping_type: u32,
@@ -1067,7 +1071,7 @@ sample_groups: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_m
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stco
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stco
 {
     version: u8,
     flags: (u8, u8, u8),
@@ -1076,7 +1080,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsc_chunk_entries_inSeq
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsc_chunk_entries_inSeq
 {
     first_chunk: u32,
     samples_per_chunk: u32,
@@ -1084,7 +1088,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsc {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsc {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
@@ -1092,7 +1096,7 @@ chunk_entries: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_m
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsd
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsd
 {
     version: u8,
     flags: (u8, u8, u8),
@@ -1102,7 +1106,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stss
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stss
 {
     version: u8,
     flags: (u8, u8, u8),
@@ -1111,14 +1115,14 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz_entry_size
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz_entry_size
 {
     no,
     yes(Vec<u32>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz {
 version: u8,
 flags: (u8, u8, u8),
 sample_size: u32,
@@ -1127,14 +1131,14 @@ entry_size: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inS
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stts_sample_entries_inSeq
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stts_sample_entries_inSeq
 {
     sample_count: u32,
     sample_delta: u32,
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stts {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stts {
 version: u8,
 flags: (u8, u8, u8),
 entry_count: u32,
@@ -1142,12 +1146,12 @@ sample_entries: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data
 {
     co64(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_co64), ctts(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_ctts), sbgp(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp), sgpd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sgpd), stco(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stco), stsc(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsc), stsd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsd), stss(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stss), stsz(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz), stts(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stts), unknown(Vec<u8>) }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq {
 size_field: u32,
 r#type: (u8, u8, u8, u8),
 size: u64,
@@ -1155,7 +1159,7 @@ data: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_dat
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_vmhd
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_vmhd
 {
     version: u8,
     flags: (u8, u8, u8),
@@ -1164,11 +1168,12 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data
+{
     dinf(Vec<main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq>), smhd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_smhd), stbl(Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq>), unknown(Vec<u8>), vmhd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_vmhd) }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -1177,7 +1182,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_da
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data {
     hdlr(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_hdlr),
     mdhd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_mdhd),
     minf(
@@ -1187,7 +1192,7 @@ enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -1195,7 +1200,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_version0 {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_version0 {
     creation_time: u32,
     modification_time: u32,
     track_ID: u32,
@@ -1204,7 +1209,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_v
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_version1 {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_version1 {
     creation_time: u64,
     modification_time: u64,
     track_ID: u32,
@@ -1213,13 +1218,13 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_v
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields {
     version0(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_version0),
     version1(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields_version1),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd {
     version: u8,
     flags: (u8, u8, u8),
     fields: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields,
@@ -1234,7 +1239,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data {
     edts(Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq>),
     mdia(Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq>),
     tkhd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd),
@@ -1242,7 +1247,7 @@ enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -1250,13 +1255,13 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_udta_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_udta_inSeq_data {
     meta(u32, Vec<main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq>),
     unknown(Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_udta_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_udta_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -1264,7 +1269,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_udta_inSeq {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data {
     mvhd(main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd),
     trak(Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq>),
     udta(Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_udta_inSeq>),
@@ -1272,7 +1277,7 @@ enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq_data_moov_inSeq {
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -1280,7 +1285,7 @@ struct main_mpeg4_atoms_inSeq_data_moov_inSeq {
 }
 
 #[derive(Debug, Clone)]
-enum main_mpeg4_atoms_inSeq_data {
+pub enum main_mpeg4_atoms_inSeq_data {
     free,
     ftyp(main_mpeg4_atoms_inSeq_data_ftyp),
     mdat,
@@ -1290,7 +1295,7 @@ enum main_mpeg4_atoms_inSeq_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4_atoms_inSeq {
+pub struct main_mpeg4_atoms_inSeq {
     size_field: u32,
     r#type: (u8, u8, u8, u8),
     size: u64,
@@ -1298,12 +1303,12 @@ struct main_mpeg4_atoms_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_mpeg4 {
+pub struct main_mpeg4 {
     atoms: Vec<main_mpeg4_atoms_inSeq>,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_ihdr_data {
+pub struct main_png_ihdr_data {
     width: u32,
     height: u32,
     bit_depth: u8,
@@ -1314,7 +1319,7 @@ struct main_png_ihdr_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_ihdr {
+pub struct main_png_ihdr {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_ihdr_data,
@@ -1322,7 +1327,7 @@ struct main_png_ihdr {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_PLTE {
+pub struct main_png_chunks_inSeq_PLTE {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: Vec<main_gif_logical_screen_global_color_table_yes_inSeq>,
@@ -1330,24 +1335,24 @@ struct main_png_chunks_inSeq_PLTE {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_bKGD_data_color_type_0 {
+pub struct main_png_chunks_inSeq_bKGD_data_color_type_0 {
     greyscale: u16,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_bKGD_data_color_type_2 {
+pub struct main_png_chunks_inSeq_bKGD_data_color_type_2 {
     red: u16,
     green: u16,
     blue: u16,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_bKGD_data_color_type_3 {
+pub struct main_png_chunks_inSeq_bKGD_data_color_type_3 {
     palette_index: u8,
 }
 
 #[derive(Debug, Clone)]
-enum main_png_chunks_inSeq_bKGD_data {
+pub enum main_png_chunks_inSeq_bKGD_data {
     color_type_0(main_png_chunks_inSeq_bKGD_data_color_type_0),
     color_type_2(main_png_chunks_inSeq_bKGD_data_color_type_2),
     color_type_3(main_png_chunks_inSeq_bKGD_data_color_type_3),
@@ -1356,7 +1361,7 @@ enum main_png_chunks_inSeq_bKGD_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_bKGD {
+pub struct main_png_chunks_inSeq_bKGD {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_bKGD_data,
@@ -1364,7 +1369,7 @@ struct main_png_chunks_inSeq_bKGD {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_cHRM_data {
+pub struct main_png_chunks_inSeq_cHRM_data {
     whitepoint_x: u32,
     whitepoint_y: u32,
     red_x: u32,
@@ -1376,7 +1381,7 @@ struct main_png_chunks_inSeq_cHRM_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_cHRM {
+pub struct main_png_chunks_inSeq_cHRM {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_cHRM_data,
@@ -1384,12 +1389,12 @@ struct main_png_chunks_inSeq_cHRM {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_gAMA_data {
+pub struct main_png_chunks_inSeq_gAMA_data {
     gamma: u32,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_gAMA {
+pub struct main_png_chunks_inSeq_gAMA {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_gAMA_data,
@@ -1397,14 +1402,14 @@ struct main_png_chunks_inSeq_gAMA {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_iCCP_data {
+pub struct main_png_chunks_inSeq_iCCP_data {
     profile_name: Vec<u8>,
     compression_method: u8,
     compressed_profile: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_iCCP {
+pub struct main_png_chunks_inSeq_iCCP {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_iCCP_data,
@@ -1412,7 +1417,7 @@ struct main_png_chunks_inSeq_iCCP {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_iTXt_data {
+pub struct main_png_chunks_inSeq_iTXt_data {
     keyword: Vec<u8>,
     compression_flag: u8,
     compression_method: u8,
@@ -1422,7 +1427,7 @@ struct main_png_chunks_inSeq_iTXt_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_iTXt {
+pub struct main_png_chunks_inSeq_iTXt {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_iTXt_data,
@@ -1430,14 +1435,14 @@ struct main_png_chunks_inSeq_iTXt {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_pHYs_data {
+pub struct main_png_chunks_inSeq_pHYs_data {
     pixels_per_unit_x: u32,
     pixels_per_unit_y: u32,
     unit_specifier: u8,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_pHYs {
+pub struct main_png_chunks_inSeq_pHYs {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_pHYs_data,
@@ -1445,13 +1450,13 @@ struct main_png_chunks_inSeq_pHYs {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_tEXt_data {
+pub struct main_png_chunks_inSeq_tEXt_data {
     keyword: Vec<u8>,
     text: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_tEXt {
+pub struct main_png_chunks_inSeq_tEXt {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_tEXt_data,
@@ -1459,7 +1464,7 @@ struct main_png_chunks_inSeq_tEXt {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_tIME_data {
+pub struct main_png_chunks_inSeq_tIME_data {
     year: u16,
     month: u8,
     day: u8,
@@ -1469,7 +1474,7 @@ struct main_png_chunks_inSeq_tIME_data {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_tIME {
+pub struct main_png_chunks_inSeq_tIME {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_tIME_data,
@@ -1477,14 +1482,14 @@ struct main_png_chunks_inSeq_tIME {
 }
 
 #[derive(Debug, Clone)]
-enum main_png_chunks_inSeq_tRNS_data {
+pub enum main_png_chunks_inSeq_tRNS_data {
     color_type_0(main_png_chunks_inSeq_bKGD_data_color_type_0),
     color_type_2(main_png_chunks_inSeq_bKGD_data_color_type_2),
     color_type_3(Vec<main_png_chunks_inSeq_bKGD_data_color_type_3>),
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_tRNS {
+pub struct main_png_chunks_inSeq_tRNS {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_tRNS_data,
@@ -1492,14 +1497,14 @@ struct main_png_chunks_inSeq_tRNS {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_zTXt_data {
+pub struct main_png_chunks_inSeq_zTXt_data {
     keyword: Vec<u8>,
     compression_method: u8,
     compressed_text: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_png_chunks_inSeq_zTXt {
+pub struct main_png_chunks_inSeq_zTXt {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: main_png_chunks_inSeq_zTXt_data,
@@ -1507,7 +1512,7 @@ struct main_png_chunks_inSeq_zTXt {
 }
 
 #[derive(Debug, Clone)]
-enum main_png_chunks_inSeq {
+pub enum main_png_chunks_inSeq {
     PLTE(main_png_chunks_inSeq_PLTE),
     bKGD(main_png_chunks_inSeq_bKGD),
     cHRM(main_png_chunks_inSeq_cHRM),
@@ -1522,7 +1527,7 @@ enum main_png_chunks_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_idat_inSeq {
+pub struct main_png_idat_inSeq {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: Vec<u8>,
@@ -1530,7 +1535,7 @@ struct main_png_idat_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_png_iend {
+pub struct main_png_iend {
     length: u32,
     tag: (u8, u8, u8, u8),
     data: (),
@@ -1538,7 +1543,7 @@ struct main_png_iend {
 }
 
 #[derive(Debug, Clone)]
-struct main_png {
+pub struct main_png {
     signature: (u8, u8, u8, u8, u8, u8, u8, u8),
     ihdr: main_png_ihdr,
     chunks: Vec<main_png_chunks_inSeq>,
@@ -1548,13 +1553,13 @@ struct main_png {
 }
 
 #[derive(Debug, Clone)]
-enum main_riff_data_chunks_inSeq_pad {
+pub enum main_riff_data_chunks_inSeq_pad {
     no(u8),
     yes,
 }
 
 #[derive(Debug, Clone)]
-struct main_riff_data_chunks_inSeq {
+pub struct main_riff_data_chunks_inSeq {
     tag: (u8, u8, u8, u8),
     length: u32,
     data: Vec<u8>,
@@ -1562,13 +1567,13 @@ struct main_riff_data_chunks_inSeq {
 }
 
 #[derive(Debug, Clone)]
-struct main_riff_data {
+pub struct main_riff_data {
     tag: (u8, u8, u8, u8),
     chunks: Vec<main_riff_data_chunks_inSeq>,
 }
 
 #[derive(Debug, Clone)]
-struct main_riff {
+pub struct main_riff {
     tag: (u8, u8, u8, u8),
     length: u32,
     data: main_riff_data,
@@ -1576,26 +1581,26 @@ struct main_riff {
 }
 
 #[derive(Debug, Clone)]
-struct main_tar_contents_inSeq_header_name {
+pub struct main_tar_contents_inSeq_header_name {
     string: Vec<u8>,
     __padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_tar_contents_inSeq_header_mode {
+pub struct main_tar_contents_inSeq_header_mode {
     string: Vec<u8>,
     __nul_or_wsp: u8,
     __padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_tar_contents_inSeq_header_uname {
+pub struct main_tar_contents_inSeq_header_uname {
     string: Vec<u8>,
     padding: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-struct main_tar_contents_inSeq_header {
+pub struct main_tar_contents_inSeq_header {
     name: main_tar_contents_inSeq_header_name,
     mode: main_tar_contents_inSeq_header_mode,
     uid: main_tar_contents_inSeq_header_mode,
@@ -1616,21 +1621,21 @@ struct main_tar_contents_inSeq_header {
 }
 
 #[derive(Debug, Clone)]
-struct main_tar_contents_inSeq {
+pub struct main_tar_contents_inSeq {
     header: main_tar_contents_inSeq_header,
     file: Vec<u8>,
     __padding: (),
 }
 
 #[derive(Debug, Clone)]
-struct main_tar {
+pub struct main_tar {
     contents: Vec<main_tar_contents_inSeq>,
     __padding: Vec<u8>,
     __trailing: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-enum main {
+pub enum main {
     gif(main_gif),
     gzip(Vec<main_gzip_inSeq>),
     jpeg(main_jpeg),
@@ -1644,13 +1649,13 @@ enum main {
 }
 
 #[derive(Debug, Clone)]
-enum base_bit_ix0 {
+pub enum base_bit_ix0 {
     none,
     some(u8),
 }
 
 #[derive(Debug, Clone)]
-struct tar_padding_char {
+pub struct tar_padding_char {
     oA: u8,
     o9: u8,
     o8: u8,
@@ -1667,7 +1672,7 @@ struct tar_padding_char {
 }
 
 #[derive(Debug, Clone)]
-struct utf8_byte_trailing {
+pub struct utf8_byte_trailing {
     data: main,
     end: (),
 }

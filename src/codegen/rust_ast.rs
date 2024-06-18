@@ -192,14 +192,40 @@ impl ToFragment for RustImportItems {
 /// Top-level declared item (e.g. struct definitions and functions)
 pub(crate) struct RustItem {
     vis: Visibility,
+    attrs: Vec<RustAttr>,
     decl: RustDecl,
 }
 
 impl RustItem {
     /// Promotes a standalone declaration to a top-level item with implicitly 'default' visibility (i.e. `pub(self)`).
     pub fn from_decl(decl: RustDecl) -> Self {
+        let attrs = match decl {
+            // FIXME - avoid hardcoding this, especially in two places
+            RustDecl::TypeDef(..) => vec![RustAttr::DeriveTraits(DeclDerives(vec![
+                Label::from("Debug"),
+                Label::from("Clone"),
+            ]))],
+            RustDecl::Function(_) => Vec::new(),
+        };
         Self {
+            attrs,
             vis: Default::default(),
+            decl,
+        }
+    }
+
+    pub fn pub_decl(decl: RustDecl) -> Self {
+        let attrs = match decl {
+            // FIXME - avoid hardcoding this, especially in two places
+            RustDecl::TypeDef(..) => vec![RustAttr::DeriveTraits(DeclDerives(vec![
+                Label::from("Debug"),
+                Label::from("Clone"),
+            ]))],
+            RustDecl::Function(_) => Vec::new(),
+        };
+        Self {
+            attrs,
+            vis: Visibility::Public,
             decl,
         }
     }
@@ -207,11 +233,30 @@ impl RustItem {
 
 impl RustItem {
     pub fn to_fragment(&self) -> Fragment {
-        self.vis.add_vis(self.decl.to_fragment())
+        let mut builder = FragmentBuilder::new();
+        for attr in self.attrs.iter() {
+            builder.push(attr.to_fragment().cat_break());
+        }
+        builder
+            .finalize()
+            .cat(self.vis.add_vis(self.decl.to_fragment()))
     }
 }
 
 type TraitName = Label;
+
+#[derive(Debug, Clone)]
+pub enum RustAttr {
+    DeriveTraits(DeclDerives),
+}
+
+impl ToFragment for RustAttr {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            RustAttr::DeriveTraits(derives) => derives.to_fragment(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct DeclDerives(Vec<TraitName>);
@@ -230,30 +275,24 @@ impl ToFragment for DeclDerives {
 
 #[derive(Clone, Debug)]
 pub(crate) enum RustDecl {
-    TypeDef(DeclDerives, Label, RustTypeDef),
+    TypeDef(Label, RustTypeDef),
     Function(RustFn),
 }
 
 impl RustDecl {
     /// FIXME - allow for more bespoke customization of what traits are derived.
     pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
-        Self::TypeDef(
-            DeclDerives(vec![Label::from("Debug"), Label::from("Clone")]),
-            lab.into(),
-            def,
-        )
+        Self::TypeDef(lab.into(), def)
     }
 }
 
 impl ToFragment for RustDecl {
     fn to_fragment(&self) -> Fragment {
         match self {
-            RustDecl::TypeDef(derives, name, tdef) => {
+            RustDecl::TypeDef(name, tdef) => {
                 let frag_key = Fragment::string(tdef.keyword_for());
-                let def = Fragment::intervene(frag_key, Fragment::Char(' '), name.to_fragment())
-                    .intervene(Fragment::Char(' '), tdef.to_fragment());
-                // FIXME - avoid hardcoding this, and instead allow the code-generator to specify a list of derivable traits to insert here
-                Fragment::intervene(derives.to_fragment(), Fragment::Char('\n'), def)
+                Fragment::intervene(frag_key, Fragment::Char(' '), name.to_fragment())
+                    .intervene(Fragment::Char(' '), tdef.to_fragment())
             }
             RustDecl::Function(fn_def) => fn_def.to_fragment(),
         }
