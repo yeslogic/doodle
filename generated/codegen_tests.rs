@@ -1,25 +1,6 @@
 #![cfg(test)]
-
+use super::api_helper::*;
 use super::*;
-
-type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
-
-// Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
-type Top = main;
-type TarBlock = main_tar_contents_inSeq;
-type PngData = main_png;
-type JpegData = main_jpeg;
-type JpegApp01 = main_jpeg_frame_initial_segment;
-type JfifData = main_jpeg_frame_initial_segment_app0_data_data_jfif;
-type TiffData = main_jpeg_frame_initial_segment_app1_data_data_exif_exif;
-type App0Data = main_jpeg_frame_initial_segment_app0_data_data;
-type App1Data = main_jpeg_frame_initial_segment_app1_data_data;
-type ExifData = main_jpeg_frame_initial_segment_app1_data_data_exif;
-type XmpData = main_jpeg_frame_initial_segment_app1_data_data_xmp;
-type GifData = main_gif;
-type GifLogicalScreenDesc = main_gif_logical_screen_descriptor;
-type RiffData = main_riff;
-type ExifByteOrder = main_jpeg_frame_initial_segment_app1_data_data_exif_exif_byte_order;
 
 #[test]
 fn test_png_signature_decoder() {
@@ -44,40 +25,36 @@ fn test_decoder_gif() -> TestResult {
 
 mod gzip {
     use super::*;
-    fn test_decoder_gzip(test_file: &str) -> TestResult {
-        let buffer = std::fs::read(std::path::Path::new(test_file))?;
-        let mut input = Parser::new(&buffer);
-        let parsed_data = Decoder1(&mut input)?.data;
-        match parsed_data {
-            Top::gzip(dat) => println!("{:?}", &dat[0].header),
-            other => unreachable!("expected gzip, found {other:?}"),
-        }
+
+    fn test_gzip_decode(filename: &str) -> TestResult {
+        let dat = try_decode_gzip(filename)?;
+        println!("{:?}", &dat[0].header);
         Ok(())
     }
 
     #[test]
     fn test_decoder_gzip_test1() -> TestResult {
-        test_decoder_gzip("test1.gz")
+        test_gzip_decode("test1.gz")
     }
     #[test]
     fn test_decoder_gzip_test2() -> TestResult {
-        test_decoder_gzip("test2.gz")
+        test_gzip_decode("test2.gz")
     }
     #[test]
     fn test_decoder_gzip_test3() -> TestResult {
-        test_decoder_gzip("test3.gz")
+        test_gzip_decode("test3.gz")
     }
     #[test]
     fn test_decoder_gzip_test4() -> TestResult {
-        test_decoder_gzip("test4.gz")
+        test_gzip_decode("test4.gz")
     }
     #[test]
     fn test_decoder_gzip_test5() -> TestResult {
-        test_decoder_gzip("test5.gz")
+        test_gzip_decode("test5.gz")
     }
     #[test]
     fn test_decoder_gzip_test6() -> TestResult {
-        test_decoder_gzip("test6.gz")
+        test_gzip_decode("test6.gz")
     }
 }
 

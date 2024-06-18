@@ -1,0 +1,19 @@
+[package]
+name = "doodle_gencode"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+bench = false
+path = "sample_codegen.rs"
+
+[[bench]]
+name = "gen_benchmark"
+path = "benches/gen_benchmark.rs"
+harness = false
+
+[dev-dependencies]
+criterion = "0.3"
+
+[dependencies]
+doodle = { path = "../", version = "0.1.0" }

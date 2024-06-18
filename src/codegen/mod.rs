@@ -2325,6 +2325,7 @@ pub fn print_generated_code(
         content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
     }
     content.add_submodule(RustSubmodule::new("codegen_tests"));
+    content.add_submodule(RustSubmodule::new_pub("api_helper"));
 
     fn write_to(mut f: impl std::io::Write, content: impl ToFragment) -> std::io::Result<()> {
         write!(f, "{}", content.to_fragment())
