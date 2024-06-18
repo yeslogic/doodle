@@ -12,12 +12,14 @@ pub(crate) enum Visibility {
     /// Equivalent to leaving out any visibility keywords (i.e. as if `pub(self)`)
     #[default]
     Implicit,
+    Public,
 }
 
 impl Visibility {
     fn add_vis(&self, item: Fragment) -> Fragment {
         match self {
             Self::Implicit => item,
+            Self::Public => Fragment::cat(Fragment::string("pub "), item),
         }
     }
 }
@@ -61,6 +63,10 @@ pub(crate) struct RustSubmodule(Visibility, Label);
 impl RustSubmodule {
     pub fn new(label: impl IntoLabel) -> Self {
         RustSubmodule(Visibility::default(), label.into())
+    }
+
+    pub fn new_pub(label: impl IntoLabel) -> Self {
+        RustSubmodule(Visibility::Public, label.into())
     }
 }
 

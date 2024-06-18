@@ -2,6 +2,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+pub mod api_helper;
 mod codegen_tests;
 
 use doodle::prelude::*;

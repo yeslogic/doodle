@@ -1,2 +1,2 @@
 [alias]
-cg = "run --bin doodle -- format --output rust --dest sample_codegen.rs"
+cg = "run --bin doodle -- format --output rust --dest generated/sample_codegen.rs"

@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "generated/"]
+
 [package]
 name = "doodle"
 version = "0.1.0"
@@ -8,7 +11,6 @@ edition = "2021"
 name = "generated"
 path = "sample_codegen.rs"
 bench = false
-
 
 [dev-dependencies]
 proptest = "1.1.0"
