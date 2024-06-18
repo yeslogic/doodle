@@ -2306,7 +2306,7 @@ pub fn print_generated_code(
             .ctxt
             .find_name_for(&path)
             .expect("no name found");
-        let it = RustItem::from_decl(RustDecl::type_def(name, tdef.clone()));
+        let it = RustItem::pub_decl(RustDecl::type_def(name, tdef.clone()));
         items.push(it);
     }
 
