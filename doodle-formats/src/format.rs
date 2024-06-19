@@ -2,7 +2,7 @@ use crate::format::base::BaseModule;
 use doodle::helper::*;
 use doodle::{Format, FormatModule, FormatRef};
 
-mod base;
+pub mod base;
 
 mod deflate;
 mod gif;
