@@ -13,7 +13,7 @@ path = "benches/gen_benchmark.rs"
 harness = false
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.5"
 
 [dependencies]
 doodle = { path = "../", version = "0.1.0" }

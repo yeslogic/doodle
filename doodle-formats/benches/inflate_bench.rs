@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use doodle_formats::format;
-use doodle::{decoder::{Compiler, Program, ValueLike}, read::ReadCtxt, FormatModule};
+use doodle::{decoder::{Compiler, Program, Value}, read::ReadCtxt, FormatModule};
 use lazy_static::lazy_static;
 
 // amortize the cost of constructing the program to avoid overhead in the inflate profile
@@ -14,13 +14,13 @@ lazy_static! {
 
 }
 
-fn run_decoder(f: &str) -> usize {
+fn run_decoder(f: &str) -> Value {
     let input = std::fs::read(f).unwrap();
     let value = match PROGRAM.run(ReadCtxt::new(&input)) {
         Ok((value, _)) => value,
         Err(_) => unreachable!(),
     };
-    value.get_sequence().map_or_else(|| unreachable!(), Vec::len)
+    value
 }
 
 
