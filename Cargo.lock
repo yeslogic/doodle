@@ -294,6 +294,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "doodle-formats"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.2.1",
+ "doodle",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "doodle_gencode"
 version = "0.1.0"
 dependencies = [
