@@ -2,6 +2,10 @@
 use super::api_helper::*;
 use super::*;
 
+fn testpath(filename: &str) -> String {
+    format!("../{filename}")
+}
+
 #[test]
 fn test_png_signature_decoder() {
     // PNG signature
@@ -13,7 +17,7 @@ fn test_png_signature_decoder() {
 
 #[test]
 fn test_decoder_gif() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.gif"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.gif")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -27,7 +31,7 @@ mod gzip {
     use super::*;
 
     fn test_gzip_decode(filename: &str) -> TestResult {
-        let dat = try_decode_gzip(filename)?;
+        let dat = try_decode_gzip(&testpath(filename))?;
         println!("{:?}", &dat[0].header);
         Ok(())
     }
@@ -61,7 +65,7 @@ mod gzip {
 mod jpeg {
     use super::*;
     fn test_decoder_jpeg(test_file: &str) -> TestResult {
-        let buffer = std::fs::read(std::path::Path::new(test_file))?;
+        let buffer = std::fs::read(std::path::Path::new(&testpath(test_file)))?;
         let mut input = Parser::new(&buffer);
         let parsed_data = Decoder1(&mut input)?.data;
         match parsed_data {
@@ -84,7 +88,7 @@ mod jpeg {
 
 #[test]
 fn test_decoder_peano() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.peano"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.peano")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -96,7 +100,7 @@ fn test_decoder_peano() -> TestResult {
 
 #[test]
 fn test_decoder_mpeg4() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.mp4"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.mp4")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -108,7 +112,7 @@ fn test_decoder_mpeg4() -> TestResult {
 
 #[test]
 fn test_decoder_png() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.png"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.png")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -120,7 +124,7 @@ fn test_decoder_png() -> TestResult {
 
 #[test]
 fn test_decoder_riff() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.webp"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.webp")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -132,7 +136,7 @@ fn test_decoder_riff() -> TestResult {
 
 #[test]
 fn test_decoder_tar() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.tar"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder15(&mut input)?;
     match parsed_data {
@@ -150,7 +154,7 @@ fn test_decoder_tar() -> TestResult {
 
 #[test]
 fn test_decoder_text_ascii() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.txt"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.txt")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -167,7 +171,7 @@ fn test_decoder_text_ascii() -> TestResult {
 
 #[test]
 fn test_decoder_text_utf8() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("test.utf8"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.utf8")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -184,7 +188,7 @@ fn test_decoder_text_utf8() -> TestResult {
 
 #[test]
 fn test_decoder_text_mixed() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new("mixed.utf8"))?;
+    let buffer = std::fs::read(std::path::Path::new(&testpath("mixed.utf8")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
@@ -334,37 +338,37 @@ mod test_files {
     #[test]
     #[should_panic]
     fn test_errant_png() {
-        check_png("test-images/broken.png").unwrap()
+        check_png(&testpath("test-images/broken.png")).unwrap()
     }
 
     #[test]
     fn test_all_extra_images() -> TestResult {
         let mut residue = Vec::new();
-        for entry in std::fs::read_dir("test-images")?.flatten() {
+        for entry in std::fs::read_dir(&testpath("test-images"))?.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             match () {
                 _ if name.contains("broken.png") => {
-                    assert!(check_png(format!("test-images/{}", name).as_str()).is_err());
+                    assert!(check_png(format!("../test-images/{}", name).as_str()).is_err());
                     println!("Broken PNG (expected)");
                 }
                 _ if name.ends_with(".png") => {
-                    check_png(format!("test-images/{}", name).as_str())?;
+                    check_png(format!("../test-images/{}", name).as_str())?;
                 }
                 _ if name.ends_with(".jpg") || name.ends_with(".jpeg") => {
-                    check_jpeg(format!("test-images/{}", name).as_str())?;
+                    check_jpeg(format!("../test-images/{}", name).as_str())?;
                 }
                 _ if name.ends_with(".gif") => {
-                    check_gif(format!("test-images/{}", name).as_str())?;
+                    check_gif(format!("../test-images/{}", name).as_str())?;
                 }
                 _ if name.ends_with(".tif") => {
-                    check_tiff(format!("test-images/{}", name).as_str())?;
+                    check_tiff(format!("../test-images/{}", name).as_str())?;
                 }
                 _ if name.ends_with(".webp") => {
-                    check_riff(format!("test-images/{}", name).as_str())?;
+                    check_riff(format!("../test-images/{}", name).as_str())?;
                 }
                 // FIXME: add more cases as we add handlers for each image type
                 _ => {
-                    residue.push(format!("[test_images/{}]: Skipping...", name));
+                    residue.push(format!("[../test_images/{}]: Skipping...", name));
                 }
             }
         }
