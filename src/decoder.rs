@@ -519,7 +519,6 @@ impl Expr {
                     let mut vs = Vec::new();
                     for v in values {
                         let arg = Value::Tuple(vec![Value::Seq(vs), v]);
-                        // TODO can we avoid cloning arg here?
                         if let Value::Seq(vn) = expr.eval_lambda(scope, &arg) {
                             vs = match arg {
                                 Value::Tuple(mut args) => match args.remove(0) {
