@@ -1,2 +1,6 @@
 [alias]
 cg = "run --bin doodle -- format --output rust --dest generated/sample_codegen.rs"
+
+[profile.profiling]
+inherits = "release"
+debug = true

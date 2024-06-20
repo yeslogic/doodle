@@ -1,14 +1,14 @@
 use crate::byte_set::ByteSet;
-use crate::decoder::{Scope, ScopeEntry, Value, ValueLike};
+use crate::decoder::{Scope, ScopeEntry, Value};
 use crate::read::ReadCtxt;
 use crate::Label;
 
-pub type ParseResult<T, V = Value> = Result<T, ParseError<V>>;
+pub type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Debug)]
-pub enum ParseError<V: std::fmt::Debug + Clone> {
+pub enum ParseError {
     Fail {
-        bindings: Vec<(Label, ScopeEntry<V>)>,
+        bindings: Vec<(Label, ScopeEntry<Value>)>,
         buffer: Vec<u8>,
         offset: usize,
     },
@@ -33,7 +33,7 @@ pub enum ParseError<V: std::fmt::Debug + Clone> {
     },
 }
 
-impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
+impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Fail {
@@ -84,12 +84,10 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
     }
 }
 
-impl<V: std::fmt::Debug + Clone> std::error::Error for ParseError<V> {}
+impl std::error::Error for ParseError {}
 
-impl<V: std::fmt::Debug + Clone> ParseError<V> {
-    pub fn fail(scope: &Scope<'_, V>, input: ReadCtxt<'_>) -> Self
-    where
-        V: ValueLike,
+impl ParseError {
+    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> Self
     {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
