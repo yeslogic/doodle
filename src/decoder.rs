@@ -37,10 +37,10 @@ impl Value {
         }
     }
 
-    fn matches_inner(&self, scope: &mut MultiScope<'_>, pattern: &Pattern) -> bool {
+    fn matches_inner<'a>(&'a self, scope: &mut MultiScope<'a>, pattern: &Pattern) -> bool {
         match (pattern, self) {
             (Pattern::Binding(name), head) => {
-                scope.push(name.clone(), head.clone());
+                scope.push(name.clone(), head);
                 true
             }
             (Pattern::Wildcard, _) => true,
@@ -67,7 +67,7 @@ impl Value {
         }
     }
 
-    fn matches<'a>(&self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
+    fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
         let mut pattern_scope = MultiScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
@@ -82,6 +82,14 @@ impl Value {
         match self {
             Value::Mapped(_orig, v) => v.coerce_mapped_value(),
             Value::Branch(_n, v) => v.coerce_mapped_value(),
+            v => v,
+        }
+    }
+
+    pub fn extract_mapped_value(self) -> Self {
+        match self {
+            Value::Mapped(_orig, v) => v.extract_mapped_value(),
+            Value::Branch(_n, v) => v.extract_mapped_value(),
             v => v,
         }
     }
@@ -541,8 +549,15 @@ impl Expr {
         }
     }
 
+    fn eval_value_ref<'a, 'b: 'a>(&'b self, scope: &'a Scope<'a>) -> Cow<'a, Value> {
+        match self.eval(scope) {
+            Cow::Borrowed(vref) => Cow::Borrowed(vref.coerce_mapped_value()),
+            Cow::Owned(v) => Cow::Owned(v.extract_mapped_value()),
+        }
+    }
+
     pub fn eval_value<'a>(&self, scope: &'a Scope<'a>) -> Value {
-        self.eval(scope).coerce_mapped_value().clone()
+        self.eval_value_ref(scope).into_owned()
     }
 
     fn eval_lambda<'a>(&self, scope: &'a Scope<'a>, arg: &Value) -> Value {
@@ -887,7 +902,7 @@ pub enum Scope<'a> {
 
 pub struct MultiScope<'a> {
     parent: &'a Scope<'a>,
-    entries: Vec<(Label, Value)>,
+    entries: Vec<(Label, Cow<'a, Value>)>,
 }
 
 pub struct SingleScope<'a> {
@@ -942,8 +957,14 @@ impl<'a> MultiScope<'a> {
         MultiScope { parent, entries }
     }
 
-    pub fn push(&mut self, name: impl Into<Label>, v: Value) {
-        self.entries.push((name.into(), v));
+    /// Pushes a new binding to the scope using a borrow that lives at least as long as the scope itself
+    pub fn push(&mut self, name: impl Into<Label>, v: &'a Value) {
+        self.entries.push((name.into(), Cow::Borrowed(v)));
+    }
+
+    /// Pushes a new binding to the scope using an owned [Value]
+    pub fn push_owned(&mut self, name: impl Into<Label>, v: Value) {
+        self.entries.push((name.into(), Cow::Owned(v)));
     }
 
     fn get_value_by_name(&self, name: &str) -> &Value {
@@ -957,13 +978,13 @@ impl<'a> MultiScope<'a> {
 
     fn get_bindings(&self, bindings: &mut Vec<(Label, ScopeEntry<Value>)>) {
         for (name, value) in self.entries.iter().rev() {
-            bindings.push((name.clone(), ScopeEntry::Value(value.clone())));
+            bindings.push((name.clone(), ScopeEntry::Value(value.clone().into_owned())));
         }
         self.parent.get_bindings(bindings);
     }
 
     fn into_record(self) -> Value {
-        Value::collect_fields(self.entries)
+        Value::collect_fields(self.entries.into_iter().map(|(name, value)| (name, value.into_owned())).collect())
     }
 }
 
@@ -1031,7 +1052,7 @@ impl Decoder {
                 let mut new_scope = MultiScope::with_capacity(&Scope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_value(scope);
-                    new_scope.push(name.clone(), v);
+                    new_scope.push_owned(name.clone(), v);
                 }
                 program.decoders[*n]
                     .0
@@ -1095,7 +1116,7 @@ impl Decoder {
                 let mut record_scope = MultiScope::with_capacity(scope, fields.len());
                 for (name, f) in fields {
                     let (vf, next_input) = f.parse(program, &Scope::Multi(&record_scope), input)?;
-                    record_scope.push(name.clone(), vf);
+                    record_scope.push_owned(name.clone(), vf);
                     input = next_input;
                 }
                 Ok((record_scope.into_record(), input))
