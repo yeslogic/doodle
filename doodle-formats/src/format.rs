@@ -61,13 +61,13 @@ mod test {
     use super::*;
     use doodle::{
         byte_set::ByteSet,
-        decoder::{Value, ValueLike},
+        decoder::Value,
         error::ParseError,
         read::ReadCtxt,
     };
 
     #[test]
-    fn with_relative_offset_format() -> Result<(), ParseError<Value>> {
+    fn with_relative_offset_format() -> Result<(), ParseError> {
         let mut module = FormatModule::new();
         let base = base::main(&mut module);
 
