@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
-use crate::decoder::Value;
+use crate::{decoder::Value, loc_decoder::{ParseLoc, Parsed, ParsedValue}};
 use crate::precedence::{cond_paren, Precedence};
 use crate::Label;
 use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};
@@ -17,6 +17,16 @@ fn atomic_value_to_string(value: &Value) -> String {
 pub fn print_decoded_value(module: &FormatModule, value: &Value, format: &Format) {
     use std::io::Write;
     let frag = MonoidalPrinter::new(module).compile_decoded_value(value, format);
+    let mut lock = io::stdout().lock();
+    match write!(&mut lock, "{}", frag) {
+        Ok(_) => (),
+        Err(e) => eprintln!("error: {e}"),
+    }
+}
+
+pub fn print_parsed_decoded_value(module: &FormatModule, p_value: &ParsedValue, format: &Format) {
+    use std::io::Write;
+    let frag = MonoidalPrinter::new(module).compile_parsed_decoded_value(p_value, format);
     let mut lock = io::stdout().lock();
     match write!(&mut lock, "{}", frag) {
         Ok(_) => (),
@@ -53,6 +63,7 @@ pub struct MonoidalPrinter<'module> {
 
 type Field<T> = (Label, T);
 type FieldFormat = Field<Format>;
+type FieldPValue = Field<ParsedValue>;
 type FieldValue = Field<Value>;
 
 impl<'module> MonoidalPrinter<'module> {
@@ -115,8 +126,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn is_atomic_value(&self, value: &Value, format: Option<&Format>) -> bool
-    {
+    fn is_atomic_value(&self, value: &Value, format: Option<&Format>) -> bool {
         if let Some(format) = format {
             if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
                 return true;
@@ -163,10 +173,70 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
+    fn is_atomic_parsed_value(&self, value: &ParsedValue, format: Option<&Format>) -> bool
+    {
+        if let Some(format) = format {
+            if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
+                return true;
+            }
+        }
+        self.is_atomic_value(value.into_cow_value().as_ref(), format)
+    }
+
     fn unwrap_itemvars<'a>(&'a self, format: &'a Format) -> &'a Format {
         match format {
             Format::ItemVar(level, _args) => self.unwrap_itemvars(self.module.get_format(*level)),
             _ => format,
+        }
+    }
+
+    fn compile_location(&self, loc: ParseLoc) -> Fragment {
+        match loc {
+            ParseLoc::InBuffer { offset, length } => match length {
+                // 0 => Fragment::string(format!("BUF<{offset}>")),
+                // 1 => Fragment::string(format!("BUF@{offset}")),
+                _ => Fragment::string(format!("BUF({offset}:+{length})")),
+            },
+            ParseLoc::Synthesized => Fragment::string("<SYNTH>"),
+        }
+    }
+
+    fn compile_with_location(&self, frag: Fragment, loc: ParseLoc) -> Fragment {
+        Fragment::intervene(
+            frag,
+            Fragment::string(" \t"),
+            self.compile_location(loc)
+                .delimit(Fragment::Char('['), Fragment::Char(']')),
+        )
+    }
+
+    fn compile_parsed_value(&mut self, value: &ParsedValue) -> Fragment {
+        match value {
+            ParsedValue::Flat(Parsed { loc, inner }) => {
+                let symb = match inner {
+                    Value::Bool(true) => Fragment::String("true".into()),
+                    Value::Bool(false) => Fragment::String("false".into()),
+                    Value::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
+                    Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
+                    Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
+                    Value::U64(i) => Fragment::DisplayAtom(Rc::new(*i)),
+                    Value::Char(c) => Fragment::DebugAtom(Rc::new(*c)),
+                    _ => unreachable!("found non-flat Value in ParsedValue::Flat: {inner:?}"),
+                };
+                self.compile_with_location(symb, *loc)
+            }
+            ParsedValue::Tuple(vals) => self.compile_parsed_tuple(vals, None),
+            ParsedValue::Seq(vals) => self.compile_parsed_seq(vals, None),
+            ParsedValue::Record(fields) => self.compile_parsed_record(fields, None),
+            ParsedValue::Variant(label, value) => self.compile_parsed_variant(label, value, None),
+            ParsedValue::Mapped(orig, value) => {
+                if self.flags.collapse_mapped_values {
+                    self.compile_parsed_value(value)
+                } else {
+                    self.compile_parsed_value(orig)
+                }
+            }
+            ParsedValue::Branch(_n, value) => self.compile_parsed_value(value),
         }
     }
 }
@@ -187,6 +257,121 @@ impl<'module> MonoidalPrinter<'module> {
             preview_len: Some(10),
             flags,
             module,
+        }
+    }
+
+    pub fn compile_parsed_decoded_value(&mut self, value: &ParsedValue, fmt: &Format) -> Fragment {
+        let mut frag = Fragment::Empty;
+        match fmt {
+            Format::ItemVar(level, _args) => {
+                let fmt_name = self.module.get_name(*level);
+
+                // FIXME - this is a bit hackish, we should have a sentinel or marker to avoid magic strings
+                if self.flags.pretty_utf8_strings && fmt_name == "text.string.utf8" {
+                    self.compile_parsed_string(value)
+                } else if self.flags.pretty_ascii_strings && name_is_ascii_string(fmt_name) {
+                    self.compile_parsed_ascii_string(value)
+                } else if self.flags.pretty_ascii_strings && fmt_name.starts_with("base.ascii-char")
+                {
+                    frag.encat(Fragment::Char('\''));
+                    frag.encat(self.compile_parsed_ascii_char(value));
+                    frag.encat(Fragment::Char('\''));
+                    frag
+                } else {
+                    self.compile_parsed_decoded_value(value, self.module.get_format(*level))
+                }
+            }
+            Format::Fail => panic!("uninhabited format (value={value:?}"),
+            Format::EndOfInput => self.compile_parsed_value(value),
+            Format::Align(_) => self.compile_parsed_value(value),
+            Format::Byte(_) => self.compile_parsed_value(value),
+            Format::Variant(label, format) => match value {
+                ParsedValue::Variant(label2, value) => {
+                    if label == label2 {
+                        self.compile_parsed_variant(label, value, Some(format))
+                    } else {
+                        panic!("expected variant label {label}, found {label2}");
+                    }
+                }
+                _ => panic!("expected variant, found {value:?}"),
+            },
+            Format::Union(branches) | Format::UnionNondet(branches) => match value {
+                ParsedValue::Branch(n, value) => {
+                    let format = &branches[*n];
+                    self.compile_parsed_decoded_value(value, format)
+                }
+                _ => panic!("expected branch, found {value:?}"),
+            },
+            Format::Tuple(formats) => match value {
+                ParsedValue::Tuple(parsed_tuple) => {
+                    if self.flags.pretty_ascii_strings && self.is_ascii_tuple_format(formats) {
+                        self.compile_parsed_ascii_seq(parsed_tuple)
+                    } else {
+                        self.compile_parsed_tuple(parsed_tuple, Some(formats))
+                    }
+                }
+                _ => panic!("expected tuple, found {value:?}"),
+            },
+            Format::Record(format_fields) => match value {
+                ParsedValue::Record(parsed_value_fields) => {
+                    self.compile_parsed_record(parsed_value_fields, Some(format_fields))
+                }
+                _ => panic!("expected record, found {value:?}"),
+            },
+            Format::Repeat(format)
+            | Format::Repeat1(format)
+            | Format::RepeatCount(_, format)
+            | Format::RepeatBetween(_, _, format)
+            | Format::RepeatUntilLast(_, format)
+            | Format::RepeatUntilSeq(_, format) => match value {
+                ParsedValue::Seq(values) => {
+                    if self.flags.tables_for_record_sequences
+                        && self.try_as_record_with_atomic_fields(format).is_some()
+                    {
+                        self.compile_parsed_seq_records(values, format)
+                    } else if self.flags.pretty_ascii_strings
+                        && format.is_ascii_char_format(self.module)
+                    {
+                        self.compile_parsed_ascii_seq(values)
+                    } else {
+                        self.compile_parsed_seq(values, Some(format))
+                    }
+                }
+                _ => panic!("expected sequence, found {value:?}"),
+            },
+            Format::Peek(format) => self.compile_parsed_decoded_value(value, format),
+            Format::PeekNot(_format) => self.compile_parsed_value(value),
+            Format::Slice(_, format) => self.compile_parsed_decoded_value(value, format),
+            Format::Bits(format) => self.compile_parsed_decoded_value(value, format),
+            Format::WithRelativeOffset(_, format) => {
+                self.compile_parsed_decoded_value(value, format)
+            }
+            Format::Map(format, _expr) => {
+                if self.flags.collapse_mapped_values {
+                    self.compile_parsed_value(value)
+                } else {
+                    match value {
+                        ParsedValue::Mapped(orig, _value) => {
+                            self.compile_parsed_decoded_value(orig, format)
+                        }
+                        _ => panic!("expected mapped value, found {value:?}"),
+                    }
+                }
+            }
+            Format::Compute(_expr) => self.compile_parsed_value(value),
+            Format::Let(_name, _expr, format) => self.compile_parsed_decoded_value(value, format),
+            Format::Match(_head, branches) => match value {
+                ParsedValue::Branch(index, value) => {
+                    let (_pattern, format) = &branches[*index];
+                    frag.encat(self.compile_parsed_decoded_value(value, format));
+                    return frag;
+                }
+                _ => panic!("expected branch, found {value:?}"),
+            },
+            Format::Dynamic(_name, _dynformat, format) => {
+                self.compile_parsed_decoded_value(value, format)
+            }
+            Format::Apply(_) => self.compile_parsed_value(value),
         }
     }
 
@@ -333,6 +518,23 @@ impl<'module> MonoidalPrinter<'module> {
             .find_map(|(label, value)| (label == "string").then_some(value))
     }
 
+    pub fn compile_parsed_string(&self, value: &ParsedValue) -> Fragment {
+        let vs = match value.coerce_mapped_value() {
+            ParsedValue::Record(fields) => {
+                match self
+                    .extract_string_field(fields.inner.as_slice())
+                    .unwrap_or_else(|| unreachable!("no string field"))
+                {
+                    ParsedValue::Seq(vs) => vs,
+                    v => panic!("expected sequence (parsed-)value, found {v:?}"),
+                }
+            }
+            ParsedValue::Seq(vs) => vs,
+            v => panic!("expected record or sequence, found {v:?}"),
+        };
+        self.compile_parsed_char_seq(vs)
+    }
+
     pub fn compile_string(&self, value: &Value) -> Fragment {
         let vs = match value.coerce_mapped_value() {
             Value::Record(fields) => {
@@ -348,6 +550,23 @@ impl<'module> MonoidalPrinter<'module> {
             v => panic!("expected record or sequence, found {v:?}"),
         };
         self.compile_char_seq(vs)
+    }
+
+    pub fn compile_parsed_ascii_string(&self, value: &ParsedValue) -> Fragment {
+        let vs = match value.coerce_mapped_value() {
+            ParsedValue::Record(fields) => {
+                match self
+                    .extract_string_field(fields.get_inner())
+                    .unwrap_or_else(|| unreachable!("no string field"))
+                {
+                    ParsedValue::Seq(vs) => vs,
+                    v => panic!("expected sequence value, found {v:?}"),
+                }
+            }
+            ParsedValue::Seq(vs) => vs,
+            _ => panic!("expected record value, found {value:?}"),
+        };
+        self.compile_parsed_ascii_seq(vs)
     }
 
     pub fn compile_ascii_string(&self, value: &Value) -> Fragment {
@@ -367,6 +586,16 @@ impl<'module> MonoidalPrinter<'module> {
         self.compile_ascii_seq(vs)
     }
 
+    fn compile_parsed_char_seq(&self, vals: &Parsed<Vec<ParsedValue>>) -> Fragment {
+        let mut frag = Fragment::new();
+        frag.encat(Fragment::Char('"'));
+        for v in vals.inner.iter() {
+            frag.encat(self.compile_parsed_char(v));
+        }
+        frag.encat(Fragment::Char('"'));
+        self.compile_with_location(frag.group(), vals.loc)
+    }
+
     fn compile_char_seq(&self, vals: &[Value]) -> Fragment {
         let mut frag = Fragment::new();
         frag.encat(Fragment::Char('"'));
@@ -375,6 +604,16 @@ impl<'module> MonoidalPrinter<'module> {
         }
         frag.encat(Fragment::Char('"'));
         frag.group()
+    }
+
+    fn compile_parsed_ascii_seq(&self, vals: &Parsed<Vec<ParsedValue>>) -> Fragment {
+        let mut frag = Fragment::new();
+        frag.encat(Fragment::Char('"'));
+        for v in vals.inner.iter() {
+            frag.encat(self.compile_parsed_ascii_char(v));
+        }
+        frag.encat(Fragment::Char('"'));
+        self.compile_with_location(frag.group(), vals.loc)
     }
 
     fn compile_ascii_seq(&self, vals: &[Value]) -> Fragment {
@@ -387,6 +626,20 @@ impl<'module> MonoidalPrinter<'module> {
         frag.group()
     }
 
+    fn compile_parsed_char(&self, v: &ParsedValue) -> Fragment {
+        let c = match v.coerce_mapped_value() {
+            ParsedValue::Flat(Parsed { inner, .. }) => match inner {
+                Value::U8(b) => *b as char,
+                Value::Char(c) => *c,
+                _v => panic!("expected U8 or Char value, found {_v:?}"),
+            },
+            _other => panic!("expected Flat (parsed-)value, found {_other:?}"),
+        };
+        match c {
+            '\x00'..='\x7f' => Fragment::String(c.escape_debug().collect::<String>().into()),
+            _ => Fragment::Char(c),
+        }
+    }
 
     fn compile_char(&self, v: &Value) -> Fragment {
         let c = match v.coerce_mapped_value() {
@@ -398,6 +651,26 @@ impl<'module> MonoidalPrinter<'module> {
             '\x00'..='\x7f' => Fragment::String(c.escape_debug().collect::<String>().into()),
             _ => Fragment::Char(c),
         }
+    }
+
+    fn compile_parsed_ascii_char(&self, v: &ParsedValue) -> Fragment {
+        let (_loc, b) = match v {
+            ParsedValue::Flat(Parsed {
+                loc,
+                inner: Value::U8(b),
+            }) => (*loc, *b),
+            _ => panic!("expected U8 value, found {v:?}"),
+        };
+        let symbol = match b {
+            0x00 => Fragment::String("\\0".into()),
+            0x09 => Fragment::String("\\t".into()),
+            0x0A => Fragment::String("\\n".into()),
+            0x0D => Fragment::String("\\r".into()),
+            32..=127 => Fragment::Char(b as char),
+            _ => Fragment::String(format!("\\x{b:02X}").into()),
+        };
+        // NOTE - ignoring location because ascii strings are printed inline and we can't clutter them
+        symbol
     }
 
     fn compile_ascii_char(&self, v: &Value) -> Fragment {
@@ -439,6 +712,71 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
+    fn compile_parsed_tuple(
+        &mut self,
+        vals: &Parsed<Vec<ParsedValue>>,
+        formats: Option<&[Format]>,
+    ) -> Fragment {
+        let Parsed { inner, .. } = vals;
+        let symb = if inner.is_empty() {
+            Fragment::String("()".into())
+        } else {
+            let mut frag = Fragment::new();
+            let last_index = inner.len() - 1;
+            for index in 0..last_index {
+                frag.encat(self.compile_parsed_field_value_continue(
+                    index,
+                    &inner[index],
+                    formats.map(|fs| &fs[index]),
+                    true,
+                ));
+            }
+            frag.encat(self.compile_parsed_field_value_last(
+                last_index,
+                &inner[last_index],
+                formats.map(|fs| &fs[last_index]),
+                true,
+            ));
+            frag
+        };
+        // FIXME - does location information for the overall tuple give us anything notable?
+        // self.compile_with_location(symb, *loc)
+        symb
+    }
+
+    fn compile_parsed_seq(
+        &mut self,
+        vals: &Parsed<Vec<ParsedValue>>,
+        format: Option<&Format>,
+    ) -> Fragment {
+        let Parsed { inner, .. } = vals;
+        if inner.is_empty() {
+            Fragment::String("[]".into())
+        } else {
+            let mut frag = Fragment::new();
+            let last_index = inner.len() - 1;
+            let (upper_bound, any_skipped) = match self.preview_len {
+                Some(preview_len) if inner.len() > preview_len => {
+                    (preview_len, preview_len != last_index)
+                }
+                Some(_) | None => (last_index, false),
+            };
+            for (index, val) in inner[0..upper_bound].iter().enumerate() {
+                frag.encat(self.compile_parsed_field_value_continue(index, val, format, false));
+            }
+            if any_skipped {
+                frag.encat(self.compile_field_skipped());
+            }
+            frag.encat(self.compile_parsed_field_value_last(
+                last_index,
+                &inner[last_index],
+                format,
+                false,
+            ));
+            frag
+        }
+    }
+
     fn compile_seq(&mut self, vals: &[Value], format: Option<&Format>) -> Fragment {
         if vals.is_empty() {
             Fragment::String("[]".into())
@@ -460,6 +798,37 @@ impl<'module> MonoidalPrinter<'module> {
             frag.encat(self.compile_field_value_last(last_index, &vals[last_index], format, false));
             frag
         }
+    }
+
+    fn compile_parsed_seq_records(
+        &mut self,
+        vals: &Parsed<Vec<ParsedValue>>,
+        format: &Format,
+    ) -> Fragment {
+        let fields = self.try_as_record_with_atomic_fields(format).unwrap();
+        let mut cols = Vec::new();
+        let mut header = Vec::new();
+        for (label, _) in fields.as_ref() {
+            cols.push(label.len());
+            header.push(label.clone());
+        }
+        let mut rows = Vec::new();
+        let mut locs = Vec::new();
+        for v in vals.inner.iter() {
+            let mut row = Vec::new();
+            if let ParsedValue::Record(Parsed { loc, inner: fields }) = v {
+                for (i, (_l, v)) in fields.iter().enumerate() {
+                    let cell = atomic_value_to_string(&v.clone_into_value());
+                    cols[i] = std::cmp::max(cols[i], cell.len());
+                    row.push(cell);
+                    locs.push(*loc);
+                }
+            } else {
+                panic!("expected record value: {v:?}");
+            }
+            rows.push(row);
+        }
+        self.compile_parsed_table(&cols, &header, &rows, &locs)
     }
 
     fn compile_seq_records(&mut self, vals: &[Value], format: &Format) -> Fragment {
@@ -485,6 +854,45 @@ impl<'module> MonoidalPrinter<'module> {
             rows.push(row);
         }
         self.compile_table(&cols, &header, &rows)
+    }
+
+    fn compile_parsed_table(
+        &mut self,
+        cols: &[usize],
+        header: &[Label],
+        rows: &[Vec<String>],
+        locs: &[ParseLoc],
+    ) -> Fragment {
+        let mut frags = FragmentBuilder::new();
+        let frag = frags.active_mut();
+        frag.encat(self.compile_gutter());
+        frag.encat(Fragment::Symbol(Symbol::Elbow));
+        for (i, th) in header.iter().enumerate() {
+            frag.encat(Fragment::String(
+                format!(" {:>width$}", th, width = cols[i]).into(),
+            ));
+        }
+        frag.engroup().encat_break();
+        let mut frag = frags.renew();
+        self.gutter.push(Column::Space);
+        for (tr, loc) in Iterator::zip(rows.into_iter(), locs.into_iter()) {
+            frag.encat(self.compile_gutter());
+            for (i, td) in tr.iter().enumerate() {
+                frag.encat(Fragment::String(
+                    format!(" {:>width$}", td, width = cols[i]).into(),
+                ));
+            }
+            frag.engroup()
+                .encat(Fragment::string(" \t"))
+                .encat(
+                    self.compile_location(*loc)
+                        .delimit(Fragment::Char('['), Fragment::Char(']')),
+                )
+                .encat_break();
+            frag = frags.renew();
+        }
+        self.gutter.pop();
+        frags.finalize()
     }
 
     fn compile_table(
@@ -519,6 +927,56 @@ impl<'module> MonoidalPrinter<'module> {
         frags.finalize()
     }
 
+    fn compile_parsed_record(
+        &mut self,
+        p_value_fields: &Parsed<Vec<FieldPValue>>,
+        format_fields: Option<&[FieldFormat]>,
+    ) -> Fragment {
+        let Parsed {
+            inner: value_fields,
+            ..
+        } = p_value_fields;
+        let mut value_fields_filt = Vec::new();
+        let mut format_fields_filt = format_fields.map(|_| Vec::new());
+
+        let (value_fields, format_fields) = if self.flags.hide_double_underscore_fields
+            && value_fields.iter().any(|(lab, _)| lab.starts_with("__"))
+        {
+            value_fields_filt.extend(
+                value_fields
+                    .iter()
+                    .filter(|(lab, _)| !lab.starts_with("__"))
+                    .cloned(),
+            );
+            // we can unwrap below because format_fields_filt is only Some (and the closure will only be called) if format_fields is Some
+            if let Some(v) = format_fields_filt.as_mut() {
+                v.extend(
+                    format_fields
+                        .unwrap()
+                        .iter()
+                        .filter(|(lab, _)| !lab.starts_with("__"))
+                        .cloned(),
+                )
+            }
+            (&value_fields_filt, format_fields_filt.as_deref())
+        } else {
+            (value_fields, format_fields)
+        };
+        if value_fields.is_empty() {
+            Fragment::String("{}".into())
+        } else {
+            let mut frag = Fragment::new();
+            let last_index = value_fields.len() - 1;
+            for (index, (label, value)) in value_fields[..last_index].iter().enumerate() {
+                let format = format_fields.map(|fs| &fs[index].1);
+                frag.encat(self.compile_parsed_field_value_continue(label, value, format, true));
+            }
+            let (label, value) = &value_fields[last_index];
+            let format = format_fields.map(|fs| &fs[last_index].1);
+            frag.encat(self.compile_parsed_field_value_last(label, value, format, true));
+            frag
+        }
+    }
     fn compile_record(
         &mut self,
         value_fields: &[FieldValue],
@@ -566,6 +1024,27 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
+    fn compile_parsed_variant(
+        &mut self,
+        label: &str,
+        value: &ParsedValue,
+        format: Option<&Format>,
+    ) -> Fragment {
+        if self.is_atomic_parsed_value(value, format) {
+            let mut frag = Fragment::new();
+            frag.encat(Fragment::String(format!("{{ {label} := ").into()));
+            if let Some(format) = format {
+                frag.encat(self.compile_parsed_decoded_value(value, format));
+            } else {
+                frag.encat(self.compile_parsed_value(value));
+            }
+            frag.encat(Fragment::String(" }".into()));
+            frag.engroup();
+            frag
+        } else {
+            self.compile_parsed_field_value_last(label, value, format, true)
+        }
+    }
     fn compile_variant(&mut self, label: &str, value: &Value, format: Option<&Format>) -> Fragment {
         if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
@@ -601,6 +1080,38 @@ impl<'module> MonoidalPrinter<'module> {
         )
     }
 
+    fn compile_parsed_field_value_continue(
+        &mut self,
+        label: impl fmt::Display,
+        value: &ParsedValue,
+        format: Option<&Format>,
+        format_needed: bool,
+    ) -> Fragment {
+        let mut frags = FragmentBuilder::new();
+        frags.push(self.compile_gutter());
+        frags.push(Fragment::cat(
+            Fragment::Symbol(Symbol::Junction),
+            Fragment::String(format!("{label}").into()),
+        ));
+
+        self.gutter.push(Column::Branch);
+        let frag_value = self.compile_parsed_field_value(value, format);
+        self.gutter.pop();
+
+        if let Some(format) = format {
+            if format_needed
+                || self.flags.show_redundant_formats
+                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
+            {
+                frags.push(Fragment::String(" <- ".into()));
+                frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
+            }
+        }
+        // let tagged = self.compile_with_location(frag_value, value.get_loc());
+        frags.push(frag_value);
+        frags.finalize().group()
+    }
+
     fn compile_field_value_continue(
         &mut self,
         label: impl fmt::Display,
@@ -628,6 +1139,38 @@ impl<'module> MonoidalPrinter<'module> {
                 frags.push(self.compile_format(format, Precedence::FORMAT_COMPOUND));
             }
         }
+        frags.push(frag_value);
+        frags.finalize().group()
+    }
+
+    fn compile_parsed_field_value_last(
+        &mut self,
+        label: impl fmt::Display,
+        value: &ParsedValue,
+        format: Option<&Format>,
+        format_needed: bool,
+    ) -> Fragment {
+        let mut frags = FragmentBuilder::new();
+        frags.push(self.compile_gutter());
+        frags.push(Fragment::cat(
+            Fragment::Symbol(Symbol::Elbow),
+            Fragment::String(format!("{label}").into()),
+        ));
+
+        self.gutter.push(Column::Space);
+        let frag_value = self.compile_parsed_field_value(value, format);
+        self.gutter.pop();
+
+        if let Some(format) = format {
+            if format_needed
+                || self.flags.show_redundant_formats
+                || (self.is_indirect_format(format) && !frag_value.is_single_line(true))
+            {
+                frags.push(Fragment::String(" <- ".into()));
+                frags.push(self.compile_format(format, Default::default()));
+            }
+        }
+        // let tagged = self.compile_with_location(frag_value, value.get_loc());
         frags.push(frag_value);
         frags.finalize().group()
     }
@@ -661,6 +1204,46 @@ impl<'module> MonoidalPrinter<'module> {
         }
         frags.push(frag_value);
         frags.finalize().group()
+    }
+
+    fn compile_parsed_field_value(
+        &mut self,
+        value: &ParsedValue,
+        format: Option<&Format>,
+    ) -> Fragment {
+        match format {
+            Some(format) => {
+                if self.flags.omit_implied_values && self.is_implied_value_format(format) {
+                    Fragment::cat(
+                        Fragment::string(" \t"),
+                        self.compile_location(value.get_loc())
+                            .delimit(Fragment::Char('['), Fragment::Char(']')),
+                    )
+                    .cat_break()
+                } else {
+                    Fragment::join_with_wsp_eol(
+                        Fragment::String(" :=".into()),
+                        self.compile_parsed_decoded_value(value, format),
+                        Fragment::cat(
+                            Fragment::string(" \t"),
+                            self.compile_location(value.get_loc())
+                                .delimit(Fragment::Char('['), Fragment::Char(']')),
+                        ),
+                    )
+                    .group()
+                }
+            }
+            None => Fragment::join_with_wsp_eol(
+                Fragment::String(" :=".into()),
+                self.compile_parsed_value(value),
+                Fragment::cat(
+                    Fragment::string(" \t"),
+                    self.compile_location(value.get_loc())
+                        .delimit(Fragment::Char('['), Fragment::Char(']')),
+                ),
+            )
+            .group(),
+        }
     }
 
     fn compile_field_value(&mut self, value: &Value, format: Option<&Format>) -> Fragment {

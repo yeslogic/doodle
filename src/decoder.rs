@@ -67,7 +67,7 @@ impl Value {
         }
     }
 
-    fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
+    pub(crate) fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
         let mut pattern_scope = MultiScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
@@ -128,7 +128,7 @@ impl Value {
         Value::Variant(label.into(), value.into())
     }
 
-    fn unwrap_usize(self) -> usize {
+    pub(crate) fn unwrap_usize(self) -> usize {
         match self {
             Value::U8(n) => usize::from(n),
             Value::U16(n) => usize::from(n),
@@ -138,14 +138,14 @@ impl Value {
         }
     }
 
-    fn unwrap_tuple(self) -> Vec<Value> {
+    pub(crate) fn unwrap_tuple(self) -> Vec<Value> {
         match self {
             Value::Tuple(values) => values,
             _ => panic!("value is not a tuple"),
         }
     }
 
-    fn unwrap_bool(self) -> bool {
+    pub(crate) fn unwrap_bool(self) -> bool {
         match self {
             Value::Bool(b) => b,
             _ => panic!("value is not a bool"),
@@ -1057,7 +1057,7 @@ impl Decoder {
                     .0
                     .parse(program, &Scope::Multi(&new_scope), input)
             }
-            Decoder::Fail => Err(ParseError::fail(scope, input)),
+            Decoder::Fail => Err(ParseError::<Value>::fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok((Value::UNIT, input)),
                 Some((b, _)) => Err(ParseError::trailing(b, input.offset)),
@@ -1098,7 +1098,7 @@ impl Decoder {
                         return Ok((Value::Branch(index, Box::new(v)), input));
                     }
                 }
-                Err(ParseError::fail(scope, input))
+                Err(ParseError::<Value>::fail(scope, input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
@@ -1221,7 +1221,7 @@ impl Decoder {
             }
             Decoder::PeekNot(a) => {
                 if a.parse(program, scope, input).is_ok() {
-                    Err(ParseError::fail(scope, input))
+                    Err(ParseError::<Value>::fail(scope, input))
                 } else {
                     Ok((Value::Tuple(vec![]), input))
                 }
