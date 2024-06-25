@@ -2453,7 +2453,7 @@ impl<'a> Generator<'a> {
         let ctxt = crate::typecheck::Ctxt::new(module, &UScope::Empty);
         let _ = tc
             .infer_utype_format(top_format, ctxt)
-            .unwrap_or_else(|err| panic!("Failed to infer topl-level format type: {err}"));
+            .unwrap_or_else(|err| panic!("Failed to infer top-level format type: {err}"));
         let mut gen = Self {
             elaborator: Elaborator::new(module, tc, CodeGen::new()),
             sourcemap: SourceMap::new(),

@@ -8,15 +8,15 @@ use doodle::{Expr, Format, FormatModule, FormatRef};
 #[allow(clippy::redundant_clone)]
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
-        // (flags & 0b10000000) != 0
-        expr_ne(bit_and(flags, Expr::U8(0b1000_0000)), Expr::U8(0))
+        // (flags->table-flag) != 0
+        expr_ne(record_proj(flags, "table-flag"), Expr::U8(0))
     }
 
     fn color_table_len(flags: Expr) -> Expr {
-        // 2 << (flags & 7)
+        // 2 << (flags->table-size)
         shl(
             Expr::U16(2),
-            Expr::AsU16(Box::new(bit_and(flags, Expr::U8(0b111)))),
+            as_u16(record_proj(flags, "table-size"))
         )
     }
 
@@ -54,18 +54,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
+    // NOTE: Bit data
+    // <Packed Fields>  =      Global Color Table Flag       1 Bit
+    //                         Color Resolution              3 Bits
+    //                         Sort Flag                     1 Bit
+    //                         Size of Global Color Table    3 Bits
+    let logical_screen_descriptor_flags = packed_bits_u8([1, 3, 1, 3], ["table-flag", "color-resolution", "sort-flag", "table-size"]);
+
     // 18. Logical Screen Descriptor
     let logical_screen_descriptor = module.define_format(
         "gif.logical-screen-descriptor",
         record([
             ("screen-width", base.u16le()),
             ("screen-height", base.u16le()),
-            ("flags", base.u8()),
-            // TODO: Bit data
-            // <Packed Fields>  =      Global Color Table Flag       1 Bit
-            //                         Color Resolution              3 Bits
-            //                         Sort Flag                     1 Bit
-            //                         Size of Global Color Table    3 Bits
+            ("flags", logical_screen_descriptor_flags),
             ("bg-color-index", base.u8()),
             ("pixel-aspect-ratio", base.u8()),
         ]),
@@ -73,6 +75,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     // 19. Global Color Table
     let global_color_table = color_table;
+
+    // NOTE: Bit data
+    // <Packed Fields>  =      Local Color Table Flag        1 Bit
+    //                         Interlace Flag                1 Bit
+    //                         Sort Flag                     1 Bit
+    //                         Reserved                      2 Bits
+    //                         Size of Local Color Table     3 Bits
+    let image_descriptor_flags = packed_bits_u8([1, 1, 1, 2, 3], ["table-flag", "interlace-flag", "sort-flag", "reserved", "table-size"]);
 
     // 20. Image Descriptor
     let image_descriptor = module.define_format(
@@ -83,13 +93,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("image-top-position", base.u16le()),
             ("image-width", base.u16le()),
             ("image-height", base.u16le()),
-            ("flags", base.u8()),
-            // TODO: Bit data
-            // <Packed Fields>  =      Local Color Table Flag        1 Bit
-            //                         Interlace Flag                1 Bit
-            //                         Sort Flag                     1 Bit
-            //                         Reserved                      2 Bits
-            //                         Size of Local Color Table     3 Bits
+            ("flags", image_descriptor_flags),
         ]),
     );
 
@@ -106,6 +110,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
+    // NOTE: Bit data
+    // <Packed Fields>  =     Reserved                      3 Bits
+    //                        Disposal Method               3 Bits
+    //                        User Input Flag               1 Bit
+    //                        Transparent Color Flag        1 Bit
+    let graphic_control_extension_flags = packed_bits_u8([3, 3, 1, 1], ["reserved", "disposal-method", "user-input-flag", "transparent-color-flag"]);
+
     // 23. Graphic Control Extension
     let graphic_control_extension = module.define_format(
         "gif.graphic-control-extension",
@@ -113,12 +124,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("separator", is_byte(0x21)),
             ("label", is_byte(0xF9)),
             ("block-size", is_byte(4)),
-            ("flags", base.u8()),
-            // TODO: Bit data
-            // <Packed Fields>  =     Reserved                      3 Bits
-            //                        Disposal Method               3 Bits
-            //                        User Input Flag               1 Bit
-            //                        Transparent Color Flag        1 Bit
+            ("flags", graphic_control_extension_flags),
             ("delay-time", base.u16le()),
             ("transparent-color-index", base.u8()),
             ("terminator", block_terminator.call()),
