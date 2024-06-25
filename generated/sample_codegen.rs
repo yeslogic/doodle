@@ -14,10 +14,18 @@ pub struct main_gif_header {
 }
 
 #[derive(Debug, Clone)]
+pub struct main_gif_logical_screen_descriptor_flags {
+    table_flag: u8,
+    color_resolution: u8,
+    sort_flag: u8,
+    table_size: u8,
+}
+
+#[derive(Debug, Clone)]
 pub struct main_gif_logical_screen_descriptor {
     screen_width: u16,
     screen_height: u16,
-    flags: u8,
+    flags: main_gif_logical_screen_descriptor_flags,
     bg_color_index: u8,
     pixel_aspect_ratio: u8,
 }
@@ -42,11 +50,19 @@ pub struct main_gif_logical_screen {
 }
 
 #[derive(Debug, Clone)]
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some_flags {
+    reserved: u8,
+    disposal_method: u8,
+    user_input_flag: u8,
+    transparent_color_flag: u8,
+}
+
+#[derive(Debug, Clone)]
 pub struct main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some {
     separator: u8,
     label: u8,
     block_size: u8,
-    flags: u8,
+    flags: main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some_flags,
     delay_time: u16,
     transparent_color_index: u8,
     terminator: u8,
@@ -83,14 +99,23 @@ terminator: u8
 }
 
 #[derive(Debug, Clone)]
-pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor_flags
 {
-    separator: u8,
-    image_left_position: u16,
-    image_top_position: u16,
-    image_width: u16,
-    image_height: u16,
-    flags: u8,
+    table_flag: u8,
+    interlace_flag: u8,
+    sort_flag: u8,
+    reserved: u8,
+    table_size: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor {
+separator: u8,
+image_left_position: u16,
+image_top_position: u16,
+image_width: u16,
+image_height: u16,
+flags: main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor_flags
 }
 
 #[derive(Debug, Clone)]
@@ -18664,7 +18689,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18676,7 +18701,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18688,7 +18713,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18700,7 +18725,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18712,7 +18737,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18724,7 +18749,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18736,7 +18761,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18748,7 +18773,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18760,7 +18785,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18772,7 +18797,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18784,7 +18809,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18796,7 +18821,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18808,7 +18833,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18820,7 +18845,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18832,7 +18857,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18844,7 +18869,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18856,7 +18881,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18868,7 +18893,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18880,7 +18905,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18892,7 +18917,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18904,7 +18929,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18916,7 +18941,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18928,7 +18953,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18940,7 +18965,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18952,7 +18977,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18964,7 +18989,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18976,7 +19001,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -18988,7 +19013,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -19000,7 +19025,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(6063571551916569871u64));
+return Err(ParseError::ExcludedBranch(9325807925413251017u64));
 }
 }
 },
@@ -19188,7 +19213,7 @@ y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14930914466285702939u64));
+return Err(ParseError::ExcludedBranch(17129992010457015870u64));
 }
 }))
 },
@@ -19223,7 +19248,7 @@ y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14930914466285702939u64));
+return Err(ParseError::ExcludedBranch(17129992010457015870u64));
 }
 }))
 },
@@ -19790,7 +19815,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19802,7 +19827,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19814,7 +19839,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19826,7 +19851,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19838,7 +19863,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19850,7 +19875,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19862,7 +19887,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19874,7 +19899,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19886,7 +19911,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19898,7 +19923,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19910,7 +19935,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19922,7 +19947,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19934,7 +19959,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19946,7 +19971,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19958,7 +19983,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19970,7 +19995,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19982,7 +20007,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -19994,7 +20019,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20006,7 +20031,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20018,7 +20043,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20030,7 +20055,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20042,7 +20067,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20054,7 +20079,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20066,7 +20091,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20078,7 +20103,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20090,7 +20115,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20102,7 +20127,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20114,7 +20139,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20126,7 +20151,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(10352311402584848123u64));
+return Err(ParseError::ExcludedBranch(5055951424363922763u64));
 }
 }
 },
@@ -20676,11 +20701,11 @@ fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<main_gif_header, Pa
 fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<main_gif_logical_screen, ParseError> {
     let descriptor = ((|| PResult::Ok((Decoder181(_input))?))())?;
     let global_color_table = ((|| {
-        PResult::Ok(match descriptor.clone().flags & 128u8 != 0u8 {
+        PResult::Ok(match descriptor.clone().flags.table_flag != 0u8 {
             true => {
                 let inner = {
                     let mut accum = Vec::new();
-                    for _ in 0..2u16 << ((descriptor.clone().flags & 7u8) as u16) {
+                    for _ in 0..2u16 << (descriptor.clone().flags.table_size as u16) {
                         accum.push((Decoder179(_input))?);
                     }
                     accum
@@ -21085,7 +21110,24 @@ fn Decoder174<'input>(
             }
         })
     })())?;
-    let flags = ((|| PResult::Ok((Decoder17(_input))?))())?;
+    let flags = ((|| {
+        PResult::Ok({
+            let inner = {
+                let b = _input.read_byte()?;
+                b
+            };
+            ((|packedbits: u8| {
+                PResult::Ok(
+                    main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some_flags {
+                        reserved: packedbits >> 5u8 & 7u8,
+                        disposal_method: packedbits >> 2u8 & 7u8,
+                        user_input_flag: packedbits >> 1u8 & 1u8,
+                        transparent_color_flag: packedbits >> 0u8 & 1u8,
+                    },
+                )
+            })(inner))?
+        })
+    })())?;
     let delay_time = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let transparent_color_index = ((|| PResult::Ok((Decoder17(_input))?))())?;
     let terminator = ((|| PResult::Ok((Decoder173(_input))?))())?;
@@ -21145,11 +21187,11 @@ fn Decoder176<'input>(
 {
     let descriptor = ((|| PResult::Ok((Decoder178(_input))?))())?;
     let local_color_table = ((|| {
-        PResult::Ok(match descriptor.clone().flags & 128u8 != 0u8 {
+        PResult::Ok(match descriptor.clone().flags.table_flag != 0u8 {
             true => {
                 let inner = {
                     let mut accum = Vec::new();
-                    for _ in 0..2u16 << ((descriptor.clone().flags & 7u8) as u16) {
+                    for _ in 0..2u16 << (descriptor.clone().flags.table_size as u16) {
                         accum.push((Decoder179(_input))?);
                     }
                     accum
@@ -21285,7 +21327,17 @@ fn Decoder178<'input>(
     let image_top_position = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let image_width = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let image_height = ((|| PResult::Ok((Decoder24(_input))?))())?;
-    let flags = ((|| PResult::Ok((Decoder17(_input))?))())?;
+    let flags = ((|| {
+        PResult::Ok({
+            let inner = {
+                let b = _input.read_byte()?;
+                b
+            };
+            ((|packedbits: u8| {
+                PResult::Ok(main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor_flags { table_flag: packedbits >> 7u8 & 1u8, interlace_flag: packedbits >> 6u8 & 1u8, sort_flag: packedbits >> 5u8 & 1u8, reserved: packedbits >> 3u8 & 3u8, table_size: packedbits >> 0u8 & 7u8 })
+            })(inner))?
+        })
+    })())?;
     PResult::Ok(
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor {
             separator,
@@ -21360,7 +21412,22 @@ fn Decoder181<'input>(
 ) -> Result<main_gif_logical_screen_descriptor, ParseError> {
     let screen_width = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let screen_height = ((|| PResult::Ok((Decoder24(_input))?))())?;
-    let flags = ((|| PResult::Ok((Decoder17(_input))?))())?;
+    let flags = ((|| {
+        PResult::Ok({
+            let inner = {
+                let b = _input.read_byte()?;
+                b
+            };
+            ((|packedbits: u8| {
+                PResult::Ok(main_gif_logical_screen_descriptor_flags {
+                    table_flag: packedbits >> 7u8 & 1u8,
+                    color_resolution: packedbits >> 4u8 & 7u8,
+                    sort_flag: packedbits >> 3u8 & 1u8,
+                    table_size: packedbits >> 0u8 & 7u8,
+                })
+            })(inner))?
+        })
+    })())?;
     let bg_color_index = ((|| PResult::Ok((Decoder17(_input))?))())?;
     let pixel_aspect_ratio = ((|| PResult::Ok((Decoder17(_input))?))())?;
     PResult::Ok(main_gif_logical_screen_descriptor {

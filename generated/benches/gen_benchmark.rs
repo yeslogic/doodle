@@ -7,7 +7,5 @@ pub fn inflate_benchmark(c: &mut Criterion) {
     });
 }
 
-
-
 criterion_group!(benches, inflate_benchmark);
 criterion_main!(benches);
