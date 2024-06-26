@@ -10,7 +10,13 @@ fn null_terminated(f: Format) -> Format {
     )
 }
 
-pub fn main(module: &mut FormatModule, _deflate: FormatRef, base: &BaseModule) -> FormatRef {
+pub fn main(
+    module: &mut FormatModule,
+    _deflate: FormatRef,
+    utf8text: FormatRef,
+    utf8text_nz: FormatRef,
+    base: &BaseModule,
+) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
             ("length", base.u32be()), // FIXME < 2^31
@@ -31,7 +37,6 @@ pub fn main(module: &mut FormatModule, _deflate: FormatRef, base: &BaseModule) -
     let keyword = module.define_format(
         "png.keyword",
         // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
-        // FIXME - this is incorrect, and we have to fix it using new primitives
         repeat_between(
             Expr::U32(1),
             Expr::U32(79),
@@ -138,27 +143,25 @@ pub fn main(module: &mut FormatModule, _deflate: FormatRef, base: &BaseModule) -
         ("compression-flag", byte_in([0, 1])),
         ("compression-method", is_byte(0)),
         ("language-tag", base.asciiz_string()), // REVIEW - there are specific rules to this (1-8--character ascii-only words separated by hyphens)
-        ("translated-keyword", base.asciiz_string()),
-        (
-            "text",
+        ("translated-keyword", null_terminated(utf8text_nz.call())),
+        ("text", {
             if_then_else(
                 Expr::IntRel(
                     doodle::IntRel::Eq,
                     Box::new(var("compression-flag")),
                     Box::new(Expr::U8(1)),
                 ),
-                zlib.call(),
-                // FIXME - replace with UTF8-compatible text format (e.g. text.rs)
-                repeat(base.u8()),
-            ),
-        ),
+                Format::Variant("compressed".into(), Box::new(zlib.call())),
+                Format::Variant("uncompressed".into(), Box::new(utf8text.call())),
+            )
+        }),
     ]);
 
     let itxt = module.define_format("png.itxt", chunk(is_bytes(b"iTXt"), itxt_data));
 
     let iccp_data = record(vec![
         ("profile-name", null_terminated(keyword.call())),
-        ("compression-method", is_byte(0)), // FIXME: technically the value is unrestricted but 0 := deflate is the only defined value
+        ("compression-method", is_byte(0)), // REVIEW: technically the value is unrestricted but 0 := deflate is the only defined value
         ("compressed-profile", zlib.call()),
     ]);
 
@@ -245,7 +248,7 @@ pub fn main(module: &mut FormatModule, _deflate: FormatRef, base: &BaseModule) -
             ("tIME", time.call()),
             ("tRNS", trns.call_args(vec![var("ihdr")])),
             ("zTXt", ztxt.call()),
-            // FIXME other tags excluding IHDR/IDAT/IEND
+            // FIXME - add remainder of extant tags (besides IHDR/IDAT/IEND)
         ]),
     );
 
