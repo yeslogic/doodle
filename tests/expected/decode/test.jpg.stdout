@@ -23,40 +23,48 @@
 │       │   │   │   └── dqt <- jpeg.dqt :=
 │       │   │   │       ├── marker <- { ... }
 │       │   │   │       ├── length <- base.u16be := 67
-│       │   │   │       └── data <- slice (length - 2) jpeg.dqt-data :=
-│       │   │   │           ├── precision-table-id <- base.u8 := 0
-│       │   │   │           └── elements <- repeat base.u8 :=
-│       │   │   │               ├── 0 := 8
-│       │   │   │               ├── 1 := 6
-│       │   │   │               ├── 2 := 6
-│       │   │   │               ├── 3 := 7
-│       │   │   │               ├── 4 := 6
-│       │   │   │               ├── 5 := 5
-│       │   │   │               ├── 6 := 8
-│       │   │   │               ├── 7 := 7
-│       │   │   │               ├── 8 := 7
-│       │   │   │               ├── 9 := 7
-│       │   │   │               ~
-│       │   │   │               └── 63 := 50
+│       │   │   │       └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
+│       │   │   │           └── 0 <- jpeg.dqt-data :=
+│       │   │   │               ├── precision-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │               │   ├── precision := 0
+│       │   │   │               │   └── table-id := 0
+│       │   │   │               └── elements <- match precision-table-id.precision { ... } :=
+│       │   │   │                   └── Bytes <- repeat-count 64 base.u8 :=
+│       │   │   │                       ├── 0 := 8
+│       │   │   │                       ├── 1 := 6
+│       │   │   │                       ├── 2 := 6
+│       │   │   │                       ├── 3 := 7
+│       │   │   │                       ├── 4 := 6
+│       │   │   │                       ├── 5 := 5
+│       │   │   │                       ├── 6 := 8
+│       │   │   │                       ├── 7 := 7
+│       │   │   │                       ├── 8 := 7
+│       │   │   │                       ├── 9 := 7
+│       │   │   │                       ~
+│       │   │   │                       └── 63 := 50
 │       │   │   └── 1 <- jpeg.table-or-misc :=
 │       │   │       └── dqt <- jpeg.dqt :=
 │       │   │           ├── marker <- { ... }
 │       │   │           ├── length <- base.u16be := 67
-│       │   │           └── data <- slice (length - 2) jpeg.dqt-data :=
-│       │   │               ├── precision-table-id <- base.u8 := 1
-│       │   │               └── elements <- repeat base.u8 :=
-│       │   │                   ├── 0 := 9
-│       │   │                   ├── 1 := 9
-│       │   │                   ├── 2 := 9
-│       │   │                   ├── 3 := 12
-│       │   │                   ├── 4 := 11
-│       │   │                   ├── 5 := 12
-│       │   │                   ├── 6 := 24
-│       │   │                   ├── 7 := 13
-│       │   │                   ├── 8 := 13
-│       │   │                   ├── 9 := 24
-│       │   │                   ~
-│       │   │                   └── 63 := 50
+│       │   │           └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
+│       │   │               └── 0 <- jpeg.dqt-data :=
+│       │   │                   ├── precision-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │                   │   ├── precision := 0
+│       │   │                   │   └── table-id := 1
+│       │   │                   └── elements <- match precision-table-id.precision { ... } :=
+│       │   │                       └── Bytes <- repeat-count 64 base.u8 :=
+│       │   │                           ├── 0 := 9
+│       │   │                           ├── 1 := 9
+│       │   │                           ├── 2 := 9
+│       │   │                           ├── 3 := 12
+│       │   │                           ├── 4 := 11
+│       │   │                           ├── 5 := 12
+│       │   │                           ├── 6 := 24
+│       │   │                           ├── 7 := 13
+│       │   │                           ├── 8 := 13
+│       │   │                           ├── 9 := 24
+│       │   │                           ~
+│       │   │                           └── 63 := 50
 │       │   ├── header <- jpeg.frame-header :=
 │       │   │   └── sof0 <- jpeg.sof0 :=
 │       │   │       ├── marker <- { ... }
@@ -67,10 +75,24 @@
 │       │   │           ├── num-samples-per-line <- base.u16be := 105
 │       │   │           ├── num-image-components <- base.u8 := 3
 │       │   │           └── image-components <- repeat-count num-image-components jpeg.sof-image-component :=
-│       │   │               └──  id sampling-factor quantization-table-id
-│       │   │                     1              34                     0
-│       │   │                     2              17                     1
-│       │   │                     3              17                     1
+│       │   │               ├── 0 <- jpeg.sof-image-component :=
+│       │   │               │   ├── id <- base.u8 := 1
+│       │   │               │   ├── sampling-factor <- map (packedbits -> { ... }) U8 :=
+│       │   │               │   │   ├── horizontal := 2
+│       │   │               │   │   └── vertical := 2
+│       │   │               │   └── quantization-table-id <- base.u8 := 0
+│       │   │               ├── 1 <- jpeg.sof-image-component :=
+│       │   │               │   ├── id <- base.u8 := 2
+│       │   │               │   ├── sampling-factor <- map (packedbits -> { ... }) U8 :=
+│       │   │               │   │   ├── horizontal := 1
+│       │   │               │   │   └── vertical := 1
+│       │   │               │   └── quantization-table-id <- base.u8 := 1
+│       │   │               └── 2 <- jpeg.sof-image-component :=
+│       │   │                   ├── id <- base.u8 := 3
+│       │   │                   ├── sampling-factor <- map (packedbits -> { ... }) U8 :=
+│       │   │                   │   ├── horizontal := 1
+│       │   │                   │   └── vertical := 1
+│       │   │                   └── quantization-table-id <- base.u8 := 1
 │       │   ├── scan <- jpeg.scan :=
 │       │   │   ├── segments <- repeat jpeg.table-or-misc :=
 │       │   │   │   ├── 0 <- jpeg.table-or-misc :=
@@ -198,13 +220,26 @@
 │       │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
 │       │   │   │       ├── num-image-components <- base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
-│       │   │   │       │   └──  component-selector entropy-coding-table-ids
-│       │   │   │       │                         1                        0
-│       │   │   │       │                         2                       17
-│       │   │   │       │                         3                       17
+│       │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
+│       │   │   │       │   │   ├── component-selector <- base.u8 := 1
+│       │   │   │       │   │   └── entropy-coding-table-ids <- map (packedbits -> { ... }) U8 :=
+│       │   │   │       │   │       ├── dc-entropy-coding-table-id := 0
+│       │   │   │       │   │       └── ac-entropy-coding-table-id := 0
+│       │   │   │       │   ├── 1 <- jpeg.sos-image-component :=
+│       │   │   │       │   │   ├── component-selector <- base.u8 := 2
+│       │   │   │       │   │   └── entropy-coding-table-ids <- map (packedbits -> { ... }) U8 :=
+│       │   │   │       │   │       ├── dc-entropy-coding-table-id := 1
+│       │   │   │       │   │       └── ac-entropy-coding-table-id := 1
+│       │   │   │       │   └── 2 <- jpeg.sos-image-component :=
+│       │   │   │       │       ├── component-selector <- base.u8 := 3
+│       │   │   │       │       └── entropy-coding-table-ids <- map (packedbits -> { ... }) U8 :=
+│       │   │   │       │           ├── dc-entropy-coding-table-id := 1
+│       │   │   │       │           └── ac-entropy-coding-table-id := 1
 │       │   │   │       ├── start-spectral-selection <- base.u8 := 0
 │       │   │   │       ├── end-spectral-selection <- base.u8 := 63
-│       │   │   │       └── approximation-bit-position <- base.u8 := 0
+│       │   │   │       └── approximation-bit-position <- map (packedbits -> { ... }) U8 :=
+│       │   │   │           ├── high := 0
+│       │   │   │           └── low := 0
 │       │   │   └── data <- jpeg.scan-data :=
 │       │   │       ├── scan-data <- repeat (_ |...| _) :=
 │       │   │       │   ├── 0 := { mcu := 191 }

@@ -1,5 +1,6 @@
 use crate::format::base::VALID_ASCII;
 use crate::format::BaseModule;
+use doodle::byte_set::ByteSet;
 use doodle::helper::*;
 use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 
@@ -21,11 +22,13 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
     )
 }
 
-pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
+pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, FormatRef) {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
-    let utf8_1 = map(
-        Format::Byte(VALID_ASCII),
+    let ascii_nz : ByteSet = ByteSet::intersection(&VALID_ASCII, &!(ByteSet::singleton(0)));
+
+    let utf8_1_nz = map(
+        Format::Byte(ascii_nz),
         lambda("byte", as_u32(var("byte"))),
     );
 
@@ -111,19 +114,25 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> FormatRef {
         ),
     );
 
-    // https://datatracker.ietf.org/doc/html/rfc3629#section-4
-    let utf8_char = module.define_format(
-        "text.utf8.char",
+    let utf8_char_nz = module.define_format(
+        "text.utf8.char.non-null",
         map(
-            union([utf8_1, utf8_2, utf8_3, utf8_4]),
+            union([utf8_1_nz, utf8_2, utf8_3, utf8_4]),
             lambda("codepoint", as_char(var("codepoint"))),
         ),
     );
 
-    // let ascii_str = module.define_format("text.string.ascii", repeat1(base.ascii_char_strict()));
+    // https://datatracker.ietf.org/doc/html/rfc3629#section-4
+    let utf8_char = module.define_format(
+        "text.utf8.char",
+            union([map(is_byte(0), lambda("_", Expr::AsChar(Box::new(Expr::U32(0))))), utf8_char_nz.call()]),
+    );
+
+    let utf8_zstr = module.define_format("text.string.utf8.non-null", repeat(utf8_char_nz.call()));
     let utf8_str = module.define_format("text.string.utf8", repeat(utf8_char.call()));
 
-    module.define_format("text.string", utf8_str.call())
+    let text = module.define_format("text.string", utf8_str.call());
+    (text, utf8_zstr)
 }
 
 fn shift6_2(hi: Expr, lo: Expr) -> Expr {

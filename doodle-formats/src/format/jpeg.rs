@@ -22,13 +22,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         ])
     };
 
+    // NOTE -  Bit data: { horizontal <- u4, vertical <- u4 }
+    let sampling_factor = packed_bits_u8([4, 4], ["horizontal", "vertical"]);
+
     // SOF_n: Frame header (See ITU T.81 Section B.2.2)
     let sof_data = {
         let sof_image_component = module.define_format(
             "jpeg.sof-image-component",
             record([
                 ("id", base.u8()),
-                ("sampling-factor", base.u8()), // TODO: Bit data: { horizontal <- u4, vertical <- u4 }
+                ("sampling-factor", sampling_factor),
                 ("quantization-table-id", base.u8()),
             ]),
         );
@@ -48,27 +51,40 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         )
     };
 
+    // NOTE - bit data
+    // class <- u4 //= 0 | 1;
+    // table-id <- u4 //= 1 |..| 4;
+    // TODO - enforce numeric constraints
+    let class_table_id = packed_bits_u8([4, 4], ["class", "table-id"]);
+
     // DHT: Define Huffman table (See ITU T.81 Section B.2.4.2)
     let dht_data = module.define_format(
         "jpeg.dht-data",
         record([
-            // class <- u4 //= 0 | 1;
-            // table-id <- u4 //= 1 |..| 4;
             ("class-table-id", base.u8()),
             ("num-codes", repeat_count(Expr::U8(16), base.u8())),
-            ("values", repeat(base.u8())), // List.map num-codes (\n => repeat-count n u8);
+            ("values", repeat(base.u8())), // TODO - List.map num-codes (\n => repeat-count n u8);
         ]),
     );
+
+    // NOTE - packed-bits field
+    // class <- u4 //= 0 | 1;
+    // table-id <- u4 //= 1 |..| 4;
+    // TODO[epic=num-constr] - enforce numeric constraints
+    let class_table_id = packed_bits_u8([4, 4], ["class", "table-id"]);
 
     // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
     let dac_data = module.define_format(
         "jpeg.dac-data",
-        record([
-            // class <- u4 //= 0 | 1;
-            // table-id <- u4 //= 1 |..| 4;
-            ("class-table-id", base.u8()),
-            ("value", base.u8()),
-        ]),
+        record([("class-table-id", class_table_id), ("value", base.u8())]),
+    );
+
+    // NOTE - packed-bits field
+    // dc-entropy-coding-table-id <- u4;
+    // ac-entropy-coding-table-id <- u4;
+    let entropy_coding_table_ids = packed_bits_u8(
+        [4, 4],
+        ["dc-entropy-coding-table-id", "ac-entropy-coding-table-id"],
     );
 
     // SOS: Scan header (See ITU T.81 Section B.2.3)
@@ -76,41 +92,65 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         let sos_image_component = module.define_format(
             "jpeg.sos-image-component",
             record([
-                ("component-selector", base.u8()), // ???
-                // TODO: Bit data
-                // dc-entropy-coding-table-id <- u4;
-                // ac-entropy-coding-table-id <- u4;
-                ("entropy-coding-table-ids", base.u8()),
+                ("component-selector", base.u8()), // FIXME - try to classify this better (???)
+                ("entropy-coding-table-ids", entropy_coding_table_ids),
             ]),
         );
+
+        // NOTE: Bit data: { high <- u4, low <- u4 }
+        let approximation_bit_position = packed_bits_u8([4, 4], ["high", "low"]);
 
         module.define_format(
             "jpeg.sos-data",
             record([
+                // TODO[epic=num-constr] - enforce numeric constraints
                 ("num-image-components", base.u8()), // 1 |..| 4
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
-                ("start-spectral-selection", base.u8()), // ???
-                ("end-spectral-selection", base.u8()),   // ???
-                ("approximation-bit-position", base.u8()), // TODO: Bit data: { high <- u4, low <- u4 }
+                ("start-spectral-selection", base.u8()), // FIXME - try to classify this better (???)
+                ("end-spectral-selection", base.u8()),   // FIXME - try to classify this better (???)
+                ("approximation-bit-position", approximation_bit_position),
             ]),
         )
     };
+
+    // NOTE - bits data
+    // precision <- u4 //= 0 | 1;
+    // table-id <- u4 //= 1 |..| 4;
+    // TODO[epic=num-constr] - enforce numeric constraints
+    let precision_table_id = packed_bits_u8([4, 4], ["precision", "table-id"]);
 
     // DQT: Define quantization table (See ITU T.81 Section B.2.4.1)
     let dqt_data = module.define_format(
         "jpeg.dqt-data",
         record([
-            // precision <- u4 //= 0 | 1;
-            // table-id <- u4 //= 1 |..| 4;
-            ("precision-table-id", base.u8()),
+            ("precision-table-id", precision_table_id),
+            // NOTE - conditional semantics on precision field:
             // elements <- match precision {
             //   0 => repeat-count 64 u8,
             //   1 => repeat-count 64 u16be,
             // };
-            ("elements", repeat(base.u8())),
+            (
+                "elements",
+                // FIXME - we probably don't want to include an explicit catch-all, but until we have other numeric constraint enforcement mechanisms, it might be helpful???
+                match_variant(
+                    record_proj(var("precision-table-id"), "precision"),
+                    [
+                        (
+                            Pattern::U8(0),
+                            "Bytes",
+                            repeat_count(Expr::U32(64), base.u8()),
+                        ),
+                        (
+                            Pattern::U8(1),
+                            "Shorts",
+                            repeat_count(Expr::U32(64), base.u16be()),
+                        ),
+                    ],
+                ),
+            ),
         ]),
     );
 
@@ -123,6 +163,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         record([("restart-interval", base.u16be())]),
     );
 
+    // NOTE: Bit data: { horizontal <- u4, vertical <- u4 }
+    let sampling_factor = packed_bits_u8([4, 4], ["horizontal", "vertical"]);
+
     // DHP: Define hierarchial progression (See ITU T.81 Section B.3.2)
     // NOTE: Same as SOF except for quantization-table-id
     let dhp_data = {
@@ -130,7 +173,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             "jpeg.dhp-image-component",
             record([
                 ("id", base.u8()),
-                ("sampling-factor", base.u8()), // TODO: Bit data: { horizontal <- u4, vertical <- u4 }
+                ("sampling-factor", sampling_factor),
                 ("quantization-table-id", is_byte(0)),
             ]),
         );
@@ -150,14 +193,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         )
     };
 
+    // NOTE: Bit data
+    // expand-horizontal <- u4 // 0 | 1;
+    // expand-vertical <- u4 // 0 | 1;
+    // TODO[epic=num-constr] - enforce numeric constraints
+    let expand_horizontal_vertical = packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]);
+
     // EXP: Expand reference components (See ITU T.81 Section B.3.3)
     let exp_data = module.define_format(
         "jpeg.exp-data",
         record([
-            // TODO: Bit data
-            // expand-horizontal <- u4 // 0 | 1;
-            // expand-vertical <- u4 // 0 | 1;
-            ("expand-horizontal-vertical", base.u8()),
+            ("expand-horizontal-vertical", expand_horizontal_vertical),
         ]),
     );
 
@@ -173,6 +219,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("version-major", base.u8()),
                 ("version-minor", base.u8()),
+                // TODO[epic=num-constr] - enforce numeric constraints
                 ("density-units", base.u8()), // 0 | 1 | 2
                 ("density-x", base.u16be()),  // != 0
                 ("density-y", base.u16be()),  // != 0
@@ -200,6 +247,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     vec![
                         (Pattern::from_bytes(b"JFIF"), "jfif", app0_jfif.call()),
                         // FIXME: there are other APP0 formats
+                        // TODO: implement JFXX, CIFF, AVI1, Ocad
                         // see https://exiftool.org/TagNames/JPEG.html
                         (Pattern::Wildcard, "other", repeat(base.u8())),
                     ],
@@ -217,6 +265,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     );
 
     // APP1: Application segment 1 (XMP)
+    // TODO[epic=refinement] - implement APP1 XMP header as non-opaque format, if feasible
     let app1_xmp = module.define_format("jpeg.app1-xmp", record([("xmp", repeat(base.u8()))]));
 
     let app1_data = module.define_format(
@@ -235,6 +284,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                             app1_xmp.call(),
                         ),
                         // FIXME: there are other APP1 formats
+                        // TODO: implement
                         // see https://exiftool.org/TagNames/JPEG.html
                         (Pattern::Wildcard, "other", repeat(base.u8())),
                     ],
@@ -270,7 +320,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let soi = module.define_format("jpeg.soi", marker(0xD8)); // Start of image
     let eoi = module.define_format("jpeg.eoi", marker(0xD9)); // End of of image
     let sos = module.define_format("jpeg.sos", marker_segment(0xDA, sos_data.call())); // Start of scan
-    let dqt = module.define_format("jpeg.dqt", marker_segment(0xDB, dqt_data.call())); // Define quantization table
+    let dqt = module.define_format("jpeg.dqt", marker_segment(0xDB, repeat1(dqt_data.call()))); // Define quantization table
     let dnl = module.define_format("jpeg.dnl", marker_segment(0xDC, dnl_data.call())); // Define number of lines
     let dri = module.define_format("jpeg.dri", marker_segment(0xDD, dri_data.call())); // Define restart interval
     let _dhp = module.define_format("jpeg.dhp", marker_segment(0xDE, dhp_data.call())); // Define hierarchical progression
