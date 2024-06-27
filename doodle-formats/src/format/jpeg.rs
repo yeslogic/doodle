@@ -61,7 +61,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     let dht_data = module.define_format(
         "jpeg.dht-data",
         record([
-            ("class-table-id", base.u8()),
+            ("class-table-id", class_table_id),
             ("num-codes", repeat_count(Expr::U8(16), base.u8())),
             ("values", repeat(base.u8())), // TODO - List.map num-codes (\n => repeat-count n u8);
         ]),
@@ -110,7 +110,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
                 ("start-spectral-selection", base.u8()), // FIXME - try to classify this better (???)
-                ("end-spectral-selection", base.u8()),   // FIXME - try to classify this better (???)
+                ("end-spectral-selection", base.u8()), // FIXME - try to classify this better (???)
                 ("approximation-bit-position", approximation_bit_position),
             ]),
         )
@@ -197,14 +197,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // expand-horizontal <- u4 // 0 | 1;
     // expand-vertical <- u4 // 0 | 1;
     // TODO[epic=num-constr] - enforce numeric constraints
-    let expand_horizontal_vertical = packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]);
+    let expand_horizontal_vertical =
+        packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]);
 
     // EXP: Expand reference components (See ITU T.81 Section B.3.3)
     let exp_data = module.define_format(
         "jpeg.exp-data",
-        record([
-            ("expand-horizontal-vertical", expand_horizontal_vertical),
-        ]),
+        record([("expand-horizontal-vertical", expand_horizontal_vertical)]),
     );
 
     // APP0: Application segment 0 (JFIF)

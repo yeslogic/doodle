@@ -25,12 +25,9 @@ fn drop_n_msb(n: usize, format: Format) -> Format {
 pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, FormatRef) {
     let utf8_tail = module.define_format("utf8.byte.trailing", drop_n_msb(2, byte_in(0x80..=0xBF)));
 
-    let ascii_nz : ByteSet = ByteSet::intersection(&VALID_ASCII, &!(ByteSet::singleton(0)));
+    let ascii_nz: ByteSet = ByteSet::intersection(&VALID_ASCII, &!(ByteSet::singleton(0)));
 
-    let utf8_1_nz = map(
-        Format::Byte(ascii_nz),
-        lambda("byte", as_u32(var("byte"))),
-    );
+    let utf8_1_nz = map(Format::Byte(ascii_nz), lambda("byte", as_u32(var("byte"))));
 
     let utf8_2 = map(
         tuple([drop_n_msb(3, byte_in(0xC2..=0xDF)), utf8_tail.call()]),
@@ -125,7 +122,13 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, Format
     // https://datatracker.ietf.org/doc/html/rfc3629#section-4
     let utf8_char = module.define_format(
         "text.utf8.char",
-            union([map(is_byte(0), lambda("_", Expr::AsChar(Box::new(Expr::U32(0))))), utf8_char_nz.call()]),
+        union([
+            map(
+                is_byte(0),
+                lambda("_", Expr::AsChar(Box::new(Expr::U32(0)))),
+            ),
+            utf8_char_nz.call(),
+        ]),
     );
 
     let utf8_zstr = module.define_format("text.string.utf8.non-null", repeat(utf8_char_nz.call()));

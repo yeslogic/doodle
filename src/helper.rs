@@ -1,17 +1,29 @@
 use crate::byte_set::ByteSet;
 use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 
-pub fn packed_bits_u8<const N: usize>(field_bit_lengths: [u8; N], field_names: [&'static str; N]) -> Format {
+pub fn packed_bits_u8<const N: usize>(
+    field_bit_lengths: [u8; N],
+    field_names: [&'static str; N],
+) -> Format {
     const BINDING_NAME: &'static str = "packedbits";
     let _totlen: u8 = field_bit_lengths.iter().sum();
-    assert_eq!(_totlen, 8, "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 8");
+    assert_eq!(
+        _totlen, 8,
+        "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 8"
+    );
     let mut fields = Vec::new();
     let mut high_bits_used = 0;
     for (nbits, name) in Iterator::zip(field_bit_lengths.into_iter(), field_names.into_iter()) {
-        fields.push((Label::Borrowed(name), mask_bits(var(BINDING_NAME), high_bits_used, nbits)));
+        fields.push((
+            Label::Borrowed(name),
+            mask_bits(var(BINDING_NAME), high_bits_used, nbits),
+        ));
         high_bits_used += nbits;
     }
-    map(Format::Byte(ByteSet::full()), lambda(BINDING_NAME, Expr::Record(fields)))
+    map(
+        Format::Byte(ByteSet::full()),
+        lambda(BINDING_NAME, Expr::Record(fields)),
+    )
 }
 
 /// Selects `nbits` bits starting from the highest unused bit in an 8-bit packed-field value, returning a U8-typed Expr

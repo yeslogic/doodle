@@ -89,8 +89,7 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
 impl<V: std::fmt::Debug + Clone> std::error::Error for ParseError<V> {}
 
 impl ParseError<Value> {
-    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> ParseError<Value>
-    {
+    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> ParseError<Value> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();
@@ -104,8 +103,7 @@ impl ParseError<Value> {
 }
 
 impl ParseError<ParsedValue> {
-    pub fn loc_fail(scope: &LocScope<'_>, input: ReadCtxt<'_>) -> ParseError<ParsedValue>
-    {
+    pub fn loc_fail(scope: &LocScope<'_>, input: ReadCtxt<'_>) -> ParseError<ParsedValue> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();

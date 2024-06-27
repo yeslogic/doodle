@@ -1,8 +1,11 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
-use crate::{decoder::Value, loc_decoder::{ParseLoc, Parsed, ParsedValue}};
 use crate::precedence::{cond_paren, Precedence};
 use crate::Label;
+use crate::{
+    decoder::Value,
+    loc_decoder::{ParseLoc, Parsed, ParsedValue},
+};
 use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};
 
 use super::{Fragment, FragmentBuilder, Symbol};
@@ -173,8 +176,7 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
-    fn is_atomic_parsed_value(&self, value: &ParsedValue, format: Option<&Format>) -> bool
-    {
+    fn is_atomic_parsed_value(&self, value: &ParsedValue, format: Option<&Format>) -> bool {
         if let Some(format) = format {
             if self.flags.pretty_ascii_strings && format.is_ascii_string_format(self.module) {
                 return true;
