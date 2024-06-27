@@ -1,6 +1,19 @@
 use crate::byte_set::ByteSet;
 use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 
+/// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
+/// are `u8`-valued sub-masks of the original byte.
+///
+/// Currently supports only static-string names for the sub-fields.
+///
+/// The order in which the fields are listed, both in the `field_bit_lengths` and `field_names` parameters,
+/// is to be understood as a MSB-to-LSB order partition.
+///
+/// Zero-bit field-lengths are not explicitly supported, but 'just work' as implemented.
+///
+/// # Notes
+///
+/// Requires that the total length of all fields is 8 bits, and panics otherwise.
 pub fn packed_bits_u8<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
@@ -33,38 +46,65 @@ fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     bit_and(shr(x, Expr::U8(shift)), Expr::U8(mask))
 }
 
+/// Returns an [`Expr`] that refers to a (hopefully) in-scope variable by name.
+///
+/// # Notes
+///
+/// This helper function does not itself require the named variable to be in-scope at the site where it is called, but
+/// out-of-scope variable references are not sound in the larger context of the program, and will typically result in
+/// Error or panic.
 pub fn var<Name: IntoLabel>(name: Name) -> Expr {
     Expr::Var(name.into())
 }
 
+/// Helper-function for [`Expr::Lambda`].
 pub fn lambda<Name: IntoLabel>(name: Name, body: Expr) -> Expr {
     Expr::Lambda(name.into(), Box::new(body))
 }
 
+/// Helper-function for [`Expr::Variant`].
 pub fn variant<Name: IntoLabel>(name: Name, value: Expr) -> Expr {
     Expr::Variant(name.into(), Box::new(value))
 }
 
+/// Helper-function for [`Pattern::Binding`] that can take `&'static str`, `String`, or `Label` parameters.
 pub fn bind<Name: IntoLabel>(name: Name) -> Pattern {
     Pattern::binding(name)
 }
 
+/// Helper-function for [`Format::Tuple`] that can take any iterable container of [`Format`]s.
 pub fn tuple(formats: impl IntoIterator<Item = Format>) -> Format {
     Format::Tuple(formats.into_iter().collect())
 }
 
-pub fn alts<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
+/// Helper-function for [`Format::Union`] over branches that are all [`Format::Variant`].
+///
+/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`].
+pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::Union(
-        (fields.into_iter())
+        (branches.into_iter())
             .map(|(label, format)| Format::Variant(label.into(), Box::new(format)))
             .collect(),
     )
 }
 
-pub fn expr_match(head: Expr, branches: impl Into<Vec<(Pattern, Expr)>>) -> Expr {
-    Expr::Match(Box::new(head), branches.into())
+/// Helper-function for [`Expr::Match`] that accepts any iterable container `branches` of `(Pattern, Expr)` pairs.
+pub fn expr_match(head: Expr, branches: impl IntoIterator<Item = (Pattern, Expr)>) -> Expr {
+    Expr::Match(Box::new(head), Vec::from_iter(branches.into_iter()))
 }
 
+/// Helper-function for [`Format::Match`] where the body of every branch is a
+/// [`Format::Variant`].
+///
+/// Accepts any iterable container of `(Pattern, Name, Format)` tuples, which prescribe
+/// a match-case of the shape `Pattern => AnonType::Name(Format)`.
+///
+/// Used primarily when the native types of the raw branch-bodies would not
+/// otherwise agree.
+///
+/// May also be used to add indicators of provenance to values that might be
+/// typed identically but have different semantics and might need to be treated
+/// differently based on which branch was taken.
 pub fn match_variant<Name: IntoLabel>(
     head: Expr,
     branches: impl IntoIterator<Item = (Pattern, Name, Format)>,
@@ -79,10 +119,28 @@ pub fn match_variant<Name: IntoLabel>(
     )
 }
 
+/// Helper-function for [`Format::Union`].
+///
+/// Accepts any iterable container of `Format`s.
+///
+/// If the branches in question are all `Format::Variant`, use [`alts`] instead.
+///
+/// If the given branches cannot be deterministically distinguished within a fixed finite lookahead, use [`union_nondet`] instead.
 pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
-    Format::Union(branches.into_iter().collect())
+    Format::Union(Vec::from_iter(branches.into_iter()))
 }
 
+/// Helper-function for constructing a [`Format::Union`] over branches that cannot be deterministically distinguished within a fixed finite lookahead.
+///
+/// Accepts any iterable container of tuples `(Name, Format)` for any `Name` that implements [`IntoLabel`], where the `Name` element becomes
+/// an identifying Variant-name for the resulting branch of the union.
+///
+/// # Notes
+///
+/// To be used sparingly, ideally only for the highest-level format definition that covers the full range of known formats.
+///
+/// If there is a potential overlap in the inputs that would be accepted as two distinct branches, the preferred (ideally, more specific) branch
+/// should always appear earlier in the iteration order.
 pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::UnionNondet(
         (branches.into_iter())
@@ -91,6 +149,16 @@ pub fn union_nondet<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, F
     )
 }
 
+/// Helper-function for [`Format::Record`] taking any iterable container of
+/// `(Name, Format)` pairs, which define each field's name and contents, in order.
+///
+/// # Notes
+///
+/// Care should be taken for any structure whose `IntoIterator` implementation
+/// does not preserve the order of insertion, as record-like values within
+/// binary formats must decode in the same order they were encoded, which must
+/// conform to the specification and will typically be invariant for
+/// non-self-describing formats.
 pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>) -> Format {
     Format::Record(
         (fields.into_iter())
@@ -99,60 +167,119 @@ pub fn record<Name: IntoLabel>(fields: impl IntoIterator<Item = (Name, Format)>)
     )
 }
 
+/// Helper function that returns a novel Format that is the (distinguished) union of `format` and [`Format::EMPTY`].
+///
+/// The variant-name assigned to a positive match for the given format will be `"some"`,
+/// and the variant-name assigned to a negative match will be `"none"`.
 pub fn optional(format: Format) -> Format {
     alts([("some", format), ("none", Format::EMPTY)])
 }
 
+/// Helper-function for [`Format::Repeat`].
 pub fn repeat(format: Format) -> Format {
     Format::Repeat(Box::new(format))
 }
 
+/// Helper-function for [`Format::Repeat1`].
 pub fn repeat1(format: Format) -> Format {
     Format::Repeat1(Box::new(format))
 }
 
+/// Helper-function for [`Format::RepeatCount`].
 pub fn repeat_count(len: Expr, format: Format) -> Format {
     Format::RepeatCount(len, Box::new(format))
 }
 
+/// Helper-function for [`Format::RepeatBetween`].
+///
+/// # Notes
+///
+/// Will result in downstream panic or error if `min` is found to exceed `max` at runtime.
+///
+/// If `min` is statically guaranteed to be equal to `max`, use [`repeat_count`] instead.
+///
+/// As currently implemented, the only `Expr`s that are accepted in the `min` and `max` positions
+/// are those that can be evaluated independent of Scope (i.e. contain no variable expressions).
+/// This is to ensure that `min <= max` can be checked in a context-free manner. This is not an inherent
+/// requirement of the primitive, but rather an imposed limitation of the implementation designed
+/// to keep the logic simple.
 pub fn repeat_between(min: Expr, max: Expr, format: Format) -> Format {
     Format::RepeatBetween(min, max, Box::new(format))
 }
 
-pub fn repeat_until_last(cond: Expr, format: Format) -> Format {
-    Format::RepeatUntilLast(cond, Box::new(format))
+/// Helper-function for [`Format::RepeatUntilLast`].
+///
+/// Creates a repetition that will consume `format` repeatedly, stopping after (specifically not 'just before')
+/// the first element for which `cond` evaluates to `true` when called with said element as its sole argument.
+///
+/// # Notes
+///
+/// By virtue of its definition, the repetition will always contain at least one element.
+pub fn repeat_until_last(predicate: Expr, format: Format) -> Format {
+    Format::RepeatUntilLast(predicate, Box::new(format))
 }
 
-pub fn repeat_until_seq(cond: Expr, format: Format) -> Format {
-    Format::RepeatUntilSeq(cond, Box::new(format))
+/// Helper-function for [`Format::RepeatUntilSeq`].
+///
+/// Creates a repetition that will consume `format` repeatedly, stopping after (specifically not 'just before')
+/// `cond` evaluates to `true` when called with the entire sequence thus-far as its sole argument.
+///
+/// # Notes
+///
+/// If `cond` evaluates is true when called with the empty sequence, will always yield an empty repetition.
+///
+/// If the condition being evaluated is a bounds-check that the length of the sequence falls between some `N` and `M`, use [`repeat_between`] instead.
+///
+/// If the condition being evaluated only ever returns true based on a predicate over the final element of the sequence, use [`repeat_until_last`] instead.
+pub fn repeat_until_seq(predicate: Expr, format: Format) -> Format {
+    Format::RepeatUntilSeq(predicate, Box::new(format))
 }
 
-pub fn if_then_else(cond: Expr, format0: Format, format1: Format) -> Format {
+/// Helper-function for alternating between two formats based on a boolean predicate.
+///
+/// If `cond` evaluates to `true`, will decode as `format_true`, otherwise as `format_false`.
+///
+/// # Notes
+///
+/// Implicitly requires that the two formats have the same value-type.
+///
+/// If the two formats have different value-types, or if knowledge of the chosen branch is needed, use [`if_then_else_variant`] instead.
+pub fn if_then_else(cond: Expr, format_true: Format, format_false: Format) -> Format {
     Format::Match(
         cond,
         vec![
-            (Pattern::Bool(true), format0),
-            (Pattern::Bool(false), format1),
+            (Pattern::Bool(true), format_true),
+            (Pattern::Bool(false), format_false),
         ],
     )
 }
 
-pub fn if_then_else_variant(cond: Expr, format0: Format, format1: Format) -> Format {
+/// Helper function for branching between two formats based on a boolean predicate, even when the two formats have different value-types.
+///
+/// If `cond` evaluates to `true`, will decode into the variant-format `yes(format_yes)`, and otherwise `no(format_no)`.
+pub fn if_then_else_variant(cond: Expr, format_yes: Format, format_no: Format) -> Format {
     if_then_else(
         cond,
-        Format::Variant("yes".into(), Box::new(format0)),
-        Format::Variant("no".into(), Box::new(format1)),
+        Format::Variant("yes".into(), Box::new(format_yes)),
+        Format::Variant("no".into(), Box::new(format_no)),
     )
 }
 
+/// Helper function for [`Format::Map`].
 pub fn map(f: Format, expr: Expr) -> Format {
     Format::Map(Box::new(f), expr)
 }
 
+/// Returns a `Format` that matches the byte `b` and fails on any other byte.
 pub fn is_byte(b: u8) -> Format {
     Format::Byte(ByteSet::from([b]))
 }
 
+/// Returns a `Format` that matches any byte in `v`, and fails on any byte not in `v`.
+///
+/// `v` can be of any type with an implemented conversion `Into<`[`ByteSet`]`>` (e.g. a u8-typed Range, any slice/array of u8, any iterator over u8).
+///
+/// If `v` is a singleton value, use [`is_byte`] instead.
 pub fn byte_in<I>(v: I) -> Format
 where
     I: Into<ByteSet>,
@@ -160,19 +287,25 @@ where
     Format::Byte(v.into())
 }
 
+/// Returns a format consisting of `count` consecutive bytes all matching `b`.
 pub fn repeat_byte(count: u32, b: u8) -> Format {
     Format::RepeatCount(Expr::U32(count), Box::new(is_byte(b)))
 }
 
+/// Returns a format that matches any byte *other than* `b`.
 pub fn not_byte(b: u8) -> Format {
     Format::Byte(!ByteSet::from([b]))
 }
 
+/// Returns a format that matches a given byte-sequence.
 pub fn is_bytes(bytes: &[u8]) -> Format {
     tuple(bytes.iter().copied().map(is_byte))
 }
 
-pub fn record_proj(head: impl Into<Expr>, label: impl IntoLabel) -> Expr {
+/// Helper-function for [`Expr::RecordProj`].
+///
+/// Provided that `label` is a valid field within the record (whether natural, or mapped) `head`, will evaluate to the value of the corresponding field.
+pub fn record_proj(head: Expr, label: impl IntoLabel) -> Expr {
     Expr::RecordProj(Box::new(head.into()), label.into())
 }
 
@@ -252,22 +385,55 @@ pub fn sub_seq(seq: Expr, start: Expr, length: Expr) -> Expr {
     Expr::SubSeq(Box::new(seq), Box::new(start), Box::new(length))
 }
 
+/// Helper-function for [`Expr::SubSeqInflate`]
+///
+/// # Notes
+///
+/// Unlike `sub_seq`, which is a pure slice operation, the `start` and `length` parameters
+/// may describe a larger range of the sequence than currently exists, provided `start` is itself in-bounds,
+/// following the Inflate/LZ77 decoding algorithm.
 pub fn sub_seq_inflate(seq: Expr, start: Expr, length: Expr) -> Expr {
     Expr::SubSeqInflate(Box::new(seq), Box::new(start), Box::new(length))
 }
 
+/// Helper-function for [`Expr::FlatMap`]
+///
+/// # Notes
+///
+/// The `seq` parameter must be a sequence type, and `f` must be a lambda that returns a sequence type. Model-wise equivalent to
+/// [`Iterator::flat_map`].
 pub fn flat_map(f: Expr, seq: Expr) -> Expr {
     Expr::FlatMap(Box::new(f), Box::new(seq))
 }
 
+/// Helper-function for [`Expr::FlatMapAccum`]
+///
+/// # Notes
+///
+/// The `seq` parameter must be a sequence type, `accum` must have the type
+/// `accum_type`, and `f` must be a lambda that takes a pair `(accum, x)` and
+/// returns a pair `(accum', ys)`, where `ys` is typed as a sequence.
+///
+/// The final value of `accum` is discarded, but the immediate return value
+/// after any non-final iteration is used as the input value for the next.
 pub fn flat_map_accum(f: Expr, accum: Expr, accum_type: ValueType, seq: Expr) -> Expr {
     Expr::FlatMapAccum(Box::new(f), Box::new(accum), accum_type, Box::new(seq))
 }
 
+/// Helper-function for [`Expr::FlatMapList`]
+///
+/// # Notes
+///
+/// The `seq` parameter must evaluate to a sequence, and `f` must be a lambda that takes a `(list, x)` pair and returns a sequence with the same type as `list`.
+///
+/// The first iteration will pass in an empty list, and each iteration will extend the list by appending the return value of its corresponding call to `f`.
+///
+/// The parameter `ret_type` corresponds to the element-type of the list being returned, not the overall type of the return-value.
 pub fn flat_map_list(f: Expr, ret_type: ValueType, seq: Expr) -> Expr {
     Expr::FlatMapList(Box::new(f), ret_type, Box::new(seq))
 }
 
+/// Helper-function for [`Expr::Dup`].
 pub fn dup(count: Expr, expr: Expr) -> Expr {
     Expr::Dup(Box::new(count), Box::new(expr))
 }
