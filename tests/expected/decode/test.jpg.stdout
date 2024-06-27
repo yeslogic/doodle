@@ -100,7 +100,9 @@
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 27
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │   │           ├── class-table-id <- base.u8 := 0
+│       │   │   │   │           ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │   │           │   ├── class := 0
+│       │   │   │   │           │   └── table-id := 0
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │   │           │   ├── 0 := 0
 │       │   │   │   │           │   ├── 1 := 2
@@ -128,7 +130,9 @@
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 58
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │   │           ├── class-table-id <- base.u8 := 16
+│       │   │   │   │           ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │   │           │   ├── class := 1
+│       │   │   │   │           │   └── table-id := 0
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │   │           │   ├── 0 := 0
 │       │   │   │   │           │   ├── 1 := 2
@@ -160,7 +164,9 @@
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 26
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │   │           ├── class-table-id <- base.u8 := 1
+│       │   │   │   │           ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │   │           │   ├── class := 0
+│       │   │   │   │           │   └── table-id := 1
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │   │           │   ├── 0 := 0
 │       │   │   │   │           │   ├── 1 := 2
@@ -187,7 +193,9 @@
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 38
 │       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │               ├── class-table-id <- base.u8 := 17
+│       │   │   │               ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │               │   ├── class := 1
+│       │   │   │               │   └── table-id := 1
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │               │   ├── 0 := 0
 │       │   │   │               │   ├── 1 := 3

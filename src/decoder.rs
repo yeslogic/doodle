@@ -67,7 +67,11 @@ impl Value {
         }
     }
 
-    pub(crate) fn matches<'a>(&'a self, scope: &'a Scope<'a>, pattern: &Pattern) -> Option<MultiScope<'a>> {
+    pub(crate) fn matches<'a>(
+        &'a self,
+        scope: &'a Scope<'a>,
+        pattern: &Pattern,
+    ) -> Option<MultiScope<'a>> {
         let mut pattern_scope = MultiScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
@@ -983,7 +987,12 @@ impl<'a> MultiScope<'a> {
     }
 
     fn into_record(self) -> Value {
-        Value::collect_fields(self.entries.into_iter().map(|(name, value)| (name, value.into_owned())).collect())
+        Value::collect_fields(
+            self.entries
+                .into_iter()
+                .map(|(name, value)| (name, value.into_owned()))
+                .collect(),
+        )
     }
 }
 

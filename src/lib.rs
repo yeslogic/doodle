@@ -18,9 +18,9 @@ pub mod bounds;
 pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
-pub mod loc_decoder;
 pub mod error;
 pub mod helper;
+pub mod loc_decoder;
 
 pub mod output;
 pub mod parser;

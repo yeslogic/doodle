@@ -223,7 +223,9 @@
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 418
 │       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │               ├── class-table-id <- base.u8 := 0
+│       │   │   │               ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │               │   ├── class := 0
+│       │   │   │               │   └── table-id := 0
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
 │       │   │   │               │   ├── 0 := 0
 │       │   │   │               │   ├── 1 := 0

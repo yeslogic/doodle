@@ -3,7 +3,9 @@ use crate::decoder::{Compiler, ScopeEntry};
 use crate::error::{LocParseResult, ParseError};
 use crate::read::ReadCtxt;
 use crate::{
-    decoder::{Value, Decoder, Program}, pattern::Pattern, Arith, DynFormat, Expr, Format, IntRel, Label
+    decoder::{Decoder, Program, Value},
+    pattern::Pattern,
+    Arith, DynFormat, Expr, Format, IntRel, Label,
 };
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -458,11 +460,7 @@ impl ParsedValue {
         }
     }
 
-    fn matches<'a>(
-        &self,
-        scope: &'a LocScope<'a>,
-        pattern:  &Pattern,
-    ) -> Option<LocMultiScope<'a>> {
+    fn matches<'a>(&self, scope: &'a LocScope<'a>, pattern: &Pattern) -> Option<LocMultiScope<'a>> {
         let mut pattern_scope = LocMultiScope::new(scope);
         self.coerce_mapped_value()
             .matches_inner(&mut pattern_scope, pattern)
@@ -471,8 +469,7 @@ impl ParsedValue {
 }
 
 impl Expr {
-    pub fn eval_with_loc<'a>(&'a self, scope: &'a LocScope<'a>) -> Cow<'a, ParsedValue>
-    {
+    pub fn eval_with_loc<'a>(&'a self, scope: &'a LocScope<'a>) -> Cow<'a, ParsedValue> {
         match self {
             Expr::Var(name) => Cow::Borrowed(scope.get_value_by_name(name)),
             Expr::Bool(b) => Cow::Owned(ParsedValue::from_evaluated(Value::Bool(*b))),
@@ -481,7 +478,10 @@ impl Expr {
             Expr::U32(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U32(*i))),
             Expr::U64(i) => Cow::Owned(ParsedValue::from_evaluated(Value::U64(*i))),
             Expr::Tuple(exprs) => Cow::Owned(ParsedValue::from_evaluated(Value::Tuple(
-                exprs.iter().map(|expr| expr.eval_value_with_loc(scope)).collect(),
+                exprs
+                    .iter()
+                    .map(|expr| expr.eval_value_with_loc(scope))
+                    .collect(),
             ))),
             Expr::TupleProj(head, index) => match head.eval_with_loc(scope) {
                 Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
@@ -505,7 +505,10 @@ impl Expr {
                 expr.eval_value_with_loc(scope),
             ))),
             Expr::Seq(exprs) => Cow::Owned(ParsedValue::from_evaluated(Value::Seq(
-                exprs.iter().map(|expr| expr.eval_value_with_loc(scope)).collect(),
+                exprs
+                    .iter()
+                    .map(|expr| expr.eval_value_with_loc(scope))
+                    .collect(),
             ))),
             Expr::Match(head, branches) => {
                 let head = head.eval_with_loc(scope);
@@ -667,98 +670,120 @@ impl Expr {
                 },
             )),
 
-            Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(match x.eval_value_with_loc(scope) {
-                Value::U8(x) => Value::U8(x),
-                Value::U16(x) => Value::U8(u8::try_from(x).unwrap()),
-                Value::U32(x) => Value::U8(u8::try_from(x).unwrap()),
-                Value::U64(x) => Value::U8(u8::try_from(x).unwrap()),
-                x => panic!("cannot convert {x:?} to U8"),
-            })),
-            Expr::AsU16(x) => Cow::Owned(ParsedValue::from_evaluated(match x.eval_value_with_loc(scope) {
-                Value::U8(x) => Value::U16(u16::from(x)),
-                Value::U16(x) => Value::U16(x),
-                Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
-                Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
-                x => panic!("cannot convert {x:?} to U16"),
-            })),
-            Expr::AsU32(x) => Cow::Owned(ParsedValue::from_evaluated(match x.eval_value_with_loc(scope) {
-                Value::U8(x) => Value::U32(u32::from(x)),
-                Value::U16(x) => Value::U32(u32::from(x)),
-                Value::U32(x) => Value::U32(x),
-                Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
-                x => panic!("cannot convert {x:?} to U32"),
-            })),
-            Expr::AsU64(x) => Cow::Owned(ParsedValue::from_evaluated(match x.eval_value_with_loc(scope) {
-                Value::U8(x) => Value::U64(u64::from(x)),
-                Value::U16(x) => Value::U64(u64::from(x)),
-                Value::U32(x) => Value::U64(u64::from(x)),
-                Value::U64(x) => Value::U64(x),
-                x => panic!("cannot convert {x:?} to U64"),
-            })),
+            Expr::AsU8(x) => Cow::Owned(ParsedValue::from_evaluated(
+                match x.eval_value_with_loc(scope) {
+                    Value::U8(x) => Value::U8(x),
+                    Value::U16(x) => Value::U8(u8::try_from(x).unwrap()),
+                    Value::U32(x) => Value::U8(u8::try_from(x).unwrap()),
+                    Value::U64(x) => Value::U8(u8::try_from(x).unwrap()),
+                    x => panic!("cannot convert {x:?} to U8"),
+                },
+            )),
+            Expr::AsU16(x) => Cow::Owned(ParsedValue::from_evaluated(
+                match x.eval_value_with_loc(scope) {
+                    Value::U8(x) => Value::U16(u16::from(x)),
+                    Value::U16(x) => Value::U16(x),
+                    Value::U32(x) => Value::U16(u16::try_from(x).unwrap()),
+                    Value::U64(x) => Value::U16(u16::try_from(x).unwrap()),
+                    x => panic!("cannot convert {x:?} to U16"),
+                },
+            )),
+            Expr::AsU32(x) => Cow::Owned(ParsedValue::from_evaluated(
+                match x.eval_value_with_loc(scope) {
+                    Value::U8(x) => Value::U32(u32::from(x)),
+                    Value::U16(x) => Value::U32(u32::from(x)),
+                    Value::U32(x) => Value::U32(x),
+                    Value::U64(x) => Value::U32(u32::try_from(x).unwrap()),
+                    x => panic!("cannot convert {x:?} to U32"),
+                },
+            )),
+            Expr::AsU64(x) => Cow::Owned(ParsedValue::from_evaluated(
+                match x.eval_value_with_loc(scope) {
+                    Value::U8(x) => Value::U64(u64::from(x)),
+                    Value::U16(x) => Value::U64(u64::from(x)),
+                    Value::U32(x) => Value::U64(u64::from(x)),
+                    Value::U64(x) => Value::U64(x),
+                    x => panic!("cannot convert {x:?} to U64"),
+                },
+            )),
 
-            Expr::U16Be(bytes) => match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                [Value::U8(hi), Value::U8(lo)] => {
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U16(u16::from_be_bytes([
-                        *hi, *lo,
-                    ]))))
+            Expr::U16Be(bytes) => {
+                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
+                    [Value::U8(hi), Value::U8(lo)] => Cow::Owned(ParsedValue::from_evaluated(
+                        Value::U16(u16::from_be_bytes([*hi, *lo])),
+                    )),
+                    _ => panic!("U16Be: expected (U8, U8)"),
                 }
-                _ => panic!("U16Be: expected (U8, U8)"),
-            },
-            Expr::U16Le(bytes) => match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                [Value::U8(lo), Value::U8(hi)] => {
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U16(u16::from_le_bytes([
-                        *lo, *hi,
-                    ]))))
+            }
+            Expr::U16Le(bytes) => {
+                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
+                    [Value::U8(lo), Value::U8(hi)] => Cow::Owned(ParsedValue::from_evaluated(
+                        Value::U16(u16::from_le_bytes([*lo, *hi])),
+                    )),
+                    _ => panic!("U16Le: expected (U8, U8)"),
                 }
-                _ => panic!("U16Le: expected (U8, U8)"),
-            },
-            Expr::U32Be(bytes) => match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_be_bytes([
-                        *a, *b, *c, *d,
-                    ]))))
+            }
+            Expr::U32Be(bytes) => {
+                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                        Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_be_bytes(
+                            [*a, *b, *c, *d],
+                        ))))
+                    }
+                    _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
                 }
-                _ => panic!("U32Be: expected (U8, U8, U8, U8)"),
-            },
-            Expr::U32Le(bytes) => match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_le_bytes([
-                        *a, *b, *c, *d,
-                    ]))))
+            }
+            Expr::U32Le(bytes) => {
+                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d)] => {
+                        Cow::Owned(ParsedValue::from_evaluated(Value::U32(u32::from_le_bytes(
+                            [*a, *b, *c, *d],
+                        ))))
+                    }
+                    _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
                 }
-                _ => panic!("U32Le: expected (U8, U8, U8, U8)"),
-            },
-            Expr::U64Be(bytes) => match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes([
-                        *a, *b, *c, *d, *e, *f, *g, *h,
-                    ]))))
+            }
+            Expr::U64Be(bytes) => {
+                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
+                        Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_be_bytes(
+                            [*a, *b, *c, *d, *e, *f, *g, *h],
+                        ))))
+                    }
+                    _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
                 }
-                _ => panic!("U32Be: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
-            },
-            Expr::U64Le(bytes) => match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
-                [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
-                    Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes([
-                        *a, *b, *c, *d, *e, *f, *g, *h,
-                    ]))))
+            }
+            Expr::U64Le(bytes) => {
+                match bytes.eval_value_with_loc(scope).unwrap_tuple().as_slice() {
+                    [Value::U8(a), Value::U8(b), Value::U8(c), Value::U8(d), Value::U8(e), Value::U8(f), Value::U8(g), Value::U8(h)] => {
+                        Cow::Owned(ParsedValue::from_evaluated(Value::U64(u64::from_le_bytes(
+                            [*a, *b, *c, *d, *e, *f, *g, *h],
+                        ))))
+                    }
+                    _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
                 }
-                _ => panic!("U32Le: expected (U8, U8, U8, U8, U8, U8, U8, U8)"),
-            },
-            Expr::AsChar(bytes) => Cow::Owned(ParsedValue::from_evaluated(match bytes.eval_value_with_loc(scope) {
-                Value::U8(x) => Value::Char(char::from(x)),
-                Value::U16(x) => {
-                    Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER))
-                }
-                Value::U32(x) => {
-                    Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
-                }
-                Value::U64(x) => Value::Char(
-                    char::from_u32(u32::try_from(x).unwrap())
-                        .unwrap_or(char::REPLACEMENT_CHARACTER),
-                ),
-                _ => panic!("AsChar: expected U8, U16, U32, or U64"),
-            })),
-            Expr::SeqLength(seq) => match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+            }
+            Expr::AsChar(bytes) => Cow::Owned(ParsedValue::from_evaluated(
+                match bytes.eval_value_with_loc(scope) {
+                    Value::U8(x) => Value::Char(char::from(x)),
+                    Value::U16(x) => {
+                        Value::Char(char::from_u32(x as u32).unwrap_or(char::REPLACEMENT_CHARACTER))
+                    }
+                    Value::U32(x) => {
+                        Value::Char(char::from_u32(x).unwrap_or(char::REPLACEMENT_CHARACTER))
+                    }
+                    Value::U64(x) => Value::Char(
+                        char::from_u32(u32::try_from(x).unwrap())
+                            .unwrap_or(char::REPLACEMENT_CHARACTER),
+                    ),
+                    _ => panic!("AsChar: expected U8, U16, U32, or U64"),
+                },
+            )),
+            Expr::SeqLength(seq) => match seq
+                .eval_with_loc(scope)
+                .coerce_mapped_value()
+                .get_sequence()
+            {
                 Some(values) => {
                     let len = values.len();
                     Cow::Owned(ParsedValue::from_evaluated(Value::U32(len as u32)))
@@ -766,7 +791,11 @@ impl Expr {
                 _ => panic!("SeqLength: expected Seq"),
             },
             Expr::SubSeq(seq, start, length) => {
-                match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+                match seq
+                    .eval_with_loc(scope)
+                    .coerce_mapped_value()
+                    .get_sequence()
+                {
                     Some(values) => {
                         let start = start.eval_value_with_loc(scope).unwrap_usize();
                         let length = length.eval_value_with_loc(scope).unwrap_usize();
@@ -778,7 +807,11 @@ impl Expr {
                 }
             }
             Expr::SubSeqInflate(seq, start, length) => {
-                match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+                match seq
+                    .eval_with_loc(scope)
+                    .coerce_mapped_value()
+                    .get_sequence()
+                {
                     Some(vs0) => {
                         let start = start.eval_value_with_loc(scope).unwrap_usize();
                         let length = length.eval_value_with_loc(scope).unwrap_usize();
@@ -796,7 +829,11 @@ impl Expr {
                 }
             }
             Expr::FlatMap(expr, seq) => {
-                match seq.eval_with_loc(scope).coerce_mapped_value().get_sequence() {
+                match seq
+                    .eval_with_loc(scope)
+                    .coerce_mapped_value()
+                    .get_sequence()
+                {
                     Some(values) => {
                         let mut vs = Vec::new();
                         for v in values {
@@ -811,33 +848,37 @@ impl Expr {
                     _ => panic!("FlatMap: expected Seq"),
                 }
             }
-            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => match seq.eval_value_with_loc(scope) {
-                Value::Seq(values) => {
-                    let mut accum = accum.eval_value_with_loc(scope);
-                    let mut vs = Vec::new();
-                    for v in values {
-                        let ret = expr
-                            .eval_lambda_with_loc(scope, &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v])));
-                        accum = match ret.unwrap_tuple().as_mut_slice() {
-                            [accum, Value::Seq(vn)] => {
-                                vs.extend_from_slice(vn);
-                                accum.clone()
-                            }
-                            _ => panic!("FlatMapAccum: expected two values"),
-                        };
+            Expr::FlatMapAccum(expr, accum, _accum_type, seq) => {
+                match seq.eval_value_with_loc(scope) {
+                    Value::Seq(values) => {
+                        let mut accum = accum.eval_value_with_loc(scope);
+                        let mut vs = Vec::new();
+                        for v in values {
+                            let ret = expr.eval_lambda_with_loc(
+                                scope,
+                                &ParsedValue::from_evaluated(Value::Tuple(vec![accum, v])),
+                            );
+                            accum = match ret.unwrap_tuple().as_mut_slice() {
+                                [accum, Value::Seq(vn)] => {
+                                    vs.extend_from_slice(vn);
+                                    accum.clone()
+                                }
+                                _ => panic!("FlatMapAccum: expected two values"),
+                            };
+                        }
+                        Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
                     }
-                    Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
+                    _ => panic!("FlatMapAccum: expected Seq"),
                 }
-                _ => panic!("FlatMapAccum: expected Seq"),
-            },
+            }
             Expr::FlatMapList(expr, _ret_type, seq) => match seq.eval_value_with_loc(scope) {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();
                     for v in values {
                         let arg = Value::Tuple(vec![Value::Seq(vs), v]);
                         // TODO can we avoid cloning arg here?
-                        if let Value::Seq(vn) =
-                            expr.eval_lambda_with_loc(scope, &ParsedValue::from_evaluated(arg.clone()))
+                        if let Value::Seq(vn) = expr
+                            .eval_lambda_with_loc(scope, &ParsedValue::from_evaluated(arg.clone()))
                         {
                             vs = match arg {
                                 Value::Tuple(mut args) => match args.remove(0) {
@@ -867,13 +908,13 @@ impl Expr {
         }
     }
 
-    pub fn eval_value_with_loc<'a>(&self, scope: &'a LocScope<'a>) -> Value
-    {
-        self.eval_with_loc(scope).coerce_mapped_value().clone_into_value()
+    pub fn eval_value_with_loc<'a>(&self, scope: &'a LocScope<'a>) -> Value {
+        self.eval_with_loc(scope)
+            .coerce_mapped_value()
+            .clone_into_value()
     }
 
-    fn eval_lambda_with_loc<'a>(&self, scope: &'a LocScope<'a>, arg: &ParsedValue) -> Value
-    {
+    fn eval_lambda_with_loc<'a>(&self, scope: &'a LocScope<'a>, arg: &ParsedValue) -> Value {
         match self {
             Expr::Lambda(name, expr) => {
                 let child_scope = LocSingleScope::new(scope, name, arg);
@@ -884,14 +925,14 @@ impl Expr {
     }
 }
 
-
-
 impl Program {
     pub fn run_with_loc<'input>(
         &self,
         input: ReadCtxt<'input>,
     ) -> LocParseResult<(ParsedValue, ReadCtxt<'input>)> {
-        self.decoders[0].0.parse_with_loc(self, &LocScope::Empty, input)
+        self.decoders[0]
+            .0
+            .parse_with_loc(self, &LocScope::Empty, input)
     }
 }
 
@@ -981,14 +1022,17 @@ impl<'a> LocMultiScope<'a> {
         self.parent.get_bindings(bindings);
     }
 
-    fn into_record(self) -> ParsedValue
-    {
+    fn into_record(self) -> ParsedValue {
         ParsedValue::collect_fields(self.entries)
     }
 }
 
 impl<'a> LocSingleScope<'a> {
-    pub fn new(parent: &'a LocScope<'a>, name: &'a str, value: &'a ParsedValue) -> LocSingleScope<'a> {
+    pub fn new(
+        parent: &'a LocScope<'a>,
+        name: &'a str,
+        value: &'a ParsedValue,
+    ) -> LocSingleScope<'a> {
         LocSingleScope {
             parent,
             name,
@@ -1049,8 +1093,7 @@ impl Decoder {
         let start_offset = input.offset;
         match self {
             Decoder::Call(n, es) => {
-                let mut new_scope =
-                    LocMultiScope::with_capacity(&LocScope::Empty, es.len());
+                let mut new_scope = LocMultiScope::with_capacity(&LocScope::Empty, es.len());
                 for (name, e) in es {
                     let v = e.eval_with_loc(scope).as_ref().clone();
                     new_scope.push(name.clone(), v);
@@ -1286,8 +1329,11 @@ impl Decoder {
                 let head = head.eval_with_loc(scope);
                 for (index, (pattern, decoder)) in branches.iter().enumerate() {
                     if let Some(pattern_scope) = head.matches(scope, pattern) {
-                        let (v, input) =
-                            decoder.parse_with_loc(program, &LocScope::Multi(&pattern_scope), input)?;
+                        let (v, input) = decoder.parse_with_loc(
+                            program,
+                            &LocScope::Multi(&pattern_scope),
+                            input,
+                        )?;
                         return Ok((ParsedValue::Branch(index, Box::new(v)), input));
                     }
                 }

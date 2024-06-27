@@ -14,10 +14,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     fn color_table_len(flags: Expr) -> Expr {
         // 2 << (flags->table-size)
-        shl(
-            Expr::U16(2),
-            as_u16(record_proj(flags, "table-size"))
-        )
+        shl(Expr::U16(2), as_u16(record_proj(flags, "table-size")))
     }
 
     let color_table_entry = module.define_format(
@@ -59,7 +56,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                         Color Resolution              3 Bits
     //                         Sort Flag                     1 Bit
     //                         Size of Global Color Table    3 Bits
-    let logical_screen_descriptor_flags = packed_bits_u8([1, 3, 1, 3], ["table-flag", "color-resolution", "sort-flag", "table-size"]);
+    let logical_screen_descriptor_flags = packed_bits_u8(
+        [1, 3, 1, 3],
+        ["table-flag", "color-resolution", "sort-flag", "table-size"],
+    );
 
     // 18. Logical Screen Descriptor
     let logical_screen_descriptor = module.define_format(
@@ -82,7 +82,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                         Sort Flag                     1 Bit
     //                         Reserved                      2 Bits
     //                         Size of Local Color Table     3 Bits
-    let image_descriptor_flags = packed_bits_u8([1, 1, 1, 2, 3], ["table-flag", "interlace-flag", "sort-flag", "reserved", "table-size"]);
+    let image_descriptor_flags = packed_bits_u8(
+        [1, 1, 1, 2, 3],
+        [
+            "table-flag",
+            "interlace-flag",
+            "sort-flag",
+            "reserved",
+            "table-size",
+        ],
+    );
 
     // 20. Image Descriptor
     let image_descriptor = module.define_format(
@@ -115,7 +124,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                        Disposal Method               3 Bits
     //                        User Input Flag               1 Bit
     //                        Transparent Color Flag        1 Bit
-    let graphic_control_extension_flags = packed_bits_u8([3, 3, 1, 1], ["reserved", "disposal-method", "user-input-flag", "transparent-color-flag"]);
+    let graphic_control_extension_flags = packed_bits_u8(
+        [3, 3, 1, 1],
+        [
+            "reserved",
+            "disposal-method",
+            "user-input-flag",
+            "transparent-color-flag",
+        ],
+    );
 
     // 23. Graphic Control Extension
     let graphic_control_extension = module.define_format(
