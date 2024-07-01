@@ -18,6 +18,7 @@ pub mod bounds;
 pub mod byte_set;
 pub mod codegen;
 pub mod decoder;
+pub mod disjoint;
 pub mod error;
 pub mod helper;
 pub mod loc_decoder;
@@ -653,6 +654,8 @@ pub enum Format {
     WithRelativeOffset(Expr, Box<Format>),
     /// Map a value with a lambda expression
     Map(Box<Format>, Expr),
+    /// Assert that a boolean condition holds on a value
+    Where(Box<Format>, Expr),
     /// Compute a value
     Compute(Expr),
     /// Let binding
@@ -726,6 +729,7 @@ impl Format {
             Format::Bits(f) => f.match_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
             Format::Map(f, _expr) => f.match_bounds(module),
+            Format::Where(f, _expr) => f.match_bounds(module),
             Format::Compute(_) => Bounds::exact(0),
             Format::Let(_name, _expr, f) => f.match_bounds(module),
             Format::Match(_, branches) => branches
@@ -776,6 +780,7 @@ impl Format {
             Format::Bits(f) => f.lookahead_bounds(module).bits_to_bytes(),
             Format::WithRelativeOffset(expr, f) => expr.bounds() + f.lookahead_bounds(module),
             Format::Map(f, _expr) => f.lookahead_bounds(module),
+            Format::Where(f, _expr) => f.lookahead_bounds(module),
             Format::Compute(_) => Bounds::exact(0),
             Format::Let(_name, _expr, f) => f.lookahead_bounds(module),
             Format::Match(_, branches) => branches
@@ -819,6 +824,7 @@ impl Format {
             Format::Bits(..) => false,
             Format::WithRelativeOffset(..) => false,
             Format::Map(f, _expr) => f.depends_on_next(module),
+            Format::Where(f, _expr) => f.depends_on_next(module),
             Format::Compute(..) => false,
             Format::Let(_name, _expr, f) => f.depends_on_next(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
@@ -1036,6 +1042,21 @@ impl FormatModule {
                         body.infer_type(&child_scope)
                     }
                     other => Err(anyhow!("Map: expected lambda, found {other:?}")),
+                }
+            }
+            Format::Where(a, expr) => {
+                let arg_type = self.infer_format_type(scope, a)?;
+                match expr {
+                    Expr::Lambda(name, body) => {
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(name.clone(), arg_type.clone());
+                        let t = body.infer_type(&child_scope)?;
+                        if t != ValueType::Base(BaseType::Bool) {
+                            return Err(anyhow!("Where: expected bool lambda, found {t:?}"));
+                        }
+                        Ok(arg_type)
+                    }
+                    other => Err(anyhow!("Where: expected lambda, found {other:?}")),
                 }
             }
             Format::Compute(expr) => expr.infer_type(scope),
@@ -1838,6 +1859,7 @@ impl<'a> MatchTreeStep<'a> {
                 }
             }
             Format::Map(f, _expr) => Self::from_format(module, f, next),
+            Format::Where(f, _expr) => Self::from_format(module, f, next),
             Format::Compute(_expr) => Self::from_next(module, next),
             Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Match(_, branches) => {

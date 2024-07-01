@@ -2377,6 +2377,16 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, out_var)?;
                 Ok(newvar)
             }
+            Format::Where(inner, f) => {
+                let newvar = self.get_new_uvar();
+                let inner_t = self.infer_utype_format(inner, ctxt)?;
+
+                let (in_v, out_var) = self.infer_vars_expr_lambda(f, ctxt.scope)?;
+                self.unify_var_pair(newvar, in_v)?;
+                self.unify_var_utype(newvar, inner_t)?;
+                self.unify_var_utype(out_var, Rc::new(UType::Base(BaseType::Bool)))?;
+                Ok(newvar)
+            }
             Format::Compute(x) => {
                 let newvar = self.get_new_uvar();
                 let xt = self.infer_utype_expr(x, ctxt.scope)?;
