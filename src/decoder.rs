@@ -49,6 +49,10 @@ impl Value {
             (Pattern::U16(i0), Value::U16(i1)) => i0 == i1,
             (Pattern::U32(i0), Value::U32(i1)) => i0 == i1,
             (Pattern::U64(i0), Value::U64(i1)) => i0 == i1,
+            (Pattern::Int(bounds), Value::U8(n)) => bounds.contains(usize::from(*n)),
+            (Pattern::Int(bounds), Value::U16(n)) => bounds.contains(usize::from(*n)),
+            (Pattern::Int(bounds), Value::U32(n)) => bounds.contains(usize::try_from(*n).unwrap()),
+            (Pattern::Int(bounds), Value::U64(n)) => bounds.contains(usize::try_from(*n).unwrap()),
             (Pattern::Char(c0), Value::Char(c1)) => c0 == c1,
             (Pattern::Tuple(ps), Value::Tuple(vs)) | (Pattern::Seq(ps), Value::Seq(vs))
                 if ps.len() == vs.len() =>
