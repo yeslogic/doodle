@@ -1,6 +1,7 @@
+use serde::Serialize;
 use std::ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub};
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
     pub min: usize,
     pub max: Option<usize>,

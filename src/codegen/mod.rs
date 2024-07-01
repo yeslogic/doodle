@@ -2541,6 +2541,7 @@ impl<'a> Elaborator<'a> {
             Pattern::U16(n) => GTPattern::U16(*n),
             Pattern::U32(n) => GTPattern::U32(*n),
             Pattern::U64(n) => GTPattern::U64(*n),
+            Pattern::Int(_) => unimplemented!(),
             Pattern::Char(c) => GTPattern::Char(*c),
             Pattern::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
