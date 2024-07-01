@@ -1,3 +1,4 @@
+use crate::bounds::Bounds;
 use crate::{BaseType, Expr, Format, FormatModule, IntoLabel, Label, TypeScope, ValueType};
 use anyhow::Result as AResult;
 use serde::Serialize;
@@ -13,6 +14,7 @@ pub enum Pattern {
     U16(u16),
     U32(u32),
     U64(u64),
+    Int(Bounds),
     Char(char),
     Tuple(Vec<Pattern>),
     Variant(Label, Box<Pattern>),
@@ -45,6 +47,11 @@ impl Pattern {
             (Pattern::U8(..), ValueType::Base(BaseType::U8)) => {}
             (Pattern::U16(..), ValueType::Base(BaseType::U16)) => {}
             (Pattern::U32(..), ValueType::Base(BaseType::U32)) => {}
+            (Pattern::U64(..), ValueType::Base(BaseType::U64)) => {}
+            (Pattern::Int(..), ValueType::Base(BaseType::U8)) => {}
+            (Pattern::Int(..), ValueType::Base(BaseType::U16)) => {}
+            (Pattern::Int(..), ValueType::Base(BaseType::U32)) => {}
+            (Pattern::Int(..), ValueType::Base(BaseType::U64)) => {}
             (Pattern::Tuple(ps), ValueType::Tuple(ts)) if ps.len() == ts.len() => {
                 for (p, t) in Iterator::zip(ps.iter(), ts.iter()) {
                     p.build_scope(scope, Rc::new(t.clone()));

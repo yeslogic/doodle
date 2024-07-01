@@ -663,6 +663,11 @@ impl TypeChecker {
                 let var = self.init_var_simple(UType::Base(BaseType::U64))?.0;
                 Ok(var)
             }
+            Pattern::Int(_) => {
+                let var = self.get_new_uvar();
+                self.unify_utype_baseset(var.into(), BaseSet::USome)?;
+                Ok(var)
+            }
             Pattern::Char(_) => {
                 let var = self.init_var_simple(UType::Base(BaseType::Char))?.0;
                 Ok(var)
