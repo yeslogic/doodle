@@ -468,7 +468,7 @@ impl CodeGen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::Where(
-                        embed_lambda_dft(f, ClosureKind::Predicate, true),
+                        embed_lambda_dft(f, ClosureKind::Transform, true),
                         Box::new(cl_inner)
                     )
                 )
@@ -2288,7 +2288,10 @@ impl ToAst for DerivedLogic<GTExpr> {
             DerivedLogic::Where(f, inner) => {
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
                 let ctrl = {
-                    let cond_valid = f.clone().call_with([RustExpr::local("inner")]).wrap_try();
+                    let cond_valid = f
+                        .clone()
+                        .call_with([RustExpr::local("inner").call_method("clone")])
+                        .wrap_try();
                     let b_valid = vec![RustStmt::Return(
                         ReturnKind::Implicit,
                         RustExpr::local("inner"),

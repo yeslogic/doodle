@@ -271,3 +271,8 @@ pub fn flat_map_list(f: Expr, ret_type: ValueType, seq: Expr) -> Expr {
 pub fn dup(count: Expr, expr: Expr) -> Expr {
     Expr::Dup(Box::new(count), Box::new(expr))
 }
+
+/// Composed `Format::Where` and `Expr::Lambda` taking a raw format, an arbitrary name for the lambda expression head, and the lambda body as an Expr.
+pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
+    Format::Where(Box::new(raw), lambda(name, body))
+}
