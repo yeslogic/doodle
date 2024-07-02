@@ -1723,7 +1723,9 @@ impl<'a> MatchTreeStep<'a> {
                     }
                 }
             }
-            TypedFormat::Map(_, f, _expr) => Self::from_gt_format(module, f, next),
+            TypedFormat::Map(_, f, _expr) | TypedFormat::Where(_, f, _expr) => {
+                Self::from_gt_format(module, f, next)
+            }
             TypedFormat::Compute(_, _expr) => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {

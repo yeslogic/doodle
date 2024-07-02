@@ -77,6 +77,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Bits(TypeRep, Box<TypedDecoderExt<TypeRep>>),
     WithRelativeOffset(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
     Map(TypeRep, Box<TypedDecoderExt<TypeRep>>, TypedExpr<TypeRep>),
+    Where(TypeRep, Box<TypedDecoderExt<TypeRep>>, TypedExpr<TypeRep>),
     Compute(TypeRep, TypedExpr<TypeRep>),
     Let(
         TypeRep,
@@ -406,6 +407,10 @@ impl<'a> GTCompiler<'a> {
             GTFormat::Map(gt, a, expr) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Map(gt.clone(), da, expr.clone()))
+            }
+            GTFormat::Where(gt, a, expr) => {
+                let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
+                Ok(TypedDecoder::Where(gt.clone(), da, expr.clone()))
             }
             GTFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
             GTFormat::Let(gt, name, expr, a) => {
