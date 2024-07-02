@@ -485,9 +485,50 @@ impl BaseSet {
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum UintSet {
-    Any,    // unrestricted and non-defaulting if more than one solution
-    Any32,  // like Any,  but defaults to U32 if multiple solutions
-    Short8, // U8 or U16, default solution is U8
+    Any,               // unrestricted and non-defaulting if more than one solution
+    Any32,             // like Any,  but defaults to U32 if multiple solutions
+    Short8,            // U8 or U16, default solution is U8
+    AtLeast(IntWidth), // Some member of the restricted set of any whose width is no less than the given IntWidth
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum IntWidth {
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
+}
+
+impl IntWidth {
+    pub const MASK8: usize = !(u8::MAX as usize);
+    pub const MASK16: usize = !(u16::MAX as usize);
+    pub const MASK32: usize = !(u32::MAX as usize);
+    pub const MASK64: usize = !(u64::MAX as usize);
+}
+
+impl crate::Bounds {
+    pub fn min_required_width(&self) -> IntWidth {
+        let max = self.max.unwrap_or(self.min);
+        match () {
+            _ if max & IntWidth::MASK8 == 0 => IntWidth::Bits8,
+            _ if max & IntWidth::MASK16 == 0 => IntWidth::Bits16,
+            _ if max & IntWidth::MASK32 == 0 => IntWidth::Bits32,
+            _ if max & IntWidth::MASK64 == 0 => IntWidth::Bits64,
+            _ => unreachable!("no valid narrowing into 64 or fewer bits for bounds {self:?}"),
+        }
+    }
+}
+
+impl BaseType {
+    pub fn int_width(&self) -> IntWidth {
+        match self {
+            BaseType::U8 => IntWidth::Bits8,
+            BaseType::U16 => IntWidth::Bits16,
+            BaseType::U32 => IntWidth::Bits32,
+            BaseType::U64 => IntWidth::Bits64,
+            _ => unreachable!("cannot measure int-width of non-integral basetype {self:?}"),
+        }
+    }
 }
 
 impl UintSet {
@@ -495,6 +536,7 @@ impl UintSet {
         match self {
             UintSet::Any | UintSet::Any32 => b.is_numeric(),
             UintSet::Short8 => b == BaseType::U8 || b == BaseType::U16,
+            UintSet::AtLeast(w) => b.int_width() >= *w,
         }
     }
 
@@ -512,6 +554,8 @@ impl UintSet {
             UintSet::Any => None,
             UintSet::Any32 => Some(BaseType::U32),
             UintSet::Short8 => Some(BaseType::U8),
+            UintSet::AtLeast(IntWidth::Bits64) => Some(BaseType::U64),
+            UintSet::AtLeast(_) => None,
         }
     }
 }
@@ -566,11 +610,16 @@ impl BaseSet {
 impl std::fmt::Display for BaseSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            // FIXME - correct this if we add U64
-            BaseSet::U(UintSet::Any) => write!(f, "{{ U8, U16, U32 }}"),
-            BaseSet::U(UintSet::Any32) => write!(f, "{{ U8, U16, [U32] }}"),
-            BaseSet::U(UintSet::Short8) => write!(f, "{{ [U8], U16 }}"),
             BaseSet::Single(t) => write!(f, "{{ {t:?} }}"),
+            BaseSet::U(UintSet::Any) => write!(f, "{{ U8, U16, U32, U64 }}"),
+            BaseSet::U(UintSet::Any32) => write!(f, "{{ U8, U16, [U32], U64 }}"),
+            BaseSet::U(UintSet::Short8) => write!(f, "{{ [U8], U16 }}"),
+            BaseSet::U(UintSet::AtLeast(w)) => match w {
+                IntWidth::Bits8 => write!(f, "{{ U8, U16, U32, U64 }}"),
+                IntWidth::Bits16 => write!(f, "{{ U16, U32, U64 }}"),
+                IntWidth::Bits32 => write!(f, "{{ U32, U64 }}"),
+                IntWidth::Bits64 => write!(f, "{{ U64 }}"),
+            },
         }
     }
 }
@@ -663,9 +712,10 @@ impl TypeChecker {
                 let var = self.init_var_simple(UType::Base(BaseType::U64))?.0;
                 Ok(var)
             }
-            Pattern::Int(_) => {
+            Pattern::Int(bounds) => {
                 let var = self.get_new_uvar();
-                self.unify_utype_baseset(var.into(), BaseSet::USome)?;
+                let width = bounds.min_required_width();
+                self.unify_utype_baseset(var.into(), BaseSet::U(UintSet::AtLeast(width)))?;
                 Ok(var)
             }
             Pattern::Char(_) => {

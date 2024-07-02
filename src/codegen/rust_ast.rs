@@ -1727,6 +1727,7 @@ impl ToFragment for MatchCaseLHS {
 #[derive(Clone, Debug)]
 pub(crate) enum RustPattern {
     PrimLiteral(RustPrimLit),
+    PrimRange(RustPrimLit, Option<RustPrimLit>),
     TupleLiteral(Vec<RustPattern>),
     ArrayLiteral(Vec<RustPattern>),
     Fill,                                   // `..`
@@ -1764,6 +1765,10 @@ impl ToFragment for RustPattern {
     fn to_fragment(&self) -> Fragment {
         match self {
             RustPattern::PrimLiteral(pl) => pl.to_fragment(),
+            RustPattern::PrimRange(pl0, Some(pl1)) => pl0
+                .to_fragment()
+                .intervene(Fragment::string("..="), pl1.to_fragment()),
+            RustPattern::PrimRange(pl0, None) => pl0.to_fragment().cat(Fragment::string("..")),
             RustPattern::TupleLiteral(tup) => RustPattern::paren_list(tup),
             RustPattern::ArrayLiteral(tup) => RustPattern::brace_list(tup),
             RustPattern::Variant(constr, inner) => {
