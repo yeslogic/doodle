@@ -1,5 +1,8 @@
 use serde::Serialize;
-use std::ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub};
+use std::{
+    num::TryFromIntError,
+    ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub},
+};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
@@ -75,6 +78,22 @@ impl Bounds {
         }
     }
 }
+
+macro_rules! try_from_bounds {
+    ( $( $t:ident ),+ ) => {
+        $(
+            impl TryFrom<Bounds> for ($t, Option<$t>) {
+                type Error = TryFromIntError;
+
+                fn try_from(value: Bounds) -> Result<Self, Self::Error> {
+                    Ok((value.min.try_into()?, value.max.map(|n| n.try_into()).transpose()?))
+                }
+            }
+        )+
+    };
+}
+
+try_from_bounds!(u8, u16, u32, u64);
 
 impl Add for Bounds {
     type Output = Self;

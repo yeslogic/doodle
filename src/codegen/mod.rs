@@ -573,18 +573,56 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
         TypedPattern::Wildcard(_) => RustPattern::CatchAll(None),
         TypedPattern::Binding(_, name) => RustPattern::CatchAll(Some(name.clone())),
         TypedPattern::Bool(b) => RustPattern::PrimLiteral(RustPrimLit::Boolean(*b)),
-        TypedPattern::U8(n) => {
-            RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(*n as usize)))
-        }
-        TypedPattern::U16(n) => {
-            RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(*n as usize)))
-        }
-        TypedPattern::U32(n) => {
-            RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(*n as usize)))
-        }
-        TypedPattern::U64(n) => {
-            RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(*n as usize)))
-        }
+        TypedPattern::U8(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U8(*n))),
+        TypedPattern::U16(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U16(*n))),
+        TypedPattern::U32(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U32(*n))),
+        TypedPattern::U64(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::U64(*n))),
+        TypedPattern::Int(gt, bounds) => match bounds.is_exact() {
+            Some(n) => RustPattern::PrimLiteral(RustPrimLit::Numeric(RustNumLit::Usize(n))),
+            None => match gt {
+                GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U8))) => {
+                    let Ok((min, opt_max)): Result<(u8, Option<u8>), _> = (*bounds).try_into()
+                    else {
+                        panic!("ascribed type PrimType::U8 does not match with inherent value-range of bounds: {bounds:?}")
+                    };
+                    RustPattern::PrimRange(
+                        RustPrimLit::Numeric(RustNumLit::U8(min)),
+                        opt_max.map(|n| RustPrimLit::Numeric(RustNumLit::U8(n))),
+                    )
+                }
+                GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U16))) => {
+                    let Ok((min, opt_max)): Result<(u16, Option<u16>), _> = (*bounds).try_into()
+                    else {
+                        panic!("ascribed type PrimType::U16 does not match with inherent value-range of bounds: {bounds:?}")
+                    };
+                    RustPattern::PrimRange(
+                        RustPrimLit::Numeric(RustNumLit::U16(min)),
+                        opt_max.map(|n| RustPrimLit::Numeric(RustNumLit::U16(n))),
+                    )
+                }
+                GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U32))) => {
+                    let Ok((min, opt_max)): Result<(u32, Option<u32>), _> = (*bounds).try_into()
+                    else {
+                        panic!("ascribed type PrimType::U32 does not match with inherent value-range of bounds: {bounds:?}")
+                    };
+                    RustPattern::PrimRange(
+                        RustPrimLit::Numeric(RustNumLit::U32(min)),
+                        opt_max.map(|n| RustPrimLit::Numeric(RustNumLit::U32(n))),
+                    )
+                }
+                GenType::Inline(RustType::Atom(AtomType::Prim(PrimType::U64))) => {
+                    let Ok((min, opt_max)): Result<(u64, Option<u64>), _> = (*bounds).try_into()
+                    else {
+                        panic!("ascribed type PrimType::U64 does not match with inherent value-range of bounds: {bounds:?}")
+                    };
+                    RustPattern::PrimRange(
+                        RustPrimLit::Numeric(RustNumLit::U64(min)),
+                        opt_max.map(|n| RustPrimLit::Numeric(RustNumLit::U64(n))),
+                    )
+                }
+                _ => unreachable!("incoherent type for integer bounds: {bounds:?}"),
+            },
+        },
         TypedPattern::Char(c) => RustPattern::PrimLiteral(RustPrimLit::Char(*c)),
     }
 }
@@ -2582,7 +2620,10 @@ impl<'a> Elaborator<'a> {
             Pattern::U16(n) => GTPattern::U16(*n),
             Pattern::U32(n) => GTPattern::U32(*n),
             Pattern::U64(n) => GTPattern::U64(*n),
-            Pattern::Int(_) => unimplemented!(),
+            Pattern::Int(bounds) => {
+                let gt = self.get_gt_from_index(index);
+                GTPattern::Int(gt, *bounds)
+            }
             Pattern::Char(c) => GTPattern::Char(*c),
             Pattern::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
