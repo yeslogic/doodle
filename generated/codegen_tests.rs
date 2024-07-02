@@ -138,7 +138,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder15(&mut input)?;
+    let parsed_data = Decoder16(&mut input)?;
     match parsed_data {
         TarBlock {
             header,

@@ -5206,11 +5206,11 @@ fn Decoder43<'input>(
                     })())?;
                     let compression_method = ((|| {
                         PResult::Ok({
-                            let b = _input.read_byte()?;
-                            if b == 0 {
-                                b
+                            let inner = (Decoder18(_input))?;
+                            if ((|x: u8| PResult::Ok(x == 0u8))(inner.clone()))? {
+                                inner
                             } else {
-                                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+                                return Err(ParseError::FalsifiedWhere);
                             }
                         })
                     })())?;

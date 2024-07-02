@@ -161,7 +161,10 @@ pub fn main(
 
     let iccp_data = record(vec![
         ("profile-name", null_terminated(keyword.call())),
-        ("compression-method", is_byte(0)), // REVIEW: technically the value is unrestricted but 0 := deflate is the only defined value
+        (
+            "compression-method",
+            where_lambda(base.u8(), "x", expr_eq(var("x"), Expr::U8(0))),
+        ), // NOTE: 0 := deflate is the only defined value
         ("compressed-profile", zlib.call()),
     ]);
 

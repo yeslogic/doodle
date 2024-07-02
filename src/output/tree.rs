@@ -360,6 +360,7 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                 }
             }
+            Format::Where(format, _expr) => self.compile_parsed_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_parsed_value(value),
             Format::Let(_name, _expr, format) => self.compile_parsed_decoded_value(value, format),
             Format::Match(_head, branches) => match value {
@@ -471,6 +472,7 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                 }
             }
+            Format::Where(format, _expr) => self.compile_decoded_value(value, format),
             Format::Compute(_expr) => self.compile_value(value),
             Format::Let(_name, _expr, format) => self.compile_decoded_value(value, format),
             Format::Match(_head, branches) => match value {
@@ -1669,6 +1671,14 @@ impl<'module> MonoidalPrinter<'module> {
                 let expr_frag = self.compile_expr(expr, Precedence::ATOM);
                 cond_paren(
                     self.compile_nested_format("map", Some(&[expr_frag]), format, prec),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::Where(format, expr) => {
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format("assert", Some(&[expr_frag]), format, prec),
                     prec,
                     Precedence::FORMAT_COMPOUND,
                 )

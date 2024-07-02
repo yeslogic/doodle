@@ -79,6 +79,7 @@ pub enum TypedFormat<TypeRep> {
     Bits(TypeRep, Box<TypedFormat<TypeRep>>),
     WithRelativeOffset(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     Map(TypeRep, Box<TypedFormat<TypeRep>>, TypedExpr<TypeRep>),
+    Where(TypeRep, Box<TypedFormat<TypeRep>>, TypedExpr<TypeRep>),
     Compute(TypeRep, TypedExpr<TypeRep>),
     Let(
         TypeRep,
@@ -156,6 +157,7 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Map(_, f, _)
+            | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
             | TypedFormat::Let(_, _, _, f) => f.lookahead_bounds(),
 
@@ -218,6 +220,7 @@ impl TypedFormat<GenType> {
             TypedFormat::WithRelativeOffset(_, _, _) => Bounds::exact(0),
 
             TypedFormat::Map(_, f, _)
+            | TypedFormat::Where(_, f, _)
             | TypedFormat::Dynamic(_, _, _, f)
             | TypedFormat::Let(_, _, _, f) => f.match_bounds(),
 
@@ -273,6 +276,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Bits(gt, ..)
             | TypedFormat::WithRelativeOffset(gt, ..)
             | TypedFormat::Map(gt, ..)
+            | TypedFormat::Where(gt, ..)
             | TypedFormat::Compute(gt, ..)
             | TypedFormat::Let(gt, ..)
             | TypedFormat::Match(gt, ..)
@@ -585,6 +589,9 @@ mod __impls {
                     Format::WithRelativeOffset(ofs.into(), rebox(inner))
                 }
                 TypedFormat::Map(_, inner, lambda) => Format::Map(rebox(inner), Expr::from(lambda)),
+                TypedFormat::Where(_, inner, lambda) => {
+                    Format::Where(rebox(inner), Expr::from(lambda))
+                }
                 TypedFormat::Compute(_, expr) => Format::Compute(Expr::from(expr)),
                 TypedFormat::Let(_, name, val, inner) => {
                     Format::Let(name, Expr::from(val), rebox(inner))
