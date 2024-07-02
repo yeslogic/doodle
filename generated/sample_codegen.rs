@@ -4976,7 +4976,7 @@ fn Decoder41<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match ihdr.clone().data.color_type {
-                    0 => {
+                    0u8 => {
                         let inner = {
                             let greyscale = ((|| PResult::Ok((Decoder26(_input))?))())?;
                             main_png_chunks_inSeq_bKGD_data_color_type_0 { greyscale }
@@ -4984,7 +4984,7 @@ fn Decoder41<'input>(
                         main_png_chunks_inSeq_bKGD_data::color_type_0(inner)
                     }
 
-                    4 => {
+                    4u8 => {
                         let inner = {
                             let greyscale = ((|| PResult::Ok((Decoder26(_input))?))())?;
                             main_png_chunks_inSeq_bKGD_data_color_type_0 { greyscale }
@@ -4992,7 +4992,7 @@ fn Decoder41<'input>(
                         main_png_chunks_inSeq_bKGD_data::color_type_4(inner)
                     }
 
-                    2 => {
+                    2u8 => {
                         let inner = {
                             let red = ((|| PResult::Ok((Decoder26(_input))?))())?;
                             let green = ((|| PResult::Ok((Decoder26(_input))?))())?;
@@ -5002,7 +5002,7 @@ fn Decoder41<'input>(
                         main_png_chunks_inSeq_bKGD_data::color_type_2(inner)
                     }
 
-                    6 => {
+                    6u8 => {
                         let inner = {
                             let red = ((|| PResult::Ok((Decoder26(_input))?))())?;
                             let green = ((|| PResult::Ok((Decoder26(_input))?))())?;
@@ -5012,7 +5012,7 @@ fn Decoder41<'input>(
                         main_png_chunks_inSeq_bKGD_data::color_type_6(inner)
                     }
 
-                    3 => {
+                    3u8 => {
                         let inner = {
                             let palette_index = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             main_png_chunks_inSeq_bKGD_data_color_type_3 { palette_index }
@@ -5892,7 +5892,7 @@ fn Decoder50<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match ihdr.clone().data.color_type {
-                    0 => {
+                    0u8 => {
                         let inner = {
                             let greyscale = ((|| PResult::Ok((Decoder26(_input))?))())?;
                             main_png_chunks_inSeq_bKGD_data_color_type_0 { greyscale }
@@ -5900,7 +5900,7 @@ fn Decoder50<'input>(
                         main_png_chunks_inSeq_tRNS_data::color_type_0(inner)
                     }
 
-                    2 => {
+                    2u8 => {
                         let inner = {
                             let red = ((|| PResult::Ok((Decoder26(_input))?))())?;
                             let green = ((|| PResult::Ok((Decoder26(_input))?))())?;
@@ -5910,7 +5910,7 @@ fn Decoder50<'input>(
                         main_png_chunks_inSeq_tRNS_data::color_type_2(inner)
                     }
 
-                    3 => {
+                    3u8 => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -10748,9 +10748,9 @@ fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -10764,7 +10764,7 @@ fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (102, 116, 121, 112) => {
+                    (102u8, 116u8, 121u8, 112u8) => {
                         let inner = {
                             let major_brand = ((|| PResult::Ok((Decoder64(_input))?))())?;
                             let minor_version = ((|| PResult::Ok((Decoder28(_input))?))())?;
@@ -10800,11 +10800,11 @@ fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
                         main_mpeg4_atoms_inSeq_data::ftyp(inner)
                     }
 
-                    (102, 114, 101, 101) => main_mpeg4_atoms_inSeq_data::free,
+                    (102u8, 114u8, 101u8, 101u8) => main_mpeg4_atoms_inSeq_data::free,
 
-                    (109, 100, 97, 116) => main_mpeg4_atoms_inSeq_data::mdat,
+                    (109u8, 100u8, 97u8, 116u8) => main_mpeg4_atoms_inSeq_data::mdat,
 
-                    (109, 101, 116, 97) => {
+                    (109u8, 101u8, 116u8, 97u8) => {
                         let field0 = ((|| PResult::Ok((Decoder28(_input))?))())?;
                         let field1 = ((|| {
                             PResult::Ok({
@@ -10832,7 +10832,7 @@ fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
                         main_mpeg4_atoms_inSeq_data::meta(field0, field1)
                     }
 
-                    (109, 111, 111, 118) => {
+                    (109u8, 111u8, 111u8, 118u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -10927,9 +10927,9 @@ fn Decoder66<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -10943,7 +10943,7 @@ fn Decoder66<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (100, 105, 110, 102) => {
+                    (100u8, 105u8, 110u8, 102u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -10968,7 +10968,7 @@ fn Decoder66<'input>(
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::dinf(inner)
                     }
 
-                    (104, 100, 108, 114) => {
+                    (104u8, 100u8, 108u8, 114u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11002,7 +11002,7 @@ fn Decoder66<'input>(
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::hdlr(inner)
                     }
 
-                    (112, 105, 116, 109) => {
+                    (112u8, 105u8, 116u8, 109u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11035,7 +11035,7 @@ fn Decoder66<'input>(
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::pitm(inner)
                     }
 
-                    (105, 105, 110, 102) => {
+                    (105u8, 105u8, 110u8, 102u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11075,7 +11075,7 @@ fn Decoder66<'input>(
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::iinf(inner)
                     }
 
-                    (105, 114, 101, 102) => {
+                    (105u8, 114u8, 101u8, 102u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11088,7 +11088,7 @@ fn Decoder66<'input>(
                             })())?;
                             let single_item_reference = ((|| {
                                 PResult::Ok(match version {
-                                    0 => {
+                                    0u8 => {
                                         let inner = {
                                             let mut accum = Vec::new();
                                             while _input.remaining() > 0 {
@@ -11113,9 +11113,9 @@ fn Decoder66<'input>(
                                                         ))?;
                                                         let size = ((|| {
                                                             PResult::Ok(match size_field {
-                                                                0 => 0u64,
+                                                                0u32 => 0u64,
 
-                                                                1 => {
+                                                                1u32 => {
                                                                     let inner =
                                                                         (Decoder65(_input))?;
                                                                     ((|x: u64| {
@@ -11186,7 +11186,7 @@ accum.push((Decoder26(_input))?);
                                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iref_single_item_reference::small(inner)
                                     }
 
-                                    1 => {
+                                    1u8 => {
                                         let inner = {
                                             let mut accum = Vec::new();
                                             while _input.remaining() > 0 {
@@ -11211,9 +11211,9 @@ accum.push((Decoder26(_input))?);
                                                         ))?;
                                                         let size = ((|| {
                                                             PResult::Ok(match size_field {
-                                                                0 => 0u64,
+                                                                0u32 => 0u64,
 
-                                                                1 => {
+                                                                1u32 => {
                                                                     let inner =
                                                                         (Decoder65(_input))?;
                                                                     ((|x: u64| {
@@ -11300,7 +11300,7 @@ accum.push((Decoder28(_input))?);
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::iref(inner)
                     }
 
-                    (105, 108, 111, 99) => {
+                    (105u8, 108u8, 111u8, 99u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11363,16 +11363,16 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_me
 }))())?;
 let data_reference_index = ((|| PResult::Ok((Decoder26(_input))?))())?;
 let base_offset = ((|| PResult::Ok(match base_offset_size {
-0 => {
+0u8 => {
 0u64
 },
 
-4 => {
+4u8 => {
 let inner = (Decoder28(_input))?;
 ((|x: u32| PResult::Ok(x as u64))(inner))?
 },
 
-8 => {
+8u8 => {
 (Decoder65(_input))?
 },
 
@@ -11386,16 +11386,16 @@ let mut accum = Vec::new();
 for _ in 0..extent_count {
 accum.push({
 let extent_index = ((|| PResult::Ok(match index_size {
-0 => {
+0u8 => {
 0u64
 },
 
-4 => {
+4u8 => {
 let inner = (Decoder28(_input))?;
 ((|x: u32| PResult::Ok(x as u64))(inner))?
 },
 
-8 => {
+8u8 => {
 (Decoder65(_input))?
 },
 
@@ -11404,16 +11404,16 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }
 }))())?;
 let extent_offset = ((|| PResult::Ok(match offset_size {
-0 => {
+0u8 => {
 0u64
 },
 
-4 => {
+4u8 => {
 let inner = (Decoder28(_input))?;
 ((|x: u32| PResult::Ok(x as u64))(inner))?
 },
 
-8 => {
+8u8 => {
 (Decoder65(_input))?
 },
 
@@ -11422,16 +11422,16 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 }
 }))())?;
 let extent_length = ((|| PResult::Ok(match length_size {
-0 => {
+0u8 => {
 0u64
 },
 
-4 => {
+4u8 => {
 let inner = (Decoder28(_input))?;
 ((|x: u32| PResult::Ok(x as u64))(inner))?
 },
 
-8 => {
+8u8 => {
 (Decoder65(_input))?
 },
 
@@ -11466,7 +11466,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq { item_ID, cons
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::iloc(inner)
                     }
 
-                    (105, 108, 115, 116) => {
+                    (105u8, 108u8, 115u8, 116u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -11491,7 +11491,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq { item_ID, cons
                         main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data::ilst(inner)
                     }
 
-                    (105, 100, 97, 116) => {
+                    (105u8, 100u8, 97u8, 116u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -11561,9 +11561,9 @@ fn Decoder67<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -11577,7 +11577,7 @@ fn Decoder67<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (109, 118, 104, 100) => {
+                    (109u8, 118u8, 104u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11590,7 +11590,7 @@ fn Decoder67<'input>(
                             })())?;
                             let fields = ((|| {
                                 PResult::Ok(match version {
-                                    0 => {
+                                    0u8 => {
                                         let inner = {
                                             let creation_time =
                                                 ((|| PResult::Ok((Decoder28(_input))?))())?;
@@ -11605,7 +11605,7 @@ fn Decoder67<'input>(
                                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields::version0(inner)
                                     }
 
-                                    1 => {
+                                    1u8 => {
                                         let inner = {
                                             let creation_time =
                                                 ((|| PResult::Ok((Decoder65(_input))?))())?;
@@ -11672,7 +11672,7 @@ fn Decoder67<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data::mvhd(inner)
                     }
 
-                    (116, 114, 97, 107) => {
+                    (116u8, 114u8, 97u8, 107u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -11697,7 +11697,7 @@ fn Decoder67<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data::trak(inner)
                     }
 
-                    (117, 100, 116, 97) => {
+                    (117u8, 100u8, 116u8, 97u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -11767,9 +11767,9 @@ fn Decoder68<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -11783,7 +11783,7 @@ fn Decoder68<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (116, 107, 104, 100) => {
+                    (116u8, 107u8, 104u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -11796,7 +11796,7 @@ fn Decoder68<'input>(
                             })())?;
                             let fields = ((|| {
                                 PResult::Ok(match version {
-                                    0 => {
+                                    0u8 => {
                                         let inner = {
                                             let creation_time =
                                                 ((|| PResult::Ok((Decoder28(_input))?))())?;
@@ -11813,7 +11813,7 @@ fn Decoder68<'input>(
                                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_tkhd_fields::version0(inner)
                                     }
 
-                                    1 => {
+                                    1u8 => {
                                         let inner = {
                                             let creation_time =
                                                 ((|| PResult::Ok((Decoder65(_input))?))())?;
@@ -11876,7 +11876,7 @@ fn Decoder68<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data::tkhd(inner)
                     }
 
-                    (101, 100, 116, 115) => {
+                    (101u8, 100u8, 116u8, 115u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -11901,7 +11901,7 @@ fn Decoder68<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data::edts(inner)
                     }
 
-                    (109, 100, 105, 97) => {
+                    (109u8, 100u8, 105u8, 97u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -11971,9 +11971,9 @@ fn Decoder69<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -11987,7 +11987,7 @@ fn Decoder69<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (109, 101, 116, 97) => {
+                    (109u8, 101u8, 116u8, 97u8) => {
                         let field0 = ((|| PResult::Ok((Decoder28(_input))?))())?;
                         let field1 = ((|| {
                             PResult::Ok({
@@ -12062,9 +12062,9 @@ fn Decoder70<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -12078,7 +12078,7 @@ fn Decoder70<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (101, 108, 115, 116) => {
+                    (101u8, 108u8, 115u8, 116u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12156,9 +12156,9 @@ fn Decoder71<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -12172,7 +12172,7 @@ fn Decoder71<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (104, 100, 108, 114) => {
+                    (104u8, 100u8, 108u8, 114u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12195,7 +12195,7 @@ fn Decoder71<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data::hdlr(inner)
                     }
 
-                    (109, 100, 104, 100) => {
+                    (109u8, 100u8, 104u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12208,7 +12208,7 @@ fn Decoder71<'input>(
                             })())?;
                             let fields = ((|| {
                                 PResult::Ok(match version {
-                                    0 => {
+                                    0u8 => {
                                         let inner = {
                                             let creation_time =
                                                 ((|| PResult::Ok((Decoder28(_input))?))())?;
@@ -12223,7 +12223,7 @@ fn Decoder71<'input>(
                                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_mvhd_fields::version0(inner)
                                     }
 
-                                    1 => {
+                                    1u8 => {
                                         let inner = {
                                             let creation_time =
                                                 ((|| PResult::Ok((Decoder65(_input))?))())?;
@@ -12252,7 +12252,7 @@ fn Decoder71<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data::mdhd(inner)
                     }
 
-                    (109, 105, 110, 102) => {
+                    (109u8, 105u8, 110u8, 102u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -12379,9 +12379,9 @@ fn Decoder73<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -12395,7 +12395,7 @@ fn Decoder73<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (118, 109, 104, 100) => {
+                    (118u8, 109u8, 104u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12421,7 +12421,7 @@ fn Decoder73<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data::vmhd(inner)
                     }
 
-                    (115, 109, 104, 100) => {
+                    (115u8, 109u8, 104u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12439,7 +12439,7 @@ fn Decoder73<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data::smhd(inner)
                     }
 
-                    (100, 105, 110, 102) => {
+                    (100u8, 105u8, 110u8, 102u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -12464,7 +12464,7 @@ fn Decoder73<'input>(
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data::dinf(inner)
                     }
 
-                    (115, 116, 98, 108) => {
+                    (115u8, 116u8, 98u8, 108u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -12536,9 +12536,9 @@ fn Decoder74<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -12552,7 +12552,7 @@ fn Decoder74<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (100, 114, 101, 102) => {
+                    (100u8, 114u8, 101u8, 102u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12585,9 +12585,9 @@ fn Decoder74<'input>(
                                                     ((|| PResult::Ok((Decoder64(_input))?))())?;
                                                 let size = ((|| {
                                                     PResult::Ok(match size_field {
-                                                        0 => 0u64,
+                                                        0u32 => 0u64,
 
-                                                        1 => {
+                                                        1u32 => {
                                                             let inner = (Decoder65(_input))?;
                                                             ((|x: u64| PResult::Ok(x - 16u64))(
                                                                 inner,
@@ -12699,9 +12699,9 @@ fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -12715,7 +12715,7 @@ fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (115, 116, 115, 100) => {
+                    (115u8, 116u8, 115u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12735,11 +12735,11 @@ fn Decoder75<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_inS
 let size_field = ((|| PResult::Ok((Decoder28(_input))?))())?;
 let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
-0 => {
+0u32 => {
 0u64
 },
 
-1 => {
+1u32 => {
 let inner = (Decoder65(_input))?;
 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
 },
@@ -12786,7 +12786,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref_data_inSeq 
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::stsd(inner)
                     }
 
-                    (115, 116, 116, 115) => {
+                    (115u8, 116u8, 116u8, 115u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12816,7 +12816,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::stts(inner)
                     }
 
-                    (99, 116, 116, 115) => {
+                    (99u8, 116u8, 116u8, 115u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12846,7 +12846,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::ctts(inner)
                     }
 
-                    (115, 116, 115, 115) => {
+                    (115u8, 116u8, 115u8, 115u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12872,7 +12872,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::stss(inner)
                     }
 
-                    (115, 116, 115, 99) => {
+                    (115u8, 116u8, 115u8, 99u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12903,7 +12903,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::stsc(inner)
                     }
 
-                    (115, 116, 115, 122) => {
+                    (115u8, 116u8, 115u8, 122u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12939,7 +12939,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::stsz(inner)
                     }
 
-                    (115, 116, 99, 111) => {
+                    (115u8, 116u8, 99u8, 111u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12965,7 +12965,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::stco(inner)
                     }
 
-                    (99, 111, 54, 52) => {
+                    (99u8, 111u8, 54u8, 52u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -12991,7 +12991,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::co64(inner)
                     }
 
-                    (115, 103, 112, 100) => {
+                    (115u8, 103u8, 112u8, 100u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -13037,7 +13037,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                         main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data::sgpd(inner)
                     }
 
-                    (115, 98, 103, 112) => {
+                    (115u8, 98u8, 103u8, 112u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -13121,9 +13121,9 @@ fn Decoder76<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -13137,7 +13137,7 @@ fn Decoder76<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (105, 110, 102, 101) => {
+                    (105u8, 110u8, 102u8, 101u8) => {
                         let inner = {
                             let version = ((|| PResult::Ok((Decoder18(_input))?))())?;
                             let flags = ((|| {
@@ -13188,7 +13188,7 @@ fn Decoder76<'input>(
                                                 ((|| PResult::Ok((Decoder82(_input))?))())?;
                                             let extra_fields = ((|| {
                                                 PResult::Ok(match item_type {
-(109, 105, 109, 101) => {
+(109u8, 105u8, 109u8, 101u8) => {
 let inner = {
 let content_type = ((|| PResult::Ok((Decoder83(_input))?))())?;
 main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_mime { content_type }
@@ -13196,7 +13196,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_
 main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields::mime(inner)
 },
 
-(117, 114, 105, 32) => {
+(117u8, 114u8, 105u8, 32u8) => {
 let inner = {
 let item_uri_type = ((|| PResult::Ok((Decoder83(_input))?))())?;
 main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_uri { item_uri_type }
@@ -13268,9 +13268,9 @@ fn Decoder77<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -13284,7 +13284,7 @@ fn Decoder77<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (169, 116, 111, 111) => {
+                    (169u8, 116u8, 111u8, 111u8) => {
                         let inner = {
                             let mut accum = Vec::new();
                             while _input.remaining() > 0 {
@@ -13357,9 +13357,9 @@ fn Decoder78<'input>(
     let r#type = ((|| PResult::Ok((Decoder64(_input))?))())?;
     let size = ((|| {
         PResult::Ok(match size_field {
-            0 => 0u64,
+            0u32 => 0u64,
 
-            1 => {
+            1u32 => {
                 let inner = (Decoder65(_input))?;
                 ((|x: u64| PResult::Ok(x - 16u64))(inner))?
             }
@@ -13373,7 +13373,7 @@ fn Decoder78<'input>(
             _input.start_slice(sz)?;
             let ret = ((|| {
                 PResult::Ok(match r#type {
-                    (100, 97, 116, 97) => {
+                    (100u8, 97u8, 116u8, 97u8) => {
                         let inner = {
                             let type_indicator = ((|| PResult::Ok((Decoder28(_input))?))())?;
                             let locale_indicator = ((|| PResult::Ok((Decoder28(_input))?))())?;
@@ -17466,7 +17466,7 @@ fn Decoder146<'input>(
     })())?;
     let elements = ((|| {
         PResult::Ok(match precision_table_id.clone().precision {
-            0 => {
+            0u8 => {
                 let inner = {
                     let mut accum = Vec::new();
                     for _ in 0..64u32 {
@@ -17477,7 +17477,7 @@ fn Decoder146<'input>(
                 main_jpeg_frame_segments_inSeq_dqt_data_inSeq_elements::Bytes(inner)
             }
 
-            1 => {
+            1u8 => {
                 let inner = {
                     let mut accum = Vec::new();
                     for _ in 0..64u32 {
@@ -17507,12 +17507,12 @@ fn Decoder147<'input>(
     let identifier = ((|| PResult::Ok((Decoder148(_input))?))())?;
     let data = ((|| {
         PResult::Ok(match identifier.clone().string.as_slice() {
-            [69, 120, 105, 102] => {
+            [69u8, 120u8, 105u8, 102u8] => {
                 let inner = (Decoder149(_input))?;
                 main_jpeg_frame_initial_segment_app1_data_data::exif(inner)
             }
 
-            [104, 116, 116, 112, 58, 47, 47, 110, 115, 46, 97, 100, 111, 98, 101, 46, 99, 111, 109, 47, 120, 97, 112, 47, 49, 46, 48, 47] =>
+            [104u8, 116u8, 116u8, 112u8, 58u8, 47u8, 47u8, 110u8, 115u8, 46u8, 97u8, 100u8, 111u8, 98u8, 101u8, 46u8, 99u8, 111u8, 109u8, 47u8, 120u8, 97u8, 112u8, 47u8, 49u8, 46u8, 48u8, 47u8] =>
             {
                 let inner = (Decoder150(_input))?;
                 main_jpeg_frame_initial_segment_app1_data_data::xmp(inner)
@@ -17653,7 +17653,7 @@ fn Decoder151<'input>(
     let identifier = ((|| PResult::Ok((Decoder152(_input))?))())?;
     let data = ((|| {
         PResult::Ok(match identifier.clone().string.as_slice() {
-            [74, 70, 73, 70] => {
+            [74u8, 70u8, 73u8, 70u8] => {
                 let inner = (Decoder153(_input))?;
                 main_jpeg_frame_initial_segment_app0_data_data::jfif(inner)
             }
@@ -17928,17 +17928,17 @@ fn Decoder159<'input>(
     })())?;
     let data = ((|| {
         PResult::Ok(match r#type {
-            0 => {
+            0u8 => {
                 let inner = (Decoder161(_input))?;
                 main_gzip_inSeq_data_blocks_inSeq_data::uncompressed(inner)
             }
 
-            1 => {
+            1u8 => {
                 let inner = (Decoder162(_input))?;
                 main_gzip_inSeq_data_blocks_inSeq_data::fixed_huffman(inner)
             }
 
-            2 => {
+            2u8 => {
                 let inner = (Decoder163(_input))?;
                 main_gzip_inSeq_data_blocks_inSeq_data::dynamic_huffman(inner)
             }
@@ -18178,7 +18178,7 @@ fn Decoder162<'input>(
                     let code = ((|| PResult::Ok((format(_input))?))())?;
                     let extra = ((|| {
                         PResult::Ok(match code {
-257 => {
+257u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(3u16 + (length_extra_bits as u16)))())?;
@@ -18199,7 +18199,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-258 => {
+258u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(4u16 + (length_extra_bits as u16)))())?;
@@ -18220,7 +18220,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-259 => {
+259u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(5u16 + (length_extra_bits as u16)))())?;
@@ -18241,7 +18241,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-260 => {
+260u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(6u16 + (length_extra_bits as u16)))())?;
@@ -18262,7 +18262,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-261 => {
+261u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(7u16 + (length_extra_bits as u16)))())?;
@@ -18283,7 +18283,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-262 => {
+262u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(8u16 + (length_extra_bits as u16)))())?;
@@ -18304,7 +18304,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-263 => {
+263u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(9u16 + (length_extra_bits as u16)))())?;
@@ -18325,7 +18325,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-264 => {
+264u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(10u16 + (length_extra_bits as u16)))())?;
@@ -18346,7 +18346,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-265 => {
+265u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18373,7 +18373,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-266 => {
+266u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18400,7 +18400,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-267 => {
+267u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18427,7 +18427,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-268 => {
+268u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18454,7 +18454,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-269 => {
+269u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18482,7 +18482,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-270 => {
+270u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18510,7 +18510,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-271 => {
+271u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18538,7 +18538,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-272 => {
+272u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18566,7 +18566,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-273 => {
+273u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18595,7 +18595,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-274 => {
+274u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18624,7 +18624,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-275 => {
+275u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18653,7 +18653,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-276 => {
+276u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18682,7 +18682,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-277 => {
+277u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18712,7 +18712,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-278 => {
+278u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18742,7 +18742,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-279 => {
+279u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18772,7 +18772,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-280 => {
+280u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18802,7 +18802,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-281 => {
+281u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18833,7 +18833,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-282 => {
+282u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18864,7 +18864,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-283 => {
+283u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18895,7 +18895,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-284 => {
+284u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -18926,7 +18926,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra_some { le
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(inner)
 },
 
-285 => {
+285u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(258u16 + (length_extra_bits as u16)))())?;
@@ -18973,354 +18973,18 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::none
                 codes.iter().cloned(),
                 |x: main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq| {
                     PResult::Ok(match x.clone().code {
-256 => {
+256u16 => {
 [].to_vec()
 },
 
-257 => {
+257u16..=285u16 => {
 match x.clone().extra {
 main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
 [main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-258 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-259 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-260 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-261 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-262 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-263 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-264 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-265 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-266 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-267 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-268 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-269 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-270 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-271 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-272 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-273 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-274 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-275 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-276 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-277 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-278 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-279 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-280 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-281 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-282 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-283 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-284 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
-}
-}
-},
-
-285 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(9325807925413251017u64));
+return Err(ParseError::ExcludedBranch(13437705836516119394u64));
 }
 }
 },
@@ -19440,7 +19104,7 @@ fn Decoder163<'input>(
                     let code = ((|| PResult::Ok((code_length_alphabet_format(_input))?))())?;
                     let extra = ((|| {
                         PResult::Ok(match code as u8 {
-                            16 => {
+                            16u8 => {
                                 let inner = {
                                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -19451,7 +19115,7 @@ fn Decoder163<'input>(
                                 })(inner))?
                             }
 
-                            17 => {
+                            17u8 => {
                                 let inner = {
                                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -19467,7 +19131,7 @@ fn Decoder163<'input>(
                                 })(inner))?
                             }
 
-                            18 => {
+                            18u8 => {
                                 let inner = {
                                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -19501,23 +19165,23 @@ fn Decoder163<'input>(
 ();
 base_bit_ix0::none
 }, |x: (base_bit_ix0, main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_literal_length_distance_alphabet_code_lengths_inSeq)| PResult::Ok(match x.clone().1.code as u8 {
-16 => {
+16u8 => {
 (x.clone().0, dup32((x.clone().1.extra + 3u8) as u32, match x.clone().0 {
 base_bit_ix0::some(y) => {
 y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14159030909199302851u64));
+return Err(ParseError::ExcludedBranch(7259828639780166310u64));
 }
 }))
 },
 
-17 => {
+17u8 => {
 (x.clone().0, dup32((x.clone().1.extra + 3u8) as u32, 0u8))
 },
 
-18 => {
+18u8 => {
 (x.clone().0, dup32((x.clone().1.extra + 11u8) as u32, 0u8))
 },
 
@@ -19536,23 +19200,23 @@ break
 ();
 base_bit_ix0::none
 }, |x: (base_bit_ix0, main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_literal_length_distance_alphabet_code_lengths_inSeq)| PResult::Ok(match x.clone().1.code as u8 {
-16 => {
+16u8 => {
 (x.clone().0, dup32((x.clone().1.extra + 3u8) as u32, match x.clone().0 {
 base_bit_ix0::some(y) => {
 y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(14159030909199302851u64));
+return Err(ParseError::ExcludedBranch(7259828639780166310u64));
 }
 }))
 },
 
-17 => {
+17u8 => {
 (x.clone().0, dup32((x.clone().1.extra + 3u8) as u32, 0u8))
 },
 
-18 => {
+18u8 => {
 (x.clone().0, dup32((x.clone().1.extra + 11u8) as u32, 0u8))
 },
 
@@ -19591,7 +19255,7 @@ v => {
                     let code = ((|| PResult::Ok((literal_length_alphabet_format(_input))?))())?;
                     let extra = ((|| {
                         PResult::Ok(match code {
-257 => {
+257u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(3u16 + (length_extra_bits as u16)))())?;
@@ -19602,7 +19266,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-258 => {
+258u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(4u16 + (length_extra_bits as u16)))())?;
@@ -19613,7 +19277,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-259 => {
+259u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(5u16 + (length_extra_bits as u16)))())?;
@@ -19624,7 +19288,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-260 => {
+260u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(6u16 + (length_extra_bits as u16)))())?;
@@ -19635,7 +19299,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-261 => {
+261u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(7u16 + (length_extra_bits as u16)))())?;
@@ -19646,7 +19310,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-262 => {
+262u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(8u16 + (length_extra_bits as u16)))())?;
@@ -19657,7 +19321,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-263 => {
+263u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(9u16 + (length_extra_bits as u16)))())?;
@@ -19668,7 +19332,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-264 => {
+264u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(10u16 + (length_extra_bits as u16)))())?;
@@ -19679,7 +19343,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-265 => {
+265u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19696,7 +19360,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-266 => {
+266u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19713,7 +19377,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-267 => {
+267u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19730,7 +19394,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-268 => {
+268u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19747,7 +19411,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-269 => {
+269u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19765,7 +19429,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-270 => {
+270u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19783,7 +19447,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-271 => {
+271u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19801,7 +19465,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-272 => {
+272u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19819,7 +19483,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-273 => {
+273u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19838,7 +19502,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-274 => {
+274u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19857,7 +19521,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-275 => {
+275u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19876,7 +19540,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-276 => {
+276u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19895,7 +19559,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-277 => {
+277u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19915,7 +19579,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-278 => {
+278u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19935,7 +19599,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-279 => {
+279u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19955,7 +19619,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-280 => {
+280u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19975,7 +19639,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-281 => {
+281u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -19996,7 +19660,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-282 => {
+282u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -20017,7 +19681,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-283 => {
+283u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -20038,7 +19702,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-284 => {
+284u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
@@ -20059,7 +19723,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some { 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(inner)
 },
 
-285 => {
+285u16 => {
 let inner = {
 let length_extra_bits = ((|| PResult::Ok(0u8))())?;
 let length = ((|| PResult::Ok(258u16 + (length_extra_bits as u16)))())?;
@@ -20099,354 +19763,18 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::none
                 codes.iter().cloned(),
                 |x: main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq| {
                     PResult::Ok(match x.clone().code {
-256 => {
+256u16 => {
 [].to_vec()
 },
 
-257 => {
+257u16..=285u16 => {
 match x.clone().extra {
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
 [main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-258 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-259 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-260 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-261 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-262 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-263 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-264 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-265 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-266 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-267 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-268 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-269 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-270 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-271 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-272 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-273 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-274 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-275 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-276 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-277 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-278 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-279 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-280 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-281 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-282 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-283 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-284 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
-}
-}
-},
-
-285 => {
-match x.clone().extra {
-main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(rec) => {
-[main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq_reference { length: rec.clone().length, distance: rec.clone().distance_record.distance })].to_vec()
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(5055951424363922763u64));
+return Err(ParseError::ExcludedBranch(16913542601483261827u64));
 }
 }
 },
@@ -20481,65 +19809,65 @@ fn Decoder164<'input>(
     ParseError,
 > {
     PResult::Ok(match distance_code as u8 {
-        0 => (Decoder165(_input, 0u8, 1u16))?,
+        0u8 => (Decoder165(_input, 0u8, 1u16))?,
 
-        1 => (Decoder165(_input, 0u8, 2u16))?,
+        1u8 => (Decoder165(_input, 0u8, 2u16))?,
 
-        2 => (Decoder165(_input, 0u8, 3u16))?,
+        2u8 => (Decoder165(_input, 0u8, 3u16))?,
 
-        3 => (Decoder165(_input, 0u8, 4u16))?,
+        3u8 => (Decoder165(_input, 0u8, 4u16))?,
 
-        4 => (Decoder165(_input, 1u8, 5u16))?,
+        4u8 => (Decoder165(_input, 1u8, 5u16))?,
 
-        5 => (Decoder165(_input, 1u8, 7u16))?,
+        5u8 => (Decoder165(_input, 1u8, 7u16))?,
 
-        6 => (Decoder165(_input, 2u8, 9u16))?,
+        6u8 => (Decoder165(_input, 2u8, 9u16))?,
 
-        7 => (Decoder165(_input, 2u8, 13u16))?,
+        7u8 => (Decoder165(_input, 2u8, 13u16))?,
 
-        8 => (Decoder165(_input, 3u8, 17u16))?,
+        8u8 => (Decoder165(_input, 3u8, 17u16))?,
 
-        9 => (Decoder165(_input, 3u8, 25u16))?,
+        9u8 => (Decoder165(_input, 3u8, 25u16))?,
 
-        10 => (Decoder165(_input, 4u8, 33u16))?,
+        10u8 => (Decoder165(_input, 4u8, 33u16))?,
 
-        11 => (Decoder165(_input, 4u8, 49u16))?,
+        11u8 => (Decoder165(_input, 4u8, 49u16))?,
 
-        12 => (Decoder165(_input, 5u8, 65u16))?,
+        12u8 => (Decoder165(_input, 5u8, 65u16))?,
 
-        13 => (Decoder165(_input, 5u8, 97u16))?,
+        13u8 => (Decoder165(_input, 5u8, 97u16))?,
 
-        14 => (Decoder165(_input, 6u8, 129u16))?,
+        14u8 => (Decoder165(_input, 6u8, 129u16))?,
 
-        15 => (Decoder165(_input, 6u8, 193u16))?,
+        15u8 => (Decoder165(_input, 6u8, 193u16))?,
 
-        16 => (Decoder165(_input, 7u8, 257u16))?,
+        16u8 => (Decoder165(_input, 7u8, 257u16))?,
 
-        17 => (Decoder165(_input, 7u8, 385u16))?,
+        17u8 => (Decoder165(_input, 7u8, 385u16))?,
 
-        18 => (Decoder165(_input, 8u8, 513u16))?,
+        18u8 => (Decoder165(_input, 8u8, 513u16))?,
 
-        19 => (Decoder165(_input, 8u8, 769u16))?,
+        19u8 => (Decoder165(_input, 8u8, 769u16))?,
 
-        20 => (Decoder165(_input, 9u8, 1025u16))?,
+        20u8 => (Decoder165(_input, 9u8, 1025u16))?,
 
-        21 => (Decoder165(_input, 9u8, 1537u16))?,
+        21u8 => (Decoder165(_input, 9u8, 1537u16))?,
 
-        22 => (Decoder165(_input, 10u8, 2049u16))?,
+        22u8 => (Decoder165(_input, 10u8, 2049u16))?,
 
-        23 => (Decoder165(_input, 10u8, 3073u16))?,
+        23u8 => (Decoder165(_input, 10u8, 3073u16))?,
 
-        24 => (Decoder165(_input, 11u8, 4097u16))?,
+        24u8 => (Decoder165(_input, 11u8, 4097u16))?,
 
-        25 => (Decoder165(_input, 11u8, 6145u16))?,
+        25u8 => (Decoder165(_input, 11u8, 6145u16))?,
 
-        26 => (Decoder165(_input, 12u8, 8193u16))?,
+        26u8 => (Decoder165(_input, 12u8, 8193u16))?,
 
-        27 => (Decoder165(_input, 12u8, 12289u16))?,
+        27u8 => (Decoder165(_input, 12u8, 12289u16))?,
 
-        28 => (Decoder165(_input, 13u8, 16385u16))?,
+        28u8 => (Decoder165(_input, 13u8, 16385u16))?,
 
-        29 => (Decoder165(_input, 13u8, 24577u16))?,
+        29u8 => (Decoder165(_input, 13u8, 24577u16))?,
 
         _other => {
             unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#);
@@ -20557,9 +19885,9 @@ fn Decoder165<'input>(
 > {
     let distance_extra_bits = ((|| {
         PResult::Ok(match extra_bits {
-            0 => 0u16,
+            0u8 => 0u16,
 
-            1 => {
+            1u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     (field0,)
@@ -20567,7 +19895,7 @@ fn Decoder165<'input>(
                 ((|bits: (u8,)| PResult::Ok(bits.clone().0 as u16))(inner))?
             }
 
-            2 => {
+            2u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20578,7 +19906,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            3 => {
+            3u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20594,7 +19922,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            4 => {
+            4u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20612,7 +19940,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            5 => {
+            5u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20632,7 +19960,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            6 => {
+            6u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20654,7 +19982,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            7 => {
+            7u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20678,7 +20006,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            8 => {
+            8u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20706,7 +20034,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            9 => {
+            9u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20736,7 +20064,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            10 => {
+            10u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20769,7 +20097,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            11 => {
+            11u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20804,7 +20132,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            12 => {
+            12u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
@@ -20841,7 +20169,7 @@ fn Decoder165<'input>(
                 })(inner))?
             }
 
-            13 => {
+            13u8 => {
                 let inner = {
                     let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
                     let field1 = ((|| PResult::Ok((Decoder160(_input))?))())?;
