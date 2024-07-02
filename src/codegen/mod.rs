@@ -464,6 +464,15 @@ impl CodeGen {
                     )
                 )
             }
+            TypedDecoder::Where(_gt, inner, f) => {
+                let cl_inner = self.translate(inner.get_dec());
+                CaseLogic::Derived(
+                    DerivedLogic::Where(
+                        embed_lambda_dft(f, ClosureKind::Predicate, true),
+                        Box::new(cl_inner)
+                    )
+                )
+            }
             TypedDecoder::Compute(_t, expr) =>
                 CaseLogic::Simple(SimpleLogic::Eval(embed_expr(expr, ExprInfo::EmbedCloned))),
             TypedDecoder::Let(_t, name, expr, inner) => {
@@ -1104,6 +1113,14 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
     }
 }
 
+/// Transcribes a lambda-kinded `GTExpr` into a RustExpr value.
+///
+/// When `kind` is `ClosureKind::Predicate`, the resulting RustExpr will be a closure that operates on a reference to its associated argument-type
+/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an owned value of its associated argument-type
+///
+/// The `needs_ok` argument controls whether the overall body of the closure expression will be wrapped in `Ok` or not, which depends on whether
+/// there are any short-circuiting code-paths within the embedded lambda body. If `true`, an `Ok(...)` will be produced. Otherwise, the body will be
+/// transcribed as-is.
 fn embed_lambda_dft(expr: &GTExpr, kind: ClosureKind, needs_ok: bool) -> RustExpr {
     embed_lambda(expr, kind, needs_ok, ExprInfo::Natural)
 }
@@ -2201,6 +2218,7 @@ enum DerivedLogic<ExprT> {
     MapOf(RustExpr, Box<CaseLogic<ExprT>>),
     Let(Label, RustExpr, Box<CaseLogic<ExprT>>),
     Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<TypedExpr<GenType>>>),
+    Where(RustExpr, Box<CaseLogic<TypedExpr<GenType>>>),
 }
 
 #[derive(Clone, Debug)]
@@ -2266,6 +2284,26 @@ impl ToAst for DerivedLogic<GTExpr> {
                     vec![assign_inner],
                     Some(f.clone().call_with([RustExpr::local("inner")]).wrap_try()),
                 )
+            }
+            DerivedLogic::Where(f, inner) => {
+                let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
+                let ctrl = {
+                    let cond_valid = f.clone().call_with([RustExpr::local("inner")]).wrap_try();
+                    let b_valid = vec![RustStmt::Return(
+                        ReturnKind::Implicit,
+                        RustExpr::local("inner"),
+                    )];
+                    let b_invalid = vec![RustStmt::Return(
+                        ReturnKind::Keyword,
+                        RustExpr::err(RustExpr::scoped(["ParseError"], "FalsifiedWhere")),
+                    )];
+                    RustExpr::Control(Box::new(RustControl::If(
+                        cond_valid,
+                        b_valid,
+                        Some(b_invalid),
+                    )))
+                };
+                (vec![assign_inner], Some(ctrl))
             }
             DerivedLogic::Let(name, expr, inner) => {
                 let mut stmts = Vec::new();
@@ -2790,8 +2828,12 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTFormat::Map(gt, Box::new(t_inner), t_lambda)
             }
-            Format::Where(_inner, _lambda) => {
-                unimplemented!();
+            Format::Where(inner, lambda) => {
+                let index = self.get_and_increment_index();
+                let t_inner = self.elaborate_format(inner, dyns);
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::Where(gt, Box::new(t_inner), t_lambda)
             }
             Format::Compute(expr) => {
                 let index = self.get_and_increment_index();

@@ -5,6 +5,8 @@ pub type PResult<T> = Result<T, ParseError>;
 pub enum ParseError {
     /// Explicit `Format::Fail` or any of its derived equivalents
     FailToken,
+    /// Validation failure for a Format::Where
+    FalsifiedWhere,
     /// For Repeat1, RepeatCount, or RepeatUntil*, indicates that an inadequate number of values were read before encountering end-of-buffer or end-of-slice.
     InsufficientRepeats,
     /// Indicates a successful parse within a negated context, as in the case of PeekNot
@@ -32,6 +34,7 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseError::FailToken => write!(f, "reached Fail token"),
+            ParseError::FalsifiedWhere => write!(f, "parsed value deemed invalid by Where lambda"),
             ParseError::InsufficientRepeats => write!(
                 f,
                 "failed to find enough format repeats to satisfy requirement"
