@@ -481,7 +481,11 @@ pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
 ///
 /// Does not check that `lower <= upper` as that cannot be statically determined.
 pub fn where_between(format: Format, lower: Expr, upper: Expr) -> Format {
-    where_lambda(format, "x", and(expr_gte(var("x"), lower), expr_lte(var("x"), upper)))
+    where_lambda(
+        format,
+        "x",
+        and(expr_gte(var("x"), lower), expr_lte(var("x"), upper)),
+    )
 }
 
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times

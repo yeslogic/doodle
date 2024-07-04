@@ -125,8 +125,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         packed_bits_u8([4, 4], ["precision", "table-id"]),
         "precision-table-id",
         and(
-            expr_lte(record_proj(var("precision-table-id"), "precision"), Expr::U8(1)),
-            expr_lte(record_proj(var("precision-table-id"), "table-id"), Expr::U8(3)),
+            expr_lte(
+                record_proj(var("precision-table-id"), "precision"),
+                Expr::U8(1),
+            ),
+            expr_lte(
+                record_proj(var("precision-table-id"), "table-id"),
+                Expr::U8(3),
+            ),
         ),
     );
 
@@ -203,12 +209,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // NOTE: Bit data
     // expand-horizontal <- u4 // 0 | 1;
     // expand-vertical <- u4 // 0 | 1;
-    let expand_horizontal_vertical =
-        where_lambda(
-            packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]),
-            "x",
-            and(expr_lte(record_proj(var("x"), "expand-horizontal"), Expr::U8(1)), expr_lte(record_proj(var("x"), "expand-vertical"), Expr::U8(1))),
-        );
+    let expand_horizontal_vertical = where_lambda(
+        packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]),
+        "x",
+        and(
+            expr_lte(record_proj(var("x"), "expand-horizontal"), Expr::U8(1)),
+            expr_lte(record_proj(var("x"), "expand-vertical"), Expr::U8(1)),
+        ),
+    );
 
     // EXP: Expand reference components (See ITU T.81 Section B.3.3)
     let exp_data = module.define_format(
@@ -228,9 +236,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("version-major", base.u8()),
                 ("version-minor", base.u8()),
-                ("density-units", where_between(base.u8(), Expr::U8(0), Expr::U8(2))), // 0 | 1 | 2
-                ("density-x", where_lambda(base.u16be(), "x", is_nonzero_u16(var("x")))),  // != 0
-                ("density-y", where_lambda(base.u16be(), "x", is_nonzero_u16(var("x")))),  // != 0
+                (
+                    "density-units",
+                    where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(2))),
+                ), // 0 | 1 | 2
+                (
+                    "density-x",
+                    where_lambda(base.u16be(), "x", is_nonzero_u16(var("x"))),
+                ), // != 0
+                (
+                    "density-y",
+                    where_lambda(base.u16be(), "x", is_nonzero_u16(var("x"))),
+                ), // != 0
                 ("thumbnail-width", base.u8()),
                 ("thumbnail-height", base.u8()),
                 (

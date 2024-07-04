@@ -196,15 +196,65 @@ pub(crate) struct RustItem {
     decl: RustDecl,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(u8)]
+#[allow(dead_code)]
+pub(crate) enum TraitSet {
+    Empty = 0,
+    Debug = 1,
+    Clone = 2,
+    #[default]
+    DebugClone = 3,
+    Copy = 6,
+    DebugCopy = 7,
+}
+
+impl std::ops::BitAnd<TraitSet> for TraitSet {
+    type Output = TraitSet;
+
+    fn bitand(self, rhs: TraitSet) -> Self::Output {
+        unsafe { std::mem::transmute(self as u8 & rhs as u8) }
+    }
+}
+
+impl std::ops::BitOr<TraitSet> for TraitSet {
+    type Output = TraitSet;
+
+    fn bitor(self, rhs: TraitSet) -> Self::Output {
+        unsafe { std::mem::transmute(self as u8 | rhs as u8) }
+    }
+}
+
+impl TraitSet {
+    pub fn into_label_vec(self) -> Vec<Label> {
+        match self {
+            TraitSet::Empty => vec![],
+            TraitSet::Debug => vec![Label::from("Debug")],
+            TraitSet::Clone => vec![Label::from("Clone")],
+            TraitSet::DebugClone => vec![Label::from("Debug"), Label::from("Clone")],
+            TraitSet::Copy => vec![Label::from("Copy"), Label::from("Clone")],
+            TraitSet::DebugCopy => vec![
+                Label::from("Debug"),
+                Label::from("Copy"),
+                Label::from("Clone"),
+            ],
+        }
+    }
+
+    pub fn into_attr(self) -> RustAttr {
+        RustAttr::DeriveTraits(DeclDerives(self.into_label_vec()))
+    }
+}
+
 impl RustItem {
     /// Promotes a standalone declaration to a top-level item with implicitly 'default' visibility (i.e. `pub(self)`).
-    pub fn from_decl(decl: RustDecl) -> Self {
+    ///
+    /// Attaches the specified set of derive-traits `traits` to the declaration if it is a type definition.
+    ///
+    /// Currently, this argument is ignored for functions.
+    pub fn from_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
         let attrs = match decl {
-            // FIXME - avoid hardcoding this, especially in two places
-            RustDecl::TypeDef(..) => vec![RustAttr::DeriveTraits(DeclDerives(vec![
-                Label::from("Debug"),
-                Label::from("Clone"),
-            ]))],
+            RustDecl::TypeDef(..) => vec![traits.into_attr()],
             RustDecl::Function(_) => Vec::new(),
         };
         Self {
@@ -214,13 +264,14 @@ impl RustItem {
         }
     }
 
-    pub fn pub_decl(decl: RustDecl) -> Self {
+    /// Promotes a standalone declaration to a top-level item with explicit 'pub' visibility.
+    ///
+    /// Attaches the specified set of derive-traits `traits` to the declaration if it is a type definition.
+    ///
+    /// Currently, this argument is ignored for functions.
+    pub fn pub_decl_with_traits(decl: RustDecl, traits: TraitSet) -> Self {
         let attrs = match decl {
-            // FIXME - avoid hardcoding this, especially in two places
-            RustDecl::TypeDef(..) => vec![RustAttr::DeriveTraits(DeclDerives(vec![
-                Label::from("Debug"),
-                Label::from("Clone"),
-            ]))],
+            RustDecl::TypeDef(..) => vec![traits.into_attr()],
             RustDecl::Function(_) => Vec::new(),
         };
         Self {
@@ -228,6 +279,25 @@ impl RustItem {
             vis: Visibility::Public,
             decl,
         }
+    }
+
+    /// Promotes a type declaration to a top-level item with implicit 'pub(self)' visibility and the default set of derive-traits
+    /// (currently, `Debug` and `Clone`).
+    ///
+    /// For more fine-control over the traits that are derived, use [`from_decl_with_traits`](Self::from_decl_with_traits).
+    #[inline]
+    pub fn from_decl(decl: RustDecl) -> Self {
+        Self::from_decl_with_traits(decl, TraitSet::default())
+    }
+
+    /// Promotes a type declaration to a top-level item with implicit 'pub(self)' visibility and the default set of derive-traits
+    /// (currently, `Debug` and `Clone`).
+    ///
+    /// For more fine-control over the traits that are derived, use [`pub_decl_with_traits`](Self::pub_decl_with_traits).
+    #[inline]
+    #[allow(dead_code)]
+    pub fn pub_decl(decl: RustDecl) -> Self {
+        Self::pub_decl_with_traits(decl, TraitSet::default())
     }
 }
 
@@ -280,7 +350,6 @@ pub(crate) enum RustDecl {
 }
 
 impl RustDecl {
-    /// FIXME - allow for more bespoke customization of what traits are derived.
     pub fn type_def(lab: impl IntoLabel, def: RustTypeDef) -> Self {
         Self::TypeDef(lab.into(), def)
     }
@@ -452,6 +521,14 @@ impl RustTypeDef {
             RustTypeDef::Struct(str) => str.to_fragment(),
         }
     }
+
+    /// Rough heuristic to determine whether a `RustTypeDef` can derive `Copy` without resulting in a compiler error.
+    pub(crate) fn can_be_copy(&self) -> bool {
+        match self {
+            RustTypeDef::Enum(variants) => variants.iter().all(|v| v.can_be_copy()),
+            RustTypeDef::Struct(struct_def) => struct_def.can_be_copy(),
+        }
+    }
 }
 
 /// Entry-type for representing type-level constructions in Rust, for use in function signatures and return types,
@@ -520,6 +597,30 @@ impl RustType {
     }
 }
 
+impl RustType {
+    /// Conservative heuristic for determining whether it is possible to implement `Copy` on a `RustTypeDef` containing embedded values of this `RustType` without
+    /// resulting in a compiler error.
+    ///
+    /// Returns `true` if `self` is a primitive type, an immutable reference, or if it is an anonymous tuple or `Result` consisting only of such value-types.
+    ///
+    /// Because inference is performed locally, no embedded `LocalDef` values are considered to be Copyable, even when they are locally-defined with a `#[derive(Copy)]` attribute.
+    pub(crate) fn can_be_copy(&self) -> bool {
+        match self {
+            RustType::Atom(at) => match at {
+                AtomType::Prim(..) => true,
+                AtomType::TypeRef(..) => false,
+                AtomType::Comp(ct) => match ct {
+                    CompType::Vec(_) => false,
+                    CompType::Result(t_ok, t_err) => t_ok.can_be_copy() && t_err.can_be_copy(),
+                    CompType::Borrow(_lt, m, _t) => !m.is_mutable(),
+                },
+            },
+            RustType::AnonTuple(args) => args.iter().all(|t| t.can_be_copy()),
+            RustType::Verbatim(..) => false,
+        }
+    }
+}
+
 impl ToFragment for RustType {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -548,6 +649,15 @@ impl ToFragmentExt for RustType {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum RustStruct {
     Record(Vec<(Label, RustType)>),
+}
+
+impl RustStruct {
+    /// Rough heuristic to determine whether a `RustStruct` can derive `Copy` without resulting in a compiler error.
+    pub(crate) fn can_be_copy(&self) -> bool {
+        match self {
+            RustStruct::Record(flds) => flds.iter().all(|(_, t)| t.can_be_copy()),
+        }
+    }
 }
 
 impl ToFragment for RustStruct {
@@ -635,6 +745,17 @@ impl RustVariant {
     pub(crate) fn get_label(&self) -> &Label {
         match self {
             RustVariant::Unit(lab) | RustVariant::Tuple(lab, _) => lab,
+        }
+    }
+
+    /// Rough heuristic to determine whether an enum containing the given `RustVariant` can derive `Copy` without resulting in a compiler error.
+    ///
+    /// As a heuristic, this function is local-only, meaning a result of `true` merely indicates that the provided `RustVariant` itself is Copy-able,
+    /// but not that the overall enum is necessarily Copyable given its other variants.
+    pub(crate) fn can_be_copy(&self) -> bool {
+        match self {
+            RustVariant::Unit(_) => true,
+            RustVariant::Tuple(_, elts) => elts.iter().all(RustType::can_be_copy),
         }
     }
 }
@@ -882,6 +1003,12 @@ pub(crate) enum Mut {
     #[default]
     Immutable,
     Mutable,
+}
+
+impl Mut {
+    pub fn is_mutable(&self) -> bool {
+        matches!(self, Self::Mutable)
+    }
 }
 
 impl ToFragment for Mut {

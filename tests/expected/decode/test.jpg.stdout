@@ -12,9 +12,9 @@
 │       │   │               └── jfif <- jpeg.app0-jfif :=
 │       │   │                   ├── version-major <- base.u8 := 1
 │       │   │                   ├── version-minor <- base.u8 := 1
-│       │   │                   ├── density-units <- base.u8 := 1
-│       │   │                   ├── density-x <- base.u16be := 50
-│       │   │                   ├── density-y <- base.u16be := 50
+│       │   │                   ├── density-units <- assert (x -> x <= 2) base.u8 := 1
+│       │   │                   ├── density-x <- assert (x -> x != 0) base.u16be := 50
+│       │   │                   ├── density-y <- assert (x -> x != 0) base.u16be := 50
 │       │   │                   ├── thumbnail-width <- base.u8 := 0
 │       │   │                   ├── thumbnail-height <- base.u8 := 0
 │       │   │                   └── thumbnail-pixels <- repeat-count thumbnail-height (repeat-count thumbnail-width jpeg.thumbnail-pixel) := []
@@ -25,7 +25,7 @@
 │       │   │   │       ├── length <- base.u16be := 67
 │       │   │   │       └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
 │       │   │   │           └── 0 <- jpeg.dqt-data :=
-│       │   │   │               ├── precision-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │               ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │               │   ├── precision := 0
 │       │   │   │               │   └── table-id := 0
 │       │   │   │               └── elements <- match precision-table-id.precision { ... } :=
@@ -48,7 +48,7 @@
 │       │   │           ├── length <- base.u16be := 67
 │       │   │           └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
 │       │   │               └── 0 <- jpeg.dqt-data :=
-│       │   │                   ├── precision-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │                   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packedbits -> { ... }) U8) :=
 │       │   │                   │   ├── precision := 0
 │       │   │                   │   └── table-id := 1
 │       │   │                   └── elements <- match precision-table-id.precision { ... } :=
@@ -100,7 +100,7 @@
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 27
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │   │           ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │   │           ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │   │           │   ├── class := 0
 │       │   │   │   │           │   └── table-id := 0
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
@@ -130,7 +130,7 @@
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 58
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │   │           ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │   │           ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │   │           │   ├── class := 1
 │       │   │   │   │           │   └── table-id := 0
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
@@ -164,7 +164,7 @@
 │       │   │   │   │       ├── marker <- { ... }
 │       │   │   │   │       ├── length <- base.u16be := 26
 │       │   │   │   │       └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │   │           ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │   │           ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │   │           │   ├── class := 0
 │       │   │   │   │           │   └── table-id := 1
 │       │   │   │   │           ├── num-codes <- repeat-count 16 base.u8 :=
@@ -193,7 +193,7 @@
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 38
 │       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │               ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │               ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │               │   ├── class := 1
 │       │   │   │               │   └── table-id := 1
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
@@ -226,7 +226,7 @@
 │       │   │   │   ├── marker <- { ... }
 │       │   │   │   ├── length <- base.u16be := 12
 │       │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
-│       │   │   │       ├── num-image-components <- base.u8 := 3
+│       │   │   │       ├── num-image-components <- assert (x -> (x >= 1) && (x <= 4)) base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
 │       │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
 │       │   │   │       │   │   ├── component-selector <- base.u8 := 1
