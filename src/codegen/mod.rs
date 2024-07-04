@@ -901,7 +901,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             // REVIEW - lexical scopes, shadowing, and variable-name sanitization may not be quite right in the current implementation
             let loc = RustExpr::local(vname.clone());
             match info {
-                ExprInfo::EmbedCloned => loc.call_method("clone"),
+                ExprInfo::EmbedCloned => RustExpr::CloneOf(Box::new(loc)),
                 ExprInfo::Natural => loc,
             }
         }
@@ -2331,7 +2331,7 @@ impl ToAst for DerivedLogic<GTExpr> {
                 let ctrl = {
                     let cond_valid = f
                         .clone()
-                        .call_with([RustExpr::local("inner").call_method("clone")])
+                        .call_with([RustExpr::CloneOf(Box::new(RustExpr::local("inner")))])
                         .wrap_try();
                     let b_valid = vec![RustStmt::Return(
                         ReturnKind::Implicit,
