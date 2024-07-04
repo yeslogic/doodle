@@ -341,6 +341,9 @@ pub fn expr_ne(x: Expr, y: Expr) -> Expr {
 pub fn expr_lt(x: Expr, y: Expr) -> Expr {
     Expr::IntRel(IntRel::Lt, Box::new(x), Box::new(y))
 }
+pub fn expr_lte(x: Expr, y: Expr) -> Expr {
+    Expr::IntRel(IntRel::Lte, Box::new(x), Box::new(y))
+}
 
 pub fn expr_gt(x: Expr, y: Expr) -> Expr {
     Expr::IntRel(IntRel::Gt, Box::new(x), Box::new(y))
@@ -472,6 +475,15 @@ pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
     Format::Where(Box::new(raw), lambda(name, body))
 }
 
+/// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`
+///
+/// # Notes
+///
+/// Does not check that `lower <= upper` as that cannot be statically determined.
+pub fn where_between(format: Format, lower: Expr, upper: Expr) -> Format {
+    where_lambda(format, "x", and(expr_gte(var("x"), lower), expr_lte(var("x"), upper)))
+}
+
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times
 pub fn tuple_repeat(count: usize, format: Format) -> Format {
     let iter = std::iter::repeat(format).take(count);
@@ -481,4 +493,9 @@ pub fn tuple_repeat(count: usize, format: Format) -> Format {
 /// Returns an Expr that evaluates to `true` if the given U8-typed expression is non-zero
 pub fn is_nonzero_u8(expr: Expr) -> Expr {
     expr_ne(expr, Expr::U8(0))
+}
+
+/// Returns an Expr that evaluates to `true` if the given U16-typed expression is non-zero
+pub fn is_nonzero_u16(expr: Expr) -> Expr {
+    expr_ne(expr, Expr::U16(0))
 }

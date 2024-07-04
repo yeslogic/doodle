@@ -1,28 +1,32 @@
 use crate::format::BaseModule;
-use doodle::helper::*;
+use doodle::{helper::*, Expr};
 use doodle::{Format, FormatModule, FormatRef};
 
 /// gzip
 pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) -> FormatRef {
     // NOTE: Packed bits
-    //
+    //   0 0 0 x x x x x
     // [|7 6 5 4 3 2 1 0|]
-    //   ^ ^ ^ | | | | |   reserved
+    //   ^ ^ ^ | | | | |   reserved [MUST all be zero cf. RFC 1952]
     //         ^ | | | |   FCOMMENT
     //           ^ | | |   FNAME
     //             ^ | |   FEXTRA
     //               ^ |   FHCRC
     //                 ^   FTEXT
-    let flg = packed_bits_u8(
-        [3, 1, 1, 1, 1, 1],
-        [
-            "__reserved",
-            "fcomment",
-            "fname",
-            "fextra",
-            "fhcrc",
-            "ftext",
-        ],
+    let flg = where_lambda(
+        packed_bits_u8(
+            [3, 1, 1, 1, 1, 1],
+            [
+                "__reserved",
+                "fcomment",
+                "fname",
+                "fextra",
+                "fhcrc",
+                "ftext",
+            ],
+        ),
+        "flags",
+        expr_eq(record_proj(var("flags"), "__reserved"), Expr::U8(0)),
     );
 
     let header = module.define_format(
@@ -66,6 +70,15 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         ]),
     );
 
+    let fcomment_flag = is_nonzero_u8(record_projs(var("header"), &["file-flags", "fcomment"]));
+
+    let fcomment = module.define_format(
+        "gzip.fcomment",
+        record([
+            ("comment", base.asciiz_string()), // actually LATIN-1 but asciiz is good enough for now
+        ]),
+    );
+
     module.define_format(
         "gzip.main",
         repeat1(record([
@@ -78,7 +91,10 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
                 "fname",
                 if_then_else_variant(fname_flag, fname.call(), Format::EMPTY),
             ),
-            // FIXME fcomment
+            (
+                "fcomment",
+                if_then_else_variant(fcomment_flag, fcomment.call(), Format::EMPTY),
+            ),
             // FIXME fhcrc
             ("data", Format::Bits(Box::new(deflate.call()))),
             ("footer", footer.call()),

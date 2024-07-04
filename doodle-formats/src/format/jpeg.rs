@@ -51,27 +51,27 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         )
     };
 
-    // NOTE - bit data
-    // class <- u4 //= 0 | 1;
-    // table-id <- u4 //= 1 |..| 4;
-    // TODO - enforce numeric constraints
-    let class_table_id = packed_bits_u8([4, 4], ["class", "table-id"]);
+    // NOTE - bit data (common bit-packed record between DHT and DAC, up to and including numeric osntraints)
+    // class <- u4 = 0 | 1;
+    // table-id <- u4 = 0 |..| 3;
+    let class_table_id = where_lambda(
+        packed_bits_u8([4, 4], ["class", "table-id"]),
+        "class-table-id",
+        and(
+            expr_lt(record_proj(var("class-table-id"), "class"), Expr::U8(2)),
+            expr_lt(record_proj(var("class-table-id"), "table-id"), Expr::U8(4)),
+        ),
+    );
 
     // DHT: Define Huffman table (See ITU T.81 Section B.2.4.2)
     let dht_data = module.define_format(
         "jpeg.dht-data",
         record([
-            ("class-table-id", class_table_id),
+            ("class-table-id", class_table_id.clone()),
             ("num-codes", repeat_count(Expr::U8(16), base.u8())),
             ("values", repeat(base.u8())), // TODO - List.map num-codes (\n => repeat-count n u8);
         ]),
     );
-
-    // NOTE - packed-bits field
-    // class <- u4 //= 0 | 1;
-    // table-id <- u4 //= 1 |..| 4;
-    // TODO[epic=num-constr] - enforce numeric constraints
-    let class_table_id = packed_bits_u8([4, 4], ["class", "table-id"]);
 
     // DAC: Define arithmetic conditioning table (See ITU T.81 Section B.2.4.3)
     let dac_data = module.define_format(
@@ -103,8 +103,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         module.define_format(
             "jpeg.sos-data",
             record([
-                // TODO[epic=num-constr] - enforce numeric constraints
-                ("num-image-components", base.u8()), // 1 |..| 4
+                (
+                    "num-image-components",
+                    where_between(base.u8(), Expr::U8(1), Expr::U8(4)),
+                ), // 1 |..| 4
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sos_image_component.call()),
@@ -118,9 +120,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
 
     // NOTE - bits data
     // precision <- u4 //= 0 | 1;
-    // table-id <- u4 //= 1 |..| 4;
-    // TODO[epic=num-constr] - enforce numeric constraints
-    let precision_table_id = packed_bits_u8([4, 4], ["precision", "table-id"]);
+    // table-id <- u4 //= 0 |..| 3;
+    let precision_table_id = where_lambda(
+        packed_bits_u8([4, 4], ["precision", "table-id"]),
+        "precision-table-id",
+        and(
+            expr_lte(record_proj(var("precision-table-id"), "precision"), Expr::U8(1)),
+            expr_lte(record_proj(var("precision-table-id"), "table-id"), Expr::U8(3)),
+        ),
+    );
 
     // DQT: Define quantization table (See ITU T.81 Section B.2.4.1)
     let dqt_data = module.define_format(
@@ -134,7 +142,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             // };
             (
                 "elements",
-                // FIXME - we probably don't want to include an explicit catch-all, but until we have other numeric constraint enforcement mechanisms, it might be helpful???
                 match_variant(
                     record_proj(var("precision-table-id"), "precision"),
                     [
@@ -196,9 +203,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     // NOTE: Bit data
     // expand-horizontal <- u4 // 0 | 1;
     // expand-vertical <- u4 // 0 | 1;
-    // TODO[epic=num-constr] - enforce numeric constraints
     let expand_horizontal_vertical =
-        packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]);
+        where_lambda(
+            packed_bits_u8([4, 4], ["expand-horizontal", "expand-vertical"]),
+            "x",
+            and(expr_lte(record_proj(var("x"), "expand-horizontal"), Expr::U8(1)), expr_lte(record_proj(var("x"), "expand-vertical"), Expr::U8(1))),
+        );
 
     // EXP: Expand reference components (See ITU T.81 Section B.3.3)
     let exp_data = module.define_format(
@@ -218,10 +228,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("version-major", base.u8()),
                 ("version-minor", base.u8()),
-                // TODO[epic=num-constr] - enforce numeric constraints
-                ("density-units", base.u8()), // 0 | 1 | 2
-                ("density-x", base.u16be()),  // != 0
-                ("density-y", base.u16be()),  // != 0
+                ("density-units", where_between(base.u8(), Expr::U8(0), Expr::U8(2))), // 0 | 1 | 2
+                ("density-x", where_lambda(base.u16be(), "x", is_nonzero_u16(var("x")))),  // != 0
+                ("density-y", where_lambda(base.u16be(), "x", is_nonzero_u16(var("x")))),  // != 0
                 ("thumbnail-width", base.u8()),
                 ("thumbnail-height", base.u8()),
                 (
