@@ -2384,7 +2384,12 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             .ctxt
             .find_name_for(&path)
             .expect("no name found");
-        let it = RustItem::pub_decl(RustDecl::type_def(name, tdef.clone()));
+        let traits = if tdef.can_be_copy() {
+            TraitSet::DebugCopy
+        } else {
+            TraitSet::DebugClone
+        };
+        let it = RustItem::pub_decl_with_traits(RustDecl::type_def(name, tdef.clone()), traits);
         items.push(it);
     }
 

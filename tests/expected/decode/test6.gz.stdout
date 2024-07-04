@@ -4,7 +4,7 @@
 │           ├── header <- gzip.header :=
 │           │   ├── magic <- (...)
 │           │   ├── method <- base.u8 := 8
-│           │   ├── file-flags <- map (packedbits -> { ... }) U8 :=
+│           │   ├── file-flags <- assert (flags -> flags.__reserved == 0) (map (packedbits -> { ... }) U8) :=
 │           │   │   ├── fcomment := 0
 │           │   │   ├── fname := 1
 │           │   │   ├── fextra := 0
@@ -15,6 +15,7 @@
 │           │   └── os-id <- base.u8 := 3
 │           ├── fextra <- match (header.file-flags.fextra != 0) { ... } := { no := () }
 │           ├── fname <- match (header.file-flags.fname != 0) { ... } := { yes := "test6" }
+│           ├── fcomment <- match (header.file-flags.fcomment != 0) { ... } := { no := () }
 │           ├── data <- bits deflate.main :=
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=

@@ -369,6 +369,17 @@ impl Expr {
                     "mismatched operand types for {_rel:?}: {x:?}, {y:?}"
                 )),
             },
+            Expr::Arith(_arith @ (Arith::BoolAnd | Arith::BoolOr), x, y) => {
+                match (x.infer_type(scope)?, y.infer_type(scope)?) {
+                    (ValueType::Base(BaseType::Bool), ValueType::Base(BaseType::Bool)) => {
+                        Ok(ValueType::Base(BaseType::Bool))
+                    }
+                    (x, y) => Err(anyhow!(
+                        "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
+                    )),
+                }
+            }
+
             Expr::Arith(_arith, x, y) => match (x.infer_type(scope)?, y.infer_type(scope)?) {
                 (ValueType::Base(b1), ValueType::Base(b2)) if b1 == b2 && b1.is_numeric() => {
                     Ok(ValueType::Base(b1))

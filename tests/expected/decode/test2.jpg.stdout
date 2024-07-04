@@ -147,7 +147,7 @@
 │       │   │           ├── length <- base.u16be := 132
 │       │   │           └── data <- slice (length - 2) (repeat1 jpeg.dqt-data) :=
 │       │   │               ├── 0 <- jpeg.dqt-data :=
-│       │   │               │   ├── precision-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │               │   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packedbits -> { ... }) U8) :=
 │       │   │               │   │   ├── precision := 0
 │       │   │               │   │   └── table-id := 0
 │       │   │               │   └── elements <- match precision-table-id.precision { ... } :=
@@ -165,7 +165,7 @@
 │       │   │               │           ~
 │       │   │               │           └── 63 := 12
 │       │   │               └── 1 <- jpeg.dqt-data :=
-│       │   │                   ├── precision-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │                   ├── precision-table-id <- assert (precision-table-id -> (precision-table-id.precision <= 1) && (precision-table-id.table-id <= 3)) (map (packedbits -> { ... }) U8) :=
 │       │   │                   │   ├── precision := 0
 │       │   │                   │   └── table-id := 1
 │       │   │                   └── elements <- match precision-table-id.precision { ... } :=
@@ -223,7 +223,7 @@
 │       │   │   │           ├── marker <- { ... }
 │       │   │   │           ├── length <- base.u16be := 418
 │       │   │   │           └── data <- slice (length - 2) jpeg.dht-data :=
-│       │   │   │               ├── class-table-id <- map (packedbits -> { ... }) U8 :=
+│       │   │   │               ├── class-table-id <- assert (class-table-id -> (class-table-id.class < 2) && (class-table-id.table-id < 4)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │               │   ├── class := 0
 │       │   │   │               │   └── table-id := 0
 │       │   │   │               ├── num-codes <- repeat-count 16 base.u8 :=
@@ -256,7 +256,7 @@
 │       │   │   │   ├── marker <- { ... }
 │       │   │   │   ├── length <- base.u16be := 12
 │       │   │   │   └── data <- slice (length - 2) jpeg.sos-data :=
-│       │   │   │       ├── num-image-components <- base.u8 := 3
+│       │   │   │       ├── num-image-components <- assert (x -> (x >= 1) && (x <= 4)) base.u8 := 3
 │       │   │   │       ├── image-components <- repeat-count num-image-components jpeg.sos-image-component :=
 │       │   │   │       │   ├── 0 <- jpeg.sos-image-component :=
 │       │   │   │       │   │   ├── component-selector <- base.u8 := 1
