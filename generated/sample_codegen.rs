@@ -17611,7 +17611,7 @@ fn Decoder147<'input>(
 ) -> Result<main_jpeg_frame_initial_segment_app1_data, ParseError> {
     let identifier = ((|| PResult::Ok((Decoder148(_input))?))())?;
     let data = ((|| {
-        PResult::Ok(match identifier.string.clone().as_slice() {
+        PResult::Ok(match identifier.string.as_slice() {
             [69u8, 120u8, 105u8, 102u8] => {
                 let inner = (Decoder149(_input))?;
                 main_jpeg_frame_initial_segment_app1_data_data::exif(inner)
@@ -17757,7 +17757,7 @@ fn Decoder151<'input>(
 ) -> Result<main_jpeg_frame_initial_segment_app0_data, ParseError> {
     let identifier = ((|| PResult::Ok((Decoder152(_input))?))())?;
     let data = ((|| {
-        PResult::Ok(match identifier.string.clone().as_slice() {
+        PResult::Ok(match identifier.string.as_slice() {
             [74u8, 70u8, 73u8, 70u8] => {
                 let inner = (Decoder153(_input))?;
                 main_jpeg_frame_initial_segment_app0_data_data::jfif(inner)
@@ -18094,8 +18094,8 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::liter
 
 main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_values_inSeq::reference(r) => {
 {
-let ix = (((x.0.clone().len()) as u32) - ((r.distance.clone()) as u32)) as usize;
-(slice_ext(&x.0.clone(), ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
+let ix = (((x.0.len()) as u32) - ((r.distance.clone()) as u32)) as usize;
+(slice_ext(x.0, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
 }
 }
 })
@@ -21506,5 +21506,5 @@ return Err(ParseError::ExcludedBranch(8001216093308031977u64));
         })())?;
         (field0, field1)
     };
-    PResult::Ok(((|x: (Vec<u8>, u8)| PResult::Ok((x.0.clone().len()) as u32))(inner))?)
+    PResult::Ok(((|x: (Vec<u8>, u8)| PResult::Ok((x.0.len()) as u32))(inner))?)
 }

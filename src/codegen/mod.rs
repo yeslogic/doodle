@@ -490,7 +490,7 @@ impl CodeGen {
                 let scrutinized = embed_expr(scrutinee, ExprInfo::Natural);
                 let head = match scrutinee.get_type().unwrap().as_ref() {
                     GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Vec(..)))) =>
-                        scrutinized.call_method("as_slice"),
+                        scrutinized.vec_as_slice(),
                     _ => scrutinized,
                 };
                 let mut cl_cases = Vec::new();
@@ -816,7 +816,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             // NOTE - SeqLength is treated as U32 in Format context, so any operations on it have to be done on a U32 value rather than the natural `.len(): _ -> usize` return-value
             RustExpr::Operation(
                 RustOp::AsCast(
-                    Box::new(embed_expr_dft(seq).call_method("len")),
+                    Box::new(embed_expr_dft(seq).vec_len()),
                     RustType::Atom(AtomType::Prim(PrimType::U32))
                 )
             )
@@ -866,7 +866,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
 
             let range = RustExpr::RangeExclusive(Box::new(RustExpr::local("ix")), Box::new(end_expr));
 
-            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![RustExpr::Borrow(Box::new(embed_expr(seq, ExprInfo::Natural))), range]).call_method("to_vec")))
+            RustExpr::BlockScope(vec![bind_ix], Box::new(RustExpr::local("slice_ext").call_with(vec![RustExpr::borrow_of(embed_expr(seq, ExprInfo::Natural)), range]).call_method("to_vec")))
         }
         TypedExpr::FlatMap(_, f, seq) =>
             RustExpr::local("try_flat_map_vec")
@@ -1853,7 +1853,7 @@ where
                             RustExpr::num_lit(0usize),
                         );
                         let min_cond = RustExpr::infix(
-                            RustExpr::local("accum").call_method("len"),
+                            RustExpr::local("accum").vec_len(),
                             Operator::Gte,
                             RustExpr::Operation(RustOp::AsCast(
                                 Box::new(expr_min.clone()),
@@ -1861,7 +1861,7 @@ where
                             )),
                         );
                         let max_cond = RustExpr::infix(
-                            RustExpr::local("accum").call_method("len"),
+                            RustExpr::local("accum").vec_len(),
                             Operator::Eq,
                             RustExpr::Operation(RustOp::AsCast(
                                 Box::new(expr_max.clone()),
