@@ -1459,6 +1459,13 @@ impl RustExpr {
         Self::Entity(RustEntity::Scoped(lpath, name.into()))
     }
 
+    pub fn borrow_of(self) -> Self {
+        match self {
+            Self::CloneOf(this) => *this,
+            other => Self::Borrow(Box::new(other)),
+        }
+    }
+
     pub fn field(self, name: impl Into<Label>) -> Self {
         match self {
             Self::CloneOf(this) => Self::CloneOf(Box::new(this.field(name))),
@@ -1481,6 +1488,24 @@ impl RustExpr {
         self.call_with(None)
     }
 
+    pub fn vec_as_slice(self) -> Self {
+        match self {
+            Self::CloneOf(this) => this.call_method("as_slice"),
+            other => other.call_method("as_slice"),
+        }
+    }
+
+    pub fn vec_len(self) -> Self {
+        match self {
+            Self::CloneOf(this) => this.call_method("len"),
+            other => other.call_method("len"),
+        }
+    }
+
+    pub fn call_method(self, name: impl Into<Label>) -> Self {
+        self.call_method_with(name, None)
+    }
+
     pub fn call_method_with(
         self,
         name: impl Into<Label>,
@@ -1491,10 +1516,6 @@ impl RustExpr {
             SubIdent::ByName(name.into()),
             args.into_iter().collect(),
         )
-    }
-
-    pub fn call_method(self, name: impl Into<Label>) -> Self {
-        self.call_method_with(name, None)
     }
 
     pub fn infix(lhs: Self, op: Operator, rhs: Self) -> Self {
