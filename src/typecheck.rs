@@ -1,4 +1,4 @@
-use crate::{BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, ValueType};
+use crate::{Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, ValueType};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     rc::Rc,
@@ -43,9 +43,12 @@ impl UVar {
 /// Unification type, equivalent to ValueType up to abstraction
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum UType {
-    Empty,     // Reserved for value-free Formats (Format::Fail only)
-    Hole,      // ground type-hole for shape-only unifications
-    Var(UVar), // type-hole
+    /// Reserved case for Formats that fundamentally cannot be parsed successfully (Format::Fail and implied failure-cases)
+    Empty,
+    /// Anonymous type-hole for shape-only unifications (i.e. where we would want to use a meta-variable but don't have one available).
+    Hole,
+    /// Indexed type-hole acting as a unification metavariable
+    Var(UVar),
     Base(BaseType),
     Tuple(Vec<Rc<UType>>),
     Record(Vec<(Label, Rc<UType>)>),
@@ -86,6 +89,9 @@ impl UType {
         Self::Tuple(elems.into_iter().map(Into::into).collect())
     }
 
+    /// Attempts to convert a `ValueType` to an `UType`, returning `Some(ut)` if the conversion was successful.
+    ///
+    /// Will return `None` if the conversion failed due to the presence of a Union-type at any layer.
     pub(crate) fn from_valuetype(vt: &ValueType) -> Option<UType> {
         match vt {
             ValueType::Any => Some(Self::Hole),
@@ -181,7 +187,7 @@ pub(crate) enum DynScope<'a> {
 }
 
 impl<'a> DynScope<'a> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::Empty
     }
 
@@ -201,7 +207,7 @@ pub(crate) struct DynSingleScope<'a> {
 }
 
 impl<'a> DynSingleScope<'a> {
-    pub fn new(parent: &'a DynScope<'a>, name: &'a str, dynf_var: UVar) -> Self {
+    pub const fn new(parent: &'a DynScope<'a>, name: &'a str, dynf_var: UVar) -> Self {
         Self {
             parent,
             name,
@@ -235,7 +241,7 @@ impl<'a> Ctxt<'a> {
         }
     }
 
-    pub fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
+    pub const fn new(module: &'a FormatModule, scope: &'a UScope<'a>) -> Self {
         Self {
             module,
             scope,
@@ -245,7 +251,7 @@ impl<'a> Ctxt<'a> {
 }
 
 impl<'a> USingleScope<'a> {
-    pub fn new(parent: &'a UScope<'a>, name: &'a str, uvar: UVar) -> USingleScope<'a> {
+    pub const fn new(parent: &'a UScope<'a>, name: &'a str, uvar: UVar) -> USingleScope<'a> {
         Self { parent, name, uvar }
     }
 
@@ -290,6 +296,7 @@ pub(crate) enum VType {
     IndefiniteUnion(VMId),
 }
 
+/// Mutably updated state-engine for performing complete type-inference on a top-level `Format`.
 #[derive(Debug)]
 pub struct TypeChecker {
     constraints: Vec<Constraints>,
@@ -298,11 +305,13 @@ pub struct TypeChecker {
     level_vars: HashMap<usize, UVar>,
 }
 
+/// Association type that identifies the relationship between a metavariable and the possibly-empty set
+/// of other metavariables that must agree in order for the tree to be well-typed.
 #[derive(Clone, Debug, Default)]
 enum Alias {
     #[default]
     Ground, // no aliases anywhere
-    BackRef(usize),            // direct back-ref to earliest alias (must be canonical)
+    BackRef(usize), // direct back-ref to earliest alias (which itself must be canonical)
     Canonical(HashSet<usize>), // list of forward-references to update if usurped by an earlier canonical alias
 }
 
@@ -320,6 +329,7 @@ impl Alias {
         }
     }
 
+    /// Returns the index of the canonical back-reference if `self` is [`Alias::BackRef`], or `None` otherwise.
     pub fn as_backref(&self) -> Option<usize> {
         match self {
             Alias::Ground | Alias::Canonical(_) => None,
@@ -350,6 +360,7 @@ impl Alias {
         std::mem::replace(self, Alias::BackRef(tgt))
     }
 
+    /// Returns an iterator over the set of forward-references if `self` is [`Alias::Canonical`], or an empty iterator otherwise.
     fn iter_fwd_refs<'a>(&'a self) -> Box<dyn Iterator<Item = usize> + 'a> {
         match self {
             Alias::Ground | Alias::BackRef(_) => Box::new(std::iter::empty()),
@@ -357,6 +368,7 @@ impl Alias {
         }
     }
 
+    /// Returns `true` iff `self` is [`Alias::Canonical`] and contains the specified forward-reference.
     fn contains_fwd_ref(&self, tgt: usize) -> bool {
         match self {
             Alias::Ground | Alias::BackRef(_) => false,
@@ -1026,10 +1038,11 @@ impl TypeChecker {
                 // we only care about old if it is still an extant varmap
                 if let Some(old_vm) = self.varmaps.as_inner().get(&old.0) {
                     let Some(new_vm) = self.varmaps.as_inner().get(&vmid.0) else {
-                        unreachable!("impossible failure after previous assertion")
+                        unreachable!("HashMap::get returned None for {vmid} even though assertion on HashMap::contains_key succeeded")
                     };
                     for key in old_vm.keys() {
-                        // this check may be costly so we are gating it for non-release builds
+                        // NOTE: this check may be costly so we are gating it for non-release builds
+                        // NOTE: this isn't necessarily enough to validate subset-equivalence of the old and new VarMaps, as we do not check that the values associated with the common keys can unify
                         debug_assert!(
                             new_vm.contains_key(key),
                             "previous varmap {other} of {uvar} has variant {key} but new varmap {vmid} does not"
@@ -1037,7 +1050,7 @@ impl TypeChecker {
                     }
                 }
 
-                // FIXME - do we care about the value of other, or can we ignore it
+                // REVIEW - does the value of `old` matter here, or do we merely discard it?
                 *other = vmid;
                 Ok(())
             }
@@ -1218,6 +1231,38 @@ impl TypeChecker {
         }
     }
 
+    fn proj_shape_to_vtype(&self, shape: &ProjShape) -> VType {
+        match shape {
+            ProjShape::TupleWith(ix_vars) => {
+                let mut flat = Vec::new();
+                for (ix, var) in ix_vars.iter() {
+                    while *ix > flat.len() {
+                        flat.push(Rc::new(UType::Hole));
+                    }
+                    flat.push((*var).into());
+                }
+                VType::ImplicitTuple(flat)
+            }
+            ProjShape::RecordWith(fld_vars) => {
+                let mut flat = Vec::new();
+                for (lbl, var) in fld_vars.iter() {
+                    flat.push((lbl.clone(), (*var).into()));
+                }
+                VType::ImplicitRecord(flat)
+            }
+            ProjShape::SeqOf(v) => VType::Abstract(Rc::new(UType::Seq((*v).into()))),
+        }
+    }
+
+    fn repoint_vmid(&mut self, v: UVar, id: VMId) {
+        match &mut self.constraints[v.0] {
+            Constraints::Variant(placeholder) => {
+                *placeholder = id;
+            }
+            other => unreachable!("repoint_vmid expects Constraints::Variant, found {other:?}"),
+        }
+    }
+
     fn unify_utype(&mut self, left: Rc<UType>, right: Rc<UType>) -> TCResult<Rc<UType>> {
         match (left.as_ref(), right.as_ref()) {
             (UType::Hole, UType::Hole) => {
@@ -1315,311 +1360,13 @@ impl TypeChecker {
         }
     }
 
-    fn infer_var_expr_acc(
-        &mut self,
-        e: &Expr,
-        vt: &ValueType,
-        scope: &UScope<'_>,
-    ) -> TCResult<UVar> {
-        let uv = self.infer_var_expr(e, scope)?;
-        self.unify_var_valuetype(uv, vt)?;
-        Ok(uv)
-    }
-
-    fn infer_var_expr<'a>(&mut self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<UVar> {
-        let topvar = match e {
-            Expr::Var(lbl) => {
-                let occ_var = self.get_new_uvar();
-                match scope.get_uvar_by_name(lbl) {
-                    Some(uv) => {
-                        self.unify_var_pair(uv, occ_var)?;
-                    }
-                    None => unreachable!("variable {lbl} not in scope"),
-                }
-                occ_var
-            }
-            Expr::Bool(_) => self.init_var_simple(UType::Base(BaseType::Bool))?.0,
-            Expr::U8(_) => self.init_var_simple(UType::Base(BaseType::U8))?.0,
-            Expr::U16(_) => self.init_var_simple(UType::Base(BaseType::U16))?.0,
-            Expr::U32(_) => self.init_var_simple(UType::Base(BaseType::U32))?.0,
-            Expr::U64(_) => self.init_var_simple(UType::Base(BaseType::U64))?.0,
-            Expr::Tuple(ts) => {
-                let newvar = self.get_new_uvar();
-                let mut uts = Vec::with_capacity(ts.len());
-                for t in ts {
-                    uts.push(self.infer_utype_expr(t, scope)?);
-                }
-                self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
-                newvar
-            }
-            Expr::TupleProj(e_tup, ix) => {
-                let newvar = self.get_new_uvar();
-                let v_tup = self.infer_var_expr(e_tup, scope)?;
-                self.unify_var_proj_index(v_tup, *ix, newvar)?;
-                newvar
-            }
-            Expr::Record(fs) => {
-                let newvar = self.get_new_uvar();
-                let mut fields = Vec::with_capacity(fs.len());
-                let mut child = UMultiScope::with_capacity(scope, fs.len());
-                for (lbl, f) in fs {
-                    let scope = UScope::Multi(&child);
-                    let fvar = self.infer_var_expr(f, &scope)?;
-                    child.push(lbl.clone(), fvar);
-                    fields.push((lbl.clone(), fvar.into()));
-                }
-                self.unify_var_utype(newvar, Rc::new(UType::Record(fields)))?;
-                newvar
-            }
-            Expr::RecordProj(e_rec, fname) => {
-                let newvar = self.get_new_uvar();
-                let rec_var = self.infer_var_expr(e_rec, scope)?;
-                self.unify_var_proj_field(rec_var, fname.clone(), newvar)?;
-                newvar
-            }
-            Expr::Seq(elems) => {
-                let seq_uvar = self.get_new_uvar();
-                let elem_uvar = self.get_new_uvar();
-                for elem in elems.iter() {
-                    let elem_t = self.infer_utype_expr(elem, scope)?;
-                    self.unify_var_utype(elem_uvar, elem_t)?;
-                }
-                self.unify_var_utype(
-                    seq_uvar,
-                    Rc::new(UType::Seq(Rc::new(UType::Var(elem_uvar)))),
-                )?;
-                seq_uvar
-            }
-            Expr::Match(head, branches) => {
-                let newvar = self.get_new_uvar();
-                let head_t = self.infer_utype_expr(head, scope)?;
-                for (pat, rhs_expr) in branches.iter() {
-                    self.unify_utype_expr_match_case(head_t.clone(), pat, newvar, rhs_expr, scope)?;
-                }
-                newvar
-            }
-            Expr::Lambda(_, _) => {
-                unreachable!("infer_utype_expr: cannot directly infer utype of lambda expression")
-            }
-            Expr::Variant(vname, inner) => {
-                let newvar = self.get_new_uvar();
-                let inner_t = self.infer_utype_expr(inner, scope)?;
-                self.add_uvar_variant(newvar, vname.clone(), inner_t)?;
-                newvar
-            }
-            Expr::Arith(_arith, x, y) => {
-                let zvar = self.get_new_uvar();
-
-                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let tx = Rc::new(UType::Var(xvar));
-                let _cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
-
-                let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let ty = Rc::new(UType::Var(yvar));
-                let _cy = self.unify_utype_baseset(ty, BaseSet::UAny)?;
-
-                self.unify_var_pair(zvar, xvar)?;
-                self.unify_var_pair(zvar, yvar)?;
-                zvar
-            }
-            Expr::IntRel(_rel, x, y) => {
-                let zvar = self.get_new_uvar();
-
-                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
-                let tx = Rc::new(UType::Var(xvar));
-                let _cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
-
-                let yvar = self.infer_var_expr(y.as_ref(), scope)?;
-                let ty = Rc::new(UType::Var(yvar));
-                let _cy = self.unify_utype_baseset(ty, BaseSet::UAny)?;
-
-                self.unify_var_pair(xvar, yvar)?;
-
-                let cz = Constraint::Elem(BaseSet::Single(BaseType::Bool));
-                self.unify_var_constraint(zvar, cz)?;
-
-                zvar
-            }
-
-            Expr::AsU8(x) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
-                newvar
-            }
-            Expr::AsU16(x) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
-                newvar
-            }
-            Expr::AsU32(x) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
-                newvar
-            }
-            Expr::AsU64(x) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
-                newvar
-            }
-            Expr::AsChar(x) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::Char))?.0;
-                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
-                self.unify_utype_baseset(ut, BaseSet::UAny)?;
-                newvar
-            }
-
-            Expr::U16Be(bytes) | Expr::U16Le(bytes) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
-                let ut = self.infer_utype_expr(bytes.as_ref(), scope)?;
-                self.unify_utype(ut, Rc::new(UType::tuple([BaseType::U8; 2])))?;
-                newvar
-            }
-            Expr::U32Be(bytes) | Expr::U32Le(bytes) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
-                let ut = self.infer_utype_expr(bytes.as_ref(), scope)?;
-                self.unify_utype(ut, Rc::new(UType::tuple([BaseType::U8; 4])))?;
-                newvar
-            }
-            Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
-                let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
-                let ut = self.infer_utype_expr(bytes.as_ref(), scope)?;
-                self.unify_utype(ut, Rc::new(UType::tuple([BaseType::U8; 8])))?;
-                newvar
-            }
-            Expr::SeqLength(seq_expr) => {
-                // REVIEW - does this always have to be U32?
-                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
-                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
-                let elem_var = self.get_new_uvar();
-                self.unify_var_proj_elem(seq_var, elem_var)?;
-                newvar
-            }
-            Expr::SubSeq(seq_expr, start_expr, len_expr) => {
-                let newvar = self.get_new_uvar();
-                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
-
-                let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
-                let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
-
-                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
-                self.unify_utype_baseset(start_t, BaseSet::USome)?;
-                self.unify_utype_baseset(len_t, BaseSet::USome)?;
-
-                // ensure that seq_t is a sequence type, and then equate it to newvar
-                let elem_var = self.get_new_uvar();
-                self.unify_var_proj_elem(seq_var, elem_var)?;
-                self.unify_var_pair(newvar, seq_var)?;
-
-                newvar
-            }
-            Expr::SubSeqInflate(seq_expr, start_expr, len_expr) => {
-                let newvar = self.get_new_uvar();
-                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
-
-                let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
-                let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
-
-                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
-                self.unify_utype_baseset(start_t, BaseSet::USome)?;
-                self.unify_utype_baseset(len_t, BaseSet::USome)?;
-
-                // ensure that seq_t is a sequence type, and then equate it to newvar
-                let elem_var = self.get_new_uvar();
-                self.unify_var_proj_elem(seq_var, elem_var)?;
-                self.unify_var_pair(newvar, seq_var)?;
-
-                newvar
-            }
-            Expr::FlatMap(f_expr, seq_expr) => {
-                let newvar = self.get_new_uvar();
-
-                let (in_v, out_v) = self.infer_vars_expr_lambda(f_expr.as_ref(), scope)?;
-                let seq_v = self.infer_var_expr(seq_expr.as_ref(), scope)?;
-
-                let out_elem_v = self.get_new_uvar();
-
-                self.unify_var_proj_elem(seq_v, in_v)?;
-                self.unify_var_proj_elem(out_v, out_elem_v)?;
-                self.unify_var_pair(newvar, out_v)?;
-
-                newvar
-            }
-            Expr::FlatMapAccum(f_expr, acc_expr, acc_vt, seq_expr) => {
-                // NOTE - ((acc, x) -> (acc, [y])) -> acc -> Vt(acc) -> [x] -> [y]
-                let ys_var = self.get_new_uvar();
-
-                let (acc_x_var, acc_ys_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
-                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt, scope)?;
-                let xs_var = self.infer_var_expr(seq_expr, scope)?;
-                let x_var = self.get_new_uvar();
-                let y_var = self.get_new_uvar();
-
-                self.unify_var_proj_elem(ys_var, y_var)?;
-                self.unify_var_proj_elem(xs_var, x_var)?;
-
-                // constrain the shape to be exactly the tuple we expect
-                self.unify_var_utype(
-                    acc_x_var,
-                    Rc::new(UType::Tuple(vec![acc_var.into(), x_var.into()])),
-                )?;
-                self.unify_var_utype(
-                    acc_ys_var,
-                    Rc::new(UType::Tuple(vec![acc_var.into(), ys_var.into()])),
-                )?;
-
-                ys_var
-            }
-            Expr::FlatMapList(f_expr, ret_type, seq_expr) => {
-                // NOTE - (([y], x) -> [y]) -> Vt(y) -> [x] -> [y]
-                let ys_var = self.get_new_uvar();
-
-                let (init_x_var, tail_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
-                let xs_var = self.infer_var_expr(seq_expr, scope)?;
-                let x_var = self.get_new_uvar();
-                let y_var = self.get_new_uvar();
-
-                self.unify_var_proj_elem(ys_var, y_var)?;
-                self.unify_var_proj_elem(xs_var, x_var)?;
-                self.unify_var_valuetype(y_var, ret_type)?;
-                self.unify_var_pair(ys_var, tail_var)?;
-
-                // constrain the shape to be exactly the tuple we expect
-                self.unify_var_utype(
-                    init_x_var,
-                    Rc::new(UType::Tuple(vec![ys_var.into(), x_var.into()])),
-                )?;
-
-                ys_var
-            }
-            Expr::Dup(count, x) => {
-                let newvar = self.get_new_uvar();
-                let count_t = self.infer_utype_expr(count, scope)?;
-                let x_var = self.infer_var_expr(x, scope)?;
-
-                // REVIEW - this choice may have effects down the road if forced to unify against an incompatible numeric type
-                self.unify_utype_baseset(count_t, BaseSet::USome)?;
-                self.unify_var_proj_elem(newvar, x_var)?;
-
-                newvar
-            }
-        };
-        Ok(topvar)
-    }
-
-    fn infer_utype_expr(&mut self, e: &Expr, scope: &'_ UScope<'_>) -> TCResult<Rc<UType>> {
-        let var = self.infer_var_expr(e, scope)?;
-        Ok(Rc::new(UType::Var(var)))
-    }
-
     /// Unifies a UType against a BaseSet, updating any variable constraints in the process.
     ///
-    /// Fails (with `Err`) for any shapeful UType other than `Base` or `Var`.
+    /// Returns a copy of the novel constraint implied by the unification
+    /// if `ut` is `Base`, `Var`, or `Hole` (in the case of `Hole`, no additional inference is performed
+    /// and the constraint is directly returned without any further unification).
     ///
-    /// Otherwise returns a copy of the novel constraint implied by the unification.
+    /// Otherwise, returns an `Err` indicating thtat the unification was not possible.
     fn unify_utype_baseset(&mut self, ut: Rc<UType>, bs: BaseSet) -> TCResult<Constraint> {
         match ut.as_ref() {
             UType::Var(uv) => {
@@ -1642,7 +1389,6 @@ impl TypeChecker {
 
     /// Attempt to unify a [`UVar`] with a [`ValueType`], primarily for use with `Expr::FlatMapAccum`.
     fn unify_var_valuetype(&mut self, uv: UVar, vt: &ValueType) -> TCResult<()> {
-        // FIXME - only top-level unions are handled property, any embedded union will break down
         match UType::from_valuetype(vt) {
             Some(ref ut) => self.unify_var_utype(uv, Rc::new(ut.clone()))?,
             _ => match vt {
@@ -1878,6 +1624,322 @@ impl TypeChecker {
         // return the de-facto vmid for both variables
         Ok(lo)
     }
+}
+// !SECTION
+
+// SECTION - mid-to-high-level model-type inference rules
+impl TypeChecker {
+    fn infer_var_expr_acc(
+        &mut self,
+        e: &Expr,
+        vt: &ValueType,
+        scope: &UScope<'_>,
+    ) -> TCResult<UVar> {
+        let uv = self.infer_var_expr(e, scope)?;
+        self.unify_var_valuetype(uv, vt)?;
+        Ok(uv)
+    }
+
+    fn infer_var_expr<'a>(&mut self, e: &Expr, scope: &'a UScope<'a>) -> TCResult<UVar> {
+        let topvar = match e {
+            Expr::Var(lbl) => {
+                let occ_var = self.get_new_uvar();
+                match scope.get_uvar_by_name(lbl) {
+                    Some(uv) => {
+                        self.unify_var_pair(uv, occ_var)?;
+                    }
+                    None => unreachable!("variable {lbl} not in scope"),
+                }
+                occ_var
+            }
+            Expr::Bool(_) => self.init_var_simple(UType::Base(BaseType::Bool))?.0,
+            Expr::U8(_) => self.init_var_simple(UType::Base(BaseType::U8))?.0,
+            Expr::U16(_) => self.init_var_simple(UType::Base(BaseType::U16))?.0,
+            Expr::U32(_) => self.init_var_simple(UType::Base(BaseType::U32))?.0,
+            Expr::U64(_) => self.init_var_simple(UType::Base(BaseType::U64))?.0,
+            Expr::Tuple(ts) => {
+                let newvar = self.get_new_uvar();
+                let mut uts = Vec::with_capacity(ts.len());
+                for t in ts {
+                    uts.push(self.infer_utype_expr(t, scope)?);
+                }
+                self.unify_var_utype(newvar, Rc::new(UType::Tuple(uts)))?;
+                newvar
+            }
+            Expr::TupleProj(e_tup, ix) => {
+                let newvar = self.get_new_uvar();
+                let v_tup = self.infer_var_expr(e_tup, scope)?;
+                self.unify_var_proj_index(v_tup, *ix, newvar)?;
+                newvar
+            }
+            Expr::Record(fs) => {
+                let newvar = self.get_new_uvar();
+                let mut fields = Vec::with_capacity(fs.len());
+                let mut child = UMultiScope::with_capacity(scope, fs.len());
+                for (lbl, f) in fs {
+                    let scope = UScope::Multi(&child);
+                    let fvar = self.infer_var_expr(f, &scope)?;
+                    child.push(lbl.clone(), fvar);
+                    fields.push((lbl.clone(), fvar.into()));
+                }
+                self.unify_var_utype(newvar, Rc::new(UType::Record(fields)))?;
+                newvar
+            }
+            Expr::RecordProj(e_rec, fname) => {
+                let newvar = self.get_new_uvar();
+                let rec_var = self.infer_var_expr(e_rec, scope)?;
+                self.unify_var_proj_field(rec_var, fname.clone(), newvar)?;
+                newvar
+            }
+            Expr::Seq(elems) => {
+                let seq_uvar = self.get_new_uvar();
+                let elem_uvar = self.get_new_uvar();
+                for elem in elems.iter() {
+                    let elem_t = self.infer_utype_expr(elem, scope)?;
+                    self.unify_var_utype(elem_uvar, elem_t)?;
+                }
+                self.unify_var_utype(
+                    seq_uvar,
+                    Rc::new(UType::Seq(Rc::new(UType::Var(elem_uvar)))),
+                )?;
+                seq_uvar
+            }
+            Expr::Match(head, branches) => {
+                let newvar = self.get_new_uvar();
+                let head_t = self.infer_utype_expr(head, scope)?;
+                for (pat, rhs_expr) in branches.iter() {
+                    self.unify_utype_expr_match_case(head_t.clone(), pat, newvar, rhs_expr, scope)?;
+                }
+                newvar
+            }
+            Expr::Lambda(_, _) => {
+                unreachable!("infer_utype_expr: cannot directly infer utype of lambda expression")
+            }
+            Expr::Variant(vname, inner) => {
+                let newvar = self.get_new_uvar();
+                let inner_t = self.infer_utype_expr(inner, scope)?;
+                self.add_uvar_variant(newvar, vname.clone(), inner_t)?;
+                newvar
+            }
+            Expr::Arith(Arith::BoolAnd | Arith::BoolOr, x, y) => {
+                let zvar = self.get_new_uvar();
+
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let tx = Rc::new(UType::Var(xvar));
+                let _cx = self.unify_utype_baseset(tx, BaseSet::Single(BaseType::Bool))?;
+
+                let yvar = self.infer_var_expr(y.as_ref(), scope)?;
+                let ty = Rc::new(UType::Var(yvar));
+                let _cy = self.unify_utype_baseset(ty, BaseSet::Single(BaseType::Bool))?;
+
+                self.unify_var_constraint(zvar, BaseSet::Single(BaseType::Bool).to_constraint())?;
+                zvar
+            }
+            Expr::Arith(_, x, y) => {
+                let zvar = self.get_new_uvar();
+
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let tx = Rc::new(UType::Var(xvar));
+                let _cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+
+                let yvar = self.infer_var_expr(y.as_ref(), scope)?;
+                let ty = Rc::new(UType::Var(yvar));
+                let _cy = self.unify_utype_baseset(ty, BaseSet::UAny)?;
+
+                self.unify_var_pair(zvar, xvar)?;
+                self.unify_var_pair(zvar, yvar)?;
+                zvar
+            }
+            Expr::IntRel(_rel, x, y) => {
+                let zvar = self.get_new_uvar();
+
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+                let tx = Rc::new(UType::Var(xvar));
+                let _cx = self.unify_utype_baseset(tx, BaseSet::UAny)?;
+
+                let yvar = self.infer_var_expr(y.as_ref(), scope)?;
+                let ty = Rc::new(UType::Var(yvar));
+                let _cy = self.unify_utype_baseset(ty, BaseSet::UAny)?;
+
+                self.unify_var_pair(xvar, yvar)?;
+
+                let cz = Constraint::Elem(BaseSet::Single(BaseType::Bool));
+                self.unify_var_constraint(zvar, cz)?;
+
+                zvar
+            }
+            Expr::AsU8(x) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U8))?.0;
+                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
+                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                newvar
+            }
+            Expr::AsU16(x) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
+                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
+                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                newvar
+            }
+            Expr::AsU32(x) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
+                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
+                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                newvar
+            }
+            Expr::AsU64(x) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
+                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
+                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                newvar
+            }
+            Expr::AsChar(x) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::Char))?.0;
+                let ut = self.infer_utype_expr(x.as_ref(), scope)?;
+                self.unify_utype_baseset(ut, BaseSet::UAny)?;
+                newvar
+            }
+
+            Expr::U16Be(bytes) | Expr::U16Le(bytes) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U16))?.0;
+                let ut = self.infer_utype_expr(bytes.as_ref(), scope)?;
+                self.unify_utype(ut, Rc::new(UType::tuple([BaseType::U8; 2])))?;
+                newvar
+            }
+            Expr::U32Be(bytes) | Expr::U32Le(bytes) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
+                let ut = self.infer_utype_expr(bytes.as_ref(), scope)?;
+                self.unify_utype(ut, Rc::new(UType::tuple([BaseType::U8; 4])))?;
+                newvar
+            }
+            Expr::U64Be(bytes) | Expr::U64Le(bytes) => {
+                let newvar = self.init_var_simple(UType::Base(BaseType::U64))?.0;
+                let ut = self.infer_utype_expr(bytes.as_ref(), scope)?;
+                self.unify_utype(ut, Rc::new(UType::tuple([BaseType::U8; 8])))?;
+                newvar
+            }
+            Expr::SeqLength(seq_expr) => {
+                // REVIEW - does this always have to be U32?
+                let newvar = self.init_var_simple(UType::Base(BaseType::U32))?.0;
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+                let elem_var = self.get_new_uvar();
+                self.unify_var_proj_elem(seq_var, elem_var)?;
+                newvar
+            }
+            Expr::SubSeq(seq_expr, start_expr, len_expr) => {
+                let newvar = self.get_new_uvar();
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+
+                let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
+                let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
+
+                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
+                self.unify_utype_baseset(start_t, BaseSet::USome)?;
+                self.unify_utype_baseset(len_t, BaseSet::USome)?;
+
+                // ensure that seq_t is a sequence type, and then equate it to newvar
+                let elem_var = self.get_new_uvar();
+                self.unify_var_proj_elem(seq_var, elem_var)?;
+                self.unify_var_pair(newvar, seq_var)?;
+
+                newvar
+            }
+            Expr::SubSeqInflate(seq_expr, start_expr, len_expr) => {
+                let newvar = self.get_new_uvar();
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+
+                let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
+                let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
+
+                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
+                self.unify_utype_baseset(start_t, BaseSet::USome)?;
+                self.unify_utype_baseset(len_t, BaseSet::USome)?;
+
+                // ensure that seq_t is a sequence type, and then equate it to newvar
+                let elem_var = self.get_new_uvar();
+                self.unify_var_proj_elem(seq_var, elem_var)?;
+                self.unify_var_pair(newvar, seq_var)?;
+
+                newvar
+            }
+            Expr::FlatMap(f_expr, seq_expr) => {
+                let newvar = self.get_new_uvar();
+
+                let (in_v, out_v) = self.infer_vars_expr_lambda(f_expr.as_ref(), scope)?;
+                let seq_v = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+
+                let out_elem_v = self.get_new_uvar();
+
+                self.unify_var_proj_elem(seq_v, in_v)?;
+                self.unify_var_proj_elem(out_v, out_elem_v)?;
+                self.unify_var_pair(newvar, out_v)?;
+
+                newvar
+            }
+            Expr::FlatMapAccum(f_expr, acc_expr, acc_vt, seq_expr) => {
+                // NOTE - ((acc, x) -> (acc, [y])) -> acc -> Vt(acc) -> [x] -> [y]
+                let ys_var = self.get_new_uvar();
+
+                let (acc_x_var, acc_ys_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
+                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt, scope)?;
+                let xs_var = self.infer_var_expr(seq_expr, scope)?;
+                let x_var = self.get_new_uvar();
+                let y_var = self.get_new_uvar();
+
+                self.unify_var_proj_elem(ys_var, y_var)?;
+                self.unify_var_proj_elem(xs_var, x_var)?;
+
+                // constrain the shape to be exactly the tuple we expect
+                self.unify_var_utype(
+                    acc_x_var,
+                    Rc::new(UType::Tuple(vec![acc_var.into(), x_var.into()])),
+                )?;
+                self.unify_var_utype(
+                    acc_ys_var,
+                    Rc::new(UType::Tuple(vec![acc_var.into(), ys_var.into()])),
+                )?;
+
+                ys_var
+            }
+            Expr::FlatMapList(f_expr, ret_type, seq_expr) => {
+                // NOTE - (([y], x) -> [y]) -> Vt(y) -> [x] -> [y]
+                let ys_var = self.get_new_uvar();
+
+                let (init_x_var, tail_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
+                let xs_var = self.infer_var_expr(seq_expr, scope)?;
+                let x_var = self.get_new_uvar();
+                let y_var = self.get_new_uvar();
+
+                self.unify_var_proj_elem(ys_var, y_var)?;
+                self.unify_var_proj_elem(xs_var, x_var)?;
+                self.unify_var_valuetype(y_var, ret_type)?;
+                self.unify_var_pair(ys_var, tail_var)?;
+
+                // constrain the shape to be exactly the tuple we expect
+                self.unify_var_utype(
+                    init_x_var,
+                    Rc::new(UType::Tuple(vec![ys_var.into(), x_var.into()])),
+                )?;
+
+                ys_var
+            }
+            Expr::Dup(count, x) => {
+                let newvar = self.get_new_uvar();
+                let count_t = self.infer_utype_expr(count, scope)?;
+                let x_var = self.infer_var_expr(x, scope)?;
+
+                self.unify_utype_baseset(count_t, BaseSet::USome)?;
+                self.unify_var_proj_elem(newvar, x_var)?;
+
+                newvar
+            }
+        };
+        Ok(topvar)
+    }
+
+    fn infer_utype_expr(&mut self, e: &Expr, scope: &'_ UScope<'_>) -> TCResult<Rc<UType>> {
+        let var = self.infer_var_expr(e, scope)?;
+        Ok(Rc::new(UType::Var(var)))
+    }
 
     fn infer_vars_expr_lambda<'a>(
         &mut self,
@@ -1906,7 +1968,7 @@ impl TypeChecker {
     ///
     /// If an occurs check fails, returns the corresponding `Err(_)` value.
     ///
-    /// Otherwise, returns Some(t) where t is a UType other than UType::Var(v) or UType::Var(v1) where
+    /// Otherwise, returns `Ok(Some(t))` where `t` is a UType other than UType::Var(v) or UType::Var(v1) where
     /// v1 is an isomorphic alias to v.
     pub(crate) fn substitute_uvar_vtype(&self, v: UVar) -> Result<Option<VType>, TCError> {
         self.occurs(v)?;
@@ -1920,39 +1982,8 @@ impl TypeChecker {
             },
         })
     }
-
-    fn proj_shape_to_vtype(&self, shape: &ProjShape) -> VType {
-        match shape {
-            ProjShape::TupleWith(ix_vars) => {
-                let mut flat = Vec::new();
-                for (ix, var) in ix_vars.iter() {
-                    while *ix > flat.len() {
-                        flat.push(Rc::new(UType::Hole));
-                    }
-                    flat.push((*var).into());
-                }
-                VType::ImplicitTuple(flat)
-            }
-            ProjShape::RecordWith(fld_vars) => {
-                let mut flat = Vec::new();
-                for (lbl, var) in fld_vars.iter() {
-                    flat.push((lbl.clone(), (*var).into()));
-                }
-                VType::ImplicitRecord(flat)
-            }
-            ProjShape::SeqOf(v) => VType::Abstract(Rc::new(UType::Seq((*v).into()))),
-        }
-    }
-
-    fn repoint_vmid(&mut self, v: UVar, id: VMId) {
-        match &mut self.constraints[v.0] {
-            Constraints::Variant(placeholder) => {
-                *placeholder = id;
-            }
-            other => unreachable!("repoint_vmid expects Constraints::Variant, found {other:?}"),
-        }
-    }
 }
+// !SECTION
 
 // SECTION - low-level methods dealing with UVar aliasing concerns
 impl TypeChecker {
@@ -2190,7 +2221,6 @@ impl TypeChecker {
                 .into());
             }
             (Constraints::Invariant(c), Constraints::Variant(vmid)) => {
-                // FIXME - remove this following line after fixing bug
                 return Err(TCErrorKind::VarianceMismatch(
                     Ord::min(v1, v2),
                     *vmid,
@@ -2306,7 +2336,7 @@ impl TypeChecker {
             Format::Fail => Ok(self.init_var_simple(UType::Empty)?.0),
             Format::EndOfInput | Format::Align(_) => Ok(self.init_var_simple(UType::UNIT)?.0),
             Format::Byte(_set) => {
-                // FIXME - this may be a bit overly pedantic
+                // REVIEW - is there a better approach when matching an empty set of bytes?
                 if _set.is_empty() {
                     Ok(self.init_var_simple(UType::Empty)?.0)
                 } else {
@@ -2513,7 +2543,7 @@ impl TypeChecker {
     pub fn reify(&self, t: Rc<UType>) -> Option<ValueType> {
         match t.as_ref() {
             UType::Hole => {
-                // FIXME - should this simply return None instead?
+                // REVIEW - should this simply return None instead?
                 unreachable!("reify: UType::Hole should be erased by any non-Hole unification!");
             }
             &UType::Var(uv) => {

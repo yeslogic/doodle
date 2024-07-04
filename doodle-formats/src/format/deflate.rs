@@ -4,10 +4,6 @@ use std::collections::BTreeMap;
 
 use doodle::{BaseType, DynFormat, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
-fn tuple_proj(x: Expr, i: usize) -> Expr {
-    Expr::TupleProj(Box::new(x), i)
-}
-
 fn shl_u8(x: Expr, r: u8) -> Expr {
     shl(x, Expr::U8(r))
 }
@@ -16,10 +12,18 @@ fn shl_u16(x: Expr, r: u16) -> Expr {
     shl(as_u16(x), Expr::U16(r))
 }
 
+fn cast<N>(x: usize) -> N
+where
+    N: TryFrom<usize>,
+    N::Error: std::fmt::Debug,
+{
+    N::try_from(x).unwrap()
+}
+
 fn bits_value_u8(name: &'static str, n: usize) -> Expr {
     if n > 1 {
         bit_or(
-            shl_u8(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
+            shl_u8(tuple_proj(var(name), n - 1), cast(n - 1)),
             bits_value_u8(name, n - 1),
         )
     } else {
@@ -30,7 +34,7 @@ fn bits_value_u8(name: &'static str, n: usize) -> Expr {
 fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     if n > 1 {
         bit_or(
-            shl_u16(tuple_proj(var(name), n - 1), (n - 1).try_into().unwrap()),
+            shl_u16(tuple_proj(var(name), n - 1), cast(n - 1)),
             bits_value_u16(name, n - 1),
         )
     } else {
@@ -39,29 +43,29 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
 }
 
 fn bits8(n: usize, base: &BaseModule) -> Format {
+    if n == 0 {
+        return Format::Compute(Expr::U8(0));
+    }
+
     let mut fs = Vec::with_capacity(n);
     for _ in 0..n {
         fs.push(base.bit());
     }
-    if n > 0 {
-        map(tuple(fs), lambda("bits", bits_value_u8("bits", n)))
-    } else {
-        /* if n == 0 */
-        Format::Compute(Expr::U8(0))
-    }
+    map(
+        tuple_repeat(n, base.bit()),
+        lambda("bits", bits_value_u8("bits", n)),
+    )
 }
 
 fn bits16(n: usize, base: &BaseModule) -> Format {
-    let mut fs = Vec::with_capacity(n);
-    for _ in 0..n {
-        fs.push(base.bit());
+    if n == 0 {
+        return Format::Compute(Expr::U16(0));
     }
-    if n > 0 {
-        map(tuple(fs), lambda("bits", bits_value_u16("bits", n)))
-    } else {
-        /* if n == 0 */
-        Format::Compute(Expr::U16(0))
-    }
+
+    map(
+        tuple_repeat(n, base.bit()),
+        lambda("bits", bits_value_u16("bits", n)),
+    )
 }
 
 fn length_record(

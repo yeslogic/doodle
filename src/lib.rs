@@ -228,6 +228,8 @@ pub enum Arith {
     BitOr,
     Shl,
     Shr,
+    BoolOr,
+    BoolAnd,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]

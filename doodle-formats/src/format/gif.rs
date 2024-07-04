@@ -56,6 +56,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                         Color Resolution              3 Bits
     //                         Sort Flag                     1 Bit
     //                         Size of Global Color Table    3 Bits
+    // NOTE: Global and local Color Tables have to have the same field-names for
+    // common fields in order to ensure that the helpers that extract those values
+    // are applicable to both cases without any extra work.
     let logical_screen_descriptor_flags = packed_bits_u8(
         [1, 3, 1, 3],
         ["table-flag", "color-resolution", "sort-flag", "table-size"],
@@ -82,6 +85,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     //                         Sort Flag                     1 Bit
     //                         Reserved                      2 Bits
     //                         Size of Local Color Table     3 Bits
+    // NOTE: Global and local Color Tables have to have the same field-names for
+    // common fields in order to ensure that the helpers that extract those values
+    // are applicable to both cases without any extra work.
     let image_descriptor_flags = packed_bits_u8(
         [1, 1, 1, 2, 3],
         [

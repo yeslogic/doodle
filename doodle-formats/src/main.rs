@@ -2,6 +2,8 @@
 #![deny(rust_2018_idioms)]
 
 use anyhow::{anyhow, Result as AResult};
+use doodle::codegen::{generate_code, ToFragment};
+use doodle::Format;
 use std::fs;
 use std::path::PathBuf;
 
@@ -69,10 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 FormatOutput::Debug => println!("{module:?}"),
                 FormatOutput::Json => serde_json::to_writer(std::io::stdout(), &module).unwrap(),
                 FormatOutput::Rust => {
-                    doodle::codegen::print_generated_code(&module, &format, dest);
-
-                    // let program = Compiler::compile_program(&module, &format)?;
-                    // doodle::codegen::print_program(&program);
+                    print_generated_code(&module, &format, dest);
                 }
             }
 
@@ -125,9 +124,41 @@ fn check_all(module: &FormatModule) -> AResult<()> {
     Ok(())
 }
 
+fn print_generated_code(
+    module: &FormatModule,
+    top_format: &Format,
+    dest: Option<std::path::PathBuf>,
+) {
+    let content = generate_code(module, top_format);
+
+    fn write_to(mut f: impl std::io::Write, content: impl ToFragment) -> std::io::Result<()> {
+        write!(f, "{}", content.to_fragment())
+    }
+
+    match dest {
+        None => write_to(std::io::stdout().lock(), content).expect("failed to write"),
+        Some(path) => {
+            if !path.exists()
+                || (path.is_file()
+                    && path
+                        .file_name()
+                        .is_some_and(|s| s.to_string_lossy().contains("codegen.rs")))
+            {
+                let f = std::fs::File::create(path).unwrap_or_else(|err| panic!("error: {err}"));
+                write_to(f, content).expect("failed to write");
+            } else {
+                panic!(
+                    "will not overwrite directory or protected file: {}",
+                    path.to_string_lossy()
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn test_codegen() {
     let mut module = FormatModule::new();
     let format = format::main(&mut module).call();
-    doodle::codegen::print_generated_code(&module, &format, None);
+    let _ = generate_code(&module, &format);
 }
