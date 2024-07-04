@@ -1107,6 +1107,7 @@ pub(crate) enum RustExpr {
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
     Struct(RustEntity, Vec<(Label, Option<Box<RustExpr>>)>),
+    CloneOf(Box<RustExpr>),
     Deref(Box<RustExpr>),
     Borrow(Box<RustExpr>),
     BorrowMut(Box<RustExpr>),
@@ -1459,11 +1460,17 @@ impl RustExpr {
     }
 
     pub fn field(self, name: impl Into<Label>) -> Self {
-        Self::FieldAccess(Box::new(self), SubIdent::ByName(name.into()))
+        match self {
+            Self::CloneOf(this) => Self::CloneOf(Box::new(this.field(name))),
+            other => Self::FieldAccess(Box::new(other), SubIdent::ByName(name.into())),
+        }
     }
 
     pub fn nth(self, ix: usize) -> Self {
-        Self::FieldAccess(Box::new(self), SubIdent::ByIndex(ix))
+        match self {
+            Self::CloneOf(this) => Self::CloneOf(Box::new(this.nth(ix))),
+            other => Self::FieldAccess(Box::new(other), SubIdent::ByIndex(ix)),
+        }
     }
 
     pub fn call_with(self, args: impl IntoIterator<Item = Self>) -> Self {
@@ -1547,6 +1554,10 @@ impl RustExpr {
                 [_, ..] => None,
             },
             RustExpr::Struct(..) => None,
+            RustExpr::CloneOf(x) => match &**x {
+                RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
+                other => other.try_get_primtype(),
+            },
             RustExpr::Deref(x) => match &**x {
                 // FIXME - intervening parentheses (RustExpr::Paren) break this match but we can't do much about that.
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
@@ -1592,6 +1603,7 @@ impl RustExpr {
             RustExpr::Entity(..) => true,
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
+            RustExpr::CloneOf(expr) => expr.is_pure(),
             // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
             RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
@@ -1637,6 +1649,12 @@ impl ToFragmentExt for RustExpr {
                 x.to_fragment_precedence(Precedence::Projection)
                     .intervene(Fragment::Char('.'), name.to_fragment())
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
+                prec,
+                Precedence::Projection,
+            ),
+            RustExpr::CloneOf(x) => cond_paren(
+                x.to_fragment_precedence(Precedence::Projection)
+                    .intervene(Fragment::Char('.'), Fragment::string("clone()")),
                 prec,
                 Precedence::Projection,
             ),
