@@ -639,6 +639,18 @@ impl Expr {
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 },
             )),
+            Expr::Arith(Arith::BoolAnd, x, y) => Cow::Owned(ParsedValue::from_evaluated(
+                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
+                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
+                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+                },
+            )),
+            Expr::Arith(Arith::BoolOr, x, y) => Cow::Owned(ParsedValue::from_evaluated(
+                match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
+                    (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
+                    (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+                },
+            )),
             Expr::Arith(Arith::Shl, x, y) => Cow::Owned(ParsedValue::from_evaluated(
                 match (x.eval_value_with_loc(scope), y.eval_value_with_loc(scope)) {
                     (Value::U8(x), Value::U8(y)) => {

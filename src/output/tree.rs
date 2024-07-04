@@ -1404,6 +1404,16 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::BITOR,
             ),
+            Expr::Arith(Arith::BoolAnd, lhs, rhs) => cond_paren(
+                self.compile_binop(" && ", lhs, rhs, Precedence::BITAND, Precedence::BITAND),
+                prec,
+                Precedence::LOGAND,
+            ),
+            Expr::Arith(Arith::BoolOr, lhs, rhs) => cond_paren(
+                self.compile_binop(" || ", lhs, rhs, Precedence::BITOR, Precedence::BITOR),
+                prec,
+                Precedence::LOGOR,
+            ),
             Expr::Arith(Arith::Shl, lhs, rhs) => cond_paren(
                 self.compile_binop(" << ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
                 prec,

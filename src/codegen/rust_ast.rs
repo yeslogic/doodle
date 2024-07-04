@@ -1121,6 +1121,8 @@ pub(crate) enum Operator {
     Shr,
     BitOr,
     BitAnd,
+    BoolOr,
+    BoolAnd,
 }
 
 impl Operator {
@@ -1134,6 +1136,8 @@ impl Operator {
             Operator::Shl | Operator::Shr => Precedence::BITSHIFT,
             Operator::BitOr => Precedence::BITOR,
             Operator::BitAnd => Precedence::BITAND,
+            Operator::BoolAnd => Precedence::LOGAND,
+            Operator::BoolOr => Precedence::LOGOR,
         }
     }
 
@@ -1146,6 +1150,10 @@ impl Operator {
                     None
                 }
             }
+            Operator::BoolAnd | Operator::BoolOr => match (lhs_type, rhs_type) {
+                (PrimType::Bool, PrimType::Bool) => Some(PrimType::Bool),
+                _ => None,
+            },
             Operator::Lt | Operator::Lte | Operator::Gt | Operator::Gte => {
                 if lhs_type == rhs_type && lhs_type.is_numeric() {
                     Some(PrimType::Bool)
@@ -1195,6 +1203,8 @@ impl Operator {
             Operator::Shr => " >> ",
             Operator::BitOr => " | ",
             Operator::BitAnd => " & ",
+            Operator::BoolOr => " || ",
+            Operator::BoolAnd => " && ",
         }
     }
 }

@@ -306,7 +306,28 @@ pub fn is_bytes(bytes: &[u8]) -> Format {
 ///
 /// Provided that `label` is a valid field within the record (whether natural, or mapped) `head`, will evaluate to the value of the corresponding field.
 pub fn record_proj(head: Expr, label: impl IntoLabel) -> Expr {
-    Expr::RecordProj(Box::new(head.into()), label.into())
+    Expr::RecordProj(Box::new(head), label.into())
+}
+
+/// Helper-function for a left-associative fold over a list of field-projections on a nested-record
+/// that operates in a Lens-like fashion. The list of labels should begin with the outermost field projection.
+///
+/// If the list of labels is empty, will simply return `head`.
+///
+/// Otherwise, will return `(((head->label0)->label1)->...)->labelN`.
+pub fn record_projs(head: Expr, labels: &[&'static str]) -> Expr {
+    if labels.is_empty() {
+        return head;
+    } else {
+        record_projs(record_proj(head, labels[0]), &labels[1..])
+    }
+}
+
+/// Helper-function for [`Expr::TupleProj`].
+///
+/// Provided that `index` is a valid position within the tuple (whether natural, or mapped) `head`, will evaluate to the value of the corresponding positional argument.
+pub fn tuple_proj(head: Expr, index: usize) -> Expr {
+    Expr::TupleProj(Box::new(head), index)
 }
 
 pub fn expr_eq(x: Expr, y: Expr) -> Expr {
@@ -359,6 +380,14 @@ pub fn sub(x: Expr, y: Expr) -> Expr {
 
 pub fn rem(x: Expr, y: Expr) -> Expr {
     Expr::Arith(Arith::Rem, Box::new(x), Box::new(y))
+}
+
+pub fn or(x: Expr, y: Expr) -> Expr {
+    Expr::Arith(Arith::BoolOr, Box::new(x), Box::new(y))
+}
+
+pub fn and(x: Expr, y: Expr) -> Expr {
+    Expr::Arith(Arith::BoolAnd, Box::new(x), Box::new(y))
 }
 
 pub fn bit_or(x: Expr, y: Expr) -> Expr {
@@ -441,4 +470,15 @@ pub fn dup(count: Expr, expr: Expr) -> Expr {
 /// Composed `Format::Where` and `Expr::Lambda` taking a raw format, an arbitrary name for the lambda expression head, and the lambda body as an Expr.
 pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
     Format::Where(Box::new(raw), lambda(name, body))
+}
+
+/// Homogenous-format tuple whose elements are all `format`, repeating `count` times
+pub fn tuple_repeat(count: usize, format: Format) -> Format {
+    let iter = std::iter::repeat(format).take(count);
+    Format::Tuple(iter.collect())
+}
+
+/// Returns an Expr that evaluates to `true` if the given U8-typed expression is non-zero
+pub fn is_nonzero_u8(expr: Expr) -> Expr {
+    expr_ne(expr, Expr::U8(0))
 }

@@ -1,7 +1,8 @@
 mod name;
 pub(crate) mod rust_ast;
-pub mod typed_decoder;
-pub mod typed_format;
+pub(crate) mod typed_decoder;
+pub(crate) mod typed_format;
+pub use rust_ast::ToFragment;
 
 use crate::{
     byte_set::ByteSet,
@@ -760,6 +761,8 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let op = match arith {
                 Arith::BitAnd => Operator::BitAnd,
                 Arith::BitOr => Operator::BitOr,
+                Arith::BoolAnd => Operator::BoolAnd,
+                Arith::BoolOr => Operator::BoolOr,
                 Arith::Add => Operator::Add,
                 Arith::Sub => Operator::Sub,
                 Arith::Mul => Operator::Mul,
@@ -2357,11 +2360,7 @@ impl ToAst for DerivedLogic<GTExpr> {
     }
 }
 
-pub fn print_generated_code(
-    module: &FormatModule,
-    top_format: &Format,
-    dest: Option<std::path::PathBuf>,
-) {
+pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragment {
     let mut items = Vec::new();
 
     let Generator {
@@ -2405,30 +2404,7 @@ pub fn print_generated_code(
     }
     content.add_submodule(RustSubmodule::new("codegen_tests"));
     content.add_submodule(RustSubmodule::new_pub("api_helper"));
-
-    fn write_to(mut f: impl std::io::Write, content: impl ToFragment) -> std::io::Result<()> {
-        write!(f, "{}", content.to_fragment())
-    }
-
-    match dest {
-        None => write_to(std::io::stdout().lock(), content).expect("failed to write"),
-        Some(path) => {
-            if !path.exists()
-                || (path.is_file()
-                    && path
-                        .file_name()
-                        .is_some_and(|s| s.to_string_lossy().contains("codegen.rs")))
-            {
-                let f = std::fs::File::create(path).unwrap_or_else(|err| panic!("error: {err}"));
-                write_to(f, content).expect("failed to write");
-            } else {
-                panic!(
-                    "will not overwrite directory or protected file: {}",
-                    path.to_string_lossy()
-                );
-            }
-        }
-    }
+    content
 }
 
 #[derive(Clone, Debug)]

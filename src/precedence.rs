@@ -15,6 +15,8 @@ pub(crate) enum Precedence {
     ArithInfix(ArithLevel),
     /// Infix bitwise operation of the designated bitwise sub-precedence
     BitwiseInfix(BitwiseLevel),
+    /// Infix logical operation of the designated logical sub-precedence
+    LogicalInfix(LogicalLevel),
     /// Unchainable quantitative comparison, such as inequality and equality operations
     Comparison(CompareLevel),
     /// Functional abstractions such as `match` expressions and closures
@@ -43,6 +45,23 @@ pub(crate) enum BitwiseLevel {
     Shift = 0, // Highest bitwise precedence
     And = 1,
     Or = 2,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum LogicalLevel {
+    And = 0,
+    Or = 1,
+}
+
+impl IntransitiveOrd for LogicalLevel {
+    fn relate(&self, other: &Self) -> Relation {
+        match (self, other) {
+            (LogicalLevel::And, LogicalLevel::And) => Relation::Congruent,
+            (LogicalLevel::And, LogicalLevel::Or) => Relation::Superior,
+            (LogicalLevel::Or, LogicalLevel::And) => Relation::Inferior,
+            (LogicalLevel::Or, LogicalLevel::Or) => Relation::Congruent,
+        }
+    }
 }
 
 /// Intransitive partial relation over operator subclasses
@@ -134,6 +153,7 @@ impl IntransitiveOrd for Precedence {
             // Implications
             (Self::ArithInfix(x), Self::ArithInfix(y)) => x.relate(y),
             (Self::BitwiseInfix(x), Self::BitwiseInfix(y)) => x.relate(y),
+            (Self::LogicalInfix(x), Self::LogicalInfix(y)) => x.relate(y),
             (Self::Comparison(x), Self::Comparison(y)) => x.relate(y),
 
             // Ascending relations (continued)
@@ -143,6 +163,12 @@ impl IntransitiveOrd for Precedence {
             // Disjunctions
             (Self::ArithInfix(_), Self::BitwiseInfix(_)) => Relation::Disjoint,
             (Self::BitwiseInfix(_), Self::ArithInfix(_)) => Relation::Disjoint,
+
+            (Self::LogicalInfix(_), Self::ArithInfix(_)) => Relation::Disjoint,
+            (Self::ArithInfix(_), Self::LogicalInfix(_)) => Relation::Disjoint,
+
+            (Self::LogicalInfix(_), Self::BitwiseInfix(_)) => Relation::Disjoint,
+            (Self::BitwiseInfix(_), Self::LogicalInfix(_)) => Relation::Disjoint,
         }
     }
 }
@@ -154,8 +180,10 @@ impl Precedence {
     pub(crate) const COMPARE: Self = Precedence::Comparison(CompareLevel::Comparison);
     pub(crate) const EQUALITY: Self = Precedence::Comparison(CompareLevel::Equality);
     pub(crate) const BITOR: Self = Precedence::BitwiseInfix(BitwiseLevel::Or);
+    pub(crate) const LOGOR: Self = Precedence::LogicalInfix(LogicalLevel::Or);
     pub(crate) const ADDSUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
     pub(crate) const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
+    pub(crate) const LOGAND: Self = Precedence::LogicalInfix(LogicalLevel::And);
     pub(crate) const DIVREM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
     pub(crate) const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
     pub(crate) const BITSHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
