@@ -1488,6 +1488,9 @@ impl RustExpr {
         self.call_with(None)
     }
 
+    /// Helper method that calls the `as_slice` method on the expression passed in,
+    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
+    /// clone-then-borrow constructs in the generated code.
     pub fn vec_as_slice(self) -> Self {
         match self {
             Self::CloneOf(this) => this.call_method("as_slice"),
@@ -1495,6 +1498,9 @@ impl RustExpr {
         }
     }
 
+    /// Helper method that calls the `len` method on the expression passed in,
+    /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
+    /// clone-then-borrow constructs in the generated code.
     pub fn vec_len(self) -> Self {
         match self {
             Self::CloneOf(this) => this.call_method("len"),
