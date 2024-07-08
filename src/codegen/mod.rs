@@ -61,10 +61,11 @@ mod path_names {
             }
         }
 
-        /// Finds or generates a new name for a RustTypeDef
+        /// Finds an existing name, or generates a new name, for a [`RustTypeDef`]
         ///
-        /// Returns `(old, (ix, false))` if the RustTypeDef was already in-scope with name `old` where `ix` is paired with the given
-        /// Returns `(new, (ix, true))` otherwise, where `path` is the local path for RustTypeDef at time-of-invocation, and `new` is a novel name
+        /// Returns `(old, (ix, false))` if the RustTypeDef was already given a name `old`, where `ix` is the index of the definition in the overall order of ad-hoc types that were defined thus-far.
+        ///
+        /// Returns `(new, (ix, true))` otherwise, where `ix` is the uniquely-identifying index of the newly defined type at time-of-invocation, and `new` is a fresh path-based name for the type.
         pub fn get_name(&mut self, def: &RustTypeDef) -> (Label, (usize, bool)) {
             match self.rev_map.get(def) {
                 Some((ix, path)) => match self.ctxt.find_name_for(path).ok() {
@@ -154,11 +155,9 @@ impl CodeGen {
             ValueType::Base(BaseType::U32) => PrimType::U32.into(),
             ValueType::Base(BaseType::U64) => PrimType::U64.into(),
             ValueType::Base(BaseType::Char) => PrimType::Char.into(),
-            // FIXME - replace with first-class `Option` in RustType model rather than a verbatim construct
-            ValueType::Option(param_t) => GenType::Inline(RustType::Verbatim(
-                "Option".into(),
-                UseParams::single_type(self.lift_type(param_t).to_rust_type()),
-            )),
+            ValueType::Option(param_t) => GenType::Inline(
+                CompType::Option(Box::new(self.lift_type(param_t).to_rust_type())).into(),
+            ),
             ValueType::Tuple(vs) => {
                 match &vs[..] {
                     [] => RustType::AnonTuple(Vec::new()).into(),
@@ -1018,6 +1017,7 @@ fn refutability_check<A: std::fmt::Debug>(
                         AtomType::Comp(ct) =>
                             match ct {
                                 CompType::Vec(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
+                                CompType::Option(_t) => unimplemented!("support has not yet been extended to matching on in-model Option-types"),
                                 CompType::Result(_, _) =>
                                     unreachable!("unexpected result in pattern head-type"),
                                 CompType::Borrow(_, _, t) => {
@@ -1039,7 +1039,8 @@ fn refutability_check<A: std::fmt::Debug>(
         GenType::Def(_, def) => {
             match def {
                 RustTypeDef::Enum(vars) => {
-                    // NOTE - attempts to check full-variant coverage using subtyped partial unions leads to unforeseen badness; we can only check for every possible value being covered for every possible variant
+                    // NOTE - we encounter badness when attempting to check full-variant coverage using subtyped partial unions
+                    // NOTE - we can only check for every possible value being covered for every possible variant
                     let mut variant_coverage: HashMap<Label, Refutability> = HashMap::from_iter(
                         vars.iter().map(|x| (x.get_label().clone(), Refutability::Refutable))
                     );

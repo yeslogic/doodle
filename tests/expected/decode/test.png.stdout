@@ -2,7 +2,7 @@
 │   └── png <- png.main :=
 │       ├── signature <- png.signature
 │       ├── ihdr <- png.ihdr :=
-│       │   ├── length <- base.u32be := 13
+│       │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 13
 │       │   ├── tag <- png.ihdr-tag
 │       │   ├── data <- slice length png.ihdr-data :=
 │       │   │   ├── width <- base.u32be := 50
@@ -16,7 +16,7 @@
 │       ├── chunks <- repeat png.chunk(...) :=
 │       │   ├── 0 <- png.chunk(...) :=
 │       │   │   └── PLTE <- png.plte :=
-│       │   │       ├── length <- base.u32be := 87
+│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 87
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (repeat1 { ... }) :=
 │       │   │       │   └──    r   g   b
@@ -52,7 +52,7 @@
 │       │   │       └── crc <- base.u32be := 1943707985
 │       │   ├── 1 <- png.chunk(...) :=
 │       │   │   └── tRNS <- png.trns(...) :=
-│       │   │       ├── length <- base.u32be := 1
+│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └── color-type-3 <- repeat { ... } :=
@@ -61,7 +61,7 @@
 │       │   │       └── crc <- base.u32be := 1088870502
 │       │   ├── 2 <- png.chunk(...) :=
 │       │   │   └── bKGD <- png.bkgd(...) :=
-│       │   │       ├── length <- base.u32be := 1
+│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
 │       │   │       │   └── color-type-3 <- { ... } :=
@@ -69,7 +69,7 @@
 │       │   │       └── crc <- base.u32be := 2282036552
 │       │   ├── 3 <- png.chunk(...) :=
 │       │   │   └── pHYs <- png.phys :=
-│       │   │       ├── length <- base.u32be := 9
+│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 9
 │       │   │       ├── tag <- (...)
 │       │   │       ├── data <- slice length { ... } :=
 │       │   │       │   ├── pixels-per-unit-x <- base.u32be := 2835
@@ -78,7 +78,7 @@
 │       │   │       └── crc <- base.u32be := 10132504
 │       │   └── 4 <- png.chunk(...) :=
 │       │       └── tIME <- png.time :=
-│       │           ├── length <- base.u32be := 7
+│       │           ├── length <- assert (length -> length <= 2147483647) base.u32be := 7
 │       │           ├── tag <- (...)
 │       │           ├── data <- slice length { ... } :=
 │       │           │   ├── year <- base.u16be := 2005
@@ -90,7 +90,7 @@
 │       │           └── crc <- base.u32be := 491070829
 │       ├── idat <- repeat1 png.idat :=
 │       │   └── 0 <- png.idat :=
-│       │       ├── length <- base.u32be := 1168
+│       │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 1168
 │       │       ├── tag <- png.idat-tag
 │       │       ├── data <- slice length png.idat-data :=
 │       │       │   ├── 0 := 72
@@ -108,7 +108,7 @@
 │       │       └── crc <- base.u32be := 3619834681
 │       ├── more-chunks <- repeat png.chunk(...) := []
 │       └── iend <- png.iend :=
-│           ├── length <- base.u32be := 0
+│           ├── length <- assert (length -> length <= 2147483647) base.u32be := 0
 │           ├── tag <- png.iend-tag
 │           ├── data <- slice length png.iend-data
 │           └── crc <- base.u32be := 2923585666

@@ -336,7 +336,6 @@ impl Expr {
                 }
                 Ok(ValueType::Record(fs))
             }
-            // FIXME - TupleProj
             Expr::RecordProj(head, label) => Ok(head.infer_type(scope)?.record_proj(label)),
             Expr::Variant(label, expr) => Ok(ValueType::Union(BTreeMap::from([(
                 label.clone(),

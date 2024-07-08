@@ -12,6 +12,7 @@ function main() {
 // Convert a value into HTML.
 //
 // FIXME: somehow this modifies the Json object passed to it.
+// FIXME: add in support for Option and U64
 function valueToHTML(value) {
   const result = document.createElement('dl');
 
