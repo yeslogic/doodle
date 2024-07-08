@@ -628,10 +628,13 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
     }
 }
 
+/// Helper type that dictates the ownership model when transcribing a `GTExpr` into a `RustExpr`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum ExprInfo {
     #[default]
+    /// Uses implicit copy-or-move semantics on referenced local variables (i.e. as opposed to cloning)
     Natural,
+    /// Applies a `clone` operation to any referenced local variables
     EmbedCloned,
 }
 
@@ -739,11 +742,9 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     .collect()
             ),
         TypedExpr::TupleProj(_, expr_tup, ix) => {
-            // FIXME - field and index projections should be optimized around whole-object clone avoidance, when possible
             embed_expr(expr_tup, ExprInfo::EmbedCloned).nth(*ix)
         }
         TypedExpr::RecordProj(_, expr_rec, fld) => {
-            // FIXME - field and index projections should be optimized around whole-object clone avoidance, when possible
             embed_expr(expr_rec, ExprInfo::EmbedCloned).field(fld.clone())
         }
         TypedExpr::Seq(_, elts) => {
