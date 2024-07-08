@@ -1280,6 +1280,24 @@ impl Decoder {
                 let totlen = input.offset - start_offset;
                 Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
             }
+            Decoder::Maybe(expr, a) => {
+                let is_present = expr.eval_value_with_loc(scope).unwrap_bool();
+                if is_present {
+                    let (raw, next_input) = a.parse_with_loc(program, scope, input)?;
+                    Ok((
+                        ParsedValue::Variant(Label::Borrowed("Some"), Box::new(raw)),
+                        next_input,
+                    ))
+                } else {
+                    Ok((
+                        ParsedValue::Variant(
+                            Label::Borrowed("None"),
+                            Box::new(ParsedValue::unit_at(input.offset)),
+                        ),
+                        input,
+                    ))
+                }
+            }
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse_with_loc(program, scope, input)?;
                 Ok((v, input))

@@ -1,6 +1,6 @@
 use crate::format::BaseModule;
 use doodle::helper::*;
-use doodle::{Expr, Format, FormatModule, FormatRef};
+use doodle::{Expr, FormatModule, FormatRef};
 
 /// Graphics Interchange Format (GIF)
 ///
@@ -23,10 +23,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
 
     let color_table = |flags: Expr| {
-        if_then_else_variant(
+        cond_maybe(
             has_color_table(flags.clone()),
             repeat_count(color_table_len(flags), color_table_entry.call()),
-            Format::EMPTY,
         )
     };
 

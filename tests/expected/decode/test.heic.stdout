@@ -355,7 +355,8 @@
 │           │                           └── items <- repeat-count item_count { ... } :=
 │           │                               ├── 0 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 1
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -366,7 +367,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 97715
 │           │                               ├── 1 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 2
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -377,7 +379,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 27699
 │           │                               ├── 2 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 3
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -388,7 +391,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 84325
 │           │                               ├── 3 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 4
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -399,7 +403,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 27493
 │           │                               ├── 4 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 5
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -410,7 +415,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 34733
 │           │                               ├── 5 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 6
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -421,7 +427,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 10655
 │           │                               ├── 6 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 7
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 1 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 1
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -432,7 +439,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 8
 │           │                               ├── 7 :=
 │           │                               │   ├── item_ID <- match (version < 2) { ... } := 8
-│           │                               │   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                               │   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                               │   ├── data_reference_index <- base.u16be := 0
 │           │                               │   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                               │   ├── extent_count <- base.u16be := 1
@@ -443,7 +451,8 @@
 │           │                               │           └── extent_length <- match length_size { ... } := 2618
 │           │                               └── 8 :=
 │           │                                   ├── item_ID <- match (version < 2) { ... } := 9
-│           │                                   ├── construction_method <- match (version > 0) { ... } := { yes := 0 }
+│           │                                   ├── construction_method <- maybe (version > 0) base.u16be :=
+some 0
 │           │                                   ├── data_reference_index <- base.u16be := 0
 │           │                                   ├── base_offset <- match base_offset_size { ... } := 0
 │           │                                   ├── extent_count <- base.u16be := 1

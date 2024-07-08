@@ -257,12 +257,22 @@ pub fn if_then_else(cond: Expr, format_true: Format, format_false: Format) -> Fo
 /// Helper function for branching between two formats based on a boolean predicate, even when the two formats have different value-types.
 ///
 /// If `cond` evaluates to `true`, will decode into the variant-format `yes(format_yes)`, and otherwise `no(format_no)`.
+///
+/// # Notes
+///
+/// If `format_no` happens to be `Format::EMPTY`, consider using [`cond_maybe`] instead.
 pub fn if_then_else_variant(cond: Expr, format_yes: Format, format_no: Format) -> Format {
     if_then_else(
         cond,
         Format::Variant("yes".into(), Box::new(format_yes)),
         Format::Variant("no".into(), Box::new(format_no)),
     )
+}
+
+/// Helper function for accepting a given format if and only if the given expression evaluates to `true`, and otherwise
+/// returning a None-value without parsing any bytes.
+pub fn cond_maybe(cond: Expr, format: Format) -> Format {
+    Format::Maybe(cond, Box::new(format))
 }
 
 /// Helper function for [`Format::Map`].

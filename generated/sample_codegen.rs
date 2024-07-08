@@ -31,22 +31,16 @@ pub struct main_gif_logical_screen_descriptor {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_gif_logical_screen_global_color_table_yes_inSeq {
+pub struct main_gif_logical_screen_global_color_table_inSeq {
     r: u8,
     g: u8,
     b: u8,
 }
 
 #[derive(Debug, Clone)]
-pub enum main_gif_logical_screen_global_color_table {
-    no,
-    yes(Vec<main_gif_logical_screen_global_color_table_yes_inSeq>),
-}
-
-#[derive(Debug, Clone)]
 pub struct main_gif_logical_screen {
     descriptor: main_gif_logical_screen_descriptor,
-    global_color_table: main_gif_logical_screen_global_color_table,
+    global_color_table: Option<Vec<main_gif_logical_screen_global_color_table_inSeq>>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -129,7 +123,7 @@ terminator: u8
 pub struct main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image {
     descriptor:
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor,
-    local_color_table: main_gif_logical_screen_global_color_table,
+    local_color_table: Option<Vec<main_gif_logical_screen_global_color_table_inSeq>>,
     data: main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_data,
 }
 
@@ -214,7 +208,7 @@ pub struct main_gzip_inSeq_header {
 }
 
 #[derive(Debug, Clone)]
-pub struct main_gzip_inSeq_fextra_yes_subfields_inSeq {
+pub struct main_gzip_inSeq_fextra_subfields_inSeq {
     si1: u8,
     si2: u8,
     len: u16,
@@ -222,38 +216,20 @@ pub struct main_gzip_inSeq_fextra_yes_subfields_inSeq {
 }
 
 #[derive(Debug, Clone)]
-pub struct main_gzip_inSeq_fextra_yes {
+pub struct main_gzip_inSeq_fextra {
     xlen: u16,
-    subfields: Vec<main_gzip_inSeq_fextra_yes_subfields_inSeq>,
+    subfields: Vec<main_gzip_inSeq_fextra_subfields_inSeq>,
 }
 
 #[derive(Debug, Clone)]
-pub enum main_gzip_inSeq_fextra {
-    no,
-    yes(main_gzip_inSeq_fextra_yes),
-}
-
-#[derive(Debug, Clone)]
-pub struct main_gzip_inSeq_fname_yes {
+pub struct main_gzip_inSeq_fname {
     string: Vec<u8>,
     null: u8,
 }
 
 #[derive(Debug, Clone)]
-pub enum main_gzip_inSeq_fname {
-    no,
-    yes(main_gzip_inSeq_fname_yes),
-}
-
-#[derive(Debug, Clone)]
-pub struct main_gzip_inSeq_fcomment_yes {
-    comment: main_gzip_inSeq_fname_yes,
-}
-
-#[derive(Debug, Clone)]
-pub enum main_gzip_inSeq_fcomment {
-    no,
-    yes(main_gzip_inSeq_fcomment_yes),
+pub struct main_gzip_inSeq_fcomment {
+    comment: main_gzip_inSeq_fname,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -381,9 +357,9 @@ pub struct main_gzip_inSeq_footer {
 #[derive(Debug, Clone)]
 pub struct main_gzip_inSeq {
     header: main_gzip_inSeq_header,
-    fextra: main_gzip_inSeq_fextra,
-    fname: main_gzip_inSeq_fname,
-    fcomment: main_gzip_inSeq_fcomment,
+    fextra: Option<main_gzip_inSeq_fextra>,
+    fname: Option<main_gzip_inSeq_fname>,
+    fcomment: Option<main_gzip_inSeq_fcomment>,
     data: main_gzip_inSeq_data,
     footer: main_gzip_inSeq_footer,
 }
@@ -403,7 +379,7 @@ pub struct main_jpeg_frame_initial_segment_app0_data_data_jfif {
     density_y: u16,
     thumbnail_width: u8,
     thumbnail_height: u8,
-    thumbnail_pixels: Vec<Vec<main_gif_logical_screen_global_color_table_yes_inSeq>>,
+    thumbnail_pixels: Vec<Vec<main_gif_logical_screen_global_color_table_inSeq>>,
 }
 
 #[derive(Debug, Clone)]
@@ -414,7 +390,7 @@ pub enum main_jpeg_frame_initial_segment_app0_data_data {
 
 #[derive(Debug, Clone)]
 pub struct main_jpeg_frame_initial_segment_app0_data {
-    identifier: main_gzip_inSeq_fname_yes,
+    identifier: main_gzip_inSeq_fname,
     data: main_jpeg_frame_initial_segment_app0_data_data,
 }
 
@@ -475,7 +451,7 @@ pub enum main_jpeg_frame_initial_segment_app1_data_data {
 
 #[derive(Debug, Clone)]
 pub struct main_jpeg_frame_initial_segment_app1_data {
-    identifier: main_gzip_inSeq_fname_yes,
+    identifier: main_gzip_inSeq_fname,
     data: main_jpeg_frame_initial_segment_app1_data_data,
 }
 
@@ -780,19 +756,19 @@ pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_hdlr {
     predefined: u32,
     handler_type: (u8, u8, u8, u8),
     reserved: (u32, u32, u32),
-    name: main_gzip_inSeq_fname_yes,
+    name: main_gzip_inSeq_fname,
 }
 
 #[derive(Debug, Clone)]
 pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_mime
 {
-    content_type: main_gzip_inSeq_fname_yes,
+    content_type: main_gzip_inSeq_fname,
 }
 
 #[derive(Debug, Clone)]
 pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields_uri
 {
-    item_uri_type: main_gzip_inSeq_fname_yes,
+    item_uri_type: main_gzip_inSeq_fname,
 }
 
 #[derive(Debug, Clone)]
@@ -805,7 +781,7 @@ pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_
 item_ID: u32,
 item_protection_index: u16,
 item_type: (u8, u8, u8, u8),
-item_name: main_gzip_inSeq_fname_yes,
+item_name: main_gzip_inSeq_fname,
 extra_fields: main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_infe_fields_no_extra_fields
 }
 
@@ -814,9 +790,9 @@ pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_
 {
     item_ID: u16,
     item_protection_index: u16,
-    item_name: main_gzip_inSeq_fname_yes,
-    content_type: main_gzip_inSeq_fname_yes,
-    content_encoding: main_gzip_inSeq_fname_yes,
+    item_name: main_gzip_inSeq_fname,
+    content_type: main_gzip_inSeq_fname,
+    content_encoding: main_gzip_inSeq_fname,
 }
 
 #[derive(Debug, Clone)]
@@ -856,12 +832,6 @@ pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method {
-    no,
-    yes(u16),
-}
-
-#[derive(Debug, Copy, Clone)]
 pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_extents_inSeq {
     extent_index: u64,
     extent_offset: u64,
@@ -871,8 +841,7 @@ pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_exte
 #[derive(Debug, Clone)]
 pub struct main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq {
     item_ID: u32,
-    construction_method:
-        main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method,
+    construction_method: Option<u16>,
     data_reference_index: u16,
     base_offset: u64,
     extent_count: u16,
@@ -1089,7 +1058,7 @@ pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSe
     component_manufacturer: u32,
     component_flags: u32,
     component_flags_mask: u32,
-    component_name: main_gzip_inSeq_fname_yes,
+    component_name: main_gzip_inSeq_fname,
 }
 
 #[derive(Debug, Clone)]
@@ -1135,13 +1104,6 @@ sample_entries: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_grouping_type_parameter
-{
-    no,
-    yes(u32),
-}
-
-#[derive(Debug, Copy, Clone)]
 pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_sample_groups_inSeq
 {
     sample_count: u32,
@@ -1153,7 +1115,7 @@ pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSe
 version: u8,
 flags: (u8, u8, u8),
 grouping_type: u32,
-grouping_type_parameter: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_grouping_type_parameter,
+grouping_type_parameter: Option<u32>,
 entry_count: u32,
 sample_groups: Vec<main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_sample_groups_inSeq>
 }
@@ -1220,19 +1182,13 @@ pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSe
 }
 
 #[derive(Debug, Clone)]
-pub enum main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz_entry_size
+pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz
 {
-    no,
-    yes(Vec<u32>),
-}
-
-#[derive(Debug, Clone)]
-pub struct main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz {
-version: u8,
-flags: (u8, u8, u8),
-sample_size: u32,
-sample_count: u32,
-entry_size: main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz_entry_size
+    version: u8,
+    flags: (u8, u8, u8),
+    sample_size: u32,
+    sample_count: u32,
+    entry_size: Option<Vec<u32>>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1435,7 +1391,7 @@ pub struct main_png_ihdr {
 pub struct main_png_chunks_inSeq_PLTE {
     length: u32,
     tag: (u8, u8, u8, u8),
-    data: Vec<main_gif_logical_screen_global_color_table_yes_inSeq>,
+    data: Vec<main_gif_logical_screen_global_color_table_inSeq>,
     crc: u32,
 }
 
@@ -1532,7 +1488,7 @@ pub struct main_png_chunks_inSeq_iTXt_data {
     keyword: Vec<u8>,
     compression_flag: u8,
     compression_method: u8,
-    language_tag: main_gzip_inSeq_fname_yes,
+    language_tag: main_gzip_inSeq_fname,
     translated_keyword: Vec<char>,
     text: main_png_chunks_inSeq_iTXt_data_text,
 }
@@ -1663,18 +1619,12 @@ pub struct main_png {
     iend: main_png_iend,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum main_riff_data_chunks_inSeq_pad {
-    no(u8),
-    yes,
-}
-
 #[derive(Debug, Clone)]
 pub struct main_riff_data_chunks_inSeq {
     tag: (u8, u8, u8, u8),
     length: u32,
     data: Vec<u8>,
-    pad: main_riff_data_chunks_inSeq_pad,
+    pad: Option<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -1688,7 +1638,7 @@ pub struct main_riff {
     tag: (u8, u8, u8, u8),
     length: u32,
     data: main_riff_data,
-    pad: main_riff_data_chunks_inSeq_pad,
+    pad: Option<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -2071,33 +2021,24 @@ fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_gzip_inSeq>,
             let next_elem = {
                 let header = ((|| PResult::Ok((Decoder155(_input))?))())?;
                 let fextra = ((|| {
-                    PResult::Ok(match header.file_flags.fextra.clone() != 0u8 {
-                        true => {
-                            let inner = (Decoder156(_input))?;
-                            main_gzip_inSeq_fextra::yes(inner)
-                        }
-
-                        false => main_gzip_inSeq_fextra::no,
+                    PResult::Ok(if header.file_flags.fextra.clone() != 0u8 {
+                        Some((Decoder156(_input))?)
+                    } else {
+                        None
                     })
                 })())?;
                 let fname = ((|| {
-                    PResult::Ok(match header.file_flags.fname.clone() != 0u8 {
-                        true => {
-                            let inner = (Decoder157(_input))?;
-                            main_gzip_inSeq_fname::yes(inner)
-                        }
-
-                        false => main_gzip_inSeq_fname::no,
+                    PResult::Ok(if header.file_flags.fname.clone() != 0u8 {
+                        Some((Decoder157(_input))?)
+                    } else {
+                        None
                     })
                 })())?;
                 let fcomment = ((|| {
-                    PResult::Ok(match header.file_flags.fcomment.clone() != 0u8 {
-                        true => {
-                            let inner = (Decoder158(_input))?;
-                            main_gzip_inSeq_fcomment::yes(inner)
-                        }
-
-                        false => main_gzip_inSeq_fcomment::no,
+                    PResult::Ok(if header.file_flags.fcomment.clone() != 0u8 {
+                        Some((Decoder158(_input))?)
+                    } else {
+                        None
                     })
                 })())?;
                 let data = ((|| {
@@ -2393,20 +2334,15 @@ fn Decoder8<'input>(_input: &mut Parser<'input>) -> Result<main_riff, ParseError
         })
     })())?;
     let pad = ((|| {
-        PResult::Ok(match length % 2u32 == 0u32 {
-            true => main_riff_data_chunks_inSeq_pad::yes,
-
-            false => {
-                let inner = {
-                    let b = _input.read_byte()?;
-                    if b == 0 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-                    }
-                };
-                main_riff_data_chunks_inSeq_pad::no(inner)
-            }
+        PResult::Ok(if length % 2u32 == 1u32 {
+            let b = _input.read_byte()?;
+            Some(if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            })
+        } else {
+            None
         })
     })())?;
     PResult::Ok(main_riff {
@@ -4573,20 +4509,15 @@ fn Decoder31<'input>(
         })
     })())?;
     let pad = ((|| {
-        PResult::Ok(match length % 2u32 == 0u32 {
-            true => main_riff_data_chunks_inSeq_pad::yes,
-
-            false => {
-                let inner = {
-                    let b = _input.read_byte()?;
-                    if b == 0 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-                    }
-                };
-                main_riff_data_chunks_inSeq_pad::no(inner)
-            }
+        PResult::Ok(if length % 2u32 == 1u32 {
+            let b = _input.read_byte()?;
+            Some(if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            })
+        } else {
+            None
         })
     })())?;
     PResult::Ok(main_riff_data_chunks_inSeq {
@@ -5681,7 +5612,7 @@ fn Decoder47<'input>(
                                 let r = ((|| PResult::Ok((Decoder18(_input))?))())?;
                                 let g = ((|| PResult::Ok((Decoder18(_input))?))())?;
                                 let b = ((|| PResult::Ok((Decoder18(_input))?))())?;
-                                main_gif_logical_screen_global_color_table_yes_inSeq { r, g, b }
+                                main_gif_logical_screen_global_color_table_inSeq { r, g, b }
                             };
                             accum.push(next_elem);
                         }
@@ -9473,7 +9404,7 @@ return Err(ParseError::ExcludedBranch(7279863718715306056u64));
     PResult::Ok(accum)
 }
 
-fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -9522,7 +9453,7 @@ fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder57<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
@@ -11416,15 +11347,10 @@ false => {
 (Decoder28(_input))?
 }
 }))())?;
-let construction_method = ((|| PResult::Ok(match version > 0u8 {
-true => {
-let inner = (Decoder26(_input))?;
-main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method::yes(inner)
-},
-
-false => {
-main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq_construction_method::no
-}
+let construction_method = ((|| PResult::Ok(if version > 0u8 {
+Some((Decoder26(_input))?)
+} else {
+None
 }))())?;
 let data_reference_index = ((|| PResult::Ok((Decoder26(_input))?))())?;
 let base_offset = ((|| PResult::Ok(match base_offset_size {
@@ -12382,7 +12308,7 @@ fn Decoder71<'input>(
     )
 }
 
-fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -12431,7 +12357,7 @@ fn Decoder72<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder73<'input>(
@@ -12982,22 +12908,15 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                             let sample_size = ((|| PResult::Ok((Decoder28(_input))?))())?;
                             let sample_count = ((|| PResult::Ok((Decoder28(_input))?))())?;
                             let entry_size = ((|| {
-                                PResult::Ok(match sample_size == 0u32 {
-true => {
-let inner = {
-let mut accum = Vec::new();
-for _ in 0..sample_count {
-accum.push((Decoder28(_input))?);
-}
-accum
-};
-main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz_entry_size::yes(inner)
-},
-
-false => {
-main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz_entry_size::no
-}
-})
+                                PResult::Ok(if sample_size == 0u32 {
+                                    let mut accum = Vec::new();
+                                    for _ in 0..sample_count {
+                                        accum.push((Decoder28(_input))?);
+                                    }
+                                    Some(accum)
+                                } else {
+                                    None
+                                })
                             })())?;
                             main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_stsz { version, flags, sample_size, sample_count, entry_size }
                         };
@@ -13115,16 +13034,11 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                             })())?;
                             let grouping_type = ((|| PResult::Ok((Decoder28(_input))?))())?;
                             let grouping_type_parameter = ((|| {
-                                PResult::Ok(match version == 1u8 {
-true => {
-let inner = (Decoder28(_input))?;
-main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_grouping_type_parameter::yes(inner)
-},
-
-false => {
-main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf_inSeq_data_stbl_inSeq_data_sbgp_grouping_type_parameter::no
-}
-})
+                                PResult::Ok(if version == 1u8 {
+                                    Some((Decoder28(_input))?)
+                                } else {
+                                    None
+                                })
                             })())?;
                             let entry_count = ((|| PResult::Ok((Decoder28(_input))?))())?;
                             let sample_groups = ((|| {
@@ -13510,7 +13424,7 @@ fn Decoder78<'input>(
     )
 }
 
-fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -13559,10 +13473,10 @@ fn Decoder79<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
-fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -13611,10 +13525,10 @@ fn Decoder80<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
-fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -13663,10 +13577,10 @@ fn Decoder81<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
-fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -13715,10 +13629,10 @@ fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
-fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -13767,7 +13681,7 @@ fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fnam
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder84<'input>(_input: &mut Parser<'input>) -> Result<main_jpeg_soi, ParseError> {
@@ -17652,9 +17566,7 @@ fn Decoder147<'input>(
     PResult::Ok(main_jpeg_frame_initial_segment_app1_data { identifier, data })
 }
 
-fn Decoder148<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder148<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -17703,7 +17615,7 @@ fn Decoder148<'input>(
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder149<'input>(
@@ -17792,9 +17704,7 @@ fn Decoder151<'input>(
     PResult::Ok(main_jpeg_frame_initial_segment_app0_data { identifier, data })
 }
 
-fn Decoder152<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -17843,7 +17753,7 @@ fn Decoder152<'input>(
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder153<'input>(
@@ -17912,11 +17822,11 @@ fn Decoder153<'input>(
 
 fn Decoder154<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_gif_logical_screen_global_color_table_yes_inSeq, ParseError> {
+) -> Result<main_gif_logical_screen_global_color_table_inSeq, ParseError> {
     let r = ((|| PResult::Ok((Decoder18(_input))?))())?;
     let g = ((|| PResult::Ok((Decoder18(_input))?))())?;
     let b = ((|| PResult::Ok((Decoder18(_input))?))())?;
-    PResult::Ok(main_gif_logical_screen_global_color_table_yes_inSeq { r, g, b })
+    PResult::Ok(main_gif_logical_screen_global_color_table_inSeq { r, g, b })
 }
 
 fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_header, ParseError> {
@@ -17987,9 +17897,7 @@ fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_hea
     })
 }
 
-fn Decoder156<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fextra_yes, ParseError> {
+fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fextra, ParseError> {
     let xlen = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let subfields = ((|| {
         PResult::Ok({
@@ -18022,20 +17930,16 @@ fn Decoder156<'input>(
             ret
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fextra_yes { xlen, subfields })
+    PResult::Ok(main_gzip_inSeq_fextra { xlen, subfields })
 }
 
-fn Decoder157<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     PResult::Ok((Decoder169(_input))?)
 }
 
-fn Decoder158<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fcomment_yes, ParseError> {
+fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fcomment, ParseError> {
     let comment = ((|| PResult::Ok((Decoder168(_input))?))())?;
-    PResult::Ok(main_gzip_inSeq_fcomment_yes { comment })
+    PResult::Ok(main_gzip_inSeq_fcomment { comment })
 }
 
 fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_data, ParseError> {
@@ -19188,7 +19092,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_fixed_huffman_codes_inSeq_extra::some(rec
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(9424168512115336483u64));
+return Err(ParseError::ExcludedBranch(8472254583636614445u64));
 }
 }
 },
@@ -19376,7 +19280,7 @@ y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5266830002477521519u64));
+return Err(ParseError::ExcludedBranch(10829344819821213312u64));
 }
 }))
 },
@@ -19411,7 +19315,7 @@ y.clone()
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(5266830002477521519u64));
+return Err(ParseError::ExcludedBranch(10829344819821213312u64));
 }
 }))
 },
@@ -19978,7 +19882,7 @@ main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra::some(r
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16872236927945453232u64));
+return Err(ParseError::ExcludedBranch(8837999154482471488u64));
 }
 }
 },
@@ -20423,9 +20327,7 @@ fn Decoder167<'input>(
     PResult::Ok(main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra_some_distance_record { distance_extra_bits, distance })
 }
 
-fn Decoder168<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder168<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -20474,12 +20376,10 @@ fn Decoder168<'input>(
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
-fn Decoder169<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fname_yes, ParseError> {
+fn Decoder169<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
     let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -20528,12 +20428,12 @@ fn Decoder169<'input>(
             }
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fname_yes { string, null })
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder170<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_gzip_inSeq_fextra_yes_subfields_inSeq, ParseError> {
+) -> Result<main_gzip_inSeq_fextra_subfields_inSeq, ParseError> {
     let si1 = ((|| PResult::Ok((Decoder22(_input))?))())?;
     let si2 = ((|| PResult::Ok((Decoder22(_input))?))())?;
     let len = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -20546,7 +20446,7 @@ fn Decoder170<'input>(
             accum
         })
     })())?;
-    PResult::Ok(main_gzip_inSeq_fextra_yes_subfields_inSeq {
+    PResult::Ok(main_gzip_inSeq_fextra_subfields_inSeq {
         si1,
         si2,
         len,
@@ -20605,19 +20505,14 @@ fn Decoder171<'input>(_input: &mut Parser<'input>) -> Result<main_gif_header, Pa
 fn Decoder172<'input>(_input: &mut Parser<'input>) -> Result<main_gif_logical_screen, ParseError> {
     let descriptor = ((|| PResult::Ok((Decoder188(_input))?))())?;
     let global_color_table = ((|| {
-        PResult::Ok(match descriptor.flags.table_flag.clone() != 0u8 {
-            true => {
-                let inner = {
-                    let mut accum = Vec::new();
-                    for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
-                        accum.push((Decoder186(_input))?);
-                    }
-                    accum
-                };
-                main_gif_logical_screen_global_color_table::yes(inner)
+        PResult::Ok(if descriptor.flags.table_flag.clone() != 0u8 {
+            let mut accum = Vec::new();
+            for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
+                accum.push((Decoder186(_input))?);
             }
-
-            false => main_gif_logical_screen_global_color_table::no,
+            Some(accum)
+        } else {
+            None
         })
     })())?;
     PResult::Ok(main_gif_logical_screen {
@@ -21091,19 +20986,14 @@ fn Decoder183<'input>(
 {
     let descriptor = ((|| PResult::Ok((Decoder185(_input))?))())?;
     let local_color_table = ((|| {
-        PResult::Ok(match descriptor.flags.table_flag.clone() != 0u8 {
-            true => {
-                let inner = {
-                    let mut accum = Vec::new();
-                    for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
-                        accum.push((Decoder186(_input))?);
-                    }
-                    accum
-                };
-                main_gif_logical_screen_global_color_table::yes(inner)
+        PResult::Ok(if descriptor.flags.table_flag.clone() != 0u8 {
+            let mut accum = Vec::new();
+            for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
+                accum.push((Decoder186(_input))?);
             }
-
-            false => main_gif_logical_screen_global_color_table::no,
+            Some(accum)
+        } else {
+            None
         })
     })())?;
     let data = ((|| PResult::Ok((Decoder187(_input))?))())?;
@@ -21256,11 +21146,11 @@ fn Decoder185<'input>(
 
 fn Decoder186<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_gif_logical_screen_global_color_table_yes_inSeq, ParseError> {
+) -> Result<main_gif_logical_screen_global_color_table_inSeq, ParseError> {
     let r = ((|| PResult::Ok((Decoder18(_input))?))())?;
     let g = ((|| PResult::Ok((Decoder18(_input))?))())?;
     let b = ((|| PResult::Ok((Decoder18(_input))?))())?;
-    PResult::Ok(main_gif_logical_screen_global_color_table_yes_inSeq { r, g, b })
+    PResult::Ok(main_gif_logical_screen_global_color_table_inSeq { r, g, b })
 }
 
 fn Decoder187<'input>(

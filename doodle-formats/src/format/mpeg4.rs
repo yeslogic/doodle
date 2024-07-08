@@ -285,11 +285,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "construction_method",
-                        if_then_else_variant(
-                            expr_gt(var("version"), Expr::U8(0)),
-                            base.u16be(),
-                            Format::EMPTY,
-                        ),
+                        cond_maybe(expr_gt(var("version"), Expr::U8(0)), base.u16be()),
                     ),
                     ("data_reference_index", base.u16be()),
                     (
@@ -473,10 +469,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("sample_count", base.u32be()),
         (
             "entry_size",
-            if_then_else_variant(
+            cond_maybe(
                 expr_eq(var("sample_size"), Expr::U32(0)),
                 repeat_count(var("sample_count"), base.u32be()),
-                Format::EMPTY,
             ),
         ),
     ]);
@@ -536,11 +531,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("grouping_type", base.u32be()),
         (
             "grouping_type_parameter",
-            if_then_else_variant(
-                expr_eq(var("version"), Expr::U8(1)),
-                base.u32be(),
-                Format::EMPTY,
-            ),
+            cond_maybe(expr_eq(var("version"), Expr::U8(1)), base.u32be()),
         ),
         ("entry_count", base.u32be()),
         (

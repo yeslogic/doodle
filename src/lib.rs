@@ -72,6 +72,7 @@ pub enum ValueType {
     Record(Vec<(Label, ValueType)>),
     Union(BTreeMap<Label, ValueType>),
     Seq(Box<ValueType>),
+    Option(Box<ValueType>),
 }
 
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
@@ -104,6 +105,10 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             Some(Expr::Variant(lbl.clone(), Box::new(mk_value_expr(branch)?)))
         }
         ValueType::Seq(t) => Some(Expr::Seq(vec![mk_value_expr(t.as_ref())?])),
+        ValueType::Option(t) => Some(Expr::Variant(
+            Label::from("Some"),
+            Box::new(mk_value_expr(t)?),
+        )),
     }
 }
 
@@ -661,6 +666,8 @@ pub enum Format {
     RepeatUntilLast(Expr, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
     RepeatUntilSeq(Expr, Box<Format>),
+    /// Parse a format if and only if the given expression evaluates to true, otherwise skip
+    Maybe(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
     /// Attempt to parse a format and fail if it succeeds
@@ -710,7 +717,7 @@ impl Format {
 }
 
 impl Format {
-    /// Conservative bounds for number of bytes matched by a format
+    /// Conservative bounds for number of byte-positions advanced after a format is matched (i.e. parsed)
     fn match_bounds(&self, module: &FormatModule) -> Bounds {
         match self {
             Format::ItemVar(level, _args) => module.get_format(*level).match_bounds(module),
@@ -742,6 +749,7 @@ impl Format {
             }
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::at_least(1),
             Format::RepeatUntilSeq(_, _f) => Bounds::any(),
+            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.match_bounds(module)),
             Format::Peek(_) => Bounds::exact(0),
             Format::PeekNot(_) => Bounds::exact(0),
             Format::Slice(expr, _) => expr.bounds(),
@@ -761,7 +769,8 @@ impl Format {
         }
     }
 
-    /// Conservative bounds for number of bytes read while attempting to match a format
+    /// Conservative bounds for number of bytes that may be read in order to fully parse the given Format, regardless of how many
+    /// are consumed as opposed to being left untouched in the buffer.
     pub(crate) fn lookahead_bounds(&self, module: &FormatModule) -> Bounds {
         match self {
             Format::ItemVar(level, _args) => module.get_format(*level).lookahead_bounds(module),
@@ -793,6 +802,7 @@ impl Format {
             }
             Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::at_least(1),
             Format::RepeatUntilSeq(_, _f) => Bounds::any(),
+            Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds(module)),
             Format::Peek(f) => f.lookahead_bounds(module),
             Format::PeekNot(f) => f.lookahead_bounds(module),
             Format::Slice(expr, _) => expr.bounds(),
@@ -837,6 +847,7 @@ impl Format {
             Format::RepeatCount(..) => false,
             Format::RepeatUntilLast(..) => false,
             Format::RepeatUntilSeq(..) => false,
+            Format::Maybe(..) => true,
             Format::Peek(..) => false,
             Format::PeekNot(..) => false,
             Format::Slice(..) => false,
@@ -1047,6 +1058,15 @@ impl FormatModule {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
+            Format::Maybe(x, a) => match x.infer_type(scope)? {
+                ValueType::Base(BaseType::Bool) => {
+                    let t = self.infer_format_type(scope, a)?;
+                    Ok(ValueType::Option(Box::new(t)))
+                }
+                other => Err(anyhow!(
+                    "Maybe-predicate is not a bool-type: {x:?} ~ {other:?}"
+                )),
+            },
             Format::Peek(a) => self.infer_format_type(scope, a),
             Format::PeekNot(_a) => Ok(ValueType::Tuple(vec![])),
             Format::Slice(_expr, a) => self.infer_format_type(scope, a),
@@ -1694,6 +1714,11 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::RepeatUntilSeq(_, _expr, _a) => {
                 Self::accept() // FIXME
             }
+            TypedFormat::Maybe(_, _cond, a) => {
+                let tree_some = Self::from_gt_format(module, a, next.clone());
+                let tree_none = Self::from_next(module, next);
+                tree_some.union(tree_none)
+            }
             TypedFormat::Peek(_, a) => {
                 let tree = Self::from_next(module, next.clone());
                 let peek = Self::from_gt_format(module, a, Rc::new(Next::Empty));
@@ -1830,6 +1855,11 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::RepeatUntilSeq(_expr, _a) => {
                 Self::accept() // FIXME
+            }
+            Format::Maybe(_expr, a) => {
+                let tree_some = Self::from_format(module, a, next.clone());
+                let tree_none = Self::from_next(module, next);
+                tree_some.union(tree_none)
             }
             Format::Peek(a) => {
                 let tree = Self::from_next(module, next.clone());
