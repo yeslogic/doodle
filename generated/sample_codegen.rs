@@ -4617,7 +4617,16 @@ fn Decoder32<'input>(
 }
 
 fn Decoder33<'input>(_input: &mut Parser<'input>) -> Result<main_png_ihdr, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| PResult::Ok((Decoder61(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
@@ -4761,7 +4770,16 @@ fn Decoder34<'input>(
 }
 
 fn Decoder35<'input>(_input: &mut Parser<'input>) -> Result<main_png_idat_inSeq, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| PResult::Ok((Decoder39(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
@@ -4782,7 +4800,16 @@ fn Decoder35<'input>(_input: &mut Parser<'input>) -> Result<main_png_idat_inSeq,
 }
 
 fn Decoder36<'input>(_input: &mut Parser<'input>) -> Result<main_png_iend, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| PResult::Ok((Decoder37(_input))?))())?;
     let data = ((|| {
         PResult::Ok({
@@ -4920,7 +4947,16 @@ fn Decoder41<'input>(
     _input: &mut Parser<'input>,
     ihdr: main_png_ihdr,
 ) -> Result<main_png_chunks_inSeq_bKGD, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5039,7 +5075,16 @@ fn Decoder41<'input>(
 fn Decoder42<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_cHRM, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5127,7 +5172,16 @@ fn Decoder42<'input>(
 fn Decoder43<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_iCCP, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5234,7 +5288,16 @@ fn Decoder43<'input>(
 fn Decoder44<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_iTXt, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5388,7 +5451,16 @@ fn Decoder44<'input>(
 fn Decoder45<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_gAMA, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5460,7 +5532,16 @@ fn Decoder45<'input>(
 fn Decoder46<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_pHYs, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5538,7 +5619,16 @@ fn Decoder46<'input>(
 fn Decoder47<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_PLTE, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5636,7 +5726,16 @@ fn Decoder47<'input>(
 fn Decoder48<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_tEXt, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5751,7 +5850,16 @@ fn Decoder48<'input>(
 fn Decoder49<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_tIME, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5836,7 +5944,16 @@ fn Decoder50<'input>(
     _input: &mut Parser<'input>,
     ihdr: main_png_ihdr,
 ) -> Result<main_png_chunks_inSeq_tRNS, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -5960,7 +6077,16 @@ fn Decoder50<'input>(
 fn Decoder51<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_zTXt, ParseError> {
-    let length = ((|| PResult::Ok((Decoder28(_input))?))())?;
+    let length = ((|| {
+        PResult::Ok({
+            let inner = (Decoder28(_input))?;
+            if ((|length: u32| PResult::Ok(length <= 2147483647u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
     let tag = ((|| {
         PResult::Ok({
             let field0 = ((|| {

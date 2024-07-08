@@ -1842,7 +1842,6 @@ impl TypeChecker {
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
 
-                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
                 self.unify_utype_baseset(start_t, BaseSet::USome)?;
                 self.unify_utype_baseset(len_t, BaseSet::USome)?;
 
@@ -1860,7 +1859,6 @@ impl TypeChecker {
                 let start_t = self.infer_utype_expr(start_expr.as_ref(), scope)?;
                 let len_t = self.infer_utype_expr(len_expr.as_ref(), scope)?;
 
-                // FIXME - this may break on some formats, but it is based on a change of model we want to impose upstream
                 self.unify_utype_baseset(start_t, BaseSet::USome)?;
                 self.unify_utype_baseset(len_t, BaseSet::USome)?;
 

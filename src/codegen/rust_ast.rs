@@ -390,15 +390,6 @@ pub(crate) type DefParams = RustParams<Label, Label>;
 /// Representation of the concrete, specific parameters used when locally invoking a function or qualifying a type
 pub(crate) type UseParams = RustParams<RustLt, RustType>;
 
-impl UseParams {
-    pub fn single_type(ty: impl Into<RustType>) -> Self {
-        Self {
-            lt_params: Vec::new(),
-            ty_params: vec![ty.into()],
-        }
-    }
-}
-
 impl<Lt, Ty> RustParams<Lt, Ty> {
     pub fn new() -> Self {
         Self {
@@ -620,6 +611,7 @@ impl RustType {
                 AtomType::TypeRef(..) => false,
                 AtomType::Comp(ct) => match ct {
                     CompType::Vec(_) => false,
+                    CompType::Option(t) => t.can_be_copy(),
                     CompType::Result(t_ok, t_err) => t_ok.can_be_copy() && t_err.can_be_copy(),
                     CompType::Borrow(_lt, m, _t) => !m.is_mutable(),
                 },
@@ -917,6 +909,7 @@ impl ToFragment for RustLt {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum CompType<T = Box<RustType>, U = T> {
     Vec(T),
+    Option(T),
     Result(T, U),
     Borrow(Option<RustLt>, Mut, T),
 }
@@ -928,6 +921,10 @@ where
 {
     fn to_fragment(&self) -> Fragment {
         match self {
+            CompType::Option(inner) => {
+                let tmp = inner.to_fragment();
+                tmp.delimit(Fragment::string("Option<"), Fragment::Char('>'))
+            }
             CompType::Vec(inner) => {
                 let tmp = inner.to_fragment();
                 tmp.delimit(Fragment::string("Vec<"), Fragment::Char('>'))
@@ -1004,11 +1001,9 @@ impl TryFrom<ValueType> for RustType {
             }
             ValueType::Option(t) => {
                 let inner = Self::try_from(t.as_ref().clone())?;
-                // FIXME - replace with first-class `Option` in RustType model rather than a verbatim construct
-                Ok(RustType::Verbatim(
-                    Label::from("Option"),
-                    UseParams::single_type(inner),
-                ))
+                Ok(RustType::Atom(AtomType::Comp(CompType::Option(Box::new(
+                    inner,
+                )))))
             }
             ValueType::Any | ValueType::Record(..) | ValueType::Union(..) => Err(value),
         }
@@ -1114,19 +1109,67 @@ impl ToFragment for RustPrimLit {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum MethodSpecifier {
+    Arbitrary(SubIdent),
+    Common(CommonMethod),
+}
+
+impl MethodSpecifier {
+    pub const LEN: Self = Self::Common(CommonMethod::Len);
+}
+
+impl From<SubIdent> for MethodSpecifier {
+    fn from(v: SubIdent) -> Self {
+        Self::Arbitrary(v)
+    }
+}
+
+impl From<CommonMethod> for MethodSpecifier {
+    fn from(v: CommonMethod) -> Self {
+        Self::Common(v)
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum CommonMethod {
+    Len,
+}
+
+impl ToFragment for CommonMethod {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            CommonMethod::Len => Fragment::string("len"),
+        }
+    }
+}
+
+impl ToFragment for MethodSpecifier {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            MethodSpecifier::Arbitrary(v) => v.to_fragment(),
+            MethodSpecifier::Common(v) => v.to_fragment(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
     Entity(RustEntity),
     PrimitiveLit(RustPrimLit),
     ArrayLit(Vec<RustExpr>),
-    MethodCall(Box<RustExpr>, SubIdent, Vec<RustExpr>), // used for specifically calling methods to assign a constant precedence to avoid parenthetical nesting
+    MethodCall(Box<RustExpr>, MethodSpecifier, Vec<RustExpr>), // used for specifically calling methods to assign a constant precedence to avoid parenthetical nesting
     FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
     Struct(RustEntity, Vec<(Label, Option<Box<RustExpr>>)>),
     CloneOf(Box<RustExpr>),
+    // FIXME: this variant is unused
+    #[allow(dead_code)]
     Deref(Box<RustExpr>),
     Borrow(Box<RustExpr>),
+    // FIXME: this variant is unused
+    #[allow(dead_code)]
     BorrowMut(Box<RustExpr>),
     Try(Box<RustExpr>),
     Operation(RustOp),
@@ -1527,10 +1570,11 @@ impl RustExpr {
     /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
     /// clone-then-borrow constructs in the generated code.
     pub fn vec_len(self) -> Self {
-        match self {
-            Self::CloneOf(this) => this.call_method("len"),
-            other => other.call_method("len"),
-        }
+        let this = match self {
+            Self::CloneOf(this) => this,
+            other => Box::new(other),
+        };
+        RustExpr::MethodCall(this, MethodSpecifier::LEN, Vec::new())
     }
 
     pub fn call_method(self, name: impl Into<Label>) -> Self {
@@ -1544,7 +1588,7 @@ impl RustExpr {
     ) -> Self {
         RustExpr::MethodCall(
             Box::new(self),
-            SubIdent::ByName(name.into()),
+            SubIdent::ByName(name.into()).into(),
             args.into_iter().collect(),
         )
     }
@@ -1565,6 +1609,9 @@ impl RustExpr {
         Self::local("Err").call_with([err_val])
     }
 
+    /// Attempts to infer and return the (primitive) type of the given `RustExpr`,
+    /// returning `None` if the expression is not a primitive type or otherwise
+    /// cannot be inferred without further context or more complicated heuristics.
     pub fn try_get_primtype(&self) -> Option<PrimType> {
         match self {
             RustExpr::Entity(_) => None,
@@ -1583,11 +1630,14 @@ impl RustExpr {
             RustExpr::ArrayLit(..) => None,
             RustExpr::MethodCall(_obj, _method, _vars) => {
                 match _method {
-                    SubIdent::ByIndex(_) => {
+                    MethodSpecifier::Common(cm) => match cm {
+                        CommonMethod::Len => Some(PrimType::Usize),
+                    },
+                    MethodSpecifier::Arbitrary(SubIdent::ByIndex(_)) => {
                         unreachable!("unexpected method call using numeric subident")
                     }
-                    SubIdent::ByName(name) => {
-                        // REVIEW - is this the best idea?
+                    MethodSpecifier::Arbitrary(SubIdent::ByName(name)) => {
+                        // FIXME - this acts as a useful stent while migrating, but should be removed
                         if name.as_ref() == "len" && _vars.is_empty() {
                             Some(PrimType::Usize)
                         } else {
@@ -1611,7 +1661,6 @@ impl RustExpr {
                 other => other.try_get_primtype(),
             },
             RustExpr::Deref(x) => match &**x {
-                // FIXME - intervening parentheses (RustExpr::Paren) break this match but we can't do much about that.
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 _ => None,
             },
@@ -1657,8 +1706,14 @@ impl RustExpr {
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
             // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
             RustExpr::CloneOf(expr) => expr.is_pure(),
+            RustExpr::MethodCall(x, MethodSpecifier::LEN, args) => {
+                if args.is_empty() {
+                    x.is_pure()
+                } else {
+                    unreachable!("unexpected method call on `len` with args: {:?}", args);
+                }
+            }
             // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
-            // REVIEW - do we want to replace common calls like `Vec::len()` with designated variants to detect purity where we may not otherwise?
             RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
             RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
@@ -1698,7 +1753,6 @@ impl RustExpr {
 }
 
 impl ToFragmentExt for RustExpr {
-    // REVIEW - make sure we aren't leaving anything by the wayside
     fn to_fragment_precedence(&self, prec: Precedence) -> Fragment {
         match self {
             RustExpr::Entity(e) => e.to_fragment(),
@@ -1861,6 +1915,8 @@ impl RustStmt {
 pub(crate) enum RustControl {
     Loop(Vec<RustStmt>),
     While(RustExpr, Vec<RustStmt>),
+    // FIXME: this variant is unused
+    #[allow(dead_code)]
     ForIter(Label, RustExpr, Vec<RustStmt>), // element variable name, iterator expression (verbatim), loop contents
     ForRange0(Label, RustExpr, Vec<RustStmt>), // index variable name, upper bound (exclusive), loop contents (0..N)
     If(RustExpr, Vec<RustStmt>, Option<Vec<RustStmt>>),

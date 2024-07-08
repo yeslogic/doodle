@@ -19,7 +19,14 @@ pub fn main(
 ) -> FormatRef {
     let chunk = |tag: Format, data: Format| {
         record([
-            ("length", base.u32be()), // FIXME < 2^31
+            (
+                "length",
+                where_lambda(
+                    base.u32be(),
+                    "length",
+                    expr_lte(var("length"), Expr::U32(0x7fff_ffff)),
+                ),
+            ), // NOTE: < 2^31
             ("tag", tag),
             ("data", Format::Slice(var("length"), Box::new(data))),
             ("crc", base.u32be()), // FIXME check this
