@@ -83,18 +83,9 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         "gzip.main",
         repeat1(record([
             ("header", header.call()),
-            (
-                "fextra",
-                if_then_else_variant(fextra_flag, fextra.call(), Format::EMPTY),
-            ),
-            (
-                "fname",
-                if_then_else_variant(fname_flag, fname.call(), Format::EMPTY),
-            ),
-            (
-                "fcomment",
-                if_then_else_variant(fcomment_flag, fcomment.call(), Format::EMPTY),
-            ),
+            ("fextra", cond_maybe(fextra_flag, fextra.call())),
+            ("fname", cond_maybe(fname_flag, fname.call())),
+            ("fcomment", cond_maybe(fcomment_flag, fcomment.call())),
             // FIXME fhcrc
             ("data", Format::Bits(Box::new(deflate.call()))),
             ("footer", footer.call()),

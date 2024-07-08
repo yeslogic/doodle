@@ -53,6 +53,8 @@ pub enum UType {
     Tuple(Vec<Rc<UType>>),
     Record(Vec<(Label, Rc<UType>)>),
     Seq(Rc<UType>),
+    /// For `std::option::Option<InnerType>`
+    Option(Rc<UType>),
 }
 
 impl From<BaseType> for UType {
@@ -112,6 +114,10 @@ impl UType {
                 Some(Self::Record(ufs))
             }
             ValueType::Union(..) => None,
+            ValueType::Option(inner) => {
+                let inner_t = Self::from_valuetype(&**inner)?;
+                Some(UType::Option(Rc::new(inner_t)))
+            }
             ValueType::Seq(inner) => Some(Self::Seq(Rc::new(Self::from_valuetype(inner)?))),
         }
     }
@@ -274,6 +280,10 @@ impl<'a> UScope<'a> {
 }
 
 impl UType {
+    /// Returns an iterator over any embedded UTypes during occurs-checks.
+    ///
+    /// This method presents a context-agnostic view that merely guarantees that the embedded UTypes of
+    /// the receiver are all returned eventually, and in whatever order is most convenient.
     pub fn iter_embedded<'a>(&'a self) -> Box<dyn Iterator<Item = Rc<UType>> + 'a> {
         match self {
             UType::Empty | UType::Hole | UType::Var(..) | UType::Base(..) => {
@@ -281,7 +291,7 @@ impl UType {
             }
             UType::Tuple(ts) => Box::new(ts.iter().cloned()),
             UType::Record(fs) => Box::new(fs.iter().map(|(_l, t)| t.clone())),
-            UType::Seq(t) => Box::new(std::iter::once(t.clone())),
+            UType::Seq(t) | UType::Option(t) => Box::new(std::iter::once(t.clone())),
         }
     }
 }
@@ -970,7 +980,7 @@ impl TypeChecker {
                 }
                 Ok(())
             }
-            UType::Seq(inner) => {
+            UType::Seq(inner) | UType::Option(inner) => {
                 self.occurs_in(v, inner.clone())?;
                 Ok(())
             }
@@ -2420,6 +2430,14 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar)
             }
+            Format::Maybe(cond, inner) => {
+                let newvar = self.get_new_uvar();
+                let cond_var = self.infer_var_expr(cond, ctxt.scope)?;
+                let inner_t = self.infer_utype_format(inner, ctxt)?;
+                self.unify_var_utype(cond_var, Rc::new(UType::Base(BaseType::Bool)))?;
+                self.unify_var_utype(newvar, Rc::new(UType::Option(inner_t)))?;
+                Ok(newvar)
+            }
             Format::Peek(peek) => {
                 let newvar = self.get_new_uvar();
                 let peek_t = self.infer_utype_format(peek, ctxt)?;
@@ -2591,6 +2609,7 @@ impl TypeChecker {
                 Some(ValueType::Record(vfs))
             }
             UType::Seq(t0) => Some(ValueType::Seq(Box::new(self.reify(t0.clone())?))),
+            UType::Option(t0) => Some(ValueType::Option(Box::new(self.reify(t0.clone())?))),
         }
     }
 

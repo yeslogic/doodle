@@ -97,6 +97,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedDecoderExt<TypeRep>>,
     ),
     Apply(TypeRep, Label),
+    Maybe(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
 }
 
 #[derive(Clone, Debug)]
@@ -367,6 +368,10 @@ impl<'a> GTCompiler<'a> {
                 // FIXME probably not right
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilSeq(gt.clone(), expr.clone(), da))
+            }
+            GTFormat::Maybe(gt, cond, a) => {
+                let da = Box::new(self.compile_gt_format(a, None, next)?);
+                Ok(TypedDecoder::Maybe(gt.clone(), cond.clone(), da))
             }
             GTFormat::Peek(gt, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, Rc::new(Next::Empty))?);

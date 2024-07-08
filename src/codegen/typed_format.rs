@@ -73,6 +73,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     RepeatUntilLast(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     RepeatUntilSeq(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    Maybe(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
     Peek(TypeRep, Box<TypedFormat<TypeRep>>),
     PeekNot(TypeRep, Box<TypedFormat<TypeRep>>),
     Slice(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
@@ -145,6 +146,7 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
+            TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds()),
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
 
@@ -208,6 +210,7 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
+            TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.match_bounds()),
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
 
@@ -266,6 +269,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::RepeatBetween(gt, ..)
             | TypedFormat::RepeatUntilLast(gt, ..)
             | TypedFormat::RepeatUntilSeq(gt, ..)
+            | TypedFormat::Maybe(gt, ..)
             | TypedFormat::Peek(gt, ..)
             | TypedFormat::PeekNot(gt, ..)
             | TypedFormat::Slice(gt, ..)
@@ -577,6 +581,9 @@ mod __impls {
                 }
                 TypedFormat::RepeatUntilSeq(_, lambda, inner) => {
                     Format::RepeatUntilSeq(Expr::from(lambda), rebox(inner))
+                }
+                TypedFormat::Maybe(_, is_present, inner) => {
+                    Format::Maybe(Expr::from(is_present), rebox(inner))
                 }
                 TypedFormat::Peek(_, inner) => Format::Peek(rebox(inner)),
                 TypedFormat::PeekNot(_, inner) => Format::PeekNot(rebox(inner)),

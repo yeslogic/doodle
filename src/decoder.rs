@@ -608,6 +608,7 @@ pub enum Decoder {
     RepeatCount(Expr, Box<Decoder>),
     RepeatUntilLast(Expr, Box<Decoder>),
     RepeatUntilSeq(Expr, Box<Decoder>),
+    Maybe(Expr, Box<Decoder>),
     Peek(Box<Decoder>),
     PeekNot(Box<Decoder>),
     Slice(Expr, Box<Decoder>),
@@ -849,6 +850,10 @@ impl<'a> Compiler<'a> {
                 // FIXME probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
+            }
+            Format::Maybe(x, a) => {
+                let da = Box::new(self.compile_format(a, Rc::new(Next::Empty))?);
+                Ok(Decoder::Maybe(x.clone(), da))
             }
             Format::Peek(a) => {
                 let da = Box::new(self.compile_format(a, Rc::new(Next::Empty))?);
@@ -1211,6 +1216,21 @@ impl Decoder {
                     v.push(va);
                 }
                 Ok((Value::Seq(v), input))
+            }
+            Decoder::Maybe(expr, a) => {
+                let is_present = expr.eval_value(scope).unwrap_bool();
+                if is_present {
+                    let (raw, next_input) = a.parse(program, scope, input)?;
+                    Ok((
+                        Value::Variant(Label::Borrowed("Some"), Box::new(raw)),
+                        next_input,
+                    ))
+                } else {
+                    Ok((
+                        Value::Variant(Label::Borrowed("None"), Box::new(Value::UNIT)),
+                        input,
+                    ))
+                }
             }
             Decoder::RepeatUntilLast(expr, a) => {
                 let mut input = input;

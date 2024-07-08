@@ -158,6 +158,17 @@ fn check_covered(
         | Format::RepeatUntilSeq(_, format) => {
             check_covered(module, path, format)?;
         }
+        Format::Maybe(_expr, format) => {
+            // check Some branch
+            path.push(Label::from("Some"));
+            check_covered(module, path, format)?;
+            path.pop();
+
+            // check None branch
+            path.push(Label::from("None"));
+            check_covered(module, path, &Format::EMPTY)?;
+            path.pop();
+        }
         Format::Peek(_) => {}    // FIXME
         Format::PeekNot(_) => {} // FIXME
         Format::Slice(_, format) => {
@@ -252,6 +263,19 @@ impl<'module, W: io::Write> Context<'module, W> {
                     Ok(())
                 }
                 _ => panic!("expected sequence, found {value:?}"),
+            },
+            Format::Maybe(_expr, format) => match value {
+                // REVIEW - consider having a first-class Value::Option?
+                Value::Variant(lbl, inner) => match lbl.as_ref() {
+                    "Some" => self.write_flat(inner, format),
+                    "None" => self.write_flat(inner, &Format::EMPTY),
+                    other => {
+                        unreachable!("found unexpected variant `{other:?}` (expected Some or None)")
+                    }
+                },
+                other => {
+                    unreachable!("Maybe should only produce Some(X)|None(()), found {other:?}")
+                }
             },
             Format::Peek(format) => self.write_flat(value, format),
             Format::PeekNot(format) => self.write_flat(value, format),

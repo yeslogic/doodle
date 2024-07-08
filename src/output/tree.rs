@@ -341,6 +341,21 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
+            Format::Maybe(_, format) => {
+                match value {
+                    // FIXME - consider first-class parsedValue for Option
+                    ParsedValue::Variant(lbl, val) => match lbl.as_ref() {
+                        "Some" => Fragment::string("some")
+                            .join_with_wsp(self.compile_parsed_decoded_value(val, format)),
+                        "None" => Fragment::string("none")
+                            .join_with_wsp(self.compile_parsed_decoded_value(val, &Format::EMPTY)),
+                        _other => {
+                            unreachable!("bad variant label `{lbl:?}` (expected Some or None)")
+                        }
+                    },
+                    _ => panic!("expected variant, found {value:?}"),
+                }
+            }
             Format::Peek(format) => self.compile_parsed_decoded_value(value, format),
             Format::PeekNot(_format) => self.compile_parsed_value(value),
             Format::Slice(_, format) => self.compile_parsed_decoded_value(value, format),
@@ -457,6 +472,20 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
+            Format::Maybe(_, inner) => {
+                match value {
+                    // FIXME - consider first-class parsedValue for Option
+                    Value::Variant(lbl, val) => match lbl.as_ref() {
+                        "Some" => Fragment::string("some")
+                            .join_with_wsp(self.compile_decoded_value(val, inner)),
+                        "None" => Fragment::string("none"),
+                        _other => {
+                            unreachable!("bad variant label `{lbl:?}` (expected Some or None)")
+                        }
+                    },
+                    _ => panic!("expected variant, found {value:?}"),
+                }
+            }
             Format::Peek(format) => self.compile_decoded_value(value, format),
             Format::PeekNot(_format) => self.compile_value(value),
             Format::Slice(_, format) => self.compile_decoded_value(value, format),
@@ -1586,6 +1615,14 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FORMAT_COMPOUND,
             ),
+            Format::Maybe(expr, f) => {
+                let frag_expr = self.compile_expr(expr, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format("maybe", Some(&[frag_expr]), f, prec),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
             Format::Repeat(format) => cond_paren(
                 self.compile_nested_format("repeat", None, format, prec),
                 prec,

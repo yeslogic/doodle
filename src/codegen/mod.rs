@@ -154,6 +154,11 @@ impl CodeGen {
             ValueType::Base(BaseType::U32) => PrimType::U32.into(),
             ValueType::Base(BaseType::U64) => PrimType::U64.into(),
             ValueType::Base(BaseType::Char) => PrimType::Char.into(),
+            // FIXME - replace with first-class `Option` in RustType model rather than a verbatim construct
+            ValueType::Option(param_t) => GenType::Inline(RustType::Verbatim(
+                "Option".into(),
+                UseParams::single_type(self.lift_type(param_t).to_rust_type()),
+            )),
             ValueType::Tuple(vs) => {
                 match &vs[..] {
                     [] => RustType::AnonTuple(Vec::new()).into(),
@@ -436,7 +441,7 @@ impl CodeGen {
                     RepeatLogic::BetweenCounts(
                         tree.clone(),
                         embed_expr_dft(expr_min),
-                        embed_expr_dft(expr_max),
+                       embed_expr_dft(expr_max),
                         Box::new(self.translate(single.get_dec()))
                     )
                 )
@@ -453,6 +458,14 @@ impl CodeGen {
                     RepeatLogic::ConditionComplete(
                         embed_lambda_dft(pred_complete, ClosureKind::Predicate, true),
                         Box::new(self.translate(single.get_dec()))
+                    )
+                )
+            }
+            TypedDecoder::Maybe(_gt, cond, inner) => {
+                CaseLogic::Derived(
+                    DerivedLogic::Maybe(
+                        embed_expr(cond, ExprInfo::Natural),
+                        Box::new(self.translate(inner.get_dec()))
                     )
                 )
             }
@@ -1376,6 +1389,8 @@ impl From<RustBlock> for RustExpr {
     }
 }
 
+/// Converts a `RustBlock` into a `Vec<RustStmt>` (e.g. for use in `RustControl` constructs)
+/// by mapping the (optional) trailing `RustExpr` into an implicit-return `RustStmt`.
 fn implicate_return(value: RustBlock) -> Vec<RustStmt> {
     let (mut stmts, o_expr) = value;
     match o_expr {
@@ -2259,8 +2274,9 @@ enum DerivedLogic<ExprT> {
     UnitVariantOf(Constructor, Box<CaseLogic<ExprT>>),
     MapOf(RustExpr, Box<CaseLogic<ExprT>>),
     Let(Label, RustExpr, Box<CaseLogic<ExprT>>),
-    Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<TypedExpr<GenType>>>),
-    Where(RustExpr, Box<CaseLogic<TypedExpr<GenType>>>),
+    Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<ExprT>>),
+    Where(RustExpr, Box<CaseLogic<ExprT>>),
+    Maybe(RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 #[derive(Clone, Debug)]
@@ -2300,6 +2316,23 @@ impl ToAst for DerivedLogic<GTExpr> {
                     Iterator::chain(std::iter::once(dynl.to_ast(ctxt)), init.into_iter()).collect(),
                     last,
                 )
+            }
+            DerivedLogic::Maybe(is_present, inner_cl) => {
+                let ctrl = {
+                    let (init, last) = inner_cl.to_ast(ctxt);
+                    let new_last = last.map(|expr| RustExpr::local("Some").call_with([expr]));
+                    let if_true = implicate_return((init, new_last));
+                    let if_false = vec![RustStmt::Return(
+                        ReturnKind::Implicit,
+                        RustExpr::local("None"),
+                    )];
+                    RustExpr::Control(Box::new(RustControl::If(
+                        is_present.clone(),
+                        if_true,
+                        Some(if_false),
+                    )))
+                };
+                (Vec::new(), Some(ctrl))
             }
             DerivedLogic::VariantOf(constr, inner) => {
                 let assign_inner = RustStmt::assign("inner", RustExpr::from(inner.to_ast(ctxt)));
@@ -2815,6 +2848,13 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 GTFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
+            }
+            Format::Maybe(cond, inner) => {
+                let index = self.get_and_increment_index();
+                let t_cond = self.elaborate_expr(cond);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::Maybe(gt, t_cond, Box::new(t_inner))
             }
             Format::Peek(inner) => {
                 let index = self.get_and_increment_index();

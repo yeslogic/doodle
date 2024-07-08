@@ -33,6 +33,7 @@ impl Bounds {
         Bounds { min: 0, max: None }
     }
 
+    /// Returns `Some(n)` if `self` describes only a single exact value `n`, `None` otherwise.
     pub fn is_exact(&self) -> Option<usize> {
         match self.max {
             Some(n) if n == self.min => Some(n),
@@ -40,6 +41,7 @@ impl Bounds {
         }
     }
 
+    /// Returns `true` if the value `n` falls within the implicit range of `self`.
     pub fn contains(&self, n: usize) -> bool {
         n >= self.min
             && match self.max {
@@ -48,6 +50,8 @@ impl Bounds {
             }
     }
 
+    /// Takes a conservative union over two `Bounds` objects, returning a new `Bounds`
+    /// that has the lower of the two lower bounds and the higher of the two upper bounds.
     pub fn union(lhs: Bounds, rhs: Bounds) -> Bounds {
         Bounds {
             min: usize::min(lhs.min, rhs.min),

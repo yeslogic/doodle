@@ -390,6 +390,15 @@ pub(crate) type DefParams = RustParams<Label, Label>;
 /// Representation of the concrete, specific parameters used when locally invoking a function or qualifying a type
 pub(crate) type UseParams = RustParams<RustLt, RustType>;
 
+impl UseParams {
+    pub fn single_type(ty: impl Into<RustType>) -> Self {
+        Self {
+            lt_params: Vec::new(),
+            ty_params: vec![ty.into()],
+        }
+    }
+}
+
 impl<Lt, Ty> RustParams<Lt, Ty> {
     pub fn new() -> Self {
         Self {
@@ -993,6 +1002,14 @@ impl TryFrom<ValueType> for RustType {
                 let inner = Self::try_from(t.as_ref().clone())?;
                 Ok(CompType::<Box<RustType>>::Vec(Box::new(inner)).into())
             }
+            ValueType::Option(t) => {
+                let inner = Self::try_from(t.as_ref().clone())?;
+                // FIXME - replace with first-class `Option` in RustType model rather than a verbatim construct
+                Ok(RustType::Verbatim(
+                    Label::from("Option"),
+                    UseParams::single_type(inner),
+                ))
+            }
             ValueType::Any | ValueType::Record(..) | ValueType::Union(..) => Err(value),
         }
     }
@@ -1302,6 +1319,7 @@ impl Operator {
                     None
                 }
             }
+            // NOTE - the types of a SHR or SHL do not have to be the same, but both must be numeric at the very least
             Operator::Shl | Operator::Shr => {
                 if lhs_type.is_numeric() && rhs_type.is_numeric() {
                     Some(lhs_type)
@@ -1362,6 +1380,13 @@ impl RustOp {
             RustOp::InfixOp(op, lhs, rhs) => {
                 match (op, lhs.try_get_primtype(), rhs.try_get_primtype()) {
                     (Operator::Eq | Operator::Neq, Some(ltype), Some(rtype)) => ltype == rtype,
+                    // NOTE - we need to filter out BoolAnd and BoolOr from the next catchall branch, so we can't merely match on the literal PrimType::Bool in the case-pattern
+                    (Operator::BoolAnd | Operator::BoolOr, Some(ltype), Some(rtype)) => {
+                        match (ltype, rtype) {
+                            (PrimType::Bool, PrimType::Bool) => true,
+                            _ => false,
+                        }
+                    }
                     (_, Some(ltype), Some(rtype)) => ltype == rtype && ltype.is_numeric(),
                     (_, None, _) | (_, _, None) => false,
                 }
@@ -1630,8 +1655,10 @@ impl RustExpr {
             RustExpr::Entity(..) => true,
             RustExpr::PrimitiveLit(..) => true,
             RustExpr::ArrayLit(arr) => arr.iter().all(Self::is_pure),
+            // REVIEW - over types we have no control over, clone itself can be impure, but it should never be so for the code we ourselves are generating
             RustExpr::CloneOf(expr) => expr.is_pure(),
             // NOTE - there is no guaranteed-accurate static heuristic to distinguish pure fn's from those with possible side-effects
+            // REVIEW - do we want to replace common calls like `Vec::len()` with designated variants to detect purity where we may not otherwise?
             RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
             RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
@@ -1641,21 +1668,31 @@ impl RustExpr {
             RustExpr::Deref(expr) | RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
                 expr.is_pure()
             }
-            // NOTE - Without static analysis to determine whether the value is always Some(x) where x is a pure calculation, try can always cause the block-scope to short-circuit to Err and therefore is impure by default
+            // NOTE - while we can construct pure Try-expressions manually, the intent of `?` is to have potential side-effects and so we judge them de-facto impure
             RustExpr::Try(..) => false,
             RustExpr::Operation(op) => match op {
                 RustOp::InfixOp(.., lhs, rhs) => lhs.is_pure() && rhs.is_pure() && op.is_sound(),
                 // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
                 RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
             },
+            // NOTE - we can have block-scopes with non-empty statements that are pure, but that is a bit too much work for our purposes right now.
             RustExpr::BlockScope(stmts, tail) => stmts.is_empty() && tail.is_pure(),
             // NOTE - there may be some pure control expressions but those will be relatively rare as natural occurrences
             RustExpr::Control(..) => false,
+            // NOTE - closures never appear in a context where elision is a possibility to consider so this result doesn't actually need to be refined further
             RustExpr::Closure(..) => false,
             // NOTE - slices exprs can always be out-of-bounds so they cannot be elided without changing program behavior
             RustExpr::Slice(..) => false,
-            // NOTE - ranges can be inverted
-            RustExpr::RangeExclusive(..) => false,
+            // NOTE - ranges can only ever be language-level errors if the endpoint types are not the same
+            RustExpr::RangeExclusive(start, end) => {
+                start.is_pure()
+                    && end.is_pure()
+                    && match (start.try_get_primtype(), end.try_get_primtype()) {
+                        (Some(pt0), Some(pt1)) => pt0 == pt1,
+                        // NOTE - there are legal cases for ranges involving unknown types (i.e. those with untyped variables) but we cannot rule one way or another on those
+                        _ => false,
+                    }
+            }
         }
     }
 }
@@ -1808,6 +1845,9 @@ impl RustStmt {
         Self::Let(Mut::Mutable, name.into(), None, rhs)
     }
 
+    /// Classifies the provided Expr using [`RustExpr::is_pure`], and returns a [`RustStmt`]
+    /// that performs a vacuous let-assignment if it is effect-ful. Otherwise,
+    /// returns None.
     pub fn assign_and_forget(rhs: RustExpr) -> Option<Self> {
         if rhs.is_pure() {
             None
