@@ -1716,7 +1716,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Maybe(_, _cond, a) => {
                 let tree_some = Self::from_gt_format(module, a, next.clone());
                 let tree_none = Self::from_next(module, next);
-                tree_some.union(tree_none)
+                tree_none.union(tree_some)
             }
             TypedFormat::Peek(_, a) => {
                 let tree = Self::from_next(module, next.clone());

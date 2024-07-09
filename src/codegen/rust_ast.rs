@@ -1136,6 +1136,14 @@ pub enum CommonMethod {
     Len,
 }
 
+impl CommonMethod {
+    pub(crate) fn try_get_return_primtype(&self) -> Option<PrimType> {
+        match self {
+            CommonMethod::Len => Some(PrimType::Usize),
+        }
+    }
+}
+
 impl ToFragment for CommonMethod {
     fn to_fragment(&self) -> Fragment {
         match self {
@@ -1417,7 +1425,8 @@ impl RustOp {
     /// that the operation in question is defined on the type of the operands and that the operands conform
     /// to the expectations of the operation, and are homogenous if that is required.
     ///
-    /// If the operation might be unsound, may conservatively return false even if soundness is not ruled out.
+    /// If the operation could possibly be unsound, this method may conservatively return false even if it happens to be sound
+    /// for the given operation, in practice.
     pub fn is_sound(&self) -> bool {
         match self {
             RustOp::InfixOp(op, lhs, rhs) => {
@@ -1560,10 +1569,11 @@ impl RustExpr {
     /// unpacking any top-level `RustExpr::CloneOf` variants to avoid inefficient (and unnecessary)
     /// clone-then-borrow constructs in the generated code.
     pub fn vec_as_slice(self) -> Self {
-        match self {
-            Self::CloneOf(this) => this.call_method("as_slice"),
-            other => other.call_method("as_slice"),
-        }
+        let this = match self {
+            Self::CloneOf(this) => this,
+            other => Box::new(other),
+        };
+        this.call_method("as_slice")
     }
 
     /// Helper method that calls the `len` method on the expression passed in,
@@ -1630,14 +1640,12 @@ impl RustExpr {
             RustExpr::ArrayLit(..) => None,
             RustExpr::MethodCall(_obj, _method, _vars) => {
                 match _method {
-                    MethodSpecifier::Common(cm) => match cm {
-                        CommonMethod::Len => Some(PrimType::Usize),
-                    },
+                    // REVIEW - the current only CommonMethod, Len, is not well-defined over non-empty argument lists but we don't check this
+                    MethodSpecifier::Common(cm) => cm.try_get_return_primtype(),
                     MethodSpecifier::Arbitrary(SubIdent::ByIndex(_)) => {
                         unreachable!("unexpected method call using numeric subident")
                     }
                     MethodSpecifier::Arbitrary(SubIdent::ByName(name)) => {
-                        // FIXME - this acts as a useful stent while migrating, but should be removed
                         if name.as_ref() == "len" && _vars.is_empty() {
                             Some(PrimType::Usize)
                         } else {
@@ -1656,13 +1664,9 @@ impl RustExpr {
                 [_, ..] => None,
             },
             RustExpr::Struct(..) => None,
-            RustExpr::CloneOf(x) => match &**x {
+            RustExpr::CloneOf(x) | RustExpr::Deref(x) => match &**x {
                 RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
                 other => other.try_get_primtype(),
-            },
-            RustExpr::Deref(x) => match &**x {
-                RustExpr::Borrow(y) | RustExpr::BorrowMut(y) => y.try_get_primtype(),
-                _ => None,
             },
             RustExpr::Borrow(_) | RustExpr::BorrowMut(_) => None,
             RustExpr::Try(..) => None,
