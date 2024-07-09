@@ -52,8 +52,8 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
             TypedFormat::FormatCall(_, level, args, _) => {
                 level.hash(state);
                 args.hash(state);
-            },
-            TypedFormat::Fail | TypedFormat::EndOfInput => {},
+            }
+            TypedFormat::Fail | TypedFormat::EndOfInput => {}
             TypedFormat::Align(n) => n.hash(state),
             TypedFormat::Byte(bs) => bs.hash(state),
             TypedFormat::Variant(_tr, lbl, inner) => {
@@ -74,7 +74,8 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 hi.hash(state);
                 inner.hash(state);
             }
-            TypedFormat::RepeatUntilLast(_, f, inner) | TypedFormat::RepeatUntilSeq(_, f, inner) => {
+            TypedFormat::RepeatUntilLast(_, f, inner)
+            | TypedFormat::RepeatUntilSeq(_, f, inner) => {
                 f.hash(state);
                 inner.hash(state);
             }
@@ -377,7 +378,6 @@ impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
     }
 }
 
-// FIXME - same as TypedFormat, Eq+Hash required transitively by HashMap preconditions
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedExpr<TypeRep> {
     Var(TypeRep, Label),
@@ -498,7 +498,8 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 lhs.hash(state);
                 rhs.hash(state);
             }
-            TypedExpr::AsU8(inner) | TypedExpr::AsU16(inner)
+            TypedExpr::AsU8(inner)
+            | TypedExpr::AsU16(inner)
             | TypedExpr::AsU32(inner)
             | TypedExpr::AsU64(inner)
             | TypedExpr::AsChar(inner)
@@ -509,8 +510,7 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             | TypedExpr::U64Be(inner)
             | TypedExpr::U64Le(inner)
             | TypedExpr::SeqLength(inner) => inner.hash(state),
-             TypedExpr::SubSeq(_, sq, start, len)
-            | TypedExpr::SubSeqInflate(_, sq, start, len) => {
+            TypedExpr::SubSeq(_, sq, start, len) | TypedExpr::SubSeqInflate(_, sq, start, len) => {
                 sq.hash(state);
                 start.hash(state);
                 len.hash(state);
@@ -610,7 +610,7 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
         core::mem::discriminant(self).hash(state);
         match self {
             TypedPattern::Binding(_, lbl) => lbl.hash(state),
-            TypedPattern::Wildcard(_) => {},
+            TypedPattern::Wildcard(_) => {}
             TypedPattern::Bool(b) => b.hash(state),
             TypedPattern::U8(n) => n.hash(state),
             TypedPattern::U16(n) => n.hash(state),
