@@ -44,8 +44,82 @@ impl GenType {
     }
 }
 
-// FIXME - we have to add Hash and Eq impls for HashMap to work properly in typed_decoder
-#[derive(Clone, Debug, PartialEq, Hash, Eq)]
+impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let disc = core::mem::discriminant(self);
+        disc.hash(state);
+        match self {
+            TypedFormat::FormatCall(_, level, args, _) => {
+                level.hash(state);
+                args.hash(state);
+            },
+            TypedFormat::Fail | TypedFormat::EndOfInput => {},
+            TypedFormat::Align(n) => n.hash(state),
+            TypedFormat::Byte(bs) => bs.hash(state),
+            TypedFormat::Variant(_tr, lbl, inner) => {
+                lbl.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => {
+                branches.hash(state)
+            }
+            TypedFormat::Tuple(_, elts) => elts.hash(state),
+            TypedFormat::Record(_, flds) => flds.hash(state),
+            TypedFormat::RepeatCount(_, n, inner) => {
+                n.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::RepeatBetween(_, lo, hi, inner) => {
+                lo.hash(state);
+                hi.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::RepeatUntilLast(_, f, inner) | TypedFormat::RepeatUntilSeq(_, f, inner) => {
+                f.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Maybe(_, cond, inner) => {
+                cond.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Repeat(_, inner)
+            | TypedFormat::Repeat1(_, inner)
+            | TypedFormat::Bits(_, inner)
+            | TypedFormat::Peek(_, inner)
+            | TypedFormat::PeekNot(_, inner) => inner.hash(state),
+            TypedFormat::Slice(_, sz, inner) => {
+                sz.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::WithRelativeOffset(_, ofs, inner) => {
+                ofs.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Map(_, orig, f) | TypedFormat::Where(_, orig, f) => {
+                orig.hash(state);
+                f.hash(state);
+            }
+            TypedFormat::Compute(_, expr) => expr.hash(state),
+            TypedFormat::Let(_, lb, x, inner) => {
+                lb.hash(state);
+                x.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Match(_, head, cases) => {
+                head.hash(state);
+                cases.hash(state);
+            }
+            TypedFormat::Dynamic(_, lb, dynf, inner) => {
+                lb.hash(state);
+                dynf.hash(state);
+                inner.hash(state);
+            }
+            TypedFormat::Apply(_, lbl, _) => lbl.hash(state),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedFormat<TypeRep> {
     FormatCall(
         TypeRep,
@@ -286,13 +360,25 @@ impl TypedFormat<GenType> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedDynFormat<TypeRep> {
     Huffman(TypedExpr<TypeRep>, Option<TypedExpr<TypeRep>>),
 }
 
+impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedDynFormat::Huffman(code_lengths, opt_code_values) => {
+                code_lengths.hash(state);
+                opt_code_values.hash(state);
+            }
+        }
+    }
+}
+
 // FIXME - same as TypedFormat, Eq+Hash required transitively by HashMap preconditions
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedExpr<TypeRep> {
     Var(TypeRep, Label),
     Bool(bool),
@@ -369,6 +455,87 @@ pub enum TypedExpr<TypeRep> {
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
 }
 
+impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedExpr::Var(_, lbl) => lbl.hash(state),
+            TypedExpr::Bool(b) => b.hash(state),
+            TypedExpr::U8(n) => n.hash(state),
+            TypedExpr::U16(n) => n.hash(state),
+            TypedExpr::U32(n) => n.hash(state),
+            TypedExpr::U64(n) => n.hash(state),
+            TypedExpr::Tuple(_, ts) => ts.hash(state),
+            TypedExpr::TupleProj(_, tup, ix) => {
+                tup.hash(state);
+                ix.hash(state);
+            }
+            TypedExpr::Record(_, fs) => fs.hash(state),
+            TypedExpr::RecordProj(_, rec, fld) => {
+                rec.hash(state);
+                fld.hash(state);
+            }
+            TypedExpr::Variant(_, lbl, inner) => {
+                lbl.hash(state);
+                inner.hash(state);
+            }
+            TypedExpr::Seq(_, sq) => sq.hash(state),
+            TypedExpr::Match(_, head, cases) => {
+                head.hash(state);
+                cases.hash(state);
+            }
+            TypedExpr::Lambda(_, var, body) => {
+                var.hash(state);
+                body.hash(state);
+            }
+            TypedExpr::IntRel(_, rel, lhs, rhs) => {
+                rel.hash(state);
+                lhs.hash(state);
+                rhs.hash(state);
+            }
+            TypedExpr::Arith(_, ath, lhs, rhs) => {
+                ath.hash(state);
+                lhs.hash(state);
+                rhs.hash(state);
+            }
+            TypedExpr::AsU8(inner) | TypedExpr::AsU16(inner)
+            | TypedExpr::AsU32(inner)
+            | TypedExpr::AsU64(inner)
+            | TypedExpr::AsChar(inner)
+            | TypedExpr::U16Be(inner)
+            | TypedExpr::U16Le(inner)
+            | TypedExpr::U32Be(inner)
+            | TypedExpr::U32Le(inner)
+            | TypedExpr::U64Be(inner)
+            | TypedExpr::U64Le(inner)
+            | TypedExpr::SeqLength(inner) => inner.hash(state),
+             TypedExpr::SubSeq(_, sq, start, len)
+            | TypedExpr::SubSeqInflate(_, sq, start, len) => {
+                sq.hash(state);
+                start.hash(state);
+                len.hash(state);
+            }
+            TypedExpr::FlatMap(_, f, sq) => {
+                f.hash(state);
+                sq.hash(state);
+            }
+            TypedExpr::FlatMapAccum(_, f, acc, _vt, seq) => {
+                f.hash(state);
+                acc.hash(state);
+                seq.hash(state);
+            }
+            TypedExpr::FlatMapList(_, f, _vt, seq) => {
+                f.hash(state);
+                seq.hash(state);
+            }
+            TypedExpr::Dup(_, n, x) => {
+                n.hash(state);
+                x.hash(state);
+            }
+        }
+    }
+}
+
 impl<TypeRep> TypedExpr<TypeRep> {
     pub(crate) fn bounds(&self) -> Bounds {
         match self {
@@ -422,7 +589,7 @@ impl TypedExpr<GenType> {
 }
 
 // FIXME - same as TypedExpr, requirements of HashMap include Eq and Hash for this type
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedPattern<TypeRep> {
     Binding(TypeRep, Label),
     Wildcard(TypeRep),
@@ -436,6 +603,29 @@ pub enum TypedPattern<TypeRep> {
     Tuple(TypeRep, Vec<TypedPattern<TypeRep>>),
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
     Seq(TypeRep, Vec<TypedPattern<TypeRep>>),
+}
+
+impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            TypedPattern::Binding(_, lbl) => lbl.hash(state),
+            TypedPattern::Wildcard(_) => {},
+            TypedPattern::Bool(b) => b.hash(state),
+            TypedPattern::U8(n) => n.hash(state),
+            TypedPattern::U16(n) => n.hash(state),
+            TypedPattern::U32(n) => n.hash(state),
+            TypedPattern::U64(n) => n.hash(state),
+            TypedPattern::Int(_, bounds) => bounds.hash(state),
+            TypedPattern::Char(c) => c.hash(state),
+            TypedPattern::Tuple(_, tup) => tup.hash(state),
+            TypedPattern::Variant(_, lbl, inner) => {
+                lbl.hash(state);
+                inner.hash(state);
+            }
+            TypedPattern::Seq(_, elts) => elts.hash(state),
+        }
+    }
 }
 
 mod __impls {

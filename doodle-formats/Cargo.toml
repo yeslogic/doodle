@@ -12,6 +12,11 @@ name = "decoder_inflate_bench"
 path = "benches/inflate_bench.rs"
 harness = false
 
+[[bench]]
+name = "cgrun_benchmark"
+path = "benches/cgrun_benchmark.rs"
+harness = false
+
 [dev-dependencies]
 criterion = "0.5"
 
