@@ -79,6 +79,14 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
         ]),
     );
 
+    let fhcrc_flag = is_nonzero_u8(record_projs(var("header"), &["file-flags", "fhcrc"]));
+    let fhrcrc = module.define_format(
+        "gzip.fhcrc",
+        record([
+            ("crc", base.u16le()), // two least significant bytes of CRC32 of all prior bytes in the header
+        ]),
+    );
+
     module.define_format(
         "gzip.main",
         repeat1(record([
@@ -86,7 +94,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
             ("fextra", cond_maybe(fextra_flag, fextra.call())),
             ("fname", cond_maybe(fname_flag, fname.call())),
             ("fcomment", cond_maybe(fcomment_flag, fcomment.call())),
-            // FIXME fhcrc
+            ("fhcrc", cond_maybe(fhcrc_flag, fhcrc.call())),
             ("data", Format::Bits(Box::new(deflate.call()))),
             ("footer", footer.call()),
         ])),
