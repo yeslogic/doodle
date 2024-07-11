@@ -291,7 +291,7 @@ mod tests {
             .push_atom(NameAtom::RecordField(Label::Borrowed("header")))
             .produce_name();
         let data_header = ctxt
-            .push_atom(NameAtom::Explicit(Label::Borrowed("data.header")))
+            .push_atom(NameAtom::Explicit(Label::Borrowed("hdat")))
             .produce_name();
         let root_data_body = ctxt
             .escape()
@@ -323,7 +323,7 @@ mod tests {
             ctxt.find_name_for(&root_data_header).unwrap(),
             "root_data_header"
         );
-        assert_eq!(ctxt.find_name_for(&data_header).unwrap(), "data.header");
+        assert_eq!(ctxt.find_name_for(&data_header).unwrap(), "hdat");
         assert_eq!(
             ctxt.find_name_for(&root_data_body).unwrap(),
             "root_data_body"
