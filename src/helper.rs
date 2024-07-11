@@ -546,3 +546,13 @@ pub fn format_some(f: Format) -> Format {
 pub const fn format_none() -> Format {
     Format::Compute(expr_none())
 }
+
+/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u8`]
+pub fn where_nonzero_u8(format: Format) -> Format {
+    where_lambda(format, "x", is_nonzero_u8(var("x")))
+}
+
+/// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u16`]
+pub fn where_nonzero_u16(format: Format) -> Format {
+    where_lambda(format, "x", is_nonzero_u16(var("x")))
+}

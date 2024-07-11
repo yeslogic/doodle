@@ -41,8 +41,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("sample-precision", where_between(base.u8(), Expr::U8(2), Expr::U8(16))), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
                 ("num-lines", base.u16be()),
-                ("num-samples-per-line", where_lambda(base.u16be(), "x", is_nonzero_u16(("x")))),
-                ("num-image-components", where_lambda(base.u8(), "x", is_nonzero_u8("x"))), // 1..=4 if progressive DCT, 1..=255 otherwise
+                ("num-samples-per-line", where_nonzero_u16(base.u16be())),
+                ("num-image-components", where_nonzero_u8(base.u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), sof_image_component.call()),
@@ -80,11 +80,24 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     );
 
     // NOTE - packed-bits field
-    // dc-entropy-coding-table-id <- u4;
-    // ac-entropy-coding-table-id <- u4;
-    let entropy_coding_table_ids = packed_bits_u8(
-        [4, 4],
-        ["dc-entropy-coding-table-id", "ac-entropy-coding-table-id"],
+    // dc-entropy-coding-table-id <- u4 //= 0 | .. | 3 (restricted to 0 | 1 when baseline sequential DCT)
+    // ac-entropy-coding-table-id <- u4 //= 0 | .. | 3 (restricted to 0 | 1 when baseline sequential DCT, or simply 0 when lossless)
+    let entropy_coding_table_ids = where_lambda(
+        packed_bits_u8(
+            [4, 4],
+            ["dc-entropy-coding-table-id", "ac-entropy-coding-table-id"],
+        ),
+        "entropy-coding-table-ids",
+        and(
+            expr_lte(
+                record_proj(var("entropy-coding-table-ids"), "dc-entropy-coding-table-id"),
+                Expr::U8(3),
+            ),
+            expr_lte(
+                record_proj(var("entropy-coding-table-ids"), "ac-entropy-coding-table-id"),
+                Expr::U8(3),
+            ),
+        ),
     );
 
     // SOS: Scan header (See ITU T.81 Section B.2.3)
@@ -111,8 +124,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     "image-components",
                     repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
-                ("start-spectral-selection", where_between(base.u8(), Base::U8(0), Base::U8(63))), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
-                ("end-spectral-selection", where_between(base.u8(), Base::U8(0), Base::U8(63))), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT but 0 if start is 0, 0 in lossless (differential or otherwise)
+                ("start-spectral-selection", where_between(base.u8(), Expr::U8(0), Expr::U8(63))), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
+                ("end-spectral-selection", where_between(base.u8(), Expr::U8(0), Expr::U8(63))), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
                 ("approximation-bit-position", approximation_bit_position),
             ]),
         )
@@ -168,7 +181,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     );
 
     // DNL: Define number of lines (See ITU T.81 Section B.2.5)
-    let dnl_data = module.define_format("jpeg.dnl-data", record([("num-lines", where_lambda(base.u16be(), "x", is_nonzero_u16(var("x"))))]));
+    let dnl_data = module.define_format("jpeg.dnl-data", record([("num-lines", where_nonzero_u16(base.u16be()))]));
 
     // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
     let dri_data = module.define_format(
@@ -196,8 +209,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("sample-precision", base.u8()),
                 ("num-lines", base.u16be()),
-                ("num-samples-per-line", where_lambda(base.u16be(), "x", is_nonzero_u16(var("x")))), // != 0
-                ("num-image-components", where_lambda(base.u8(), "x", is_nonzero_u8(var("x")))), // != 0
+                ("num-samples-per-line", where_nonzero_u16(base.u16be())), // != 0
+                ("num-image-components", where_nonzero_u8(base.u8())), // != 0
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), dhp_image_component.call()),
@@ -242,11 +255,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 ), // 0 | 1 | 2
                 (
                     "density-x",
-                    where_lambda(base.u16be(), "x", is_nonzero_u16(var("x"))),
+                    where_nonzero_u16(base.u16be()),
                 ), // != 0
                 (
                     "density-y",
-                    where_lambda(base.u16be(), "x", is_nonzero_u16(var("x"))),
+                    where_nonzero_u16(base.u16be()),
                 ), // != 0
                 ("thumbnail-width", base.u8()),
                 ("thumbnail-height", base.u8()),
