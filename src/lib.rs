@@ -207,6 +207,9 @@ impl ValueType {
                 Ok(ValueType::Union(bs))
             }
             (ValueType::Seq(t1), ValueType::Seq(t2)) => Ok(ValueType::Seq(Box::new(t1.unify(t2)?))),
+            (ValueType::Option(t1), ValueType::Option(t2)) => {
+                Ok(ValueType::Option(Box::new(t1.unify(t2)?)))
+            }
             (t1, t2) => Err(UnificationError::Unsatisfiable(t1.clone(), t2.clone())),
         }
     }
