@@ -21,6 +21,7 @@ pub enum Value {
     U32(u32),
     U64(u64),
     Char(char),
+    Option(Option<Box<Value>>),
     Tuple(Vec<Value>),
     Record(Vec<(Label, Value)>),
     Variant(Label, Box<Value>),
@@ -67,6 +68,8 @@ impl Value {
             (Pattern::Variant(label0, p), Value::Variant(label1, v)) if label0 == label1 => {
                 v.matches_inner(scope, p)
             }
+            (Pattern::Option(None), Value::Option(None)) => true,
+            (Pattern::Option(Some(p)), Value::Option(Some(v))) => v.matches_inner(scope, p),
             _ => false,
         }
     }
@@ -565,6 +568,10 @@ impl Expr {
                 }
                 Cow::Owned(Value::Seq(vs))
             }
+            Expr::LiftOption(opt) => match opt {
+                Some(expr) => Cow::Owned(Value::Option(Some(Box::new(expr.eval_value(scope))))),
+                None => Cow::Owned(Value::Option(None)),
+            },
         }
     }
 
@@ -1221,15 +1228,9 @@ impl Decoder {
                 let is_present = expr.eval_value(scope).unwrap_bool();
                 if is_present {
                     let (raw, next_input) = a.parse(program, scope, input)?;
-                    Ok((
-                        Value::Variant(Label::Borrowed("Some"), Box::new(raw)),
-                        next_input,
-                    ))
+                    Ok((Value::Option(Some(Box::new(raw))), next_input))
                 } else {
-                    Ok((
-                        Value::Variant(Label::Borrowed("None"), Box::new(Value::UNIT)),
-                        input,
-                    ))
+                    Ok((Value::Option(None), input))
                 }
             }
             Decoder::RepeatUntilLast(expr, a) => {

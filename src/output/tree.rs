@@ -173,6 +173,9 @@ impl<'module> MonoidalPrinter<'module> {
                 None => self.is_atomic_value(value.as_ref(), None),
                 f => panic!("expected format suitable for branch: {f:?}"),
             },
+            Value::Option(None) => true,
+            // REVIEW - do we have a better alternative to passing in `None` on the following line?
+            Value::Option(Some(value)) => self.is_atomic_value(value, None),
         }
     }
 
@@ -239,6 +242,8 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             ParsedValue::Branch(_n, value) => self.compile_parsed_value(value),
+            ParsedValue::Option(None) => Fragment::string("none"),
+            ParsedValue::Option(Some(value)) => self.compile_parsed_variant("some", value, None),
         }
     }
 }
@@ -341,21 +346,19 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
-            Format::Maybe(_, format) => {
-                match value {
-                    // FIXME - consider first-class parsedValue for Option
-                    ParsedValue::Variant(lbl, val) => match lbl.as_ref() {
-                        "Some" => Fragment::string("some")
-                            .join_with_wsp(self.compile_parsed_decoded_value(val, format)),
-                        "None" => Fragment::string("none")
-                            .join_with_wsp(self.compile_parsed_decoded_value(val, &Format::EMPTY)),
-                        _other => {
-                            unreachable!("bad variant label `{lbl:?}` (expected Some or None)")
-                        }
-                    },
-                    _ => panic!("expected variant, found {value:?}"),
-                }
-            }
+            Format::Maybe(_, format) => match value {
+                ParsedValue::Option(opt_val) => match opt_val {
+                    Some(val) => Fragment::string("some")
+                        .join_with_wsp(self.compile_parsed_decoded_value(val, format)),
+                    None => {
+                        Fragment::string("none").join_with_wsp(self.compile_parsed_decoded_value(
+                            &ParsedValue::from_evaluated(Value::UNIT),
+                            &Format::EMPTY,
+                        ))
+                    }
+                },
+                _ => panic!("expected variant, found {value:?}"),
+            },
             Format::Peek(format) => self.compile_parsed_decoded_value(value, format),
             Format::PeekNot(_format) => self.compile_parsed_value(value),
             Format::Slice(_, format) => self.compile_parsed_decoded_value(value, format),
@@ -475,15 +478,12 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Maybe(_, inner) => {
                 match value {
                     // FIXME - consider first-class parsedValue for Option
-                    Value::Variant(lbl, val) => match lbl.as_ref() {
-                        "Some" => Fragment::string("some")
+                    Value::Option(opt_val) => match opt_val {
+                        Some(val) => Fragment::string("some")
                             .join_with_wsp(self.compile_decoded_value(val, inner)),
-                        "None" => Fragment::string("none"),
-                        _other => {
-                            unreachable!("bad variant label `{lbl:?}` (expected Some or None)")
-                        }
+                        None => Fragment::string("none"),
                     },
-                    _ => panic!("expected variant, found {value:?}"),
+                    _ => panic!("expected Option, found {value:?}"),
                 }
             }
             Format::Peek(format) => self.compile_decoded_value(value, format),
@@ -523,8 +523,8 @@ impl<'module> MonoidalPrinter<'module> {
 
     pub fn compile_value(&mut self, value: &Value) -> Fragment {
         match value {
-            Value::Bool(true) => Fragment::String("true".into()),
-            Value::Bool(false) => Fragment::String("false".into()),
+            Value::Bool(true) => Fragment::string("true"),
+            Value::Bool(false) => Fragment::string("false"),
             Value::U8(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U16(i) => Fragment::DisplayAtom(Rc::new(*i)),
             Value::U32(i) => Fragment::DisplayAtom(Rc::new(*i)),
@@ -542,6 +542,8 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Value::Branch(_n, value) => self.compile_value(value),
+            Value::Option(None) => Fragment::string("none"),
+            Value::Option(Some(value)) => self.compile_variant("some", value, None),
         }
     }
 
@@ -1543,7 +1545,12 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FUNAPP,
             ),
-
+            Expr::LiftOption(Some(expr)) => cond_paren(
+                self.compile_prefix("some", None, expr),
+                prec,
+                Precedence::FUNAPP,
+            ),
+            Expr::LiftOption(None) => Fragment::string("none"),
             Expr::TupleProj(head, index) => cond_paren(
                 self.compile_expr(head, Precedence::PROJ)
                     .cat(Fragment::Char('.'))

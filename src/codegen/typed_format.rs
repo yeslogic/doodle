@@ -453,6 +453,7 @@ pub enum TypedExpr<TypeRep> {
         Box<TypedExpr<TypeRep>>,
     ),
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep>>>),
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -532,6 +533,7 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 n.hash(state);
                 x.hash(state);
             }
+            TypedExpr::LiftOption(_, opt) => opt.hash(state),
         }
     }
 }
@@ -583,6 +585,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::FlatMap(gt, _, _)
             | TypedExpr::FlatMapAccum(gt, _, _, _, _)
             | TypedExpr::FlatMapList(gt, _, _, _)
+            | TypedExpr::LiftOption(gt, _)
             | TypedExpr::Dup(gt, _, _) => Some(Cow::Borrowed(gt)),
         }
     }
@@ -603,6 +606,7 @@ pub enum TypedPattern<TypeRep> {
     Tuple(TypeRep, Vec<TypedPattern<TypeRep>>),
     Variant(TypeRep, Label, Box<TypedPattern<TypeRep>>),
     Seq(TypeRep, Vec<TypedPattern<TypeRep>>),
+    Option(TypeRep, Option<Box<TypedPattern<TypeRep>>>),
 }
 
 impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
@@ -624,6 +628,7 @@ impl<TypeRep> std::hash::Hash for TypedPattern<TypeRep> {
                 inner.hash(state);
             }
             TypedPattern::Seq(_, elts) => elts.hash(state),
+            TypedPattern::Option(_, opt) => opt.hash(state),
         }
     }
 }
@@ -731,6 +736,8 @@ mod __impls {
                     Expr::FlatMapList(rebox(lambda), vt, rebox(seq))
                 }
                 TypedExpr::Dup(_, count, x) => Expr::Dup(rebox(count), rebox(x)),
+                TypedExpr::LiftOption(_, None) => Expr::LiftOption(None),
+                TypedExpr::LiftOption(_, Some(x)) => Expr::LiftOption(Some(rebox(x))),
             }
         }
     }
@@ -830,6 +837,8 @@ mod __impls {
                 TypedPattern::Tuple(_, elts) => Pattern::Tuple(revec(elts)),
                 TypedPattern::Variant(_, name, inner) => Pattern::Variant(name, rebox(inner)),
                 TypedPattern::Seq(_, elts) => Pattern::Seq(revec(elts)),
+                TypedPattern::Option(_, Some(inner)) => Pattern::Option(Some(rebox(inner))),
+                TypedPattern::Option(_, None) => Pattern::Option(None),
             }
         }
     }

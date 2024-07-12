@@ -580,6 +580,17 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
                 unreachable!("cannot inline TypedPattern::Variant with abstract gentype: {other:?}")
             }
         },
+        TypedPattern::Option(gt, inner) => match gt {
+            GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Option(..)))) => {
+                match inner.as_ref() {
+                    Some(inner_pat) => {
+                        RustPattern::Option(Some(Box::new(embed_pattern_t(inner_pat))))
+                    }
+                    None => RustPattern::Option(None),
+                }
+            }
+            _ => unreachable!("cannot inline TypedPattern::Option with non-Option gentype: {gt:?}"),
+        },
         TypedPattern::Seq(_t, elts) => {
             RustPattern::ArrayLiteral(elts.iter().map(embed_pattern_t).collect())
         }
@@ -927,6 +938,9 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             unreachable!(
                 "TypedExpr::Lambda unsupported as first-class embed (requires embed_lambda with proper ClosureKind argument)"
             ),
+        // TODO - determine if we need to type-annotate the Some call based on the gt we are currently ignoring
+        TypedExpr::LiftOption(_, Some(x)) => RustExpr::local("Some").call_with([embed_expr(x, info)]),
+        TypedExpr::LiftOption(_, None) => RustExpr::local("None"),
     }
 }
 
@@ -2666,6 +2680,16 @@ impl<'a> Elaborator<'a> {
                 let gt = self.get_gt_from_index(index);
                 GTPattern::Seq(gt, t_elts)
             }
+            Pattern::Option(opt) => {
+                let t_pat = if let Some(pat) = opt.as_ref() {
+                    Some(Box::new(self.elaborate_pattern(pat)))
+                } else {
+                    self.increment_index();
+                    None
+                };
+                let gt = self.get_gt_from_index(index);
+                GTPattern::Option(gt, t_pat)
+            }
         }
     }
 
@@ -3181,6 +3205,16 @@ impl<'a> Elaborator<'a> {
                 let x_t = self.elaborate_expr(x);
                 let gt = self.get_gt_from_index(index);
                 GTExpr::Dup(gt, Box::new(count_t), Box::new(x_t))
+            }
+            Expr::LiftOption(opt) => {
+                let t_expr = if let Some(expr) = opt {
+                    Some(Box::new(self.elaborate_expr(expr)))
+                } else {
+                    self.increment_index();
+                    None
+                };
+                let gt = self.get_gt_from_index(index);
+                GTExpr::LiftOption(gt, t_expr)
             }
         }
     }

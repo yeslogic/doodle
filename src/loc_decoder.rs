@@ -149,6 +149,7 @@ pub enum ParsedValue {
     Seq(Parsed<Vec<ParsedValue>>),
     Mapped(Box<ParsedValue>, Box<ParsedValue>),
     Branch(usize, Box<ParsedValue>),
+    Option(Option<Box<ParsedValue>>),
 }
 
 impl ParsedValue {
@@ -162,11 +163,13 @@ impl ParsedValue {
             ParsedValue::Variant(_lab, inner) => inner.get_loc(),
             ParsedValue::Mapped(orig, _) => orig.get_loc(),
             ParsedValue::Branch(_ix, inner) => inner.get_loc(),
+            ParsedValue::Option(Some(inner)) => inner.get_loc(),
+            ParsedValue::Option(None) => ParseLoc::Synthesized,
         }
     }
 
     /// Helper function to construct a `Value::UNIT` with a zero-length spanning slice at a given starting offset.
-    const fn unit_at(offset: usize) -> ParsedValue {
+    pub(crate) const fn unit_at(offset: usize) -> ParsedValue {
         Self::unit_spanning(offset, 0)
     }
 
@@ -228,6 +231,8 @@ impl ParsedValue {
             ParsedValue::Variant(_, inner) => inner.transpose(new_loc),
             ParsedValue::Branch(_, inner) => inner.transpose(new_loc),
             ParsedValue::Mapped(_, image) => image.transpose(new_loc),
+            ParsedValue::Option(Some(inner)) => inner.transpose(new_loc),
+            ParsedValue::Option(None) => {}
         }
     }
 }
@@ -250,6 +255,7 @@ impl From<ParsedValue> for Value {
                 Value::Mapped(Box::new((*orig).into()), Box::new((*image).into()))
             }
             ParsedValue::Branch(ix, inner) => Value::Branch(ix, Box::new((*inner).into())),
+            ParsedValue::Option(opt) => Value::Option(opt.map(|v| Box::new((*v).into()))),
         }
     }
 }
@@ -295,6 +301,9 @@ impl ParsedValue {
             ),
             ParsedValue::Branch(ix, inner) => {
                 Value::Branch(*ix, Box::new((**inner).clone().into()))
+            }
+            ParsedValue::Option(opt) => {
+                Value::Option(opt.as_ref().map(|v| Box::new((**v).clone().into())))
             }
         }
     }
@@ -362,6 +371,8 @@ impl ParsedValue {
             (Pattern::Variant(label0, p), ParsedValue::Variant(label1, v)) if label0 == label1 => {
                 v.matches_inner(scope, p)
             }
+            (Pattern::Option(None), ParsedValue::Option(None)) => true,
+            (Pattern::Option(Some(p)), ParsedValue::Option(Some(v))) => v.matches_inner(scope, p),
             _ => false,
         }
     }
@@ -390,7 +401,7 @@ impl ParsedValue {
         }
     }
 
-    fn from_evaluated(expr_value: Value) -> Self {
+    pub(crate) fn from_evaluated(expr_value: Value) -> Self {
         match expr_value {
             Value::Bool(_)
             | Value::U8(_)
@@ -442,6 +453,9 @@ impl ParsedValue {
             Value::Branch(ix, inner) => {
                 let inner = Box::new(ParsedValue::from_evaluated(*inner));
                 ParsedValue::Branch(ix, inner)
+            }
+            Value::Option(opt) => {
+                ParsedValue::Option(opt.map(|inner| Box::new(ParsedValue::from_evaluated(*inner))))
             }
         }
     }
@@ -917,6 +931,10 @@ impl Expr {
                 }
                 Cow::Owned(ParsedValue::from_evaluated(Value::Seq(vs)))
             }
+            Expr::LiftOption(opt) => Cow::Owned(ParsedValue::from_evaluated(Value::Option(
+                opt.as_ref()
+                    .map(|expr| Box::new(expr.eval_value_with_loc(scope))),
+            ))),
         }
     }
 
@@ -1284,18 +1302,9 @@ impl Decoder {
                 let is_present = expr.eval_value_with_loc(scope).unwrap_bool();
                 if is_present {
                     let (raw, next_input) = a.parse_with_loc(program, scope, input)?;
-                    Ok((
-                        ParsedValue::Variant(Label::Borrowed("Some"), Box::new(raw)),
-                        next_input,
-                    ))
+                    Ok((ParsedValue::Option(Some(Box::new(raw))), next_input))
                 } else {
-                    Ok((
-                        ParsedValue::Variant(
-                            Label::Borrowed("None"),
-                            Box::new(ParsedValue::unit_at(input.offset)),
-                        ),
-                        input,
-                    ))
+                    Ok((ParsedValue::Option(None), input))
                 }
             }
             Decoder::Peek(a) => {
