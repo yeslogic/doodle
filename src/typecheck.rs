@@ -1303,6 +1303,14 @@ impl TypeChecker {
                     Ok(Rc::new(UType::Seq(inner)))
                 }
             }
+            (UType::Option(o1), UType::Option(o2)) => {
+                if o1 == o2 {
+                    Ok(left)
+                } else {
+                    let inner = self.unify_utype(o1.clone(), o2.clone())?;
+                    Ok(Rc::new(UType::Option(inner)))
+                }
+            }
             (UType::Base(b1), UType::Base(b2)) => {
                 if b1 != b2 {
                     return Err(UnificationError::Unsatisfiable(left, right).into());

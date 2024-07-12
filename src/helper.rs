@@ -513,3 +513,36 @@ pub fn is_nonzero_u8(expr: Expr) -> Expr {
 pub fn is_nonzero_u16(expr: Expr) -> Expr {
     expr_ne(expr, Expr::U16(0))
 }
+
+/// Helper for constructing `Option::None` within the Expr model-language.
+pub const fn expr_none() -> Expr {
+    Expr::LiftOption(None)
+}
+
+/// Helper for constructing `Option::Some(expr)` within the Expr model-language.
+pub fn expr_some(expr: Expr) -> Expr {
+    Expr::LiftOption(Some(Box::new(expr)))
+}
+
+/// Helper for constructing `Option::None` within the Pattern model-language.
+pub const fn pat_none() -> Pattern {
+    Pattern::Option(None)
+}
+
+/// Helper for constructing `Option::Some(pat)` within the Pattern model-language.
+pub fn pat_some(pat: Pattern) -> Pattern {
+    Pattern::Option(Some(Box::new(pat)))
+}
+
+/// Helper for constructing `fmt -> Option::Some` within the Format model-language.
+pub fn format_some(f: Format) -> Format {
+    map(
+        f,
+        lambda("val", Expr::LiftOption(Some(Box::new(var("val"))))),
+    )
+}
+
+/// Helper for constructing `Option::None` within the Format model-language.
+pub const fn format_none() -> Format {
+    Format::Compute(expr_none())
+}

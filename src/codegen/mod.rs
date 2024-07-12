@@ -966,7 +966,7 @@ impl Refutability {
     }
 }
 
-fn refutability_check<A: std::fmt::Debug>(
+fn refutability_check<A: std::fmt::Debug + Clone>(
     head_type: &GenType,
     cases: &[(TypedPattern<GenType>, A)],
 ) -> Refutability {
@@ -1031,7 +1031,16 @@ fn refutability_check<A: std::fmt::Debug>(
                         AtomType::Comp(ct) =>
                             match ct {
                                 CompType::Vec(_) => Refutability::Refutable, // Vec can have any length, so no match can be exhaustive without catchalls
-                                CompType::Option(_t) => unimplemented!("support has not yet been extended to matching on in-model Option-types"),
+                                CompType::Option(t) => {
+                                    let none_covered = cases.iter().any(|(pat, _)| matches!(pat, TypedPattern::Option(_, None)));
+                                    if !none_covered {
+                                        return Refutability::Refutable;
+                                    }
+
+                                    let some_cases: Vec<(TypedPattern<GenType>, A)> = cases.iter().filter_map(|(pat, rhs)| match pat { TypedPattern::Option(_, Some(x)) => Some(((**x).clone(), rhs.clone())), _ => None}).collect();
+                                    let rust_type = (**t).clone();
+                                    refutability_check(&GenType::Inline(rust_type), &some_cases)
+                                }
                                 CompType::Result(_, _) =>
                                     unreachable!("unexpected result in pattern head-type"),
                                 CompType::Borrow(_, _, t) => {
