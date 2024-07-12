@@ -773,6 +773,19 @@ impl TypeChecker {
                 )?;
                 Ok(seq_uvar)
             }
+            Pattern::Option(opt) => {
+                let outer_var = self.get_new_uvar();
+                let inner_var = if let Some(inner) = opt.as_ref() {
+                    self.infer_var_scope_pattern(inner, scope)?
+                } else {
+                    self.get_new_uvar()
+                };
+                self.unify_var_utype(
+                    outer_var,
+                    Rc::new(UType::Option(Rc::new(UType::Var(inner_var)))),
+                )?;
+                Ok(outer_var)
+            }
         }
     }
 
@@ -1937,6 +1950,22 @@ impl TypeChecker {
 
                 self.unify_utype_baseset(count_t, BaseSet::USome)?;
                 self.unify_var_proj_elem(newvar, x_var)?;
+
+                newvar
+            }
+            Expr::LiftOption(opt) => {
+                let newvar = self.get_new_uvar();
+
+                let inner_var = if let Some(expr) = opt.as_ref() {
+                    self.infer_var_expr(expr, scope)?
+                } else {
+                    self.get_new_uvar()
+                };
+
+                self.unify_var_utype(
+                    newvar,
+                    Rc::new(UType::Option(Rc::new(UType::Var(inner_var)))),
+                )?;
 
                 newvar
             }

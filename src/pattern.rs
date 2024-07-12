@@ -19,6 +19,7 @@ pub enum Pattern {
     Tuple(Vec<Pattern>),
     Variant(Label, Box<Pattern>),
     Seq(Vec<Pattern>),
+    Option(Option<Box<Pattern>>),
 }
 
 impl Pattern {
@@ -61,6 +62,12 @@ impl Pattern {
                 for p in ps {
                     p.build_scope(scope, Rc::new((**t).clone()));
                 }
+            }
+            (Pattern::Option(None), ValueType::Option(_)) => {
+                // do nothing
+            }
+            (Pattern::Option(Some(p)), ValueType::Option(t)) => {
+                p.build_scope(scope, Rc::new((**t).clone()))
             }
             (Pattern::Variant(label, p), ValueType::Union(branches)) => {
                 if let Some(t) = branches.get(label) {

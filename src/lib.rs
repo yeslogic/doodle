@@ -278,6 +278,8 @@ pub enum Expr {
     FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
     FlatMapList(Box<Expr>, ValueType, Box<Expr>),
     Dup(Box<Expr>, Box<Expr>),
+
+    LiftOption(Option<Box<Expr>>),
 }
 
 // #[derive(Clone, Debug, PartialEq)]
@@ -561,6 +563,10 @@ impl Expr {
                 let t = expr.infer_type(scope)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
+            Expr::LiftOption(expr) => match expr {
+                Some(expr) => Ok(ValueType::Option(Box::new(expr.infer_type(scope)?))),
+                None => Ok(ValueType::Option(Box::new(ValueType::Any))),
+            },
         }
     }
 

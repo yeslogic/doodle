@@ -2012,6 +2012,7 @@ pub(crate) enum RustPattern {
     PrimRange(RustPrimLit, Option<RustPrimLit>),
     TupleLiteral(Vec<RustPattern>),
     ArrayLiteral(Vec<RustPattern>),
+    Option(Option<Box<RustPattern>>),
     Fill,                                   // `..`
     CatchAll(Option<Label>),                // None <- `_`, Some("x") for `x`
     Variant(Constructor, Box<RustPattern>), // FIXME - need to attach enum scope
@@ -2065,6 +2066,11 @@ impl ToFragment for RustPattern {
             RustPattern::Fill => Fragment::String("..".into()),
             RustPattern::CatchAll(None) => Fragment::Char('_'),
             RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
+            RustPattern::Option(None) => Fragment::string("None"),
+            RustPattern::Option(Some(pat)) => Fragment::string("Some").cat(
+                pat.to_fragment()
+                    .delimit(Fragment::Char('('), Fragment::Char(')')),
+            ),
         }
     }
 }
