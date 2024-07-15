@@ -81,6 +81,15 @@ impl Bounds {
             max: self.max.map(|n| (n + 7) / 8),
         }
     }
+
+    /// Finds the largest possible value of `x & m` for `x` in the bounds of `self`.
+    fn best_mask(&self, m: usize) -> usize {
+        if self.contains(m) {
+            m
+        } else {
+            self.max.map_or(m, |n| mask(n) & m)
+        }
+    }
 }
 
 macro_rules! try_from_bounds {
@@ -223,10 +232,11 @@ impl BitAnd<Bounds> for Bounds {
             min: 0,
             max: match (self.max, rhs.max) {
                 (Some(m1), Some(m2)) => {
-                    if self.min == m1 || rhs.min == m2 {
-                        Some(m1 & m2)
-                    } else {
-                        Some(mask(m1) & mask(m2))
+                    match (self.min == m1, rhs.min == m2) {
+                        (true, true) => Some(m1 & m2),
+                        (true, false) => Some(rhs.best_mask(m1)),
+                        (false, true) => Some(self.best_mask(m2)),
+                        (false, false) => Some(mask(m1) & mask(m2))
                     }
                 }
                 _ => None,
