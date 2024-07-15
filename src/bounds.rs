@@ -4,6 +4,17 @@ use std::{
     ops::{Add, BitAnd, BitOr, Div, Mul, Shl, Shr, Sub},
 };
 
+/// Returns the number of significant bits in `x`
+///
+/// If `x` is `0`, returns `0`.
+fn sigbits(x: usize) -> usize {
+    match x {
+        0 => 0,
+        _ => (x.ilog2() + 1) as usize,
+    }
+}
+
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
     pub min: usize,
@@ -16,6 +27,56 @@ impl Bounds {
             min,
             max: Some(max),
         }
+    }
+
+    /// Given a range `(x, x+N)`, returns the ideal value `(k, (y, y+N))` such that:
+    ///   * `k & (y + i) = 0 && k | (y + i) = x + i` for `i` in `0..=N`
+    ///   * `k == 0 || k > y + N`
+    ///
+    /// In other words, `k` is the high-bit mask of the invariant bits over the range `x..=x+N`,
+    /// and each `y + i` are the complementary variant low-bits over the same range.
+    pub(crate) fn bitwise_bounds(&self) -> (usize, Bounds) {
+        let Some(max) = self.max else {
+            return (0, *self);
+        };
+
+        if self.min == max {
+            return (self.min, Bounds::exact(0));
+        }
+
+        // start of the common prefix
+        let Some(nbits) = self.nbits_exact() else {
+            return (0, *self);
+        };
+
+        // end of the common prefix
+        let mbits = sigbits(max ^ self.min);
+
+        let set_bits = if mbits >= nbits {
+            return (0, *self);
+        } else {
+            nbits - mbits
+        };
+
+        let hi_mask = ((1 << set_bits) - 1) << mbits;
+        let lo_mask = (1 << mbits) - 1;
+
+        let k = hi_mask & max;
+        let y0 = self.min & lo_mask;
+        let y1 = max & lo_mask;
+
+        (k, Bounds::new(y0, y1))
+    }
+
+    pub(crate) fn significant_bits(&self) -> Bounds {
+        Self {
+            min: sigbits(self.min) as usize,
+            max: self.max.map(sigbits),
+        }
+    }
+
+    pub(crate) fn nbits_exact(&self) -> Option<usize> {
+        self.significant_bits().is_exact()
     }
 
     pub const fn exact(n: usize) -> Bounds {
@@ -208,15 +269,13 @@ impl BitOr<Bounds> for Bounds {
     type Output = Self;
 
     fn bitor(self, rhs: Bounds) -> Bounds {
+        let (k1, lo_self) = self.bitwise_bounds();
+        let (k2, lo_rhs) = rhs.bitwise_bounds();
         Bounds {
             min: usize::max(self.min, rhs.min),
-            max: match (self.max, rhs.max) {
+            max: match (lo_self.max, lo_rhs.max) {
                 (Some(m1), Some(m2)) => {
-                    if self.min == m1 || rhs.min == m2 {
-                        Some(m1 | m2)
-                    } else {
-                        Some(mask(m1) | mask(m2))
-                    }
+                    Some((k1 | k2) | (mask(m1) | mask(m2)))
                 }
                 _ => None,
             },
@@ -228,16 +287,18 @@ impl BitAnd<Bounds> for Bounds {
     type Output = Self;
 
     fn bitand(self, rhs: Bounds) -> Bounds {
+        let (k1, lo_self) = self.bitwise_bounds();
+        let (k2, lo_rhs) = rhs.bitwise_bounds();
         Bounds {
-            min: 0,
-            max: match (self.max, rhs.max) {
+            min: (k1 & k2),
+            max: match (lo_self.max, lo_rhs.max) {
                 (Some(m1), Some(m2)) => {
-                    match (self.min == m1, rhs.min == m2) {
-                        (true, true) => Some(m1 & m2),
-                        (true, false) => Some(rhs.best_mask(m1)),
-                        (false, true) => Some(self.best_mask(m2)),
-                        (false, false) => Some(mask(m1) & mask(m2))
-                    }
+                    Some((k1 & k2) | match (lo_self.min == m1, lo_rhs.min == m2) {
+                        (true, true) => m1 & m2,
+                        (true, false) => lo_rhs.best_mask(m1),
+                        (false, true) => lo_self.best_mask(m2),
+                        (false, false) => mask(m1) & mask(m2)
+                    })
                 }
                 _ => None,
             },
@@ -258,7 +319,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    fn any_bounds() -> impl Strategy<Value = Bounds> {
+    fn precise_bounds() -> prop::strategy::Union<BoxedStrategy<Bounds>> {
         Strategy::prop_union(
             any::<u8>().prop_map(|n| Bounds::exact(n as usize)).boxed(),
             any::<(u8, u8)>()
@@ -267,7 +328,10 @@ mod tests {
                 })
                 .boxed(),
         )
-        .or(any::<u8>()
+    }
+
+    fn any_bounds() -> impl Strategy<Value = Bounds> {
+        precise_bounds().or(any::<u8>()
             .prop_map(|n| Bounds::at_least(n as usize))
             .boxed())
     }
@@ -403,6 +467,21 @@ mod tests {
                 (Bounds::exact(a) >> Bounds::exact(b)).is_exact().unwrap() == a >> b)
         }
     }
+
+    proptest! {
+        #[test]
+        fn test_bitwise_bounds(bounds in precise_bounds()) {
+            let a = bounds.min;
+            let b = bounds.max.unwrap();
+            let (k, sub_bounds) = bounds.bitwise_bounds();
+            let c = sub_bounds.min;
+            let d = sub_bounds.max.unwrap();
+            prop_assert!(
+                ((k == 0 || k > d) && (k & c == 0 && k | c == a) && (k & d == 0 && k | d == b))
+            )
+        }
+    }
+
     /*
         proptest! {
             #[test]
