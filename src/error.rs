@@ -4,11 +4,11 @@ use crate::loc_decoder::{LocScope, ParsedValue};
 use crate::read::ReadCtxt;
 use crate::Label;
 
-pub type ParseResult<T> = Result<T, ParseError>;
-pub type LocParseResult<T> = Result<T, ParseError<crate::loc_decoder::ParsedValue>>;
+pub type DecodeResult<T> = Result<T, DecodeError>;
+pub type LocDecodeError<T> = Result<T, DecodeError<crate::loc_decoder::ParsedValue>>;
 
 #[derive(Debug)]
-pub enum ParseError<V: Clone = Value> {
+pub enum DecodeError<V: Clone = Value> {
     Fail {
         bindings: Vec<(Label, ScopeEntry<V>)>,
         buffer: Vec<u8>,
@@ -35,7 +35,7 @@ pub enum ParseError<V: Clone = Value> {
     },
 }
 
-impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
+impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeError<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Fail {
@@ -45,7 +45,7 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
             } => {
                 write!(
                     f,
-                    "parse failure at Offset={offset}, Buffer={buffer:#?} (Scope: {bindings:?})"
+                    "decode failure at Offset={offset}, Buffer={buffer:#?} (Scope: {bindings:?})"
                 )
             }
             Self::Trailing { byte, offset } => {
@@ -86,15 +86,15 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for ParseError<V> {
     }
 }
 
-impl<V: std::fmt::Debug + Clone> std::error::Error for ParseError<V> {}
+impl<V: std::fmt::Debug + Clone> std::error::Error for DecodeError<V> {}
 
-impl ParseError<Value> {
-    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> ParseError<Value> {
+impl DecodeError<Value> {
+    pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> DecodeError<Value> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();
         let offset = input.offset;
-        ParseError::Fail {
+        DecodeError::Fail {
             bindings,
             buffer,
             offset,
@@ -102,13 +102,13 @@ impl ParseError<Value> {
     }
 }
 
-impl ParseError<ParsedValue> {
-    pub fn loc_fail(scope: &LocScope<'_>, input: ReadCtxt<'_>) -> ParseError<ParsedValue> {
+impl DecodeError<ParsedValue> {
+    pub fn loc_fail(scope: &LocScope<'_>, input: ReadCtxt<'_>) -> DecodeError<ParsedValue> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
         let buffer = input.input.to_owned();
         let offset = input.offset;
-        ParseError::Fail {
+        DecodeError::Fail {
             bindings,
             buffer,
             offset,
@@ -116,7 +116,7 @@ impl ParseError<ParsedValue> {
     }
 }
 
-impl<V: Clone> ParseError<V> {
+impl<V: Clone> DecodeError<V> {
     pub fn trailing(byte: u8, offset: usize) -> Self {
         Self::Trailing { byte, offset }
     }

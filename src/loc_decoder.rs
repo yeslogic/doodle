@@ -1,6 +1,6 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::{Compiler, ScopeEntry};
-use crate::error::{LocParseResult, ParseError};
+use crate::error::{LocDecodeError, DecodeError};
 use crate::read::ReadCtxt;
 use crate::{
     decoder::{Decoder, Program, Value},
@@ -959,7 +959,7 @@ impl Program {
     pub fn run_with_loc<'input>(
         &self,
         input: ReadCtxt<'input>,
-    ) -> LocParseResult<(ParsedValue, ReadCtxt<'input>)> {
+    ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
         self.decoders[0]
             .0
             .parse_with_loc(self, &LocScope::Empty, input)
@@ -1119,7 +1119,7 @@ impl Decoder {
         program: &Program,
         scope: &LocScope<'_>,
         input: ReadCtxt<'input>,
-    ) -> LocParseResult<(ParsedValue, ReadCtxt<'input>)> {
+    ) -> LocDecodeError<(ParsedValue, ReadCtxt<'input>)> {
         let start_offset = input.offset;
         match self {
             Decoder::Call(n, es) => {
@@ -1132,26 +1132,26 @@ impl Decoder {
                     .0
                     .parse_with_loc(program, &LocScope::Multi(&new_scope), input)
             }
-            Decoder::Fail => Err(ParseError::<ParsedValue>::loc_fail(scope, input)),
+            Decoder::Fail => Err(DecodeError::<ParsedValue>::loc_fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok((ParsedValue::unit_at(start_offset), input)),
-                Some((b, _)) => Err(ParseError::<ParsedValue>::trailing(b, input.offset)),
+                Some((b, _)) => Err(DecodeError::<ParsedValue>::trailing(b, input.offset)),
             },
             Decoder::Align(n) => {
                 let skip = (n - (input.offset % n)) % n;
                 let (_, input) = input
                     .split_at(skip)
-                    .ok_or(ParseError::overrun(skip, input.offset))?;
+                    .ok_or(DecodeError::overrun(skip, input.offset))?;
                 Ok((ParsedValue::unit_spanning(start_offset, skip), input))
             }
             Decoder::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()
-                    .ok_or(ParseError::overbyte(input.offset))?;
+                    .ok_or(DecodeError::overbyte(input.offset))?;
                 if bs.contains(b) {
                     Ok((ParsedValue::new_flat(Value::U8(b), start_offset, 1), input))
                 } else {
-                    Err(ParseError::unexpected(b, *bs, input.offset))
+                    Err(DecodeError::unexpected(b, *bs, input.offset))
                 }
             }
             Decoder::Variant(label, d) => {
@@ -1159,7 +1159,7 @@ impl Decoder {
                 Ok((ParsedValue::Variant(label.clone(), Box::new(v)), input))
             }
             Decoder::Branch(tree, branches) => {
-                let index = tree.matches(input).ok_or(ParseError::NoValidBranch {
+                let index = tree.matches(input).ok_or(DecodeError::NoValidBranch {
                     offset: input.offset,
                 })?;
                 let d = &branches[index];
@@ -1173,7 +1173,7 @@ impl Decoder {
                         return Ok((ParsedValue::Branch(index, Box::new(v)), input));
                     }
                 }
-                Err(ParseError::loc_fail(scope, input))
+                Err(DecodeError::loc_fail(scope, input))
             }
             Decoder::Tuple(fields) => {
                 let mut input = input;
@@ -1200,7 +1200,7 @@ impl Decoder {
             Decoder::While(tree, a) => {
                 let mut input = input;
                 let mut v = Vec::new();
-                while tree.matches(input).ok_or(ParseError::NoValidBranch {
+                while tree.matches(input).ok_or(DecodeError::NoValidBranch {
                     offset: input.offset,
                 })? == 0
                 {
@@ -1218,7 +1218,7 @@ impl Decoder {
                     let (va, next_input) = a.parse_with_loc(program, scope, input)?;
                     input = next_input;
                     v.push(va);
-                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
                         offset: input.offset,
                     })? == 0
                     {
@@ -1246,7 +1246,7 @@ impl Decoder {
                 let max = max.eval_value_with_loc(scope).unwrap_usize();
                 let mut v = Vec::new();
                 loop {
-                    if tree.matches(input).ok_or(ParseError::NoValidBranch {
+                    if tree.matches(input).ok_or(DecodeError::NoValidBranch {
                         offset: input.offset,
                     })? == 0
                         || v.len() == max
@@ -1313,7 +1313,7 @@ impl Decoder {
             }
             Decoder::PeekNot(a) => {
                 if a.parse_with_loc(program, scope, input).is_ok() {
-                    Err(ParseError::loc_fail(scope, input))
+                    Err(DecodeError::loc_fail(scope, input))
                 } else {
                     Ok((ParsedValue::unit_at(start_offset), input))
                 }
@@ -1322,7 +1322,7 @@ impl Decoder {
                 let size = expr.eval_value_with_loc(scope).unwrap_usize();
                 let (slice, input) = input
                     .split_at(size)
-                    .ok_or(ParseError::overrun(size, input.offset))?;
+                    .ok_or(DecodeError::overrun(size, input.offset))?;
                 let (v, _) = a.parse_with_loc(program, scope, slice)?;
                 Ok((v, input))
             }
@@ -1338,14 +1338,14 @@ impl Decoder {
                 let bytes_read = input.remaining().len() - bytes_remain;
                 let (_, input) = input
                     .split_at(bytes_read)
-                    .ok_or(ParseError::overrun(bytes_read, input.offset))?;
+                    .ok_or(DecodeError::overrun(bytes_read, input.offset))?;
                 Ok((v, input))
             }
             Decoder::WithRelativeOffset(expr, a) => {
                 let offset = expr.eval_value_with_loc(scope).unwrap_usize();
                 let (_, slice) = input
                     .split_at(offset)
-                    .ok_or(ParseError::overrun(offset, input.offset))?;
+                    .ok_or(DecodeError::overrun(offset, input.offset))?;
                 let (v, _) = a.parse_with_loc(program, scope, slice)?;
                 Ok((v, input))
             }
@@ -1359,7 +1359,7 @@ impl Decoder {
                 let (v, input) = d.parse_with_loc(program, scope, input)?;
                 match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(ParseError::loc_fail(scope, input)),
+                    false => Err(DecodeError::loc_fail(scope, input)),
                 }
             }
             Decoder::Compute(expr) => {
