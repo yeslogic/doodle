@@ -17,8 +17,18 @@ fn sigbits(x: usize) -> usize {
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
-    pub min: usize,
-    pub max: Option<usize>,
+    pub(crate) min: usize,
+    pub(crate) max: Option<usize>,
+}
+
+impl Bounds {
+    pub const fn get_min(&self) -> usize {
+        self.min
+    }
+
+    pub const fn get_max(&self) -> Option<usize> {
+        self.max
+    }
 }
 
 impl Bounds {
@@ -29,36 +39,45 @@ impl Bounds {
         }
     }
 
-    /// Given a range `(x, x+N)`, returns the ideal value `(k, (y, y+N))` such that:
-    ///   * `k & (y + i) = 0 && k | (y + i) = x + i` for `i` in `0..=N`
+    /// Given a range `(x, x+N)`, returns the `(k, (y, y+N))` such that:
+    ///   * `k & (y + i) == 0 && k | (y + i) == x + i` for `i` in `0..=N`
     ///   * `k == 0 || k > y + N`
     ///
-    /// In other words, `k` is the high-bit mask of the invariant bits over the range `x..=x+N`,
-    /// and each `y + i` are the complementary variant low-bits over the same range.
+    /// In other words, `k` is the longest common bit-prefix of `x` and `x + N`, which is
+    /// `0` if `x + N` has strictly more significant bits than `x`. Correspondingly,
+    /// `y` is a bit-masked version of `x` that fills in the complementary bits of `x` not covered
+    /// by `k`.
+    ///
+    /// If `k == 0`, the returned `Bounds` will be a duplicate of `self`.
     pub(crate) fn bitwise_bounds(&self) -> (usize, Bounds) {
+        // Unbounded Bounds have no longest common prefix
         let Some(max) = self.max else {
             return (0, *self);
         };
 
+        // Exact bounds give `k = x`, `y = 0`
         if self.min == max {
             return (self.min, Bounds::exact(0));
         }
 
-        // start of the common prefix
+        // Highest significant bit of the common prefix
         let Some(nbits) = self.nbits_exact() else {
             return (0, *self);
         };
 
-        // end of the common prefix
+        // Highest significant bit not in the common prefix
         let mbits = sigbits(max ^ self.min);
 
         let set_bits = if mbits >= nbits {
+            // this case *ought* to be precluded by previous short-circuiting checks, but we should still do the right thing
             return (0, *self);
         } else {
             nbits - mbits
         };
 
+        // bitmask over x that constitutes k
         let hi_mask = ((1 << set_bits) - 1) << mbits;
+        // bitmask over x that constitutes y
         let lo_mask = (1 << mbits) - 1;
 
         let k = hi_mask & max;
@@ -68,6 +87,8 @@ impl Bounds {
         (k, Bounds::new(y0, y1))
     }
 
+    /// Returns a new `Bounds` value that indicates the range of the number of significant bits in
+    /// `self` over the range `min..=max`.
     pub(crate) fn significant_bits(&self) -> Bounds {
         Self {
             min: sigbits(self.min) as usize,
@@ -75,6 +96,8 @@ impl Bounds {
         }
     }
 
+    /// Returns the exact number of significant bits in both `self.min` and `self.max` if they match,
+    /// `None` otherwise.
     pub(crate) fn nbits_exact(&self) -> Option<usize> {
         self.significant_bits().is_exact()
     }
