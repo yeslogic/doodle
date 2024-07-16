@@ -22,10 +22,16 @@ pub struct Bounds {
 }
 
 impl Bounds {
+    #[inline]
+    #[must_use]
+    /// Return the lowest value of the given `Bounds`.
     pub const fn get_min(&self) -> usize {
         self.min
     }
 
+    #[inline]
+    #[must_use]
+    /// Return the highest value of the given `Bounds`, which will be `None` for unbounded ranges.
     pub const fn get_max(&self) -> Option<usize> {
         self.max
     }
