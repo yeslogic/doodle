@@ -14,7 +14,6 @@ fn sigbits(x: usize) -> usize {
     }
 }
 
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub struct Bounds {
     pub(crate) min: usize,
@@ -45,7 +44,8 @@ impl Bounds {
         }
     }
 
-    /// Given a range `(x, x+N)`, returns the `(k, (y, y+N))` such that:
+    /// Given a range `(x, x+N)`, returns the `(k, (y, y+N))` for the largest
+    /// value of `k` such that:
     ///   * `k & (y + i) == 0 && k | (y + i) == x + i` for `i` in `0..=N`
     ///   * `k == 0 || k > y + N`
     ///
@@ -74,12 +74,13 @@ impl Bounds {
         // Highest significant bit not in the common prefix
         let mbits = sigbits(max ^ self.min);
 
-        let set_bits = if mbits >= nbits {
-            // this case *ought* to be precluded by previous short-circuiting checks, but we should still do the right thing
+        // length, in bits, of the common prefix
+        let set_bits = nbits.checked_sub(mbits).expect("mbits should never exceed nbits");
+
+        // a zero-length bit-prefix will always be 0, so we can skip the math
+        if set_bits == 0 {
             return (0, *self);
-        } else {
-            nbits - mbits
-        };
+        }
 
         // bitmask over x that constitutes k
         let hi_mask = ((1 << set_bits) - 1) << mbits;
@@ -303,9 +304,7 @@ impl BitOr<Bounds> for Bounds {
         Bounds {
             min: usize::max(self.min, rhs.min),
             max: match (lo_self.max, lo_rhs.max) {
-                (Some(m1), Some(m2)) => {
-                    Some((k1 | k2) | (mask(m1) | mask(m2)))
-                }
+                (Some(m1), Some(m2)) => Some((k1 | k2) | (mask(m1) | mask(m2))),
                 _ => None,
             },
         }
@@ -321,14 +320,15 @@ impl BitAnd<Bounds> for Bounds {
         Bounds {
             min: (k1 & k2),
             max: match (lo_self.max, lo_rhs.max) {
-                (Some(m1), Some(m2)) => {
-                    Some((k1 & k2) | match (lo_self.min == m1, lo_rhs.min == m2) {
-                        (true, true) => m1 & m2,
-                        (true, false) => lo_rhs.best_mask(m1),
-                        (false, true) => lo_self.best_mask(m2),
-                        (false, false) => mask(m1) & mask(m2)
-                    })
-                }
+                (Some(m1), Some(m2)) => Some(
+                    (k1 & k2)
+                        | match (lo_self.min == m1, lo_rhs.min == m2) {
+                            (true, true) => m1 & m2,
+                            (true, false) => lo_rhs.best_mask(m1),
+                            (false, true) => lo_self.best_mask(m2),
+                            (false, false) => mask(m1) & mask(m2),
+                        },
+                ),
                 _ => None,
             },
         }
