@@ -75,6 +75,10 @@ pub enum ValueType {
     Option(Box<ValueType>),
 }
 
+impl ValueType {
+    pub const BOOL: Self = ValueType::Base(BaseType::Bool);
+}
+
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
     match vt {
         ValueType::Any | ValueType::Empty => None,
