@@ -487,14 +487,21 @@ pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`
 ///
+/// Attempts to check for `lower == 0` to avoid vacuous lower bounds on unsigned types.
+///
 /// # Notes
 ///
 /// Does not check that `lower <= upper` as that cannot be statically determined.
 pub fn where_between(format: Format, lower: Expr, upper: Expr) -> Format {
+    let cond = if lower.bounds().is_exact().is_some_and(|x| x == 0) {
+        expr_lte(var("x"), upper)
+    } else {
+        and(expr_gte(var("x"), lower), expr_lte(var("x"), upper))
+    };
     where_lambda(
         format,
         "x",
-        and(expr_gte(var("x"), lower), expr_lte(var("x"), upper)),
+        cond
     )
 }
 
@@ -558,8 +565,14 @@ pub fn where_nonzero_u16(format: Format) -> Format {
 }
 
 /// Helper for constructing `Format::ForEach`
+/// Helper for constructing `Format::ForEach`
 pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
     Format::ForEach(seq, name.into(), Box::new(inner))
+}
+
+/// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
+pub fn aligned(f: Format, align: usize) -> Format {
+    map(tuple([Format::Align(align), f]), lambda("x", tuple_proj(var("x"), 1)))
 }
 
 /// Helper for parsing `(f, suffix)` where we only want to see the `f` component
