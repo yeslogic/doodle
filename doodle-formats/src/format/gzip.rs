@@ -80,7 +80,7 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
     );
 
     let fhcrc_flag = is_nonzero_u8(record_projs(var("header"), &["file-flags", "fhcrc"]));
-    let fhrcrc = module.define_format(
+    let fhcrc = module.define_format(
         "gzip.fhcrc",
         record([
             ("crc", base.u16le()), // two least significant bytes of CRC32 of all prior bytes in the header
