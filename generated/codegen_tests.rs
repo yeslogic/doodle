@@ -86,6 +86,20 @@ mod jpeg {
     }
 }
 
+
+#[test]
+fn test_decoder_waldo() -> TestResult {
+    let buffer = std::fs::read(std::path::Path::new(&testpath("test.waldo")))?;
+    let mut input = Parser::new(&buffer);
+    let parsed_data = Decoder1(&mut input)?.data;
+    match parsed_data {
+        Top::waldo(x) => println!("Waldo: Found at offset {} (noise length: {})", x.r#where, x.noise.len()),
+        other => unreachable!("expected waldo, found {other:?}"),
+    }
+    Ok(())
+
+}
+
 #[test]
 fn test_decoder_peano() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.peano")))?;
@@ -138,7 +152,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder16(&mut input)?;
+    let parsed_data = Decoder17(&mut input)?;
     match parsed_data {
         TarBlock {
             header,
@@ -294,7 +308,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder7(&mut input)?;
+        let dat = Decoder8(&mut input)?;
         print_png_breadcrumb(dat);
         Ok(())
     }
@@ -303,7 +317,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder5(&mut input)?;
+        let dat = Decoder6(&mut input)?;
         print_jpeg_breadcrumb(dat);
         Ok(())
     }
@@ -312,7 +326,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder3(&mut input)?;
+        let dat = Decoder4(&mut input)?;
         print_gif_breadcrumb(dat);
         Ok(())
     }
@@ -321,7 +335,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder9(&mut input)?;
+        let dat = Decoder10(&mut input)?;
         print_tiff_breadcrumb(dat);
         Ok(())
     }
@@ -330,7 +344,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder8(&mut input)?;
+        let dat = Decoder9(&mut input)?;
         print_riff_breadcrumb(dat);
         Ok(())
     }

@@ -185,9 +185,10 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
 
-            TypedFormat::Pos | TypedFormat::Compute(_, _) | TypedFormat::EndOfInput | TypedFormat::Fail => {
-                Bounds::exact(0)
-            }
+            TypedFormat::Pos
+            | TypedFormat::Compute(_, _)
+            | TypedFormat::EndOfInput
+            | TypedFormat::Fail => Bounds::exact(0),
 
             TypedFormat::Peek(_, inner) | TypedFormat::PeekNot(_, inner) => {
                 inner.lookahead_bounds()

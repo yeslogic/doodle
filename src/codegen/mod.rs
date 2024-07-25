@@ -1303,15 +1303,10 @@ impl SimpleLogic<GTExpr> {
                         .wrap_try(),
                 ),
             ),
-            SimpleLogic::YieldCurrentOffset => {
-                (
-                    Vec::new(),
-                    Some(
-                        RustExpr::local(ctxt.input_varname.clone())
-                            .call_method("get_offset_u64")
-                    )
-                )
-            }
+            SimpleLogic::YieldCurrentOffset => (
+                Vec::new(),
+                Some(RustExpr::local(ctxt.input_varname.clone()).call_method("get_offset_u64")),
+            ),
             SimpleLogic::ByteIn(bs) => {
                 let call = RustExpr::local(ctxt.input_varname.clone())
                     .call_method("read_byte")

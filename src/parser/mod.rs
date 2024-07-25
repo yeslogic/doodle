@@ -31,8 +31,10 @@ impl<'a> Parser<'a> {
     /// For convenience of usage in generated code, the type of the `offset` parameter
     /// is `u32`, as that is much more commonly used in `Format` and `Expr` internally
     /// than `usize`, which would be the natural type for this parameter.
-    pub fn advance_by(&mut self, offset: u32) -> Result<(), ParseError> {
-        let delta = offset as usize;
+    pub fn advance_by<N>(&mut self, offset: N) -> Result<(), ParseError>
+    where N: TryInto<usize, Error: std::fmt::Debug>
+    {
+        let delta = offset.try_into().unwrap();
         self.offset.try_increment(delta)?;
         Ok(())
     }
