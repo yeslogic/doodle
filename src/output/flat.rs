@@ -124,7 +124,7 @@ fn check_covered(
         }
         Format::Fail => {}
         Format::EndOfInput => {}
-        Format::Pos => {},
+        Format::Pos => {}
         Format::Align(_) => {}
         Format::Byte(_) => {
             return Err(format!("uncovered byte: {:?}", path));

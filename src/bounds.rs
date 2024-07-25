@@ -75,7 +75,9 @@ impl Bounds {
         let mbits = sigbits(max ^ self.min);
 
         // length, in bits, of the common prefix
-        let set_bits = nbits.checked_sub(mbits).expect("mbits should never exceed nbits");
+        let set_bits = nbits
+            .checked_sub(mbits)
+            .expect("mbits should never exceed nbits");
 
         // a zero-length bit-prefix will always be 0, so we can skip the math
         if set_bits == 0 {

@@ -1,6 +1,6 @@
 use crate::byte_set::ByteSet;
 use crate::decoder::{Compiler, ScopeEntry};
-use crate::error::{LocDecodeError, DecodeError};
+use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
 use crate::{
     decoder::{Decoder, Program, Value},

@@ -32,14 +32,20 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             record([
                 ("id", base.u8()), // NOTE: should be distinct from all other ids in the repetition
                 ("sampling-factor", sampling_factor),
-                ("quantization-table-id", where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(3)))), // 0..=3 if DQT, 0 if lossless
+                (
+                    "quantization-table-id",
+                    where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(3))),
+                ), // 0..=3 if DQT, 0 if lossless
             ]),
         );
 
         module.define_format(
             "jpeg.sof-data",
             record([
-                ("sample-precision", where_between(base.u8(), Expr::U8(2), Expr::U8(16))), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
+                (
+                    "sample-precision",
+                    where_between(base.u8(), Expr::U8(2), Expr::U8(16)),
+                ), // 8 in Sequential DCT (extended allows 12), 8 or 12 in Progressive DCT, 2-16 lossless
                 ("num-lines", base.u16be()),
                 ("num-samples-per-line", where_nonzero_u16(base.u16be())),
                 ("num-image-components", where_nonzero_u8(base.u8())), // 1..=4 if progressive DCT, 1..=255 otherwise
@@ -90,11 +96,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         "entropy-coding-table-ids",
         and(
             expr_lte(
-                record_proj(var("entropy-coding-table-ids"), "dc-entropy-coding-table-id"),
+                record_proj(
+                    var("entropy-coding-table-ids"),
+                    "dc-entropy-coding-table-id",
+                ),
                 Expr::U8(3),
             ),
             expr_lte(
-                record_proj(var("entropy-coding-table-ids"), "ac-entropy-coding-table-id"),
+                record_proj(
+                    var("entropy-coding-table-ids"),
+                    "ac-entropy-coding-table-id",
+                ),
                 Expr::U8(3),
             ),
         ),
@@ -124,8 +136,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     "image-components",
                     repeat_count(var("num-image-components"), sos_image_component.call()),
                 ),
-                ("start-spectral-selection", where_between(base.u8(), Expr::U8(0), Expr::U8(63))), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
-                ("end-spectral-selection", where_between(base.u8(), Expr::U8(0), Expr::U8(63))), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
+                (
+                    "start-spectral-selection",
+                    where_between(base.u8(), Expr::U8(0), Expr::U8(63)),
+                ), // FIXME -  0 in sequential DCT, 0..=63 in progressive DCT, 1-7 in lossless but 0 for lossless differential frames in hierarchical mode
+                (
+                    "end-spectral-selection",
+                    where_between(base.u8(), Expr::U8(0), Expr::U8(63)),
+                ), // FIXME - 63 in sequential DCT, start..=63 in in progressive DCT (but 0 if start is 0), 0 in lossless (differential or otherwise)
                 ("approximation-bit-position", approximation_bit_position),
             ]),
         )
@@ -181,7 +199,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
     );
 
     // DNL: Define number of lines (See ITU T.81 Section B.2.5)
-    let dnl_data = module.define_format("jpeg.dnl-data", record([("num-lines", where_nonzero_u16(base.u16be()))]));
+    let dnl_data = module.define_format(
+        "jpeg.dnl-data",
+        record([("num-lines", where_nonzero_u16(base.u16be()))]),
+    );
 
     // DRI: Define restart interval (See ITU T.81 Section B.2.4.4)
     let dri_data = module.define_format(
@@ -210,7 +231,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                 ("sample-precision", base.u8()),
                 ("num-lines", base.u16be()),
                 ("num-samples-per-line", where_nonzero_u16(base.u16be())), // != 0
-                ("num-image-components", where_nonzero_u8(base.u8())), // != 0
+                ("num-image-components", where_nonzero_u8(base.u8())),     // != 0
                 (
                     "image-components",
                     repeat_count(var("num-image-components"), dhp_image_component.call()),
@@ -253,14 +274,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                     "density-units",
                     where_lambda(base.u8(), "x", expr_lte(var("x"), Expr::U8(2))),
                 ), // 0 | 1 | 2
-                (
-                    "density-x",
-                    where_nonzero_u16(base.u16be()),
-                ), // != 0
-                (
-                    "density-y",
-                    where_nonzero_u16(base.u16be()),
-                ), // != 0
+                ("density-x", where_nonzero_u16(base.u16be())), // != 0
+                ("density-y", where_nonzero_u16(base.u16be())), // != 0
                 ("thumbnail-width", base.u8()),
                 ("thumbnail-height", base.u8()),
                 (

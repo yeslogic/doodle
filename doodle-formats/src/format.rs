@@ -15,6 +15,7 @@ mod riff;
 mod tar;
 mod text;
 mod tiff;
+mod waldo;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
@@ -30,6 +31,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let png = png::main(module, deflate, text, utf8nz, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
+    let waldo = waldo::main(module, &base);
 
     module.define_format(
         "main",
@@ -37,6 +39,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
             (
                 "data",
                 union_nondet(vec![
+                    ("waldo", waldo.call()),
                     ("peano", peano.call()),
                     ("gif", gif.call()),
                     ("gzip", gzip.call()),
