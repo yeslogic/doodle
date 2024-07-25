@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::mem::size_of;
 
 use crate::format::BaseModule;
@@ -190,6 +191,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         )
     );
 
+    let vt_addr = ValueType::Union(
+        BTreeMap::from(
+            [ ( Label::Borrowed("Addr32"), ValueType::Base(BaseType::U32)),
+              ( Label::Borrowed("Addr64"), ValueType::Base(BaseType::U64)) ]
+        )
+    );
+
     let elf_off = module.define_format_args("elf.types.elf-off",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
@@ -198,9 +206,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         match_variant(
             var("is_64"),
             vec![
-                (Pattern::U8(ELF_CLASS_32), "Addr32", elf32_off_endian.call_args(vec![var("is_be")])), // 32-bit offset
-                (Pattern::U8(ELF_CLASS_64), "Addr64", elf64_off_endian.call_args(vec![var("is_be")])), // 64-bit foffset
+                (Pattern::U8(ELF_CLASS_32), "Off32", elf32_off_endian.call_args(vec![var("is_be")])), // 32-bit offset
+                (Pattern::U8(ELF_CLASS_64), "Off64", elf64_off_endian.call_args(vec![var("is_be")])), // 64-bit foffset
             ]
+        )
+    );
+
+    let vt_off = ValueType::Union(
+        BTreeMap::from(
+            [ ( Label::Borrowed("Off32"), ValueType::Base(BaseType::U32)),
+              ( Label::Borrowed("Off64"), ValueType::Base(BaseType::U64)) ]
         )
     );
 
@@ -243,23 +258,56 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     // SECTION - Section Header Type
 
-    const SHT_NULL: u32 = 0;
-    const SHT_PROGBITS: u32 = 1;
-    const SHT_SYMTAB: u32 = 2;
+    const SHT_NULL: u32 = 0; // no associated section
+    const SHT_PROGBITS: u32 = 1; // program-specific data
+    const SHT_SYMTAB: u32 = 2; // symbols for link editing (multiple disallowed)
+    const SHT_STRTAB: u32 = 3; // string table
+    const SHT_RELA: u32 =  4; // relocation entries with addends (multiple allowed)
+    const SHT_HASH: u32 = 5; // symbol hash table (multiple disallowed)
+    const SHT_DYNAMIC: u32 = 6; // information for dynamic linking (multiple disallowed)
+    const SHT_NOTE: u32 = 7; // notes section
+    const SHT_NOBITS: u32 = 8; // like PROGBITS, but occupying no space in the file (sh_offset indicates conceptual file offset)
+    const SHT_REL: u32 = 9; // relocation entries (multiple allowed)
+    const SHT_SHLIB: u32 = 10; // reserved, unspecified semantics
+    const SHT_DYNSYM: u32 = 11; // symbol hash table (multiple disallowed)
+    // NOTE - range-gap for [12,13]
+    const SHT_INIT_ARRAY: u32 = 14; // array of pointers to initialization functions
+    const SHT_FINI_ARRAY: u32 = 15; // array of pointers to termination functions
+    const SHT_PREINIT_ARRAY: u32 = 16; // array of pointers to pre-initialization functions
+    const SHT_GROUP: u32 = 17; // section group (may only appear in ET_REL ELF files, and must precede all other entries of the given group)
+    const SHT_SYMTAB_SHNDX: u32 = 18; // Extended section-header indexes associated with an SHT_SYMTAB section, indicating a symbol table entry (and occurring in the same order)
+
+    // NOTE - the following constants are range endpoints and not implicit singletons
+    const SHT_LOOS: u32 = 0x60000000; // OS-specific range (lower bounds)
+    const SHT_HIOS: u32 = 0x6fffffff; // OS-specific range (upper bounds)
+
+    const SHT_LOPROC: u32 = 0x70000000; // processor-specific range (lower bounds)
+    const SHT_HIPROC: u32 = 0x7fffffff; // processor-specific range (upper bounds)
+
+    const SHT_LOUSER: u32 = 0x80000000; // application-specific range (lower bounds)
+    const SHT_HIUSER: u32 = 0xffffffff; // application-specific range (upper bounds)
 
     // Section Header Type
-    /* Values:
-     * SHT_NULL = 0 : no associated section
-     * SHT_PROGBITS = 1 : program-specific data
-     * SHT_SYMTAB = 2 : symbols for link editing (only one such table allowed, currently)
-     * SHT_STRTAB = 3 : string table
-     * SHT_RELA = 4 : relocation entries with addends (multiple allowed)
-     * SHT_HASH = 5 : symbol hash table (only one such table allowed, currently)
-     */
-    // FIXME -
-    let elf_sh_type = elf_word_endian;
+    let elf_sh_type = module.define_format_args(
+        "elf.shdr.sh-type",
+        vec![ISBE_ARG],
+        where_lambda(
+            elf_word_endian.call_args(vec![var("is_be")]),
+            "sh-type",
+            expr_match(
+                var("sh-type"),
+                [
+                    // values in range SHT_NULL..=SHT_DYNSYM (or 0..=11)
+                    (Pattern::Int(Bounds::new(SHT_NULL as usize, SHT_DYNSYM as usize)), Expr::Bool(true)),
+                    (Pattern::Int(Bounds::new(SHT_INIT_ARRAY as usize, SHT_SYMTAB_SHNDX as usize)), Expr::Bool(true)),
+                    (Pattern::Int(Bounds::new(SHT_LOOS as usize, SHT_HIUSER as usize)), Expr::Bool(true)),
+                    (Pattern::Wildcard, Expr::Bool(false)),
+                ]
+            )
+        )
+    );
 
-    // !SECTIOn
+    // !SECTION
 
     /* Section Header Flags - 1-bit flags in ELF-file specific byte-order and bit-class
      *
@@ -280,30 +328,104 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // FIXME - for now, using an uninterpreted, raw full-width uint for section-header flags...
     let elf_sh_flags = elf_full_endian;
 
+    /* `sh_info` field of shdr
+     *
+     * Interpretation and semantics depend on the elf_sh_type value:
+     *  - SHT_REL[A]  => section header index for section to which relocation applies
+     *  - SHT_SYMTAB,
+     *    SHT_DYNSYM  => one more than the symbol table index of last local symbol (STB_LOCAL binding)
+     *  - SHT_GROUP   => symbol table index of entry in associated symbol table
+     *  - SHT_SYMTAB_SHNDX => 0
+     *  - SHT_DYNAMIC => 0
+     *  - SHT_HASH    => 0
+     */
+    let elf_sh_info = module.define_format_args(
+        "elf.shdr.sh-info",
+        vec![ISBE_ARG],
+        elf_word_endian.call_args(vec![var("is_be")]),
+    );
+
+
     // Elf Section Header
     let elf_shdr = module.define_format_args("elf.shdr",
         vec![ ISBE_ARG, CLASS_ARG ],
         record([
             ("name", elf_word_endian.call_args(vec![var("is_be")])), // specifier for the section-name, given as an index into the string-header section table
-            ("type", elf_sh_type.call_args(vec![var("is_be"), var("class")])), // section type, which dictates its contents and semantics
+            ("type", elf_sh_type.call_args(vec![var("is_be")])), // section type, which dictates its contents and semantics
             ("flags", elf_sh_flags.call_args(vec![var("is_be"), var("class")])), // sequence of 1-bit flags dictating various attributes
             ("addr", elf_addr.call_args(vec![var("is_be"), var("class")])), // virtual address of (the first byte of) this section in memory, when it will appear in the memory image of the process during execution (0 otherwise)
             ("offset", elf_off.call_args(vec![var("is_be"), var("class")])), // file-offset of the first byte in this section
+            ("size", elf_full_endian.call_args(vec![var("is_be"), var("class")])), // number of bytes in this section
+            ("link", elf_word_endian.call_args(vec![var("is_be")])), // section header table index link (depends on section type)
+            ("info", elf_sh_info.call_args(vec![var("is_be")])), // extra information that the section type dictates the interpretation of
+            ("addralign", elf_full_endian.call_args(vec![var("is_be"), var("class")])), // section alignment
+            ("entsize", elf_full_endian.call_args(vec![var("is_be"), var("class")])), // section entry size
         ])
     );
 
     // FIXME - if the number of sections is large enough, a 0 will be recorded in header.shnum and the number of headers will be indicated by the first header
     // REVIEW - this is not correct for all cases
     let elf_shdr_table = module.define_format_args("elf.shdr-table",
-        vec![ISBE_ARG, CLASS_ARG],
-        repeat_count(record_proj(var("header"), "shnum"), elf_shdr.call_args(vec![var("is_be"), var("class")]))
+        vec![ISBE_ARG, CLASS_ARG, (Label::Borrowed("shnum"), ValueType::Base(BaseType::U32))],
+        repeat_count(var("shnum"), elf_shdr.call_args(vec![var("is_be"), var("class")]))
     );
 
+    // Program Header Flags (32-bit and 64-bit)
+
+    // 64-bit selective Option
+    let elf_ph_flags64 = module.define_format_args("elf.phdr.p-flags64", vec![ISBE_ARG, CLASS_ARG],
+        cond_maybe(expr_eq(var("class"), Expr::U8(ELF_CLASS_64)), elf_word_endian.call_args(vec![var("is_be")]))
+    );
+
+    // 32-bit selective Option
+    let elf_ph_flags32 = module.define_format_args("elf.phdr.p-flags32", vec![ISBE_ARG, CLASS_ARG],
+        cond_maybe(expr_eq(var("class"), Expr::U8(ELF_CLASS_32)), elf_word_endian.call_args(vec![var("is_be")]))
+    );
+
+    let elf_phdr = module.define_format_args("elf.phdr",
+        vec![ISBE_ARG, CLASS_ARG],
+        record([
+            ("type", elf_word_endian.call_args(vec![var("is_be")])),
+            ("flags64", elf_ph_flags64.call_args(vec![var("is_be"), var("class")])),
+            ("offset", elf_off.call_args(vec![var("is_be"), var("class")])),
+            ("vaddr", elf_addr.call_args(vec![var("is_be"), var("class")])),
+            ("paddr", elf_addr.call_args(vec![var("is_be"), var("class")])),
+            ("filesz", elf_full_endian.call_args(vec![var("is_be"), var("class")])),
+            ("memsz", elf_full_endian.call_args(vec![var("is_be"), var("class")])),
+            ("flags32", elf_ph_flags32.call_args(vec![var("is_be"), var("class")])),
+            ("align", elf_full_endian.call_args(vec![var("is_be"), var("class")])),
+        ])
+    );
+
+    let elf_phdr_table = module.define_format_args("elf.phdr-table",
+        vec![ISBE_ARG, CLASS_ARG, (Label::Borrowed("phnum"), ValueType::Base(BaseType::U32))],
+        repeat_count(var("phnum"), elf_phdr.call_args(vec![var("is_be"), var("class")]))
+    );
+
+    let elf_section = module.define_format_args("elf.section",
+        vec![
+            (Label::Borrowed("type"), ValueType::Base(BaseType::U32)),
+            (Label::Borrowed("offset"), vt_off.clone()),
+            (Label::Borrowed("size"), ValueType::Base(BaseType::U32)),
+        ],
+        // FIXME - we can refine this a lot more based on the type passed in
+        repeat_count(var("size"), base.u8())
+    );
+
+    // FIXME - `elf_section` takes extra arguments so this definition is inherently broken
+    let elf_sections =
+    module.define_format_args(
+        "elf.sections",
+        vec![ISBE_ARG, CLASS_ARG],
+        repeat(elf_section.call_args(vec![var("is_be"), var("class")]))
+    );
 
     module.define_format("elf.main",
         record([
             ("header", elf_header.call()),
-            ("section_headers", elf_shdr_table.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"])])),
+            ("program_headers", elf_phdr_table.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"]), record_proj(var("header"), "phnum")])),
+            ("section_headers", elf_shdr_table.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"]), record_proj(var("header"), "shnum")])),
+            ("sections", elf_sections.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"])])),
             // TODO - add segments and section header table
         ])
     )
