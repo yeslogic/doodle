@@ -124,6 +124,7 @@ fn check_covered(
         }
         Format::Fail => {}
         Format::EndOfInput => {}
+        Format::Pos => {},
         Format::Align(_) => {}
         Format::Byte(_) => {
             return Err(format!("uncovered byte: {:?}", path));
@@ -212,6 +213,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             Format::Fail => Ok(()),
             Format::EndOfInput => Ok(()),
             Format::Align(_) => Ok(()),
+            Format::Pos => Ok(()),
             Format::Byte(_) => Ok(()),
             Format::Variant(label, format) => match value {
                 Value::Variant(label2, value) => {

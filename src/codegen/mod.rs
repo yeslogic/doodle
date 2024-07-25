@@ -265,6 +265,7 @@ impl CodeGen {
             TypedDecoder::Fail => CaseLogic::Simple(SimpleLogic::Fail),
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
+            TypedDecoder::Pos => CaseLogic::Simple(SimpleLogic::YieldCurrentOffset),
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
@@ -1302,6 +1303,15 @@ impl SimpleLogic<GTExpr> {
                         .wrap_try(),
                 ),
             ),
+            SimpleLogic::YieldCurrentOffset => {
+                (
+                    Vec::new(),
+                    Some(
+                        RustExpr::local(ctxt.input_varname.clone())
+                            .call_method("get_offset_u64")
+                    )
+                )
+            }
             SimpleLogic::ByteIn(bs) => {
                 let call = RustExpr::local(ctxt.input_varname.clone())
                     .call_method("read_byte")
@@ -2289,6 +2299,7 @@ enum SimpleLogic<ExprT> {
     ByteIn(ByteSet),
     Eval(RustExpr),
     CallDynamic(Label),
+    YieldCurrentOffset,
 }
 
 /// Cases that recurse into other case-logic only once
@@ -2780,6 +2791,10 @@ impl<'a> Elaborator<'a> {
             Format::Align(n) => {
                 self.increment_index();
                 GTFormat::Align(*n)
+            }
+            Format::Pos => {
+                self.increment_index();
+                GTFormat::Pos
             }
             Format::Byte(bs) => {
                 self.increment_index();

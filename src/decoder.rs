@@ -601,6 +601,7 @@ impl Expr {
 #[derive(Clone, Debug)]
 pub enum Decoder {
     Call(usize, Vec<(Label, Expr)>),
+    Pos,
     Fail,
     EndOfInput,
     Align(usize),
@@ -719,6 +720,7 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Call(n, args))
             }
             Format::Fail => Ok(Decoder::Fail),
+            Format::Pos => Ok(Decoder::Pos),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Align(n) => Ok(Decoder::Align(*n)),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
@@ -1100,6 +1102,10 @@ impl Decoder {
                     .parse(program, &Scope::Multi(&new_scope), input)
             }
             Decoder::Fail => Err(DecodeError::<Value>::fail(scope, input)),
+            Decoder::Pos => {
+                let pos = input.offset as u64;
+                Ok((Value::U64(pos), input))
+            }
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok((Value::UNIT, input)),
                 Some((b, _)) => Err(DecodeError::trailing(b, input.offset)),

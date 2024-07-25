@@ -17,6 +17,7 @@
 │       │   ├── fname <- maybe (header.file-flags.fname != 0) gzip.fname :=
 some "test1"
 │       │   ├── fcomment <- maybe (header.file-flags.fcomment != 0) gzip.fcomment := none
+│       │   ├── fhcrc <- maybe (header.file-flags.fhcrc != 0) gzip.fhcrc := none
 │       │   ├── data <- bits deflate.main :=
 │       │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │       │   │   │   └── 0 <- deflate.block :=
@@ -118,6 +119,7 @@ some "test1"
 │           ├── fname <- maybe (header.file-flags.fname != 0) gzip.fname :=
 some "test2"
 │           ├── fcomment <- maybe (header.file-flags.fcomment != 0) gzip.fcomment := none
+│           ├── fhcrc <- maybe (header.file-flags.fhcrc != 0) gzip.fhcrc := none
 │           ├── data <- bits deflate.main :=
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=

@@ -292,6 +292,8 @@ impl<'module> MonoidalPrinter<'module> {
             Format::EndOfInput => self.compile_parsed_value(value),
             Format::Align(_) => self.compile_parsed_value(value),
             Format::Byte(_) => self.compile_parsed_value(value),
+            // NOTE : Pos self-documents its position so we don't really need to annotate that...
+            Format::Pos => self.compile_value(value.into_cow_value().as_ref()),
             Format::Variant(label, format) => match value {
                 ParsedValue::Variant(label2, value) => {
                     if label == label2 {
@@ -421,6 +423,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::EndOfInput => self.compile_value(value),
             Format::Align(_) => self.compile_value(value),
             Format::Byte(_) => self.compile_value(value),
+            Format::Pos => self.compile_value(value),
             Format::Variant(label, format) => match value {
                 Value::Variant(label2, value) => {
                     if label == label2 {
@@ -1793,8 +1796,9 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 frag
             }
-            Format::Fail => Fragment::String("fail".into()),
-            Format::EndOfInput => Fragment::String("end-of-input".into()),
+            Format::Fail => Fragment::string("fail"),
+            Format::EndOfInput => Fragment::string("end-of-input"),
+            Format::Pos => Fragment::string("pos"),
             Format::Align(n) => Fragment::String(format!("align {n}").into()),
 
             Format::Byte(bs) => match bs.len() {

@@ -98,6 +98,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     Apply(TypeRep, Label),
     Maybe(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    Pos,
 }
 
 #[derive(Clone, Debug)]
@@ -418,6 +419,7 @@ impl<'a> GTCompiler<'a> {
                 Ok(TypedDecoder::Where(gt.clone(), da, expr.clone()))
             }
             GTFormat::Compute(gt, expr) => Ok(TypedDecoder::Compute(gt.clone(), expr.clone())),
+            GTFormat::Pos => Ok(TypedDecoder::Pos),
             GTFormat::Let(gt, name, expr, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next.clone())?);
                 Ok(TypedDecoder::Let(
