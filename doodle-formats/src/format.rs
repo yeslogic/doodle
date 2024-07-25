@@ -16,6 +16,7 @@ mod tar;
 mod text;
 mod tiff;
 mod waldo;
+mod elf;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
