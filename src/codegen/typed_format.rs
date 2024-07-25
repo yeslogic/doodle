@@ -53,7 +53,7 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 level.hash(state);
                 args.hash(state);
             }
-            TypedFormat::Fail | TypedFormat::EndOfInput => {}
+            TypedFormat::Pos | TypedFormat::Fail | TypedFormat::EndOfInput => {}
             TypedFormat::Align(n) => n.hash(state),
             TypedFormat::Byte(bs) => bs.hash(state),
             TypedFormat::Variant(_tr, lbl, inner) => {
@@ -175,6 +175,7 @@ pub enum TypedFormat<TypeRep> {
         Box<TypedFormat<TypeRep>>,
     ),
     Apply(TypeRep, Label, Rc<TypedDynFormat<TypeRep>>),
+    Pos,
 }
 
 impl TypedFormat<GenType> {
@@ -184,7 +185,7 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
 
-            TypedFormat::Compute(_, _) | TypedFormat::EndOfInput | TypedFormat::Fail => {
+            TypedFormat::Pos | TypedFormat::Compute(_, _) | TypedFormat::EndOfInput | TypedFormat::Fail => {
                 Bounds::exact(0)
             }
 
@@ -254,6 +255,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Peek(_, _)
             | TypedFormat::PeekNot(_, _)
             | TypedFormat::EndOfInput
+            | TypedFormat::Pos
             | TypedFormat::Fail => Bounds::exact(0),
 
             TypedFormat::Align(n) => Bounds::new(0, n - 1),
@@ -331,6 +333,8 @@ impl TypedFormat<GenType> {
                 Some(Cow::Owned(GenType::from(RustType::UNIT)))
             }
             TypedFormat::Byte(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
+            // REVIEW - forcing Pos to be a U64-valued format
+            TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
 
             TypedFormat::FormatCall(gt, ..)
             | TypedFormat::Variant(gt, ..)
@@ -752,6 +756,7 @@ mod __impls {
                         .collect();
                     Format::ItemVar(level, args)
                 }
+                TypedFormat::Pos => Format::Pos,
                 TypedFormat::Fail => Format::Fail,
                 TypedFormat::EndOfInput => Format::EndOfInput,
                 TypedFormat::Align(n) => Format::Align(n),

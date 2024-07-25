@@ -700,6 +700,8 @@ pub enum Format {
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
     Apply(Label),
+    /// Current byte-offset relative to start-of-buffer (as a U64(?))
+    Pos,
 }
 
 impl Format {
@@ -765,7 +767,7 @@ impl Format {
             Format::WithRelativeOffset(_, _) => Bounds::exact(0),
             Format::Map(f, _expr) => f.match_bounds(module),
             Format::Where(f, _expr) => f.match_bounds(module),
-            Format::Compute(_) => Bounds::exact(0),
+            Format::Compute(_) | Format::Pos => Bounds::exact(0),
             Format::Let(_name, _expr, f) => f.match_bounds(module),
             Format::Match(_, branches) => branches
                 .iter()
@@ -818,7 +820,7 @@ impl Format {
             Format::WithRelativeOffset(expr, f) => expr.bounds() + f.lookahead_bounds(module),
             Format::Map(f, _expr) => f.lookahead_bounds(module),
             Format::Where(f, _expr) => f.lookahead_bounds(module),
-            Format::Compute(_) => Bounds::exact(0),
+            Format::Compute(_) | Format::Pos => Bounds::exact(0),
             Format::Let(_name, _expr, f) => f.lookahead_bounds(module),
             Format::Match(_, branches) => branches
                 .iter()
@@ -863,7 +865,7 @@ impl Format {
             Format::WithRelativeOffset(..) => false,
             Format::Map(f, _expr) => f.depends_on_next(module),
             Format::Where(f, _expr) => f.depends_on_next(module),
-            Format::Compute(..) => false,
+            Format::Compute(..) | Format::Pos => false,
             Format::Let(_name, _expr, f) => f.depends_on_next(module),
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
@@ -1156,6 +1158,8 @@ impl FormatModule {
                 ValueKind::Format(t) => Ok(t.clone()),
                 ValueKind::Value(t) => Err(anyhow!("Apply: expected format, found {t:?}")),
             },
+            // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
+            Format::Pos => Ok(ValueType::Base(BaseType::U64)),
         }
     }
 }
@@ -1779,6 +1783,7 @@ impl<'a> MatchTreeStep<'a> {
                 Self::from_gt_format(module, f, next)
             }
             TypedFormat::Compute(_, _expr) => Self::from_next(module, next),
+            TypedFormat::Pos => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {
                 let mut tree = Self::reject();
@@ -1919,6 +1924,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Map(f, _expr) => Self::from_format(module, f, next),
             Format::Where(f, _expr) => Self::from_format(module, f, next),
+            Format::Pos => Self::from_next(module, next),
             Format::Compute(_expr) => Self::from_next(module, next),
             Format::Let(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Match(_, branches) => {

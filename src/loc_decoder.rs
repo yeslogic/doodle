@@ -1144,6 +1144,10 @@ impl Decoder {
                     .ok_or(DecodeError::overrun(skip, input.offset))?;
                 Ok((ParsedValue::unit_spanning(start_offset, skip), input))
             }
+            Decoder::Pos => {
+                let pos = input.offset as u64;
+                Ok((ParsedValue::from_evaluated(Value::U64(pos)), input))
+            }
             Decoder::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()

@@ -2565,6 +2565,8 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, uv_dynf)?;
                 Ok(newvar)
             }
+            // REVIEW - currently forcing Pos to be U64
+            Format::Pos => Ok(self.init_var_simple(UType::Base(BaseType::U64))?.0),
         }
     }
 

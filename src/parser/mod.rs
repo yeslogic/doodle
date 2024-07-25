@@ -259,4 +259,20 @@ impl<'a> Parser<'a> {
     pub fn get_current_offset(&self) -> ByteOffset {
         self.offset.get_current_offset()
     }
+
+    /// Returns a `u64`-valued byte-offset equivalent to the stored `ByteOffset`, for
+    /// use in association with [`Format::Pos`].
+    ///
+    /// # Panics
+    ///
+    /// As currently defined, will panic if we are in bits-mode.
+    pub fn get_offset_u64(&self) -> u64 {
+        match self.get_current_offset() {
+            ByteOffset::Bytes(n) => n as u64,
+            ByteOffset::Bits { .. } => {
+                // FIXME - this panic should perhaps be eliminated if possible
+                unreachable!("no unequivocal way to compute a byte-offset while in bits-mode");
+            }
+        }
+    }
 }
