@@ -150,12 +150,18 @@ impl ByteOffset {
 
 impl PartialOrd for ByteOffset {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let partial = self.abs_bit_offset().cmp(&other.abs_bit_offset());
+        let (n1, o1) = self.as_bytes();
+        let (n2, o2) = other.as_bytes();
+        let partial = n1.cmp(&n2);
         match partial {
-            // yield None instead of Some(Equal) if same bit-level offset but different modes
-            Ordering::Equal if self.is_bit_mode() ^ other.is_bit_mode() => None,
+            Ordering::Equal => match (o1, o2) {
+                (None, None) => Some(Ordering::Equal),
+                (Some(m1), Some(m2)) => Some(m1.cmp(&m2)),
+                _ => None,
+            }
             _ => Some(partial),
         }
+
     }
 }
 

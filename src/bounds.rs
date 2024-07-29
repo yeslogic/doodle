@@ -175,12 +175,19 @@ impl Bounds {
         }
     }
 
-    /// Finds the largest possible value of `x & m` for `x` in the bounds of `self`.
-    fn best_mask(&self, m: usize) -> usize {
+    /// Finds the pair `(x, m)` that yields the maximal `x & m` for `x` in the bounds of `self`.
+    ///
+    /// May fudge the value of `x` to an out-of-range value to shortcut the computation of `x & m`
+    /// over all in-range values, with the guarantee that the resulting bitwise-and will be no less
+    /// than the true maximum of `y & m` for actually-in-range `y`.
+    fn best_mask(&self, m: usize) -> (usize, usize) {
         if self.contains(m) {
-            m
+            (m, m)
         } else {
-            self.max.map_or(m, |n| mask(n) & m)
+            match self.max {
+                Some(n) => (mask(n), m),
+                _ => (m, m)
+            }
         }
     }
 }
@@ -323,18 +330,32 @@ impl BitAnd<Bounds> for Bounds {
             min: (k1 & k2),
             max: match (lo_self.max, lo_rhs.max) {
                 (Some(m1), Some(m2)) => Some(
-                    (k1 & k2)
-                        | match (lo_self.min == m1, lo_rhs.min == m2) {
-                            (true, true) => m1 & m2,
-                            (true, false) => lo_rhs.best_mask(m1),
-                            (false, true) => lo_self.best_mask(m2),
-                            (false, false) => mask(m1) & mask(m2),
+                    match (lo_self.min == m1, lo_rhs.min == m2) {
+                            (true, true) => blend_bits(k1, k2, m1, m2),
+                            (true, false) => {
+                                // NOTE - the order of x2 and m in blend_bits matters
+                                let (x2, m) = lo_rhs.best_mask(m1);
+                                blend_bits(k1, k2, m, x2)
+                            }
+                            (false, true) => {
+                                // NOTE - the order of x1 and m in blend_bits matters
+                                let (x1, m) = lo_self.best_mask(m2);
+                                blend_bits(k1, k2, x1, m)
+                            }
+                            (false, false) => blend_bits(k1, k2, mask(m1), mask(m2)),
                         },
                 ),
                 _ => None,
             },
         }
     }
+}
+
+/// Blends the bits of two bit-prefixes along with the remaining bits of the sub-ranges they correspond to.
+///
+/// The argument order matters as the presumed-zero terms `k1 & m1` and `k2 & m2` are omitted from the computation
+fn blend_bits(k1: usize, k2: usize, m1: usize, m2: usize) -> usize {
+    (k1 & k2) | (m1 & m2) | (k1 & m2) | (m1 & k2)
 }
 
 fn mask(x: usize) -> usize {
