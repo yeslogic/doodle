@@ -86,18 +86,20 @@ mod jpeg {
     }
 }
 
-
 #[test]
 fn test_decoder_waldo() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.waldo")))?;
     let mut input = Parser::new(&buffer);
     let parsed_data = Decoder1(&mut input)?.data;
     match parsed_data {
-        Top::waldo(x) => println!("Waldo: Found at offset {} (noise length: {})", x.r#where, x.noise.len()),
+        Top::waldo(x) => println!(
+            "Waldo: Found at offset {} (noise length: {})",
+            x.r#where,
+            x.noise.len()
+        ),
         other => unreachable!("expected waldo, found {other:?}"),
     }
     Ok(())
-
 }
 
 #[test]

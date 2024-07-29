@@ -158,10 +158,9 @@ impl PartialOrd for ByteOffset {
                 (None, None) => Some(Ordering::Equal),
                 (Some(m1), Some(m2)) => Some(m1.cmp(&m2)),
                 _ => None,
-            }
+            },
             _ => Some(partial),
         }
-
     }
 }
 
