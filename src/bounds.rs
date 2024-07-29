@@ -186,7 +186,7 @@ impl Bounds {
         } else {
             match self.max {
                 Some(n) => (mask(n), m),
-                _ => (m, m)
+                _ => (m, m),
             }
         }
     }
@@ -329,22 +329,20 @@ impl BitAnd<Bounds> for Bounds {
         Bounds {
             min: (k1 & k2),
             max: match (lo_self.max, lo_rhs.max) {
-                (Some(m1), Some(m2)) => Some(
-                    match (lo_self.min == m1, lo_rhs.min == m2) {
-                            (true, true) => blend_bits(k1, k2, m1, m2),
-                            (true, false) => {
-                                // NOTE - the order of x2 and m in blend_bits matters
-                                let (x2, m) = lo_rhs.best_mask(m1);
-                                blend_bits(k1, k2, m, x2)
-                            }
-                            (false, true) => {
-                                // NOTE - the order of x1 and m in blend_bits matters
-                                let (x1, m) = lo_self.best_mask(m2);
-                                blend_bits(k1, k2, x1, m)
-                            }
-                            (false, false) => blend_bits(k1, k2, mask(m1), mask(m2)),
-                        },
-                ),
+                (Some(m1), Some(m2)) => Some(match (lo_self.min == m1, lo_rhs.min == m2) {
+                    (true, true) => blend_bits(k1, k2, m1, m2),
+                    (true, false) => {
+                        // NOTE - the order of x2 and m in blend_bits matters
+                        let (x2, m) = lo_rhs.best_mask(m1);
+                        blend_bits(k1, k2, m, x2)
+                    }
+                    (false, true) => {
+                        // NOTE - the order of x1 and m in blend_bits matters
+                        let (x1, m) = lo_self.best_mask(m2);
+                        blend_bits(k1, k2, x1, m)
+                    }
+                    (false, false) => blend_bits(k1, k2, mask(m1), mask(m2)),
+                }),
                 _ => None,
             },
         }

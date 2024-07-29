@@ -32,7 +32,8 @@ impl<'a> Parser<'a> {
     /// is `u32`, as that is much more commonly used in `Format` and `Expr` internally
     /// than `usize`, which would be the natural type for this parameter.
     pub fn advance_by<N>(&mut self, offset: N) -> Result<(), ParseError>
-    where N: TryInto<usize, Error: std::fmt::Debug>
+    where
+        N: TryInto<usize, Error: std::fmt::Debug>,
     {
         let delta = offset.try_into().unwrap();
         self.offset.try_increment(delta)?;
