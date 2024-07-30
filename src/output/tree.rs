@@ -329,6 +329,7 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::Repeat(format)
             | Format::Repeat1(format)
+            | Format::ForEach(_, _, format)
             | Format::RepeatCount(_, format)
             | Format::RepeatBetween(_, _, format)
             | Format::RepeatUntilLast(_, format)
@@ -459,6 +460,7 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::Repeat(format)
             | Format::Repeat1(format)
+            | Format::ForEach(_, _, format)
             | Format::RepeatCount(_, format)
             | Format::RepeatBetween(_, _, format)
             | Format::RepeatUntilLast(_, format)
@@ -1681,6 +1683,19 @@ impl<'module> MonoidalPrinter<'module> {
                     self.compile_nested_format(
                         "repeat-until-seq",
                         Some(&[expr_frag]),
+                        format,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::ForEach(expr, lbl, format) => {
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "for-each",
+                        Some(&[expr_frag, Fragment::String(lbl.clone())]),
                         format,
                         prec,
                     ),

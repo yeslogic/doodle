@@ -428,7 +428,11 @@ impl CodeGen {
                         Box::new(self.translate(single.get_dec()))
                     )
                 ),
-
+            TypedDecoder::ForEach(_gt, expr, lbl, single) => {
+                // FIXME - do we need to ensure this is cloned?
+                let cl_expr = embed_expr(expr, ExprInfo::EmbedCloned);
+                CaseLogic::Repeat(RepeatLogic::ForEach(cl_expr, lbl.clone(), Box::new(self.translate(single.get_dec()))))
+            }
             TypedDecoder::RepeatCount(_gt, expr_count, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ExactCount(
@@ -1777,6 +1781,8 @@ enum RepeatLogic<ExprT> {
     ConditionTerminal(RustExpr, Box<CaseLogic<ExprT>>),
     /// Repetition stops after a predicate for 'complete sequence' is satisfied (post-append)
     ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>),
+    /// Lifts an Expr to a sequence of parameters to apply to a format, once per element
+    ForEach(RustExpr, Label, Box<CaseLogic<ExprT>>),
 }
 
 pub(crate) trait ToAst {
@@ -1938,6 +1944,29 @@ where
                     ))
                 };
                 stmts.push(ctrl);
+                (stmts, Some(RustExpr::local("accum")))
+            }
+            RepeatLogic::ForEach(seq, lbl, inner) => {
+                let mut stmts = Vec::new();
+
+                let inner_expr = inner.to_ast(ctxt).into();
+
+                stmts.push(RustStmt::Let(
+                    Mut::Mutable,
+                    Label::from("accum"),
+                    None,
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
+
+                let body = vec![RustStmt::Expr(
+                    RustExpr::local("accum").call_method_with("push", [inner_expr]),
+                )];
+                stmts.push(RustStmt::Control(RustControl::ForIter(
+                    lbl.clone(),
+                    seq.clone(),
+                    body,
+                )));
+
                 (stmts, Some(RustExpr::local("accum")))
             }
             RepeatLogic::ExactCount(expr_n, elt) => {
@@ -2774,6 +2803,14 @@ impl<'a> Elaborator<'a> {
                 };
                 let gt = self.get_gt_from_index(index);
                 GTFormat::FormatCall(gt, *level, t_args, t_inner)
+            }
+            Format::ForEach(expr, lbl, inner) => {
+                let index = self.get_and_increment_index();
+                let t_expr = self.elaborate_expr(expr);
+                self.increment_index();
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                GTFormat::ForEach(gt, t_expr, lbl.clone(), Box::new(t_inner))
             }
             Format::Fail => {
                 self.increment_index();

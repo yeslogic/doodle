@@ -99,6 +99,12 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Apply(TypeRep, Label),
     Maybe(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
     Pos,
+    ForEach(
+        TypeRep,
+        TypedExpr<TypeRep>,
+        Label,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -215,6 +221,15 @@ impl<'a> GTCompiler<'a> {
                 };
 
                 Ok(TypedDecoder::Call(gt.clone(), n, this_args))
+            }
+            GTFormat::ForEach(gt, expr, lbl, f) => {
+                let da = Box::new(self.compile_gt_format(f, None, next)?);
+                Ok(TypedDecoder::ForEach(
+                    gt.clone(),
+                    expr.clone(),
+                    lbl.clone(),
+                    da,
+                ))
             }
             GTFormat::Fail => Ok(TypedDecoder::Fail),
             GTFormat::EndOfInput => Ok(TypedDecoder::EndOfInput),

@@ -2378,6 +2378,17 @@ impl TypeChecker {
                 self.unify_var_pair(newvar, level_var)?;
                 Ok(newvar)
             }
+            Format::ForEach(expr, lbl, inner) => {
+                let newvar = self.get_new_uvar();
+                let v_expr = self.infer_var_expr(expr, ctxt.scope)?;
+                let v_elem = self.get_new_uvar();
+                self.unify_var_proj_elem(v_expr, v_elem)?;
+                let newscope = UScope::Single(USingleScope::new(ctxt.scope, lbl, v_elem));
+                let newctxt = ctxt.with_scope(&newscope);
+                let t_inner = self.infer_utype_format(inner.as_ref(), newctxt)?;
+                self.unify_var_utype(newvar, Rc::new(UType::Seq(t_inner)))?;
+                Ok(newvar)
+            }
             Format::Fail => Ok(self.init_var_simple(UType::Empty)?.0),
             Format::EndOfInput | Format::Align(_) => Ok(self.init_var_simple(UType::UNIT)?.0),
             Format::Byte(_set) => {

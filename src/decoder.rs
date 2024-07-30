@@ -115,7 +115,7 @@ impl Value {
         }
     }
 
-    fn get_sequence(&self) -> Option<&Vec<Self>> {
+    pub(crate) fn get_sequence(&self) -> Option<&Vec<Self>> {
         match self {
             Value::Seq(elts) => Some(elts),
             _ => None,
@@ -630,6 +630,7 @@ pub enum Decoder {
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
     RepeatBetween(MatchTree, Expr, Expr, Box<Decoder>),
+    ForEach(Expr, Label, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
@@ -854,6 +855,11 @@ impl<'a> Compiler<'a> {
                 // FIXME probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilLast(expr.clone(), da))
+            }
+            Format::ForEach(expr, lbl, a) => {
+                // FIXME probably not right
+                let da = Box::new(self.compile_format(a, next)?);
+                Ok(Decoder::ForEach(expr.clone(), lbl.clone(), da))
             }
             Format::RepeatUntilSeq(expr, a) => {
                 // FIXME probably not right
@@ -1194,6 +1200,19 @@ impl Decoder {
                     {
                         break;
                     }
+                }
+                Ok((Value::Seq(v), input))
+            }
+            Decoder::ForEach(expr, lbl, a) => {
+                let mut input = input;
+                let val = expr.eval_value(scope);
+                let seq = val.get_sequence().expect("bad type for ForEach input");
+                let mut v = Vec::with_capacity(seq.len());
+                for e in seq.iter() {
+                    let new_scope = Scope::Single(SingleScope::new(scope, lbl, e));
+                    let (va, next_input) = a.parse(program, &new_scope, input)?;
+                    v.push(va);
+                    input = next_input;
                 }
                 Ok((Value::Seq(v), input))
             }

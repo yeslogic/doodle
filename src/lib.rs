@@ -674,6 +674,8 @@ pub enum Format {
     RepeatUntilLast(Expr, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
     RepeatUntilSeq(Expr, Box<Format>),
+    /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
+    ForEach(Expr, Label, Box<Format>),
     /// Parse a format if and only if the given expression evaluates to true, otherwise skip
     Maybe(Expr, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
@@ -776,6 +778,8 @@ impl Format {
                 .unwrap(),
             Format::Dynamic(_name, _dynformat, f) => f.match_bounds(module),
             Format::Apply(_) => Bounds::at_least(1),
+            // FIXME - do we have any way of approximating this better?
+            Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
         }
     }
 
@@ -805,6 +809,8 @@ impl Format {
                 .reduce(Bounds::add)
                 .unwrap_or(Bounds::exact(0)),
             Format::Repeat(_) => Bounds::any(),
+            // FIXME - do we have any way of approximating this better?
+            Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
             Format::Repeat1(f) => f.lookahead_bounds(module) * Bounds::at_least(1),
             Format::RepeatCount(expr, f) => f.lookahead_bounds(module) * expr.bounds(),
             Format::RepeatBetween(xmin, xmax, f) => {
@@ -870,6 +876,8 @@ impl Format {
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(..) => false,
+            // REVIEW - is this correct?
+            Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
         }
     }
 
@@ -1160,6 +1168,17 @@ impl FormatModule {
             },
             // REVIEW - do we want to hard-code this as U64 or make it a flexibly abstract integer type?
             Format::Pos => Ok(ValueType::Base(BaseType::U64)),
+            Format::ForEach(expr, lbl, format) => {
+                let expr_t = expr.infer_type(scope)?;
+                let elem_t = match expr_t {
+                    ValueType::Seq(elem_t) => (*elem_t).clone(),
+                    _ => return Err(anyhow!("ForEach: expected Seq, found {expr_t:?}")),
+                };
+                let mut child_scope = TypeScope::child(scope);
+                child_scope.push(lbl.clone(), elem_t);
+                let inner_t = self.infer_format_type(&child_scope, &format)?;
+                Ok(ValueType::Seq(Box::new(inner_t)))
+            }
         }
     }
 }
@@ -1631,6 +1650,15 @@ impl<'a> MatchTreeStep<'a> {
                     Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
                 ))
             }
+            TypedFormat::ForEach(_, _expr, _lbl, a) => {
+                // FIXME - this may not be right
+                let tree = Self::from_next(module, next.clone());
+                tree.union(Self::from_gt_format(
+                    module,
+                    a,
+                    Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                ))
+            }
             TypedFormat::Repeat1(_, a) => Self::from_gt_format(
                 module,
                 a,
@@ -1824,6 +1852,15 @@ impl<'a> MatchTreeStep<'a> {
             Format::Tuple(fields) => Self::from_tuple(module, fields, next),
             Format::Record(fields) => Self::from_record(module, fields, next),
             Format::Repeat(a) => {
+                let tree = Self::from_next(module, next.clone());
+                tree.union(Self::from_format(
+                    module,
+                    a,
+                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+                ))
+            }
+            // FIXME - this may not be exactly correct
+            Format::ForEach(_expr, _lbl, a) => {
                 let tree = Self::from_next(module, next.clone());
                 tree.union(Self::from_format(
                     module,

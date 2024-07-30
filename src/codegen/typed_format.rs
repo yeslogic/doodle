@@ -69,6 +69,11 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 n.hash(state);
                 inner.hash(state);
             }
+            TypedFormat::ForEach(_, expr, lbl, inner) => {
+                expr.hash(state);
+                lbl.hash(state);
+                inner.hash(state);
+            }
             TypedFormat::RepeatBetween(_, lo, hi, inner) => {
                 lo.hash(state);
                 hi.hash(state);
@@ -127,6 +132,12 @@ pub enum TypedFormat<TypeRep> {
         usize,
         Vec<(Label, TypedExpr<TypeRep>)>,
         Rc<TypedFormat<TypeRep>>,
+    ),
+    ForEach(
+        TypeRep,
+        TypedExpr<TypeRep>,
+        Label,
+        Box<TypedFormat<TypeRep>>,
     ),
     Fail,
     EndOfInput,
@@ -223,6 +234,8 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
+            // REVIEW - can we do any better than this?
+            TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
             TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds()),
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
@@ -288,6 +301,8 @@ impl TypedFormat<GenType> {
             }
 
             TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
+            // REVIEW - can we do any better than this?
+            TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
             TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.match_bounds()),
 
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
@@ -345,6 +360,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::Record(gt, ..)
             | TypedFormat::Repeat(gt, ..)
             | TypedFormat::Repeat1(gt, ..)
+            | TypedFormat::ForEach(gt, ..)
             | TypedFormat::RepeatCount(gt, ..)
             | TypedFormat::RepeatBetween(gt, ..)
             | TypedFormat::RepeatUntilLast(gt, ..)
@@ -787,6 +803,9 @@ mod __impls {
                 }
                 TypedFormat::Maybe(_, is_present, inner) => {
                     Format::Maybe(Expr::from(is_present), rebox(inner))
+                }
+                TypedFormat::ForEach(_, expr, lbl, inner) => {
+                    Format::ForEach(Expr::from(expr), lbl, rebox(inner))
                 }
                 TypedFormat::Peek(_, inner) => Format::Peek(rebox(inner)),
                 TypedFormat::PeekNot(_, inner) => Format::PeekNot(rebox(inner)),

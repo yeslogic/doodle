@@ -1148,6 +1148,20 @@ impl Decoder {
                 let pos = input.offset as u64;
                 Ok((ParsedValue::from_evaluated(Value::U64(pos)), input))
             }
+            Decoder::ForEach(expr, lbl, a) => {
+                let mut input = input;
+                let val = expr.eval_with_loc(scope);
+                let seq = val.get_sequence().expect("bad type for ForEach input");
+                let mut v = Vec::with_capacity(seq.len());
+                for e in seq.iter() {
+                    let new_scope = LocScope::Single(LocSingleScope::new(scope, lbl, e));
+                    let (va, next_input) = a.parse_with_loc(program, &new_scope, input)?;
+                    v.push(va);
+                    input = next_input;
+                }
+                let totlen = input.offset - start_offset;
+                Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
+            }
             Decoder::Byte(bs) => {
                 let (b, input) = input
                     .read_byte()
