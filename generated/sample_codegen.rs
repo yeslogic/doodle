@@ -494,7 +494,7 @@ pub struct main_jpeg_frame_segments_inSeq_dac {
 pub struct main_jpeg_frame_segments_inSeq_dht_data {
     class_table_id: main_jpeg_frame_segments_inSeq_dac_data_class_table_id,
     num_codes: Vec<u8>,
-    values: Vec<u8>,
+    values: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
@@ -17794,22 +17794,14 @@ fn Decoder146<'input>(
     let values = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    _input.read_byte()?;
-                    {
-                        let ret = 0;
-                        _input.close_peek_context()?;
-                        ret
+            for n in num_codes.clone() {
+                accum.push({
+                    let mut accum = Vec::new();
+                    for _ in 0..n {
+                        accum.push((Decoder19(_input))?);
                     }
-                };
-                if matching_ix == 0 {
-                    let next_elem = (Decoder19(_input))?;
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
+                    accum
+                });
             }
             accum
         })

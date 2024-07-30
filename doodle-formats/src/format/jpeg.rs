@@ -75,7 +75,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         record([
             ("class-table-id", class_table_id.clone()),
             ("num-codes", repeat_count(Expr::U8(16), base.u8())),
-            ("values", repeat(base.u8())), // TODO - List.map num-codes (\n => repeat-count n u8);
+            (
+                "values",
+                for_each(var("num-codes"), "n", repeat_count(var("n"), base.u8())),
+            ), // TODO - List.map num-codes (\n => repeat-count n u8);
         ]),
     );
 

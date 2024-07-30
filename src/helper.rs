@@ -556,3 +556,7 @@ pub fn where_nonzero_u8(format: Format) -> Format {
 pub fn where_nonzero_u16(format: Format) -> Format {
     where_lambda(format, "x", is_nonzero_u16(var("x")))
 }
+
+pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
+    Format::ForEach(seq, name.into(), Box::new(inner))
+}
