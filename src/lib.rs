@@ -876,7 +876,6 @@ impl Format {
             Format::Match(_, branches) => branches.iter().any(|(_, f)| f.depends_on_next(module)),
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(..) => false,
-            // REVIEW - is this correct?
             Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
         }
     }
@@ -1651,7 +1650,6 @@ impl<'a> MatchTreeStep<'a> {
                 ))
             }
             TypedFormat::ForEach(_, _expr, _lbl, a) => {
-                // FIXME - this may not be right
                 let tree = Self::from_next(module, next.clone());
                 tree.union(Self::from_gt_format(
                     module,
@@ -1859,13 +1857,12 @@ impl<'a> MatchTreeStep<'a> {
                     Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
                 ))
             }
-            // FIXME - this may not be exactly correct
             Format::ForEach(_expr, _lbl, a) => {
                 let tree = Self::from_next(module, next.clone());
                 tree.union(Self::from_format(
                     module,
                     a,
-                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone()))
                 ))
             }
             Format::Repeat1(a) => Self::from_format(
