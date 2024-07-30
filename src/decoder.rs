@@ -852,17 +852,17 @@ impl<'a> Compiler<'a> {
                 ))
             }
             Format::RepeatUntilLast(expr, a) => {
-                // FIXME probably not right
+                // FIXME - the next value we pass in is probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilLast(expr.clone(), da))
             }
             Format::ForEach(expr, lbl, a) => {
-                // FIXME probably not right
+                // FIXME - the next value we pass in is probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::ForEach(expr.clone(), lbl.clone(), da))
             }
             Format::RepeatUntilSeq(expr, a) => {
-                // FIXME probably not right
+                // FIXME - the next value we pass in is probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
             }

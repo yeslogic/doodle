@@ -78,7 +78,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             (
                 "values",
                 for_each(var("num-codes"), "n", repeat_count(var("n"), base.u8())),
-            ), // TODO - List.map num-codes (\n => repeat-count n u8);
+            ),
         ]),
     );
 
