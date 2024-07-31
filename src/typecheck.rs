@@ -2390,7 +2390,9 @@ impl TypeChecker {
                 Ok(newvar)
             }
             Format::Fail => Ok(self.init_var_simple(UType::Empty)?.0),
-            Format::EndOfInput | Format::Align(_) => Ok(self.init_var_simple(UType::UNIT)?.0),
+            Format::SkipRemainder | Format::EndOfInput | Format::Align(_) => {
+                Ok(self.init_var_simple(UType::UNIT)?.0)
+            }
             Format::Byte(_set) => {
                 // REVIEW - is there a better approach when matching an empty set of bytes?
                 if _set.is_empty() {

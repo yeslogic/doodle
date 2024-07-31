@@ -289,7 +289,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Format::Fail => panic!("uninhabited format (value={value:?}"),
-            Format::EndOfInput => self.compile_parsed_value(value),
+            Format::EndOfInput | Format::SkipRemainder => self.compile_parsed_value(value),
             Format::Align(_) => self.compile_parsed_value(value),
             Format::Byte(_) => self.compile_parsed_value(value),
             // NOTE : Pos self-documents its position so we don't really need to annotate that...
@@ -421,7 +421,7 @@ impl<'module> MonoidalPrinter<'module> {
                 }
             }
             Format::Fail => panic!("uninhabited format (value={value:?}"),
-            Format::EndOfInput => self.compile_value(value),
+            Format::SkipRemainder | Format::EndOfInput => self.compile_value(value),
             Format::Align(_) => self.compile_value(value),
             Format::Byte(_) => self.compile_value(value),
             Format::Pos => self.compile_value(value),
@@ -1812,6 +1812,7 @@ impl<'module> MonoidalPrinter<'module> {
                 frag
             }
             Format::Fail => Fragment::string("fail"),
+            Format::SkipRemainder => Fragment::string("skip-remainder"),
             Format::EndOfInput => Fragment::string("end-of-input"),
             Format::Pos => Fragment::string("pos"),
             Format::Align(n) => Fragment::String(format!("align {n}").into()),

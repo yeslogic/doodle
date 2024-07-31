@@ -105,6 +105,7 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Label,
         Box<TypedDecoderExt<TypeRep>>,
     ),
+    SkipRemainder,
 }
 
 #[derive(Clone, Debug)]
@@ -233,6 +234,7 @@ impl<'a> GTCompiler<'a> {
             }
             GTFormat::Fail => Ok(TypedDecoder::Fail),
             GTFormat::EndOfInput => Ok(TypedDecoder::EndOfInput),
+            GTFormat::SkipRemainder => Ok(TypedDecoder::SkipRemainder),
             GTFormat::Align(n) => Ok(TypedDecoder::Align(*n)),
             GTFormat::Byte(bs) => Ok(TypedDecoder::Byte(*bs)),
             GTFormat::Variant(gt, label, f) => {

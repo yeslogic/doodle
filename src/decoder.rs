@@ -631,6 +631,7 @@ pub enum Decoder {
     Apply(Label),
     RepeatBetween(MatchTree, Expr, Expr, Box<Decoder>),
     ForEach(Expr, Label, Box<Decoder>),
+    SkipRemainder,
 }
 
 #[derive(Clone, Debug)]
@@ -725,6 +726,7 @@ impl<'a> Compiler<'a> {
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Align(n) => Ok(Decoder::Align(*n)),
             Format::Byte(bs) => Ok(Decoder::Byte(*bs)),
+            Format::SkipRemainder => Ok(Decoder::SkipRemainder),
             Format::Variant(label, f) => {
                 let d = self.compile_format(f, next.clone())?;
                 Ok(Decoder::Variant(label.clone(), Box::new(d)))
@@ -1111,6 +1113,10 @@ impl Decoder {
             Decoder::Pos => {
                 let pos = input.offset as u64;
                 Ok((Value::U64(pos), input))
+            }
+            Decoder::SkipRemainder => {
+                let input = input.skip_remainder();
+                Ok((Value::UNIT, input))
             }
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok((Value::UNIT, input)),

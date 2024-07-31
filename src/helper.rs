@@ -557,6 +557,24 @@ pub fn where_nonzero_u16(format: Format) -> Format {
     where_lambda(format, "x", is_nonzero_u16(var("x")))
 }
 
+/// Helper for constructing `Format::ForEach`
 pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
     Format::ForEach(seq, name.into(), Box::new(inner))
+}
+
+/// Helper for parsing `(f, suffix)` where we only want to see the `f` component
+#[inline]
+pub fn discard_suffix(f: Format, suffix: Format) -> Format {
+    map(tuple([f, suffix]), lambda("x", tuple_proj(var("x"), 0)))
+}
+
+/// Shortcut for computing a standalone `Format::Pos` that we immediately consume without ever needing to reuse,
+/// which discards the `Format::Pos` token via `map`
+///
+/// The `pos_varname` parameter is the verbatim name of the variable that `f` internally uses to refer to the parsed `Format::Pos`.
+pub fn with_pos(pos_varname: &'static str, f: Format) -> Format {
+    map(
+        record([(pos_varname, Format::Pos), ("val", f)]),
+        lambda("x", record_proj(var("x"), "val")),
+    )
 }

@@ -512,4 +512,23 @@ impl BufferOffset {
     pub(crate) fn rem_local(&self) -> usize {
         self.current_offset.delta(self.current_limit())
     }
+
+    /// Unconditionally replaces the current offset with `offset`, returning the previous offset.
+    ///
+    /// # Safety
+    ///
+    /// This method is unsafe because it does not check that `offset` is a legal position to which we could advance without
+    /// explicitly closing intervening slices, nor that it is a legal position in the overall buffer itself.
+    ///
+    /// It also does not check whether the new offset is greater-than-or-equal-to the current offset, meaning
+    /// that we can move backwards in the buffer, which is normally impossible.
+    ///
+    /// Furthermore, it does not distinguish between the modality (bits vs bytes) of the original and new offset,
+    /// meaning it can silently switch between two modes without any indication that the new mode is incorrect.
+    ///
+    /// This method should only be called with values of `offset` that are guaranteed to lie within the available
+    /// view of the buffer being parsed, which are no less than the current offset, and which are in the same modality.
+    pub(crate) unsafe fn set_offset(&mut self, offset: ByteOffset) -> ByteOffset {
+        std::mem::replace(&mut self.current_offset, offset)
+    }
 }

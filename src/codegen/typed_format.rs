@@ -53,7 +53,10 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 level.hash(state);
                 args.hash(state);
             }
-            TypedFormat::Pos | TypedFormat::Fail | TypedFormat::EndOfInput => {}
+            TypedFormat::SkipRemainder
+            | TypedFormat::Pos
+            | TypedFormat::Fail
+            | TypedFormat::EndOfInput => {}
             TypedFormat::Align(n) => n.hash(state),
             TypedFormat::Byte(bs) => bs.hash(state),
             TypedFormat::Variant(_tr, lbl, inner) => {
@@ -187,6 +190,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     Apply(TypeRep, Label, Rc<TypedDynFormat<TypeRep>>),
     Pos,
+    SkipRemainder,
 }
 
 impl TypedFormat<GenType> {
@@ -196,7 +200,8 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
 
-            TypedFormat::Pos
+            TypedFormat::SkipRemainder
+            | TypedFormat::Pos
             | TypedFormat::Compute(_, _)
             | TypedFormat::EndOfInput
             | TypedFormat::Fail => Bounds::exact(0),
@@ -305,6 +310,8 @@ impl TypedFormat<GenType> {
             TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
             TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.match_bounds()),
 
+            TypedFormat::SkipRemainder => Bounds::any(),
+
             TypedFormat::Slice(_, t_expr, _) => t_expr.bounds(),
 
             TypedFormat::Bits(_, f) => f.match_bounds().bits_to_bytes(),
@@ -345,7 +352,7 @@ impl TypedFormat<GenType> {
     pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
         match self {
             TypedFormat::Fail => None,
-            TypedFormat::EndOfInput | TypedFormat::Align(_) => {
+            TypedFormat::SkipRemainder | TypedFormat::EndOfInput | TypedFormat::Align(_) => {
                 Some(Cow::Owned(GenType::from(RustType::UNIT)))
             }
             TypedFormat::Byte(_) => Some(Cow::Owned(GenType::from(PrimType::U8))),
@@ -773,6 +780,7 @@ mod __impls {
                         .collect();
                     Format::ItemVar(level, args)
                 }
+                TypedFormat::SkipRemainder => Format::SkipRemainder,
                 TypedFormat::Pos => Format::Pos,
                 TypedFormat::Fail => Format::Fail,
                 TypedFormat::EndOfInput => Format::EndOfInput,

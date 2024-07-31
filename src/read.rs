@@ -44,4 +44,12 @@ impl<'a> ReadCtxt<'a> {
             None
         }
     }
+
+    pub(crate) fn skip_remainder(&self) -> ReadCtxt<'a> {
+        let offset = self.input.len();
+        ReadCtxt {
+            input: self.input,
+            offset,
+        }
+    }
 }

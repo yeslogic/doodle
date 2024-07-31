@@ -111,6 +111,7 @@ impl Bounds {
         self.significant_bits().is_exact()
     }
 
+    /// Returns a `Bounds` whose minimum and maximum are both `n`.
     pub const fn exact(n: usize) -> Bounds {
         Bounds {
             min: n,
@@ -118,10 +119,12 @@ impl Bounds {
         }
     }
 
+    /// Returns a `Bounds` whose minimum is the given `min` and with no upper limit.
     pub const fn at_least(min: usize) -> Bounds {
         Bounds { min, max: None }
     }
 
+    /// Returns a `Bounds` spanning the entire range of `usize`.
     pub const fn any() -> Bounds {
         Bounds { min: 0, max: None }
     }
@@ -168,6 +171,8 @@ impl Bounds {
         }
     }
 
+    /// Converts a `Bounds` that measures in increments of individual bits into the equivalent range
+    /// of byte-precision values.
     pub fn bits_to_bytes(&self) -> Bounds {
         Bounds {
             min: (self.min + 7) / 8,

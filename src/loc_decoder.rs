@@ -1132,6 +1132,12 @@ impl Decoder {
                     .0
                     .parse_with_loc(program, &LocScope::Multi(&new_scope), input)
             }
+            Decoder::SkipRemainder => {
+                let start = input.offset;
+                let input = input.skip_remainder();
+                let ret = ParsedValue::unit_spanning(start, input.offset - start);
+                Ok((ret, input))
+            }
             Decoder::Fail => Err(DecodeError::<ParsedValue>::loc_fail(scope, input)),
             Decoder::EndOfInput => match input.read_byte() {
                 None => Ok((ParsedValue::unit_at(start_offset), input)),

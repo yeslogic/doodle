@@ -184,3 +184,14 @@ mod utf8 {
         check_output(output, expected)
     }
 }
+
+mod waldo {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_waldo() {
+        let output = doodle().args(["file", "test.waldo"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.waldo.stdout");
+        check_output(output, expected)
+    }
+}

@@ -704,6 +704,8 @@ pub enum Format {
     Apply(Label),
     /// Current byte-offset relative to start-of-buffer (as a U64(?))
     Pos,
+    /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
+    SkipRemainder,
 }
 
 impl Format {
@@ -735,6 +737,7 @@ impl Format {
             Format::ItemVar(level, _args) => module.get_format(*level).match_bounds(module),
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
+            Format::SkipRemainder => Bounds::any(),
             Format::Align(n) => Bounds::new(0, n - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
@@ -790,6 +793,8 @@ impl Format {
             Format::ItemVar(level, _args) => module.get_format(*level).lookahead_bounds(module),
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
+            // REVIEW - this is a special case but technically speaking this is the proper value given how `lookahead_bounds` is used
+            Format::SkipRemainder => Bounds::exact(0),
             Format::Align(n) => Bounds::new(0, n - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.lookahead_bounds(module),
@@ -849,6 +854,8 @@ impl Format {
             Format::ItemVar(level, _args) => module.get_format(*level).depends_on_next(module),
             Format::Fail => false,
             Format::EndOfInput => false,
+            // NOTE - compiling SkipRemainder doesn't depend on the next format because the next format can only ever match the empty byte string at that point
+            Format::SkipRemainder => false,
             Format::Align(..) => false,
             Format::Byte(..) => false,
             Format::Variant(_label, f) => f.depends_on_next(module),
@@ -1033,7 +1040,7 @@ impl FormatModule {
                 Ok(self.get_format_type(*level).clone())
             }
             Format::Fail => Ok(ValueType::Empty),
-            Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
+            Format::SkipRemainder | Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
             Format::Align(_n) => Ok(ValueType::Tuple(vec![])),
             Format::Byte(_bs) => Ok(ValueType::Base(BaseType::U8)),
             Format::Variant(label, f) => Ok(ValueType::Union(BTreeMap::from([(
@@ -1615,6 +1622,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Align(_) => {
                 Self::accept() // FIXME
             }
+            TypedFormat::SkipRemainder => Self::accept(),
             TypedFormat::Byte(bs) => Self::branch(*bs, next),
             TypedFormat::Variant(_, _label, f) => Self::from_gt_format(module, f, next.clone()),
             TypedFormat::Union(_, branches) | TypedFormat::UnionNondet(_, branches) => {
@@ -1835,6 +1843,7 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
+            Format::SkipRemainder => Self::accept(),
             Format::Align(_) => {
                 Self::accept() // FIXME
             }
@@ -1862,7 +1871,7 @@ impl<'a> MatchTreeStep<'a> {
                 tree.union(Self::from_format(
                     module,
                     a,
-                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone()))
+                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
                 ))
             }
             Format::Repeat1(a) => Self::from_format(

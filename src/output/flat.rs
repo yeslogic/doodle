@@ -124,6 +124,7 @@ fn check_covered(
         }
         Format::Fail => {}
         Format::EndOfInput => {}
+        Format::SkipRemainder => {}
         Format::Pos => {}
         Format::Align(_) => {}
         Format::Byte(_) => {
@@ -213,6 +214,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             }
             Format::Fail => Ok(()),
             Format::EndOfInput => Ok(()),
+            Format::SkipRemainder => Ok(()),
             Format::Align(_) => Ok(()),
             Format::Pos => Ok(()),
             Format::Byte(_) => Ok(()),
