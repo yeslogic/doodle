@@ -40,6 +40,13 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    pub fn skip_remainder(&mut self) {
+        let after_skip = self.offset.current_limit();
+        unsafe {
+            self.offset.set_offset(after_skip);
+        }
+    }
+
     /// Attempts to advance the buffer by one after capturing the value of the byte at the current logical
     /// offset into the buffer.
     ///

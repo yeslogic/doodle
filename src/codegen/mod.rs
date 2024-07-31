@@ -266,6 +266,7 @@ impl CodeGen {
             TypedDecoder::EndOfInput => CaseLogic::Simple(SimpleLogic::ExpectEnd),
             TypedDecoder::Align(n) => CaseLogic::Simple(SimpleLogic::SkipToNextMultiple(*n)),
             TypedDecoder::Pos => CaseLogic::Simple(SimpleLogic::YieldCurrentOffset),
+            TypedDecoder::SkipRemainder => CaseLogic::Simple(SimpleLogic::SkipRemainder),
             TypedDecoder::Byte(bs) => CaseLogic::Simple(SimpleLogic::ByteIn(*bs)),
             TypedDecoder::Variant(gt, name, inner) => {
                 let (type_name, def) = {
@@ -1274,6 +1275,10 @@ impl SimpleLogic<GTExpr> {
                         .call_method("finish")
                         .wrap_try(),
                 ),
+            ),
+            SimpleLogic::SkipRemainder => (
+                Vec::new(),
+                Some(RustExpr::local(ctxt.input_varname.clone()).call_method("skip_remainder")),
             ),
             SimpleLogic::Invoke(ix_dec, args) => {
                 let fname = format!("Decoder{ix_dec}");
@@ -2324,6 +2329,7 @@ enum SimpleLogic<ExprT> {
     Eval(RustExpr),
     CallDynamic(Label),
     YieldCurrentOffset,
+    SkipRemainder,
 }
 
 /// Cases that recurse into other case-logic only once
@@ -2819,6 +2825,10 @@ impl<'a> Elaborator<'a> {
             Format::EndOfInput => {
                 self.increment_index();
                 GTFormat::EndOfInput
+            }
+            Format::SkipRemainder => {
+                self.increment_index();
+                GTFormat::SkipRemainder
             }
             Format::Align(n) => {
                 self.increment_index();

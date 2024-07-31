@@ -1698,7 +1698,7 @@ pub struct main_waldo {
     sep: u8,
     here: u64,
     waldo: (u8, u8, u8, u8, u8),
-    __rem: Vec<u8>,
+    __rem: (),
 }
 
 #[derive(Debug, Clone)]
@@ -2052,29 +2052,7 @@ fn Decoder2<'input>(_input: &mut Parser<'input>) -> Result<main_waldo, ParseErro
             ret
         })
     })())?;
-    let __rem = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    _input.read_byte()?;
-                    {
-                        let ret = 0;
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
-                    let next_elem = (Decoder19(_input))?;
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
-            }
-            accum
-        })
-    })())?;
+    let __rem = ((|| PResult::Ok(_input.skip_remainder()))())?;
     PResult::Ok(main_waldo {
         r#where,
         noise,

@@ -18,7 +18,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Box::new(is_bytes(b"Waldo")),
                 ),
             ),
-            ("__rem", repeat(base.u8())),
+            ("__rem", Format::SkipRemainder),
         ]),
     )
 }
