@@ -793,8 +793,8 @@ impl Format {
             Format::ItemVar(level, _args) => module.get_format(*level).lookahead_bounds(module),
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
-            // REVIEW - this is a special case but technically speaking this is the proper value given how `lookahead_bounds` is used
-            Format::SkipRemainder => Bounds::exact(0),
+            // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
+            Format::SkipRemainder => Bounds::any(),
             Format::Align(n) => Bounds::new(0, n - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.lookahead_bounds(module),
