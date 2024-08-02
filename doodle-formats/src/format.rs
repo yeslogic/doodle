@@ -32,6 +32,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let png = png::main(module, deflate, text, utf8nz, &base);
     let riff = riff::main(module, &base);
     let tar = tar::main(module, &base);
+    let elf = elf::main(module, &base);
     let waldo = waldo::main(module, &base);
 
     module.define_format(
@@ -50,6 +51,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("riff", riff.call()),
                     ("tiff", tiff.call()),
                     ("tar", tar.call()),
+                    ("elf", elf.call()),
                     ("text", text.call()),
                 ]),
             ),
