@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
 use std::mem::size_of;
 
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
 use doodle::{helper::*, IntoLabel, Label};
-use doodle::{FormatRef, FormatModule, Format, BaseType, ValueType, Pattern, Expr};
+use doodle::{BaseType, Expr, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 const ISBE_ARG: (Label, ValueType) = (Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool));
 const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::Base(BaseType::U8));
@@ -12,8 +11,20 @@ const CLASS_ARG: (Label, ValueType) = (Label::Borrowed("class"), ValueType::Base
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // SECTION - common byte-oriented types
 
-    fn define_format_endian_aligned<T>(module: &mut FormatModule, name: impl IntoLabel, be_version: Format, le_version: Format) -> FormatRef {
-        module.define_format_args(name, vec![ISBE_ARG], aligned(if_then_else(var("is_be"), be_version, le_version), size_of::<T>()))
+    fn define_format_endian_aligned<T>(
+        module: &mut FormatModule,
+        name: impl IntoLabel,
+        be_version: Format,
+        le_version: Format,
+    ) -> FormatRef {
+        module.define_format_args(
+            name,
+            vec![ISBE_ARG],
+            aligned(
+                if_then_else(var("is_be"), be_version, le_version),
+                size_of::<T>(),
+            ),
+        )
     }
 
     // SECTION - 32-bit ELF types
@@ -88,7 +99,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const ELF_CLASS_64: u8 = 2;
 
     // REVIEW - const-enum construction to promote magic numbers to proper variants?
-    let ei_class = module.define_format("elf.header.ident.class", where_between(base.u8(), Expr::U8(ELF_CLASS_NONE), Expr::U8(ELF_CLASS_64)));
+    let ei_class = module.define_format(
+        "elf.header.ident.class",
+        where_between(base.u8(), Expr::U8(ELF_CLASS_NONE), Expr::U8(ELF_CLASS_64)),
+    );
 
     // Invalid Data Encoding
     const ELF_DATA_NONE: u8 = 0;
@@ -98,9 +112,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const ELF_DATA_2MSB: u8 = 2;
 
     // direct `BE -> true`, `LE -> false` mapping on an arbitrary expression
-    fn is_be(x: Expr) -> Expr { expr_eq(x, Expr::U8(ELF_DATA_2MSB)) }
+    fn is_be(x: Expr) -> Expr {
+        expr_eq(x, Expr::U8(ELF_DATA_2MSB))
+    }
 
-    let ei_data = module.define_format("elf.header.ident.data", where_between(base.u8(), Expr::U8(ELF_DATA_NONE), Expr::U8(ELF_DATA_2MSB)));
+    let ei_data = module.define_format(
+        "elf.header.ident.data",
+        where_between(base.u8(), Expr::U8(ELF_DATA_NONE), Expr::U8(ELF_DATA_2MSB)),
+    );
 
     // Invalid Version
     const EV_NONE: u8 = 0;
@@ -108,7 +127,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // REVIEW - this is specified as being able to change but unsure how likely that is in practice (libelf on github has := 1, so we should be fine?)
     const EV_CURRENT: u8 = 1;
 
-    let ei_version = module.define_format("elf.header.ident.version", where_between(base.u8(), Expr::U8(EV_NONE), Expr::U8(EV_CURRENT)));
+    let ei_version = module.define_format(
+        "elf.header.ident.version",
+        where_between(base.u8(), Expr::U8(EV_NONE), Expr::U8(EV_CURRENT)),
+    );
 
     // NOTE: the possible values and interpretations thereof are machine-specific
     let ei_osabi = module.define_format("elf.header.ident.os-abi", base.u8());
@@ -119,16 +141,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const EI_NIDENT: u32 = 16;
 
     // ELF Identification (e_ident[])
-    let elf_ident = module.define_format("elf.header.ident",
+    let elf_ident = module.define_format(
+        "elf.header.ident",
         record([
             ("magic", is_bytes(b"\x7fELF")), // Magic bytes
-            ("class", ei_class.call()), // Class (32-bit or 64-bit)
-            ("data", ei_data.call()), // Data Encoding (endianness)
-            ("version", ei_version.call()), // Elf Version (should be EV_CURRENT (:= 1 ?))
+            ("class", ei_class.call()),      // Class (32-bit or 64-bit)
+            ("data", ei_data.call()),        // Data Encoding (endianness)
+            ("version", ei_version.call()),  // Elf Version (should be EV_CURRENT (:= 1 ?))
             ("os_abi", ei_osabi.call()),
             ("abi_version", ei_abiversion.call()),
             ("__pad", repeat(is_byte(0x00))), // Zero-byte padding to end of Ident section
-        ])
+        ]),
     );
     // !SECTION
 
@@ -145,25 +168,35 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const ET_HIPROC: u16 = 0xffff; // processor-specific
 
     // ELF File Type
-    let e_type = module.define_format_args("elf.header.type", vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
+    let e_type = module.define_format_args(
+        "elf.header.type",
+        vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
         where_lambda(
             elf_half_endian.call_args(vec![var("is_be")]),
             "type",
-            expr_match(var("type"), [
-                (Pattern::Int(Bounds::new(ET_NONE as usize, ET_CORE as usize)), Expr::Bool(true)), // non-processor-specific
-                (Pattern::U16(ET_LOOS), Expr::Bool(true)), // OS-specific
-                (Pattern::U16(ET_HIOS), Expr::Bool(true)), // OS-specific
-                (Pattern::U16(ET_LOPROC), Expr::Bool(true)), // processor-specific
-                (Pattern::U16(ET_HIPROC), Expr::Bool(true)), // processor-specific
-                (Pattern::Wildcard, Expr::Bool(false)), // not a recognized object filetype
-            ])
-        )
+            expr_match(
+                var("type"),
+                [
+                    (
+                        Pattern::Int(Bounds::new(ET_NONE as usize, ET_CORE as usize)),
+                        Expr::Bool(true),
+                    ), // non-processor-specific
+                    (Pattern::U16(ET_LOOS), Expr::Bool(true)), // OS-specific
+                    (Pattern::U16(ET_HIOS), Expr::Bool(true)), // OS-specific
+                    (Pattern::U16(ET_LOPROC), Expr::Bool(true)), // processor-specific
+                    (Pattern::U16(ET_HIPROC), Expr::Bool(true)), // processor-specific
+                    (Pattern::Wildcard, Expr::Bool(false)),    // not a recognized object filetype
+                ],
+            ),
+        ),
     );
     // !SECTION
 
     // ELF Machine (Architecture) identifier
     // TODO - machine variants are an open class that has no fixed definition, and enough distinct values that it would be difficult to exhaustively list them
-    let e_machine = module.define_format_args("elf.header.machine", vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
+    let e_machine = module.define_format_args(
+        "elf.header.machine",
+        vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
         elf_half_endian.call_args(vec![var("is_be")]),
     );
 
@@ -171,13 +204,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let e_version = module.define_format_args(
         "elf.header.version",
         vec![(Label::Borrowed("is_be"), ValueType::Base(BaseType::Bool))],
-        where_between(elf_word_endian.call_args(vec![var("is_be")]), Expr::U32(EV_NONE as u32), Expr::U32(EV_CURRENT as u32))
+        where_between(
+            elf_word_endian.call_args(vec![var("is_be")]),
+            Expr::U32(EV_NONE as u32),
+            Expr::U32(EV_CURRENT as u32),
+        ),
     );
-
 
     let var_is_be = is_be(record_proj(var("ident"), "data"));
 
-    let elf_addr = module.define_format_args("elf.types.elf-addr",
+    let elf_addr = module.define_format_args(
+        "elf.types.elf-addr",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
             (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
@@ -185,42 +222,46 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         match_variant(
             var("class"),
             vec![
-                (Pattern::U8(ELF_CLASS_32), "Addr32", elf32_addr_endian.call_args(vec![var("is_be")])), // 32-bit addr
-                (Pattern::U8(ELF_CLASS_64), "Addr64", elf64_addr_endian.call_args(vec![var("is_be")])), // 64-bit addr
-            ]
-        )
+                (
+                    Pattern::U8(ELF_CLASS_32),
+                    "Addr32",
+                    elf32_addr_endian.call_args(vec![var("is_be")]),
+                ), // 32-bit addr
+                (
+                    Pattern::U8(ELF_CLASS_64),
+                    "Addr64",
+                    elf64_addr_endian.call_args(vec![var("is_be")]),
+                ), // 64-bit addr
+            ],
+        ),
     );
 
-    let vt_addr = ValueType::Union(
-        BTreeMap::from(
-            [ ( Label::Borrowed("Addr32"), ValueType::Base(BaseType::U32)),
-              ( Label::Borrowed("Addr64"), ValueType::Base(BaseType::U64)) ]
-        )
-    );
-
-    let elf_off = module.define_format_args("elf.types.elf-off",
+    let elf_off = module.define_format_args(
+        "elf.types.elf-off",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
             (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
         ],
         match_variant(
-            var("is_64"),
+            var("class"),
             vec![
-                (Pattern::U8(ELF_CLASS_32), "Off32", elf32_off_endian.call_args(vec![var("is_be")])), // 32-bit offset
-                (Pattern::U8(ELF_CLASS_64), "Off64", elf64_off_endian.call_args(vec![var("is_be")])), // 64-bit foffset
-            ]
-        )
-    );
-
-    let vt_off = ValueType::Union(
-        BTreeMap::from(
-            [ ( Label::Borrowed("Off32"), ValueType::Base(BaseType::U32)),
-              ( Label::Borrowed("Off64"), ValueType::Base(BaseType::U64)) ]
-        )
+                (
+                    Pattern::U8(ELF_CLASS_32),
+                    "Off32",
+                    elf32_off_endian.call_args(vec![var("is_be")]),
+                ), // 32-bit offset
+                (
+                    Pattern::U8(ELF_CLASS_64),
+                    "Off64",
+                    elf64_off_endian.call_args(vec![var("is_be")]),
+                ), // 64-bit foffset
+            ],
+        ),
     );
 
     // Value that is Elf32_Word in 32-bit and Elf64_Xword in 64-bit ELF files
-    let elf_full_endian = module.define_format_args("elf.types.elf-full",
+    let elf_full_endian = module.define_format_args(
+        "elf.types.elf-full",
         vec![
             (Label::Borrowed("is_be"), ValueType::BOOL),
             (Label::Borrowed("class"), ValueType::Base(BaseType::U8)),
@@ -228,33 +269,60 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         match_variant(
             var("class"),
             vec![
-                (Pattern::U8(ELF_CLASS_32), "Full32", elf_word_endian.call_args(vec![var("is_be")])), // 32-bit full-width unsigned int
-                (Pattern::U8(ELF_CLASS_64), "Full64", elf64_xword_endian.call_args(vec![var("is_be")])), // 64-bit full-width unsigned int
-            ]
-        )
+                (
+                    Pattern::U8(ELF_CLASS_32),
+                    "Full32",
+                    elf_word_endian.call_args(vec![var("is_be")]),
+                ), // 32-bit full-width unsigned int
+                (
+                    Pattern::U8(ELF_CLASS_64),
+                    "Full64",
+                    elf64_xword_endian.call_args(vec![var("is_be")]),
+                ), // 64-bit full-width unsigned int
+            ],
+        ),
     );
-
 
     let elf_header = module.define_format(
         "elf.header",
         record([
-            ("ident", Format::Slice(Expr::U32(EI_NIDENT), Box::new(elf_ident.call()))), // machine-independent ELF identification array (byte-oriented)
+            (
+                "ident",
+                Format::Slice(Expr::U32(EI_NIDENT), Box::new(elf_ident.call())),
+            ), // machine-independent ELF identification array (byte-oriented)
             ("type", e_type.call_args(vec![var_is_be.clone()])), // file-type identifier
             ("machine", e_machine.call_args(vec![var_is_be.clone()])), // identifier for the architecture required by the ELF image
             ("version", e_version.call_args(vec![var_is_be.clone()])), // ELF version (should agree with the equivalent field in `ident`)
-            ("entry", elf_addr.call_args(vec![var_is_be.clone(), record_proj(var("ident"), "class")])), // virtual address of the entry-point into the ELF image
-            ("phoff", elf_off.call_args(vec![var_is_be.clone(), record_proj(var("ident"), "class")])), // file-offset of the program header table, in bytes (0 if not present)
-            ("shoff", elf_off.call_args(vec![var_is_be.clone(), record_proj(var("ident"), "class")])), // file-offset of the section header table, in bytes (0 if not present)
+            (
+                "entry",
+                elf_addr.call_args(vec![var_is_be.clone(), record_proj(var("ident"), "class")]),
+            ), // virtual address of the entry-point into the ELF image
+            (
+                "phoff",
+                elf_off.call_args(vec![var_is_be.clone(), record_proj(var("ident"), "class")]),
+            ), // file-offset of the program header table, in bytes (0 if not present)
+            (
+                "shoff",
+                elf_off.call_args(vec![var_is_be.clone(), record_proj(var("ident"), "class")]),
+            ), // file-offset of the section header table, in bytes (0 if not present)
             ("flags", elf_word_endian.call_args(vec![var_is_be.clone()])), // processor-specific flags
             ("ehsize", elf_half_endian.call_args(vec![var_is_be.clone()])), // size of the ELF header in bytes
-            ("phentsize", elf_half_endian.call_args(vec![var_is_be.clone()])), // (consistent) size of each entry in the program header table
-            ("phnum",    elf_half_endian.call_args(vec![var_is_be.clone()])), // number of entries in the program header table
-            ("shentsize", elf_half_endian.call_args(vec![var_is_be.clone()])), // (consistent) size of each entry in the section header table
-            ("shnum",    elf_half_endian.call_args(vec![var_is_be.clone()])), // number of entries in the section header table
-            ("shstrndx", elf_half_endian.call_args(vec![var_is_be.clone()])), // section header table index of the entry associated with the section name string table
-        ])
+            (
+                "phentsize",
+                elf_half_endian.call_args(vec![var_is_be.clone()]),
+            ), // (consistent) size of each entry in the program header table
+            ("phnum", elf_half_endian.call_args(vec![var_is_be.clone()])), // number of entries in the program header table
+            (
+                "shentsize",
+                elf_half_endian.call_args(vec![var_is_be.clone()]),
+            ), // (consistent) size of each entry in the section header table
+            ("shnum", elf_half_endian.call_args(vec![var_is_be.clone()])), // number of entries in the section header table
+            (
+                "shstrndx",
+                elf_half_endian.call_args(vec![var_is_be.clone()]),
+            ), // section header table index of the entry associated with the section name string table
+        ]),
     );
-
 
     // SECTION - Section Header Type
 
@@ -262,7 +330,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const SHT_PROGBITS: u32 = 1; // program-specific data
     const SHT_SYMTAB: u32 = 2; // symbols for link editing (multiple disallowed)
     const SHT_STRTAB: u32 = 3; // string table
-    const SHT_RELA: u32 =  4; // relocation entries with addends (multiple allowed)
+    const SHT_RELA: u32 = 4; // relocation entries with addends (multiple allowed)
     const SHT_HASH: u32 = 5; // symbol hash table (multiple disallowed)
     const SHT_DYNAMIC: u32 = 6; // information for dynamic linking (multiple disallowed)
     const SHT_NOTE: u32 = 7; // notes section
@@ -270,7 +338,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     const SHT_REL: u32 = 9; // relocation entries (multiple allowed)
     const SHT_SHLIB: u32 = 10; // reserved, unspecified semantics
     const SHT_DYNSYM: u32 = 11; // symbol hash table (multiple disallowed)
-    // NOTE - range-gap for [12,13]
+                                // NOTE - range-gap for [12,13]
     const SHT_INIT_ARRAY: u32 = 14; // array of pointers to initialization functions
     const SHT_FINI_ARRAY: u32 = 15; // array of pointers to termination functions
     const SHT_PREINIT_ARRAY: u32 = 16; // array of pointers to pre-initialization functions
@@ -298,13 +366,25 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 var("sh-type"),
                 [
                     // values in range SHT_NULL..=SHT_DYNSYM (or 0..=11)
-                    (Pattern::Int(Bounds::new(SHT_NULL as usize, SHT_DYNSYM as usize)), Expr::Bool(true)),
-                    (Pattern::Int(Bounds::new(SHT_INIT_ARRAY as usize, SHT_SYMTAB_SHNDX as usize)), Expr::Bool(true)),
-                    (Pattern::Int(Bounds::new(SHT_LOOS as usize, SHT_HIUSER as usize)), Expr::Bool(true)),
+                    (
+                        Pattern::Int(Bounds::new(SHT_NULL as usize, SHT_DYNSYM as usize)),
+                        Expr::Bool(true),
+                    ),
+                    (
+                        Pattern::Int(Bounds::new(
+                            SHT_INIT_ARRAY as usize,
+                            SHT_SYMTAB_SHNDX as usize,
+                        )),
+                        Expr::Bool(true),
+                    ),
+                    (
+                        Pattern::Int(Bounds::new(SHT_LOOS as usize, SHT_HIUSER as usize)),
+                        Expr::Bool(true),
+                    ),
                     (Pattern::Wildcard, Expr::Bool(false)),
-                ]
-            )
-        )
+                ],
+            ),
+        ),
     );
 
     // !SECTION
@@ -345,88 +425,255 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         elf_word_endian.call_args(vec![var("is_be")]),
     );
 
-
     // Elf Section Header
-    let elf_shdr = module.define_format_args("elf.shdr",
-        vec![ ISBE_ARG, CLASS_ARG ],
+    let elf_shdr = module.define_format_args(
+        "elf.shdr",
+        vec![ISBE_ARG, CLASS_ARG],
         record([
             ("name", elf_word_endian.call_args(vec![var("is_be")])), // specifier for the section-name, given as an index into the string-header section table
             ("type", elf_sh_type.call_args(vec![var("is_be")])), // section type, which dictates its contents and semantics
-            ("flags", elf_sh_flags.call_args(vec![var("is_be"), var("class")])), // sequence of 1-bit flags dictating various attributes
+            (
+                "flags",
+                elf_sh_flags.call_args(vec![var("is_be"), var("class")]),
+            ), // sequence of 1-bit flags dictating various attributes
             ("addr", elf_addr.call_args(vec![var("is_be"), var("class")])), // virtual address of (the first byte of) this section in memory, when it will appear in the memory image of the process during execution (0 otherwise)
-            ("offset", elf_off.call_args(vec![var("is_be"), var("class")])), // file-offset of the first byte in this section
-            ("size", elf_full_endian.call_args(vec![var("is_be"), var("class")])), // number of bytes in this section
+            (
+                "offset",
+                elf_off.call_args(vec![var("is_be"), var("class")]),
+            ), // file-offset of the first byte in this section
+            (
+                "size",
+                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+            ), // number of bytes in this section
             ("link", elf_word_endian.call_args(vec![var("is_be")])), // section header table index link (depends on section type)
             ("info", elf_sh_info.call_args(vec![var("is_be")])), // extra information that the section type dictates the interpretation of
-            ("addralign", elf_full_endian.call_args(vec![var("is_be"), var("class")])), // section alignment
-            ("entsize", elf_full_endian.call_args(vec![var("is_be"), var("class")])), // section entry size
-        ])
+            (
+                "addralign",
+                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+            ), // section alignment
+            (
+                "entsize",
+                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+            ), // section entry size
+        ]),
     );
 
     // FIXME - if the number of sections is large enough, a 0 will be recorded in header.shnum and the number of headers will be indicated by the first header
     // REVIEW - this is not correct for all cases
-    let elf_shdr_table = module.define_format_args("elf.shdr-table",
-        vec![ISBE_ARG, CLASS_ARG, (Label::Borrowed("shnum"), ValueType::Base(BaseType::U32))],
-        repeat_count(var("shnum"), elf_shdr.call_args(vec![var("is_be"), var("class")]))
+    let elf_shdr_table = module.define_format_args(
+        "elf.shdr-table",
+        vec![
+            ISBE_ARG,
+            CLASS_ARG,
+            (Label::Borrowed("shnum"), ValueType::Base(BaseType::U16)),
+        ],
+        repeat_count(
+            var("shnum"),
+            elf_shdr.call_args(vec![var("is_be"), var("class")]),
+        ),
     );
 
     // Program Header Flags (32-bit and 64-bit)
 
     // 64-bit selective Option
-    let elf_ph_flags64 = module.define_format_args("elf.phdr.p-flags64", vec![ISBE_ARG, CLASS_ARG],
-        cond_maybe(expr_eq(var("class"), Expr::U8(ELF_CLASS_64)), elf_word_endian.call_args(vec![var("is_be")]))
+    let elf_ph_flags64 = module.define_format_args(
+        "elf.phdr.p-flags64",
+        vec![ISBE_ARG, CLASS_ARG],
+        cond_maybe(
+            expr_eq(var("class"), Expr::U8(ELF_CLASS_64)),
+            elf_word_endian.call_args(vec![var("is_be")]),
+        ),
     );
 
     // 32-bit selective Option
-    let elf_ph_flags32 = module.define_format_args("elf.phdr.p-flags32", vec![ISBE_ARG, CLASS_ARG],
-        cond_maybe(expr_eq(var("class"), Expr::U8(ELF_CLASS_32)), elf_word_endian.call_args(vec![var("is_be")]))
+    let elf_ph_flags32 = module.define_format_args(
+        "elf.phdr.p-flags32",
+        vec![ISBE_ARG, CLASS_ARG],
+        cond_maybe(
+            expr_eq(var("class"), Expr::U8(ELF_CLASS_32)),
+            elf_word_endian.call_args(vec![var("is_be")]),
+        ),
     );
 
-    let elf_phdr = module.define_format_args("elf.phdr",
+    let elf_phdr = module.define_format_args(
+        "elf.phdr",
         vec![ISBE_ARG, CLASS_ARG],
         record([
             ("type", elf_word_endian.call_args(vec![var("is_be")])),
-            ("flags64", elf_ph_flags64.call_args(vec![var("is_be"), var("class")])),
-            ("offset", elf_off.call_args(vec![var("is_be"), var("class")])),
-            ("vaddr", elf_addr.call_args(vec![var("is_be"), var("class")])),
-            ("paddr", elf_addr.call_args(vec![var("is_be"), var("class")])),
-            ("filesz", elf_full_endian.call_args(vec![var("is_be"), var("class")])),
-            ("memsz", elf_full_endian.call_args(vec![var("is_be"), var("class")])),
-            ("flags32", elf_ph_flags32.call_args(vec![var("is_be"), var("class")])),
-            ("align", elf_full_endian.call_args(vec![var("is_be"), var("class")])),
-        ])
+            (
+                "flags64",
+                elf_ph_flags64.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "offset",
+                elf_off.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "vaddr",
+                elf_addr.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "paddr",
+                elf_addr.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "filesz",
+                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "memsz",
+                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "flags32",
+                elf_ph_flags32.call_args(vec![var("is_be"), var("class")]),
+            ),
+            (
+                "align",
+                elf_full_endian.call_args(vec![var("is_be"), var("class")]),
+            ),
+        ]),
     );
 
-    let elf_phdr_table = module.define_format_args("elf.phdr-table",
-        vec![ISBE_ARG, CLASS_ARG, (Label::Borrowed("phnum"), ValueType::Base(BaseType::U32))],
-        repeat_count(var("phnum"), elf_phdr.call_args(vec![var("is_be"), var("class")]))
+    let elf_phdr_table = module.define_format_args(
+        "elf.phdr-table",
+        vec![
+            ISBE_ARG,
+            CLASS_ARG,
+            (Label::Borrowed("phnum"), ValueType::Base(BaseType::U16)),
+        ],
+        repeat_count(
+            var("phnum"),
+            elf_phdr.call_args(vec![var("is_be"), var("class")]),
+        ),
     );
 
-    let elf_section = module.define_format_args("elf.section",
+    let elf_section = module.define_format_args(
+        "elf.section",
         vec![
             (Label::Borrowed("type"), ValueType::Base(BaseType::U32)),
-            (Label::Borrowed("offset"), vt_off.clone()),
-            (Label::Borrowed("size"), ValueType::Base(BaseType::U32)),
+            (Label::Borrowed("size"), ValueType::Base(BaseType::U64)),
         ],
         // FIXME - we can refine this a lot more based on the type passed in
-        repeat_count(var("size"), base.u8())
+        repeat_count(var("size"), base.u8()),
     );
 
-    // FIXME - `elf_section` takes extra arguments so this definition is inherently broken
-    let elf_sections =
-    module.define_format_args(
-        "elf.sections",
-        vec![ISBE_ARG, CLASS_ARG],
-        repeat(elf_section.call_args(vec![var("is_be"), var("class")]))
+    let full_as_64 = |e: Expr| -> Expr {
+        expr_match(
+            e,
+            [
+                (
+                    Pattern::Variant(Label::Borrowed("Full32"), Box::new(Pattern::binding("x32"))),
+                    Expr::AsU64(Box::new(var("x32"))),
+                ),
+                (
+                    Pattern::Variant(Label::Borrowed("Full64"), Box::new(Pattern::binding("x64"))),
+                    var("x64"),
+                ),
+            ],
+        )
+    };
+
+    let off_as_64 = |e: Expr| -> Expr {
+        expr_match(
+            e,
+            [
+                (
+                    Pattern::Variant(Label::Borrowed("Off32"), Box::new(Pattern::binding("x32"))),
+                    Expr::AsU64(Box::new(var("x32"))),
+                ),
+                (
+                    Pattern::Variant(Label::Borrowed("Off64"), Box::new(Pattern::binding("x64"))),
+                    var("x64"),
+                ),
+            ],
+        )
+    };
+
+    let eoh_offset_none0 = |offset_file: Expr, f: Format| {
+        cond_maybe(
+            expr_match(
+                offset_file.clone(),
+                [
+                    (
+                        Pattern::Variant(Label::Borrowed("Off32"), Box::new(Pattern::U32(0))),
+                        Expr::Bool(false),
+                    ),
+                    (
+                        Pattern::Variant(Label::Borrowed("Off64"), Box::new(Pattern::U64(0))),
+                        Expr::Bool(false),
+                    ),
+                    (Pattern::Wildcard, Expr::Bool(true)),
+                ],
+            ),
+            Format::WithRelativeOffset(sub(off_as_64(offset_file), var("__eoh")), Box::new(f)),
+        )
+    };
+
+    let elf_ph = eoh_offset_none0(
+        record_proj(var("header"), "phoff"),
+        elf_phdr_table.call_args(vec![
+            is_be(record_projs(var("header"), &["ident", "data"])),
+            record_projs(var("header"), &["ident", "class"]),
+            record_proj(var("header"), "phnum"),
+        ]),
     );
 
-    module.define_format("elf.main",
+    let elf_sh = eoh_offset_none0(
+        record_proj(var("header"), "shoff"),
+        elf_shdr_table.call_args(vec![
+            is_be(record_projs(var("header"), &["ident", "data"])),
+            record_projs(var("header"), &["ident", "class"]),
+            record_proj(var("header"), "shnum"),
+        ]),
+    );
+
+    module.define_format(
+        "elf.main",
         record([
             ("header", elf_header.call()),
-            ("program_headers", elf_phdr_table.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"]), record_proj(var("header"), "phnum")])),
-            ("section_headers", elf_shdr_table.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"]), record_proj(var("header"), "shnum")])),
-            ("sections", elf_sections.call_args(vec![is_be(record_projs(var("header"), &["ident", "data"])), record_projs(var("header"), &["ident", "class"])])),
-            // TODO - add segments and section header table
-        ])
+            ("__eoh", Format::Pos),
+            ("program_headers", elf_ph),
+            ("section_headers", elf_sh),
+            (
+                "sections",
+                Format::Match(
+                    var("section_headers"),
+                    vec![
+                        (
+                            pat_some(Pattern::binding("shdrs")),
+                            format_some(for_each(
+                                var("shdrs"),
+                                "shdr",
+                                cond_maybe(
+                                        and(
+                                            expr_ne(
+                                                record_proj(var("shdr"), "type"),
+                                                Expr::U32(SHT_NOBITS)
+                                            ),
+                                            expr_ne(
+                                                record_proj(var("shdr"), "type"),
+                                                Expr::U32(SHT_NULL)
+                                            ),
+                                        ),
+                                        Format::WithRelativeOffset(
+                                            sub(
+                                                off_as_64(record_proj(var("shdr"), "offset")),
+                                                var("__eoh"),
+                                            ),
+                                            Box::new(elf_section.call_args(vec![
+                                                record_proj(var("shdr"), "type"),
+                                                full_as_64(record_proj(var("shdr"), "size")),
+                                            ])),
+                                        ),
+                                )
+                            )),
+                        ),
+                        (pat_none(), format_none()),
+                    ],
+                ),
+            ),
+            ("__skip", Format::SkipRemainder),
+        ]),
     )
 }

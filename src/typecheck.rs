@@ -567,6 +567,7 @@ impl UintSet {
             (x, y) if x == y => x,
             (UintSet::Any, x) | (x, UintSet::Any) => x,
             (UintSet::Short8, _) | (_, UintSet::Short8) => Self::Short8,
+            (UintSet::AtLeast(w1), UintSet::AtLeast(w2)) => Self::AtLeast(Ord::max(w1, w2)),
             _ => unreachable!("exhaustive cases covered"),
         }
     }
