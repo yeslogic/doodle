@@ -498,11 +498,7 @@ pub fn where_between(format: Format, lower: Expr, upper: Expr) -> Format {
     } else {
         and(expr_gte(var("x"), lower), expr_lte(var("x"), upper))
     };
-    where_lambda(
-        format,
-        "x",
-        cond
-    )
+    where_lambda(format, "x", cond)
 }
 
 /// Homogenous-format tuple whose elements are all `format`, repeating `count` times
@@ -572,7 +568,10 @@ pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
 
 /// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
 pub fn aligned(f: Format, align: usize) -> Format {
-    map(tuple([Format::Align(align), f]), lambda("x", tuple_proj(var("x"), 1)))
+    map(
+        tuple([Format::Align(align), f]),
+        lambda("x", tuple_proj(var("x"), 1)),
+    )
 }
 
 /// Helper for parsing `(f, suffix)` where we only want to see the `f` component

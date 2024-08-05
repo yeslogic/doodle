@@ -285,8 +285,8 @@
 │       │   │   │       │       └── entropy-coding-table-ids <- assert (entropy-coding-table-ids -> (entropy-coding-table-ids.dc-entropy-coding-table-id <= 3) && (entropy-coding-table-ids.ac-entropy-coding-table-id <= 3)) (map (packedbits -> { ... }) U8) :=
 │       │   │   │       │           ├── dc-entropy-coding-table-id := 1
 │       │   │   │       │           └── ac-entropy-coding-table-id := 1
-│       │   │   │       ├── start-spectral-selection <- assert (x -> (x >= 0) && (x <= 63)) base.u8 := 0
-│       │   │   │       ├── end-spectral-selection <- assert (x -> (x >= 0) && (x <= 63)) base.u8 := 63
+│       │   │   │       ├── start-spectral-selection <- assert (x -> x <= 63) base.u8 := 0
+│       │   │   │       ├── end-spectral-selection <- assert (x -> x <= 63) base.u8 := 63
 │       │   │   │       └── approximation-bit-position <- map (packedbits -> { ... }) U8 :=
 │       │   │   │           ├── high := 0
 │       │   │   │           └── low := 0

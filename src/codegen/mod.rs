@@ -590,7 +590,10 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
             GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Option(..)))) => {
                 match inner.as_ref() {
                     Some(inner_pat) => {
-                        RustPattern::Option(Some(Box::new(embed_pattern_t(inner_pat))))
+                        RustPattern::Option(Some(Box::new(
+                            // FIXME - this is a hack to get `Some(ref x)` when matching on Option
+                            embed_pattern_t(inner_pat).ref_hack(),
+                        )))
                     }
                     None => RustPattern::Option(None),
                 }

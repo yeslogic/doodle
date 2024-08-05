@@ -555,7 +555,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (Label::Borrowed("size"), ValueType::Base(BaseType::U64)),
         ],
         // FIXME - we can refine this a lot more based on the type passed in
-        repeat_count(var("size"), base.u8()),
+        Format::Match(
+            var("type"),
+            vec![
+                (Pattern::Wildcard, repeat_count(var("size"), base.u8())), // abstract (unrefined) section
+            ],
+        ),
     );
 
     let full_as_64 = |e: Expr| -> Expr {
@@ -646,27 +651,27 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 var("shdrs"),
                                 "shdr",
                                 cond_maybe(
-                                        and(
-                                            expr_ne(
-                                                record_proj(var("shdr"), "type"),
-                                                Expr::U32(SHT_NOBITS)
-                                            ),
-                                            expr_ne(
-                                                record_proj(var("shdr"), "type"),
-                                                Expr::U32(SHT_NULL)
-                                            ),
+                                    and(
+                                        expr_ne(
+                                            record_proj(var("shdr"), "type"),
+                                            Expr::U32(SHT_NOBITS),
                                         ),
-                                        Format::WithRelativeOffset(
-                                            sub(
-                                                off_as_64(record_proj(var("shdr"), "offset")),
-                                                var("__eoh"),
-                                            ),
-                                            Box::new(elf_section.call_args(vec![
-                                                record_proj(var("shdr"), "type"),
-                                                full_as_64(record_proj(var("shdr"), "size")),
-                                            ])),
+                                        expr_ne(
+                                            record_proj(var("shdr"), "type"),
+                                            Expr::U32(SHT_NULL),
                                         ),
-                                )
+                                    ),
+                                    Format::WithRelativeOffset(
+                                        sub(
+                                            off_as_64(record_proj(var("shdr"), "offset")),
+                                            var("__eoh"),
+                                        ),
+                                        Box::new(elf_section.call_args(vec![
+                                            record_proj(var("shdr"), "type"),
+                                            full_as_64(record_proj(var("shdr"), "size")),
+                                        ])),
+                                    ),
+                                ),
                             )),
                         ),
                         (pat_none(), format_none()),
