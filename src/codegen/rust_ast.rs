@@ -1989,6 +1989,17 @@ impl From<Vec<RustMatchCase>> for RustMatchBody {
     }
 }
 
+impl RustPattern {
+    /// Manually replaces a direct capture of a variable with a `ref` binding under the same name, or preserves
+    /// the original value if some other pattern.
+    pub(crate) fn ref_hack(self) -> Self {
+        match self {
+            RustPattern::CatchAll(Some(label)) => RustPattern::BindRef(label),
+            _ => self,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum MatchCaseLHS {
     Pattern(RustPattern),
@@ -2014,13 +2025,14 @@ pub(crate) enum RustPattern {
     ArrayLiteral(Vec<RustPattern>),
     Option(Option<Box<RustPattern>>),
     Fill,                                   // `..`
-    CatchAll(Option<Label>),                // None <- `_`, Some("x") for `x`
+    CatchAll(Option<Label>),                // Wildcard when None, otherwise a variable-binding
+    BindRef(Label),                         // "x" => `ref x`
     Variant(Constructor, Box<RustPattern>), // FIXME - need to attach enum scope
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Constructor {
-    // Simple struct constructor
+    // Simple struct constructor (mostly used for in-scope-by-default variants like `Ok` and `None`)
     Simple(Label),
     // Compound: Variant with intervening `::` between labels
     Compound(Label, Label),
@@ -2066,6 +2078,9 @@ impl ToFragment for RustPattern {
             RustPattern::Fill => Fragment::String("..".into()),
             RustPattern::CatchAll(None) => Fragment::Char('_'),
             RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
+            RustPattern::BindRef(lab) => {
+                Fragment::string("ref ").cat(Fragment::String(lab.clone()))
+            }
             RustPattern::Option(None) => Fragment::string("None"),
             RustPattern::Option(Some(pat)) => Fragment::string("Some").cat(
                 pat.to_fragment()

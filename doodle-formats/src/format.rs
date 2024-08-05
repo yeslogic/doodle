@@ -5,6 +5,7 @@ use doodle::{Format, FormatModule, FormatRef};
 pub mod base;
 
 mod deflate;
+mod elf;
 mod gif;
 mod gzip;
 mod jpeg;
@@ -16,7 +17,6 @@ mod tar;
 mod text;
 mod tiff;
 mod waldo;
-mod elf;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);

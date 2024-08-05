@@ -11,7 +11,7 @@ fn test_png_signature_decoder() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parser = Parser::new(input);
-    let ret = Decoder27(&mut parser);
+    let ret = Decoder47(&mut parser);
     assert!(ret.is_ok());
 }
 
@@ -154,7 +154,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder17(&mut input)?;
+    let parsed_data = Decoder54(&mut input)?;
     match parsed_data {
         TarBlock {
             header,
