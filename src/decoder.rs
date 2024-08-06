@@ -139,6 +139,11 @@ impl Value {
         Value::Variant(label.into(), value.into())
     }
 
+    /// Unwraps any compatible numeric-typed `Value` and returns the contained number as a `usize`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is not numeric.
     pub(crate) fn unwrap_usize(self) -> usize {
         match self {
             Value::U8(n) => usize::from(n),
@@ -147,6 +152,16 @@ impl Value {
             Value::U64(n) => usize::try_from(n).unwrap(),
             _ => panic!("value is not a number"),
         }
+    }
+
+    /// Unwraps `Value::U8` and returns the contained value, or panics if the value is not `Value::U8`.
+    pub(crate) fn get_as_u8(&self) -> u8 {
+        match self {
+            Value::U8(n) => *n,
+            Value::U16(..) | Value::U32(..) | Value::U64(..) => panic!("value is numeric but not u8 (this may be a soft error, or even success, in future)"),
+            _ => panic!("value is not a number"),
+        }
+
     }
 
     pub(crate) fn unwrap_tuple(self) -> Vec<Value> {
@@ -632,6 +647,7 @@ pub enum Decoder {
     RepeatBetween(MatchTree, Expr, Expr, Box<Decoder>),
     ForEach(Expr, Label, Box<Decoder>),
     SkipRemainder,
+    DecodeBytes(Expr, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
@@ -722,6 +738,10 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Call(n, args))
             }
             Format::Fail => Ok(Decoder::Fail),
+            Format::DecodeBytes(expr, inner) => {
+                let d = self.compile_format(inner, next.clone())?;
+                Ok(Decoder::DecodeBytes(expr.clone(), Box::new(d)))
+            }
             Format::Pos => Ok(Decoder::Pos),
             Format::EndOfInput => Ok(Decoder::EndOfInput),
             Format::Align(n) => Ok(Decoder::Align(*n)),
@@ -1208,6 +1228,23 @@ impl Decoder {
                     }
                 }
                 Ok((Value::Seq(v), input))
+            }
+            Decoder::DecodeBytes(bytes, a) => {
+                let bytes = {
+                    let raw = bytes.eval_value(scope);
+                    let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
+                    seq_vals.into_iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
+                };
+                let new_input = ReadCtxt::new(&bytes);
+                let (va, rem_input) = a.parse(program, scope, new_input)?;
+                // REVIEW - do we *actually* want to enforce full-consumption of the sub-buffer (i.e. no strictly partial reads)
+                match rem_input.read_byte() {
+                    Some((b, _)) => {
+                        // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
+                        return Err(DecodeError::Trailing { byte: b, offset: rem_input.offset });
+                    }
+                    None => Ok((va, input)),
+                }
             }
             Decoder::ForEach(expr, lbl, a) => {
                 let mut input = input;

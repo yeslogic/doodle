@@ -130,6 +130,9 @@ fn check_covered(
         Format::Byte(_) => {
             return Err(format!("uncovered byte: {:?}", path));
         }
+        Format::DecodeBytes(_, format) => {
+            check_covered(module, path, format)?;
+        }
         Format::Variant(label, format) => {
             path.push(label.clone());
             check_covered(module, path, format)?;
@@ -283,6 +286,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                     unreachable!("Maybe should only produce Some(X)|None(()), found {other:?}")
                 }
             },
+            Format::DecodeBytes(_bytes, format) => self.write_flat(value, format),
             Format::Peek(format) => self.write_flat(value, format),
             Format::PeekNot(format) => self.write_flat(value, format),
             Format::Slice(_, format) => self.write_flat(value, format),

@@ -710,6 +710,8 @@ pub enum Format {
     Pos,
     /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
     SkipRemainder,
+    /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
+    DecodeBytes(Expr, Box<Format>),
 }
 
 impl Format {
@@ -742,6 +744,7 @@ impl Format {
             Format::Fail => Bounds::exact(0),
             Format::EndOfInput => Bounds::exact(0),
             Format::SkipRemainder => Bounds::any(),
+            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
             Format::Align(n) => Bounds::new(0, n - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.match_bounds(module),
@@ -787,6 +790,8 @@ impl Format {
             Format::Apply(_) => Bounds::at_least(1),
             // FIXME - do we have any way of approximating this better?
             Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
+            // NOTE - because we are parsing a sequence of bytes, we do not interact with the actual buffer
+            Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
         }
     }
 
@@ -799,6 +804,7 @@ impl Format {
             Format::EndOfInput => Bounds::exact(0),
             // NOTE - for PeekNot purposes it is not fully clear how to treat SkipRemainder, but we want to mirror the behavior of `Repeat(Byte)`
             Format::SkipRemainder => Bounds::any(),
+            Format::Align(0) => unreachable!("illegal Format::Align modulus (== 0)"),
             Format::Align(n) => Bounds::new(0, n - 1),
             Format::Byte(_) => Bounds::exact(1),
             Format::Variant(_label, f) => f.lookahead_bounds(module),
@@ -844,6 +850,7 @@ impl Format {
                 .unwrap(),
             Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds(module),
             Format::Apply(_) => Bounds::at_least(1),
+            Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
         }
     }
 
@@ -888,6 +895,7 @@ impl Format {
             Format::Dynamic(_name, _dynformat, f) => f.depends_on_next(module),
             Format::Apply(..) => false,
             Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
+            Format::DecodeBytes(_bytes, _f) => false,
         }
     }
 
@@ -1042,6 +1050,15 @@ impl FormatModule {
                     let _t = arg_type.unify(&t)?;
                 }
                 Ok(self.get_format_type(*level).clone())
+            }
+            Format::DecodeBytes(bytes, f) => {
+                let bytes_type = bytes.infer_type(scope)?;
+                match bytes_type {
+                    ValueType::Seq(bt) if matches!(*bt, ValueType::Base(BaseType::U8)) => {
+                        self.infer_format_type(scope, f)
+                    }
+                    other => Err(anyhow!("DecodeBytes first argument type should be Seq(U8), found {other:?} instead")),
+                }
             }
             Format::Fail => Ok(ValueType::Empty),
             Format::SkipRemainder | Format::EndOfInput => Ok(ValueType::Tuple(vec![])),
@@ -1820,7 +1837,7 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Map(_, f, _expr) | TypedFormat::Where(_, f, _expr) => {
                 Self::from_gt_format(module, f, next)
             }
-            TypedFormat::Compute(_, _expr) => Self::from_next(module, next),
+            TypedFormat::DecodeBytes(..) | TypedFormat::Compute(..) => Self::from_next(module, next),
             TypedFormat::Pos => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {
@@ -1848,8 +1865,12 @@ impl<'a> MatchTreeStep<'a> {
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::SkipRemainder => Self::accept(),
-            Format::Align(_) => {
-                Self::accept() // FIXME
+            Format::Align(n) => {
+                Self::from_align(module, next, *n)
+
+            }
+            Format::DecodeBytes(_bytes, _f) => {
+                Self::from_next(module, next)
             }
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
@@ -1983,6 +2004,27 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Apply(_name) => Self::accept(),
+        }
+    }
+
+    /// Constructs a [MatchTreeStep] that matches the various possible align-offset versions of `next`, for small enough `n`,
+    /// and otherwise fudges the return value with a universal-acceptance.
+    ///
+    /// NOTE - currently 'small enough' just means that `n` is 0 (and illegal) or `1` (and irrefutable as an alignment modulus).
+    ///
+    /// # Panics
+    ///
+    /// Will panic if `n` happens to be `0`, as it is impossible to align modulo `0`.
+    fn from_align(module: &'a FormatModule, next: Rc<Next<'a>>, n: usize) -> MatchTreeStep<'a> {
+        match n {
+            // FIXME - we might want to construct an auto-rejecting tree here, but this is perhaps less murky in terms of expected behavior
+            0 => unreachable!("alignment modulus 0 has no valid possible interpretation"),
+            1 => Self::from_next(module, next), // guaranteed to already be in alignment
+            2.. => {
+                // FIXME - this is still hackish but it is at least somewhat better than before
+                // TODO - consider handling very small cases like 2..=4, with bespoke tree-unions over each potential distance from `next` we might skip over
+                Self::accept()
+            }
         }
     }
 }
