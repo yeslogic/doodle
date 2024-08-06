@@ -57,6 +57,10 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
             | TypedFormat::Pos
             | TypedFormat::Fail
             | TypedFormat::EndOfInput => {}
+            TypedFormat::DecodeBytes(_, expr, inner) => {
+                expr.hash(state);
+                inner.hash(state);
+            }
             TypedFormat::Align(n) => n.hash(state),
             TypedFormat::Byte(bs) => bs.hash(state),
             TypedFormat::Variant(_tr, lbl, inner) => {
@@ -191,6 +195,7 @@ pub enum TypedFormat<TypeRep> {
     Apply(TypeRep, Label, Rc<TypedDynFormat<TypeRep>>),
     Pos,
     SkipRemainder,
+    DecodeBytes(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
 }
 
 impl TypedFormat<GenType> {
@@ -200,7 +205,8 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.lookahead_bounds(),
 
-            TypedFormat::SkipRemainder
+            TypedFormat::DecodeBytes(_, _, _)
+            | TypedFormat::SkipRemainder
             | TypedFormat::Pos
             | TypedFormat::Compute(_, _)
             | TypedFormat::EndOfInput
@@ -270,7 +276,8 @@ impl TypedFormat<GenType> {
         match self {
             TypedFormat::FormatCall(_gt, _lvl, _args, def) => def.match_bounds(),
 
-            TypedFormat::Compute(_, _)
+            TypedFormat::DecodeBytes(_, _, _)
+            | TypedFormat::Compute(_, _)
             | TypedFormat::Peek(_, _)
             | TypedFormat::PeekNot(_, _)
             | TypedFormat::EndOfInput
@@ -359,7 +366,8 @@ impl TypedFormat<GenType> {
             // REVIEW - forcing Pos to be a U64-valued format
             TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
 
-            TypedFormat::FormatCall(gt, ..)
+            TypedFormat::DecodeBytes(gt, ..)
+            | TypedFormat::FormatCall(gt, ..)
             | TypedFormat::Variant(gt, ..)
             | TypedFormat::Union(gt, ..)
             | TypedFormat::UnionNondet(gt, ..)
@@ -780,6 +788,7 @@ mod __impls {
                         .collect();
                     Format::ItemVar(level, args)
                 }
+                TypedFormat::DecodeBytes(_, expr, inner) => Format::DecodeBytes(Expr::from(expr), rebox(inner)),
                 TypedFormat::SkipRemainder => Format::SkipRemainder,
                 TypedFormat::Pos => Format::Pos,
                 TypedFormat::Fail => Format::Fail,

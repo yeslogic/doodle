@@ -2394,6 +2394,20 @@ impl TypeChecker {
             Format::SkipRemainder | Format::EndOfInput | Format::Align(_) => {
                 Ok(self.init_var_simple(UType::UNIT)?.0)
             }
+            Format::DecodeBytes(expr, inner) => {
+                let newvar = self.get_new_uvar();
+
+                let v_expr = self.infer_var_expr(expr, ctxt.scope)?;
+                let v_inner = self.infer_var_format(inner.as_ref(), ctxt)?;
+
+                // we can only apply DecodeBytes to expressions of type `Seq(U8)`.
+                self.unify_var_utype(v_expr, Rc::new(UType::Seq(Rc::new(UType::Base(BaseType::U8)))))?;
+
+                // provided the previous unification succeeded, our output type is equivalent to the inferred type of the inner format
+                self.unify_var_pair(newvar, v_inner)?;
+
+                Ok(newvar)
+            }
             Format::Byte(_set) => {
                 // REVIEW - is there a better approach when matching an empty set of bytes?
                 if _set.is_empty() {

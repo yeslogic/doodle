@@ -434,6 +434,10 @@ impl CodeGen {
                 let cl_expr = embed_expr(expr, ExprInfo::EmbedCloned);
                 CaseLogic::Repeat(RepeatLogic::ForEach(cl_expr, lbl.clone(), Box::new(self.translate(single.get_dec()))))
             }
+            TypedDecoder::DecodeBytes(_gt, expr, inner) => {
+                let cl_expr = embed_expr(expr, ExprInfo::Natural);
+                CaseLogic::Derived(DerivedLogic::DecodeBytes(cl_expr, Box::new(self.translate(inner.get_dec()))))
+            }
             TypedDecoder::RepeatCount(_gt, expr_count, single) =>
                 CaseLogic::Repeat(
                     RepeatLogic::ExactCount(
@@ -2345,6 +2349,7 @@ enum DerivedLogic<ExprT> {
     Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<ExprT>>),
     Where(RustExpr, Box<CaseLogic<ExprT>>),
     Maybe(RustExpr, Box<CaseLogic<ExprT>>),
+    DecodeBytes(RustExpr, Box<CaseLogic<TypedExpr<GenType>>>),
 }
 
 #[derive(Clone, Debug)]
@@ -2383,6 +2388,24 @@ impl ToAst for DerivedLogic<GTExpr> {
                 (
                     Iterator::chain(std::iter::once(dynl.to_ast(ctxt)), init.into_iter()).collect(),
                     last,
+                )
+            }
+            DerivedLogic::DecodeBytes(bytes_expr, inner_cl) => {
+                const INNER_NAME: &'static str = "reparser";
+                let bytes_ctxt = ProdCtxt {
+                    input_varname: &Cow::Borrowed(INNER_NAME),
+                };
+                let (init, last) = inner_cl.to_ast(bytes_ctxt);
+                (
+                    Iterator::chain(
+                        [
+                            RustStmt::assign("tmp", RustExpr::scoped(["Parser"], "new").call_with([RustExpr::borrow_of(bytes_expr.clone())])),
+                            RustStmt::assign(INNER_NAME, RustExpr::BorrowMut(Box::new(RustExpr::local("tmp")))),
+                        ].into_iter(),
+                        init.into_iter(),
+
+                    ).collect(),
+                    last
                 )
             }
             DerivedLogic::Maybe(is_present, inner_cl) => {
@@ -2770,7 +2793,7 @@ impl<'a> Elaborator<'a> {
             let t_branch = match branch {
                 Format::Variant(name, inner) => {
                     let t_inner = self.elaborate_format(inner, dyns);
-                    GTFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner))
+                    TypedFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner))
                 }
                 _ => self.elaborate_format(branch, dyns),
             };
@@ -2778,9 +2801,9 @@ impl<'a> Elaborator<'a> {
         }
 
         if is_det {
-            GTFormat::Union(gt, t_branches)
+            TypedFormat::Union(gt, t_branches)
         } else {
-            GTFormat::UnionNondet(gt, t_branches)
+            TypedFormat::UnionNondet(gt, t_branches)
         }
     }
 
@@ -2811,7 +2834,7 @@ impl<'a> Elaborator<'a> {
                     ret
                 };
                 let gt = self.get_gt_from_index(index);
-                GTFormat::FormatCall(gt, *level, t_args, t_inner)
+                TypedFormat::FormatCall(gt, *level, t_args, t_inner)
             }
             Format::ForEach(expr, lbl, inner) => {
                 let index = self.get_and_increment_index();
@@ -2819,31 +2842,38 @@ impl<'a> Elaborator<'a> {
                 self.increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::ForEach(gt, t_expr, lbl.clone(), Box::new(t_inner))
+                TypedFormat::ForEach(gt, t_expr, lbl.clone(), Box::new(t_inner))
+            }
+            Format::DecodeBytes(expr, inner) => {
+                let index = self.get_and_increment_index();
+                let t_expr = self.elaborate_expr(expr);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::DecodeBytes(gt, t_expr, Box::new(t_inner))
             }
             Format::Fail => {
                 self.increment_index();
-                GTFormat::Fail
+                TypedFormat::Fail
             }
             Format::EndOfInput => {
                 self.increment_index();
-                GTFormat::EndOfInput
+                TypedFormat::EndOfInput
             }
             Format::SkipRemainder => {
                 self.increment_index();
-                GTFormat::SkipRemainder
+                TypedFormat::SkipRemainder
             }
             Format::Align(n) => {
                 self.increment_index();
-                GTFormat::Align(*n)
+                TypedFormat::Align(*n)
             }
             Format::Pos => {
                 self.increment_index();
-                GTFormat::Pos
+                TypedFormat::Pos
             }
             Format::Byte(bs) => {
                 self.increment_index();
-                GTFormat::Byte(*bs)
+                TypedFormat::Byte(*bs)
             }
             Format::Variant(label, inner) => {
                 let index = self.get_and_increment_index();
@@ -2861,7 +2891,7 @@ impl<'a> Elaborator<'a> {
                         // unreachable!("found non-adhoc type for variant format elaboration: {gt:?} @ {index} ({label}({inner:?})");
                     }
                 }
-                GTFormat::Variant(gt, label.clone(), Box::new(t_inner))
+                TypedFormat::Variant(gt, label.clone(), Box::new(t_inner))
             }
             Format::Union(branches) => self.elaborate_format_union(branches, dyns, true),
             Format::UnionNondet(branches) => self.elaborate_format_union(branches, dyns, false),
@@ -2878,7 +2908,7 @@ impl<'a> Elaborator<'a> {
                 } else {
                     (self.get_gt_from_index(index), Vec::new())
                 };
-                GTFormat::Tuple(gt, t_elts)
+                TypedFormat::Tuple(gt, t_elts)
             }
             Format::Record(flds) => {
                 let index = self.get_and_increment_index();
@@ -2900,26 +2930,26 @@ impl<'a> Elaborator<'a> {
                         // unreachable!("found non-adhoc type for record format elaboration: {gt:?} @ {index} ({flds:#?})");
                     }
                 }
-                GTFormat::Record(gt, t_flds)
+                TypedFormat::Record(gt, t_flds)
             }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Repeat(gt, Box::new(t_inner))
+                TypedFormat::Repeat(gt, Box::new(t_inner))
             }
             Format::Repeat1(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Repeat1(gt, Box::new(t_inner))
+                TypedFormat::Repeat1(gt, Box::new(t_inner))
             }
             Format::RepeatCount(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
+                TypedFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
             }
             Format::RepeatBetween(min_expr, max_expr, inner) => {
                 let index = self.get_and_increment_index();
@@ -2927,87 +2957,87 @@ impl<'a> Elaborator<'a> {
                 let t_max_expr = self.elaborate_expr(max_expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatBetween(gt, t_min_expr, t_max_expr, Box::new(t_inner))
+                TypedFormat::RepeatBetween(gt, t_min_expr, t_max_expr, Box::new(t_inner))
             }
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
+                TypedFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
             }
             Format::RepeatUntilSeq(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
+                TypedFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
             }
             Format::Maybe(cond, inner) => {
                 let index = self.get_and_increment_index();
                 let t_cond = self.elaborate_expr(cond);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Maybe(gt, t_cond, Box::new(t_inner))
+                TypedFormat::Maybe(gt, t_cond, Box::new(t_inner))
             }
             Format::Peek(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Peek(gt, Box::new(t_inner))
+                TypedFormat::Peek(gt, Box::new(t_inner))
             }
             Format::PeekNot(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::PeekNot(gt, Box::new(t_inner))
+                TypedFormat::PeekNot(gt, Box::new(t_inner))
             }
             Format::Slice(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Slice(gt, t_expr, Box::new(t_inner))
+                TypedFormat::Slice(gt, t_expr, Box::new(t_inner))
             }
             Format::Bits(inner) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Bits(gt, Box::new(t_inner))
+                TypedFormat::Bits(gt, Box::new(t_inner))
             }
             Format::WithRelativeOffset(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
+                TypedFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
             }
             Format::Map(inner, lambda) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Map(gt, Box::new(t_inner), t_lambda)
+                TypedFormat::Map(gt, Box::new(t_inner), t_lambda)
             }
             Format::Where(inner, lambda) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Where(gt, Box::new(t_inner), t_lambda)
+                TypedFormat::Where(gt, Box::new(t_inner), t_lambda)
             }
             Format::Compute(expr) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Compute(gt, t_expr)
+                TypedFormat::Compute(gt, t_expr)
             }
             Format::Let(lbl, expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Let(gt, lbl.clone(), t_expr, Box::new(t_inner))
+                TypedFormat::Let(gt, lbl.clone(), t_expr, Box::new(t_inner))
             }
             Format::Match(x, branches) => {
                 let index = self.get_and_increment_index();
@@ -3019,7 +3049,7 @@ impl<'a> Elaborator<'a> {
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Match(gt, t_x, t_branches)
+                TypedFormat::Match(gt, t_x, t_branches)
             }
             Format::Dynamic(lbl, dynf, inner) => {
                 let index = self.get_and_increment_index();
@@ -3031,7 +3061,7 @@ impl<'a> Elaborator<'a> {
                 ));
                 let t_inner = self.elaborate_format(inner, &newdyns);
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(t_inner))
+                TypedFormat::Dynamic(gt, lbl.clone(), t_dynf, Box::new(t_inner))
             }
             Format::Apply(lbl) => {
                 let index = self.get_and_increment_index();
@@ -3039,7 +3069,7 @@ impl<'a> Elaborator<'a> {
                     .get_typed_dynf_by_name(lbl)
                     .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
                 let gt = self.get_gt_from_index(index);
-                GTFormat::Apply(gt, lbl.clone(), t_dynf)
+                TypedFormat::Apply(gt, lbl.clone(), t_dynf)
             }
         }
     }

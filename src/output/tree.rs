@@ -294,6 +294,9 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Byte(_) => self.compile_parsed_value(value),
             // NOTE : Pos self-documents its position so we don't really need to annotate that...
             Format::Pos => self.compile_value(value.into_cow_value().as_ref()),
+            Format::DecodeBytes(_bytes, format) => {
+                self.compile_parsed_decoded_value(value, format)
+            }
             Format::Variant(label, format) => match value {
                 ParsedValue::Variant(label2, value) => {
                     if label == label2 {
@@ -420,6 +423,7 @@ impl<'module> MonoidalPrinter<'module> {
                     self.compile_decoded_value(value, self.module.get_format(*level))
                 }
             }
+            Format::DecodeBytes(_bytes, f) => self.compile_decoded_value(value, f),
             Format::Fail => panic!("uninhabited format (value={value:?}"),
             Format::SkipRemainder | Format::EndOfInput => self.compile_value(value),
             Format::Align(_) => self.compile_value(value),
@@ -1688,6 +1692,19 @@ impl<'module> MonoidalPrinter<'module> {
                     ),
                     prec,
                     Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::DecodeBytes(expr, format) => {
+                let expr_frag = self.compile_expr(expr, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "decode-bytes",
+                        Some(&[expr_frag]),
+                        format,
+                        prec
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND
                 )
             }
             Format::ForEach(expr, lbl, format) => {
