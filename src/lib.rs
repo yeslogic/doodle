@@ -1687,8 +1687,8 @@ impl<'a> MatchTreeStep<'a> {
                         Some(0) => tree,
                         _ => {
                             // format is nullable but might match something
-                            // FIXME - implement proper tree unification for this case
-                            tree
+                            // FIXME - this is a stopgap for the complex logic we would otherwise need to model
+                            Self::accept()
                         }
                     }
                 } else {
@@ -1910,8 +1910,8 @@ impl<'a> MatchTreeStep<'a> {
                         Some(0) => tree,
                         _ => {
                             // format is nullable but might match something
-                            // FIXME - implement proper tree unification for this case
-                            tree
+                            // FIXME - this is a stopgap for the complex logic we would otherwise need to model
+                            Self::accept()
                         }
                     }
                 } else {
