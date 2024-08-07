@@ -36,25 +36,23 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let waldo = waldo::main(module, &base);
 
     let tgz = {
-        module.define_format("tgz.main", {
-            map(
-                record([
-                    ("gzip-raw", gzip.call()),
-                    (
-                        "tgz-data",
-                        for_each(
-                            var("gzip-raw"),
-                            "item",
-                            Format::DecodeBytes(
-                                record_projs(var("item"), &["data", "inflate"]),
-                                Box::new(tar.call()),
-                            ),
+        module.define_format(
+            "tgz.main",
+            record([
+                ("__gzip-raw", gzip.call()),
+                (
+                    "tgz-data",
+                    for_each(
+                        var("__gzip-raw"),
+                        "item",
+                        Format::DecodeBytes(
+                            record_projs(var("item"), &["data", "inflate"]),
+                            Box::new(tar.call()),
                         ),
                     ),
-                ]),
-                lambda("x", record_proj(var("x"), "tgz-data")),
-            )
-        })
+                ),
+            ]),
+        )
     };
 
     module.define_format(
