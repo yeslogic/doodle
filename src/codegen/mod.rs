@@ -2349,7 +2349,7 @@ enum DerivedLogic<ExprT> {
     Dynamic(DynamicLogic<ExprT>, Box<CaseLogic<ExprT>>),
     Where(RustExpr, Box<CaseLogic<ExprT>>),
     Maybe(RustExpr, Box<CaseLogic<ExprT>>),
-    DecodeBytes(RustExpr, Box<CaseLogic<TypedExpr<GenType>>>),
+    DecodeBytes(RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 #[derive(Clone, Debug)]
