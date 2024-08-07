@@ -35,6 +35,28 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let elf = elf::main(module, &base);
     let waldo = waldo::main(module, &base);
 
+    let tgz = {
+        module.define_format("tgz.main", {
+            map(
+                record([
+                    ("gzip-raw", gzip.call()),
+                    (
+                        "tgz-data",
+                        for_each(
+                            var("gzip-raw"),
+                            "item",
+                            Format::DecodeBytes(
+                                record_projs(var("item"), &["data", "inflate"]),
+                                Box::new(tar.call()),
+                            ),
+                        ),
+                    ),
+                ]),
+                lambda("x", record_proj(var("x"), "tgz-data")),
+            )
+        })
+    };
+
     module.define_format(
         "main",
         record([
@@ -44,6 +66,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("waldo", waldo.call()),
                     ("peano", peano.call()),
                     ("gif", gif.call()),
+                    ("tgz", tgz.call()),
                     ("gzip", gzip.call()),
                     ("jpeg", jpeg.call()),
                     ("mpeg4", mpeg4.call()),

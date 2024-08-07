@@ -788,7 +788,9 @@ mod __impls {
                         .collect();
                     Format::ItemVar(level, args)
                 }
-                TypedFormat::DecodeBytes(_, expr, inner) => Format::DecodeBytes(Expr::from(expr), rebox(inner)),
+                TypedFormat::DecodeBytes(_, expr, inner) => {
+                    Format::DecodeBytes(Expr::from(expr), rebox(inner))
+                }
                 TypedFormat::SkipRemainder => Format::SkipRemainder,
                 TypedFormat::Pos => Format::Pos,
                 TypedFormat::Fail => Format::Fail,

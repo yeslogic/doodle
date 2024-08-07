@@ -1172,14 +1172,20 @@ impl Decoder {
                 let bytes = {
                     let raw = bytes.eval_value_with_loc(scope);
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals.into_iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
+                    seq_vals
+                        .into_iter()
+                        .map(|v| v.get_as_u8())
+                        .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
                 let (va, rem_input) = a.parse_with_loc(program, scope, new_input)?;
                 match rem_input.read_byte() {
                     Some((b, _)) => {
                         // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        return Err(DecodeError::Trailing { byte: b, offset: rem_input.offset });
+                        return Err(DecodeError::Trailing {
+                            byte: b,
+                            offset: rem_input.offset,
+                        });
                     }
                     None => Ok((va, input)),
                 }

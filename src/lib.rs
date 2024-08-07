@@ -1680,11 +1680,24 @@ impl<'a> MatchTreeStep<'a> {
             }
             TypedFormat::ForEach(_, _expr, _lbl, a) => {
                 let tree = Self::from_next(module, next.clone());
-                tree.union(Self::from_gt_format(
-                    module,
-                    a,
-                    Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
-                ))
+                // FIXME - we might want a more robust solution to nullable formats in ForEach
+                let bounds = a.match_bounds();
+                if bounds.min() == 0 {
+                    match bounds.max() {
+                        Some(0) => tree,
+                        _ => {
+                            // format is nullable but might match something
+                            // FIXME - implement proper tree unification for this case
+                            tree
+                        }
+                    }
+                } else {
+                    tree.union(Self::from_gt_format(
+                        module,
+                        a,
+                        Rc::new(Next::Repeat(MaybeTyped::Typed(a), next.clone())),
+                    ))
+                }
             }
             TypedFormat::Repeat1(_, a) => Self::from_gt_format(
                 module,
@@ -1837,7 +1850,9 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::Map(_, f, _expr) | TypedFormat::Where(_, f, _expr) => {
                 Self::from_gt_format(module, f, next)
             }
-            TypedFormat::DecodeBytes(..) | TypedFormat::Compute(..) => Self::from_next(module, next),
+            TypedFormat::DecodeBytes(..) | TypedFormat::Compute(..) => {
+                Self::from_next(module, next)
+            }
             TypedFormat::Pos => Self::from_next(module, next),
             TypedFormat::Let(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Match(_, _, branches) => {
@@ -1865,13 +1880,8 @@ impl<'a> MatchTreeStep<'a> {
             Format::Fail => Self::reject(),
             Format::EndOfInput => Self::accept(),
             Format::SkipRemainder => Self::accept(),
-            Format::Align(n) => {
-                Self::from_align(module, next, *n)
-
-            }
-            Format::DecodeBytes(_bytes, _f) => {
-                Self::from_next(module, next)
-            }
+            Format::Align(n) => Self::from_align(module, next, *n),
+            Format::DecodeBytes(_bytes, _f) => Self::from_next(module, next),
             Format::Byte(bs) => Self::branch(*bs, next),
             Format::Variant(_label, f) => Self::from_format(module, f, next.clone()),
             Format::Union(branches) | Format::UnionNondet(branches) => {
@@ -1893,11 +1903,24 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::ForEach(_expr, _lbl, a) => {
                 let tree = Self::from_next(module, next.clone());
-                tree.union(Self::from_format(
-                    module,
-                    a,
-                    Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
-                ))
+                // FIXME - we might want a more robust solution to nullable formats in ForEach
+                let bounds = a.match_bounds(module);
+                if bounds.min() == 0 {
+                    match bounds.max() {
+                        Some(0) => tree,
+                        _ => {
+                            // format is nullable but might match something
+                            // FIXME - implement proper tree unification for this case
+                            tree
+                        }
+                    }
+                } else {
+                    tree.union(Self::from_format(
+                        module,
+                        a,
+                        Rc::new(Next::Repeat(MaybeTyped::Untyped(a), next.clone())),
+                    ))
+                }
             }
             Format::Repeat1(a) => Self::from_format(
                 module,

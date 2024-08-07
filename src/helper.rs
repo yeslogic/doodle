@@ -597,7 +597,13 @@ pub fn with_pos(pos_varname: &'static str, f: Format) -> Format {
 /// second layer, which is treated as the final result.
 pub fn two_pass(primary: Format, secondary: Format) -> Format {
     map(
-        record([("first", primary), ("second", Format::DecodeBytes(var("first"), Box::new(secondary)))]),
+        record([
+            ("first", primary),
+            (
+                "second",
+                Format::DecodeBytes(var("first"), Box::new(secondary)),
+            ),
+        ]),
         lambda("x", record_proj(var("x"), "second")),
     )
 }
