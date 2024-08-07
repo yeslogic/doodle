@@ -2399,13 +2399,21 @@ impl ToAst for DerivedLogic<GTExpr> {
                 (
                     Iterator::chain(
                         [
-                            RustStmt::assign("tmp", RustExpr::scoped(["Parser"], "new").call_with([RustExpr::borrow_of(bytes_expr.clone())])),
-                            RustStmt::assign(INNER_NAME, RustExpr::BorrowMut(Box::new(RustExpr::local("tmp")))),
-                        ].into_iter(),
+                            RustStmt::assign_mut(
+                                "tmp",
+                                RustExpr::scoped(["Parser"], "new")
+                                    .call_with([RustExpr::vec_as_slice(bytes_expr.clone())]),
+                            ),
+                            RustStmt::assign(
+                                INNER_NAME,
+                                RustExpr::BorrowMut(Box::new(RustExpr::local("tmp"))),
+                            ),
+                        ]
+                        .into_iter(),
                         init.into_iter(),
-
-                    ).collect(),
-                    last
+                    )
+                    .collect(),
+                    last,
                 )
             }
             DerivedLogic::Maybe(is_present, inner_cl) => {

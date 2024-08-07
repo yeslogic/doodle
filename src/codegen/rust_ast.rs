@@ -1570,8 +1570,8 @@ impl RustExpr {
     /// clone-then-borrow constructs in the generated code.
     pub fn vec_as_slice(self) -> Self {
         let this = match self {
-            Self::CloneOf(this) => this,
-            other => Box::new(other),
+            Self::CloneOf(this) => *this,
+            other => other,
         };
         this.call_method("as_slice")
     }

@@ -226,11 +226,7 @@ impl<'a> GTCompiler<'a> {
             }
             GTFormat::DecodeBytes(gt, expr, f) => {
                 let da = Box::new(self.compile_gt_format(f, None, next)?);
-                Ok(TypedDecoder::DecodeBytes(
-                    gt.clone(),
-                    expr.clone(),
-                    da,
-                ))
+                Ok(TypedDecoder::DecodeBytes(gt.clone(), expr.clone(), da))
             }
             GTFormat::ForEach(gt, expr, lbl, f) => {
                 let da = Box::new(self.compile_gt_format(f, None, next)?);

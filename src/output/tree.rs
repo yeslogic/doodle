@@ -294,9 +294,7 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Byte(_) => self.compile_parsed_value(value),
             // NOTE : Pos self-documents its position so we don't really need to annotate that...
             Format::Pos => self.compile_value(value.into_cow_value().as_ref()),
-            Format::DecodeBytes(_bytes, format) => {
-                self.compile_parsed_decoded_value(value, format)
-            }
+            Format::DecodeBytes(_bytes, format) => self.compile_parsed_decoded_value(value, format),
             Format::Variant(label, format) => match value {
                 ParsedValue::Variant(label2, value) => {
                     if label == label2 {
@@ -1697,14 +1695,9 @@ impl<'module> MonoidalPrinter<'module> {
             Format::DecodeBytes(expr, format) => {
                 let expr_frag = self.compile_expr(expr, Precedence::ATOM);
                 cond_paren(
-                    self.compile_nested_format(
-                        "decode-bytes",
-                        Some(&[expr_frag]),
-                        format,
-                        prec
-                    ),
+                    self.compile_nested_format("decode-bytes", Some(&[expr_frag]), format, prec),
                     prec,
-                    Precedence::FORMAT_COMPOUND
+                    Precedence::FORMAT_COMPOUND,
                 )
             }
             Format::ForEach(expr, lbl, format) => {

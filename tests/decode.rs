@@ -195,3 +195,14 @@ mod waldo {
         check_output(output, expected)
     }
 }
+
+mod tgz {
+    use super::*;
+
+    #[test]
+    fn test_decode_test_tgz() {
+        let output = doodle().args(["file", "test.tgz"]).output().unwrap();
+        let expected = expect_test::expect_file!("expected/decode/test.tgz.stdout");
+        check_output(output, expected)
+    }
+}

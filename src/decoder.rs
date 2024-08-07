@@ -161,7 +161,6 @@ impl Value {
             Value::U16(..) | Value::U32(..) | Value::U64(..) => panic!("value is numeric but not u8 (this may be a soft error, or even success, in future)"),
             _ => panic!("value is not a number"),
         }
-
     }
 
     pub(crate) fn unwrap_tuple(self) -> Vec<Value> {
@@ -1233,7 +1232,10 @@ impl Decoder {
                 let bytes = {
                     let raw = bytes.eval_value(scope);
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals.into_iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
+                    seq_vals
+                        .into_iter()
+                        .map(|v| v.get_as_u8())
+                        .collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
                 let (va, rem_input) = a.parse(program, scope, new_input)?;
@@ -1241,7 +1243,10 @@ impl Decoder {
                 match rem_input.read_byte() {
                     Some((b, _)) => {
                         // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        return Err(DecodeError::Trailing { byte: b, offset: rem_input.offset });
+                        return Err(DecodeError::Trailing {
+                            byte: b,
+                            offset: rem_input.offset,
+                        });
                     }
                     None => Ok((va, input)),
                 }
@@ -1406,7 +1411,10 @@ impl Decoder {
                         return Ok((Value::Branch(index, Box::new(v)), input));
                     }
                 }
-                panic!("non-exhaustive patterns");
+                panic!(
+                    "non-exhaustive patterns: {head:?} not in {:#?}",
+                    branches.iter().map(|(p, _)| p).collect::<Vec<_>>()
+                );
             }
             Decoder::Dynamic(name, DynFormat::Huffman(lengths_expr, opt_values_expr), d) => {
                 let lengths_val = lengths_expr.eval(scope);
