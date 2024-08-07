@@ -1776,6 +1776,12 @@ pub struct main_tar {
 }
 
 #[derive(Debug, Clone)]
+pub struct main_tgz {
+    __gzip_raw: Vec<main_gzip_inSeq>,
+    tgz_data: Vec<main_tar>,
+}
+
+#[derive(Debug, Clone)]
 pub struct main_waldo {
     r#where: u64,
     noise: Vec<u8>,
@@ -1797,7 +1803,7 @@ pub enum main {
     riff(main_riff),
     tar(main_tar),
     text(Vec<char>),
-    tgz(Vec<main_tar>),
+    tgz(main_tgz),
     tiff(main_jpeg_frame_initial_segment_app1_data_data_exif_exif),
     waldo(main_waldo),
 }
@@ -1817,12 +1823,6 @@ pub struct tar_padding_char {
     o0: u8,
     __nil: u8,
     value: u32,
-}
-
-#[derive(Debug, Clone)]
-pub struct base_u8 {
-    gzip_raw: Vec<main_gzip_inSeq>,
-    tgz_data: Vec<main_tar>,
 }
 
 #[derive(Debug, Clone)]
@@ -2268,25 +2268,25 @@ fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<main_gif, ParseError>
     })
 }
 
-fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_tar>, ParseError> {
-    let inner = {
-        let gzip_raw = ((|| PResult::Ok((Decoder205(_input))?))())?;
-        let tgz_data = ((|| {
-            PResult::Ok({
-                let mut accum = Vec::new();
-                for item in gzip_raw.clone() {
-                    accum.push({
-                        let mut tmp = Parser::new(item.data.inflate.as_slice());
-                        let reparser = &mut tmp;
-                        (Decoder206(reparser))?
-                    });
-                }
-                accum
-            })
-        })())?;
-        base_u8 { gzip_raw, tgz_data }
-    };
-    PResult::Ok(((|x: base_u8| PResult::Ok(x.tgz_data.clone()))(inner))?)
+fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<main_tgz, ParseError> {
+    let __gzip_raw = ((|| PResult::Ok((Decoder205(_input))?))())?;
+    let tgz_data = ((|| {
+        PResult::Ok({
+            let mut accum = Vec::new();
+            for item in __gzip_raw.clone() {
+                accum.push({
+                    let mut tmp = Parser::new(item.data.inflate.as_slice());
+                    let reparser = &mut tmp;
+                    (Decoder206(reparser))?
+                });
+            }
+            accum
+        })
+    })())?;
+    PResult::Ok(main_tgz {
+        __gzip_raw,
+        tgz_data,
+    })
 }
 
 fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_gzip_inSeq>, ParseError> {
