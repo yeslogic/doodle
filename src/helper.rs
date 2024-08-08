@@ -568,10 +568,7 @@ pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
 
 /// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
 pub fn aligned(f: Format, align: usize) -> Format {
-    map(
-        tuple([Format::Align(align), f]),
-        lambda("x", tuple_proj(var("x"), 1)),
-    )
+    chain(Format::Align(align), "_", f)
 }
 
 /// Helper for parsing `(f, suffix)` where we only want to see the `f` component
@@ -584,11 +581,9 @@ pub fn discard_suffix(f: Format, suffix: Format) -> Format {
 /// which discards the `Format::Pos` token via `map`
 ///
 /// The `pos_varname` parameter is the verbatim name of the variable that `f` internally uses to refer to the parsed `Format::Pos`.
+#[inline]
 pub fn with_pos(pos_varname: &'static str, f: Format) -> Format {
-    map(
-        record([(pos_varname, Format::Pos), ("val", f)]),
-        lambda("x", record_proj(var("x"), "val")),
-    )
+    chain(Format::Pos, pos_varname, f)
 }
 
 /// Shortcut for two-layer decoding of a Format that is embedded in the result of parsing another.
@@ -596,14 +591,20 @@ pub fn with_pos(pos_varname: &'static str, f: Format) -> Format {
 /// The first argument is the outer layer, whose immediate result is discarded after processing the
 /// second layer, which is treated as the final result.
 pub fn two_pass(primary: Format, secondary: Format) -> Format {
-    map(
-        record([
-            ("first", primary),
-            (
-                "second",
-                Format::DecodeBytes(var("first"), Box::new(secondary)),
-            ),
-        ]),
-        lambda("x", record_proj(var("x"), "second")),
+    chain(
+        primary,
+        "raw",
+        Format::DecodeBytes(var("raw"), Box::new(secondary)),
     )
+}
+
+/// Helper method for [`Format::LetFormat`]
+#[inline]
+pub fn chain(f0: Format, name: impl IntoLabel, f: Format) -> Format {
+    Format::LetFormat(Box::new(f0), name.into(), Box::new(f))
+}
+
+/// Shortcut for discarding a Format's return value but perserving its effect on the overall parse
+pub fn void(f: Format) -> Format {
+    chain(f, "_", Format::EMPTY)
 }

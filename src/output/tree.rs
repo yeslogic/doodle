@@ -397,6 +397,7 @@ impl<'module> MonoidalPrinter<'module> {
                 self.compile_parsed_decoded_value(value, format)
             }
             Format::Apply(_) => self.compile_parsed_value(value),
+            Format::LetFormat(_f0, _name, f) => self.compile_parsed_decoded_value(value, f),
         }
     }
 
@@ -521,6 +522,7 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::Dynamic(_name, _dynformat, format) => self.compile_decoded_value(value, format),
             Format::Apply(_) => self.compile_value(value),
+            Format::LetFormat(_f0, _name, f) => self.compile_decoded_value(value, f),
         }
     }
 
@@ -1780,6 +1782,20 @@ impl<'module> MonoidalPrinter<'module> {
                         "let",
                         Some(&[Fragment::String(name.clone()), expr_frag]),
                         format,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::LetFormat(f0, name, f) => {
+                // FIXME - do we want to print more than a stub if the format is simple enough to represent?
+                let fmt_frag = self.compile_format(f0, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "let-format",
+                        Some(&[Fragment::String(name.clone()), fmt_frag]),
+                        f,
                         prec,
                     ),
                     prec,

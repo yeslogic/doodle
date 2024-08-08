@@ -158,8 +158,8 @@ impl Bounds {
         }
     }
 
-    /// Dual method to `union`, which keeps the most restrictive upper-bound of the
-    /// two Bounds values rather than the least.
+    /// Dual method to [`Bounds::union`], which picks the minimum upper-bound of the two `Bounds` objects instead
+    /// of the maximum, but otherwise behaves the same.
     pub fn intersection(lhs: Bounds, rhs: Bounds) -> Bounds {
         Bounds {
             min: usize::min(lhs.min, rhs.min),

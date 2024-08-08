@@ -712,6 +712,8 @@ pub enum Format {
     SkipRemainder,
     /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
     DecodeBytes(Expr, Box<Format>),
+    /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
+    LetFormat(Box<Format>, Label, Box<Format>),
 }
 
 impl Format {
@@ -792,6 +794,9 @@ impl Format {
             Format::ForEach(_expr, _lbl, _f) => Bounds::any(),
             // NOTE - because we are parsing a sequence of bytes, we do not interact with the actual buffer
             Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
+            Format::LetFormat(first, _, second) => {
+                first.match_bounds(module) + second.match_bounds(module)
+            }
         }
     }
 
@@ -851,6 +856,10 @@ impl Format {
             Format::Dynamic(_name, _dynformat, f) => f.lookahead_bounds(module),
             Format::Apply(_) => Bounds::at_least(1),
             Format::DecodeBytes(_bytes, _f) => Bounds::exact(0),
+            Format::LetFormat(f0, _, f) => Bounds::union(
+                f0.lookahead_bounds(module),
+                f0.match_bounds(module) + f.lookahead_bounds(module),
+            ),
         }
     }
 
@@ -896,6 +905,9 @@ impl Format {
             Format::Apply(..) => false,
             Format::ForEach(_expr, _lbl, f) => f.depends_on_next(module),
             Format::DecodeBytes(_bytes, _f) => false,
+            Format::LetFormat(first, _, second) => {
+                first.depends_on_next(module) || second.depends_on_next(module)
+            }
         }
     }
 
@@ -1149,6 +1161,12 @@ impl FormatModule {
                 let mut child_scope = TypeScope::child(scope);
                 child_scope.push(name.clone(), t);
                 self.infer_format_type(&child_scope, format)
+            }
+            Format::LetFormat(f0, name, f) => {
+                let t0 = self.infer_format_type(scope, f0)?;
+                let mut new_scope = TypeScope::child(scope);
+                new_scope.push(name.clone(), t0);
+                self.infer_format_type(&new_scope, f)
             }
             Format::Match(head, branches) => {
                 if branches.is_empty() {
@@ -1864,6 +1882,10 @@ impl<'a> MatchTreeStep<'a> {
             }
             TypedFormat::Dynamic(_, _name, _expr, f) => Self::from_gt_format(module, f, next),
             TypedFormat::Apply(..) => Self::accept(),
+            TypedFormat::LetFormat(_, f0, _name, f) => {
+                let next0 = Rc::new(Next::Cat(MaybeTyped::Typed(f), next));
+                Self::from_gt_format(module, f0, next0)
+            }
         }
     }
 
@@ -2027,6 +2049,10 @@ impl<'a> MatchTreeStep<'a> {
             }
             Format::Dynamic(_name, _expr, f) => Self::from_format(module, f, next),
             Format::Apply(_name) => Self::accept(),
+            Format::LetFormat(f0, _name, f) => {
+                let next0 = Rc::new(Next::Cat(MaybeTyped::Untyped(f), next));
+                Self::from_format(module, f0, next0)
+            }
         }
     }
 
