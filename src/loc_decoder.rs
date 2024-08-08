@@ -1357,6 +1357,11 @@ impl Decoder {
                 let (v, _next_input) = a.parse_with_loc(program, scope, input)?;
                 Ok((v, input))
             }
+            Decoder::LetFormat(da, name, db) => {
+                let (va, input) = da.parse_with_loc(program, scope, input)?;
+                let new_scope = LocScope::Single(LocSingleScope::new(scope, &name, &va));
+                db.parse_with_loc(program, &new_scope, input)
+            }
             Decoder::PeekNot(a) => {
                 if a.parse_with_loc(program, scope, input).is_ok() {
                     Err(DecodeError::loc_fail(scope, input))

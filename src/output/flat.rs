@@ -196,6 +196,10 @@ fn check_covered(
         }
         Format::Dynamic(_name, _dynformat, format) => check_covered(module, path, format)?,
         Format::Apply(_) => {}
+        Format::LetFormat(f0, _name, f) => {
+            check_covered(module, path, f0)?;
+            check_covered(module, path, f)?;
+        }
     }
     Ok(())
 }
@@ -306,6 +310,7 @@ impl<'module, W: io::Write> Context<'module, W> {
             },
             Format::Dynamic(_name, _dynformat, format) => self.write_flat(value, format),
             Format::Apply(_) => Ok(()), // FIXME
+            Format::LetFormat(_f0, _name, f) => self.write_flat(value, f),
         }
     }
 }

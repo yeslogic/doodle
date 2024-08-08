@@ -128,6 +128,11 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 inner.hash(state);
             }
             TypedFormat::Apply(_, lbl, _) => lbl.hash(state),
+            TypedFormat::LetFormat(_, f0, lbl, f) => {
+                f0.hash(state);
+                lbl.hash(state);
+                f.hash(state);
+            }
         }
     }
 }
@@ -196,6 +201,12 @@ pub enum TypedFormat<TypeRep> {
     Pos,
     SkipRemainder,
     DecodeBytes(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    LetFormat(
+        TypeRep,
+        Box<TypedFormat<TypeRep>>,
+        Label,
+        Box<TypedFormat<TypeRep>>,
+    ),
 }
 
 impl TypedFormat<GenType> {
@@ -269,6 +280,10 @@ impl TypedFormat<GenType> {
                 .unwrap(),
 
             TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
+            TypedFormat::LetFormat(_, f0, _name, f) => Bounds::union(
+                f0.lookahead_bounds(),
+                f0.match_bounds() + f.lookahead_bounds(),
+            ),
         }
     }
 
@@ -337,6 +352,7 @@ impl TypedFormat<GenType> {
                 .unwrap(),
 
             TypedFormat::Apply(_, _, _) => Bounds::at_least(1),
+            TypedFormat::LetFormat(_, f0, _name, f1) => f0.match_bounds() + f1.match_bounds(),
         }
     }
 
@@ -366,7 +382,8 @@ impl TypedFormat<GenType> {
             // REVIEW - forcing Pos to be a U64-valued format
             TypedFormat::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
 
-            TypedFormat::DecodeBytes(gt, ..)
+            TypedFormat::LetFormat(gt, ..)
+            | TypedFormat::DecodeBytes(gt, ..)
             | TypedFormat::FormatCall(gt, ..)
             | TypedFormat::Variant(gt, ..)
             | TypedFormat::Union(gt, ..)
@@ -798,6 +815,9 @@ mod __impls {
                 TypedFormat::Align(n) => Format::Align(n),
                 TypedFormat::Byte(b) => Format::Byte(b),
                 TypedFormat::Variant(_, lbl, inner) => Format::Variant(lbl, rebox(inner)),
+                TypedFormat::LetFormat(_, f0, name, f) => {
+                    Format::LetFormat(rebox(f0), name, rebox(f))
+                }
                 TypedFormat::Union(_, branches) => {
                     Format::Union(branches.into_iter().map(Format::from).collect())
                 }

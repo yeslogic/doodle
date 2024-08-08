@@ -107,6 +107,12 @@ pub(crate) enum TypedDecoder<TypeRep> {
     ),
     SkipRemainder,
     DecodeBytes(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    LetFormat(
+        TypeRep,
+        Box<TypedDecoderExt<TypeRep>>,
+        Label,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -473,6 +479,12 @@ impl<'a> GTCompiler<'a> {
                 ))
             }
             GTFormat::Apply(gt, name, _) => Ok(TypedDecoder::Apply(gt.clone(), name.clone())),
+            GTFormat::LetFormat(gt, f0, name, f) => {
+                let a_next = Next::Cat(MaybeTyped::Typed(f.as_ref()), next.clone());
+                let d0 = Box::new(self.compile_gt_format(f0, None, Rc::new(a_next))?);
+                let d = Box::new(self.compile_gt_format(f, None, next)?);
+                Ok(TypedDecoder::LetFormat(gt.clone(), d0, name.clone(), d))
+            }
         }?;
         Ok(TypedDecoderExt::new(dec, args))
     }

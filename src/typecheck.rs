@@ -231,6 +231,7 @@ impl<'a> DynSingleScope<'a> {
 }
 
 impl<'a> Ctxt<'a> {
+    /// Returns a copy of `self` with the given `UScope` instead of `self.scope`.
     pub(crate) fn with_scope(&'a self, newscope: &'a UScope<'a>) -> Ctxt<'a> {
         Self {
             module: self.module,
@@ -2598,6 +2599,15 @@ impl TypeChecker {
             }
             // REVIEW - currently forcing Pos to be U64
             Format::Pos => Ok(self.init_var_simple(UType::Base(BaseType::U64))?.0),
+            Format::LetFormat(f0, name, f) => {
+                let newvar = self.get_new_uvar();
+                let f0_v = self.infer_var_format(f0, ctxt)?;
+                let scope = UScope::Single(USingleScope::new(ctxt.scope, name, f0_v));
+                let newctxt = ctxt.with_scope(&scope);
+                let f_v = self.infer_var_format(f, newctxt)?;
+                self.unify_var_pair(newvar, f_v)?;
+                Ok(newvar)
+            }
         }
     }
 

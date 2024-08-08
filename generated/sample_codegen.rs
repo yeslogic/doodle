@@ -1776,12 +1776,6 @@ pub struct main_tar {
 }
 
 #[derive(Debug, Clone)]
-pub struct main_tgz {
-    __gzip_raw: Vec<main_gzip_inSeq>,
-    tgz_data: Vec<main_tar>,
-}
-
-#[derive(Debug, Clone)]
 pub struct main_waldo {
     r#where: u64,
     noise: Vec<u8>,
@@ -1803,7 +1797,7 @@ pub enum main {
     riff(main_riff),
     tar(main_tar),
     text(Vec<char>),
-    tgz(main_tgz),
+    tgz(Vec<main_tar>),
     tiff(main_jpeg_frame_initial_segment_app1_data_data_exif_exif),
     waldo(main_waldo),
 }
@@ -2216,7 +2210,7 @@ fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<Vec<u32>, ParseError>
                 break;
             }
         } else {
-            let next_elem = (Decoder229(_input))?;
+            let next_elem = (Decoder228(_input))?;
             accum.push(next_elem);
         }
     }
@@ -2224,8 +2218,8 @@ fn Decoder3<'input>(_input: &mut Parser<'input>) -> Result<Vec<u32>, ParseError>
 }
 
 fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<main_gif, ParseError> {
-    let header = ((|| PResult::Ok((Decoder211(_input))?))())?;
-    let logical_screen = ((|| PResult::Ok((Decoder212(_input))?))())?;
+    let header = ((|| PResult::Ok((Decoder210(_input))?))())?;
+    let logical_screen = ((|| PResult::Ok((Decoder211(_input))?))())?;
     let blocks = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -2250,7 +2244,7 @@ fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<main_gif, ParseError>
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder213(_input))?;
+                    let next_elem = (Decoder212(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -2259,7 +2253,7 @@ fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<main_gif, ParseError>
             accum
         })
     })())?;
-    let trailer = ((|| PResult::Ok((Decoder214(_input))?))())?;
+    let trailer = ((|| PResult::Ok((Decoder213(_input))?))())?;
     PResult::Ok(main_gif {
         header,
         logical_screen,
@@ -2268,25 +2262,17 @@ fn Decoder4<'input>(_input: &mut Parser<'input>) -> Result<main_gif, ParseError>
     })
 }
 
-fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<main_tgz, ParseError> {
-    let __gzip_raw = ((|| PResult::Ok((Decoder205(_input))?))())?;
-    let tgz_data = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            for item in __gzip_raw.clone() {
-                accum.push({
-                    let mut tmp = Parser::new(item.data.inflate.as_slice());
-                    let reparser = &mut tmp;
-                    (Decoder206(reparser))?
-                });
-            }
-            accum
-        })
-    })())?;
-    PResult::Ok(main_tgz {
-        __gzip_raw,
-        tgz_data,
-    })
+fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_tar>, ParseError> {
+    let gzip_raw = (Decoder205(_input))?;
+    let mut accum = Vec::new();
+    for item in gzip_raw.clone() {
+        accum.push({
+            let mut tmp = Parser::new(item.data.inflate.as_slice());
+            let reparser = &mut tmp;
+            (Decoder12(reparser))?
+        });
+    }
+    PResult::Ok(accum)
 }
 
 fn Decoder6<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_gzip_inSeq>, ParseError> {
@@ -3741,18 +3727,12 @@ fn Decoder24<'input>(
 }
 
 fn Decoder25<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(4)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder35(_input))?,
+    let _ = _input.skip_align(4)?;
+    PResult::Ok(match is_be {
+        true => (Decoder35(_input))?,
 
-                false => (Decoder36(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u32)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder36(_input))?,
+    })
 }
 
 fn Decoder26<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
@@ -3848,33 +3828,21 @@ fn Decoder30<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, Pa
 }
 
 fn Decoder31<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(4)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder35(_input))?,
+    let _ = _input.skip_align(4)?;
+    PResult::Ok(match is_be {
+        true => (Decoder35(_input))?,
 
-                false => (Decoder36(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u32)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder36(_input))?,
+    })
 }
 
 fn Decoder32<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(8)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder33(_input))?,
+    let _ = _input.skip_align(8)?;
+    PResult::Ok(match is_be {
+        true => (Decoder33(_input))?,
 
-                false => (Decoder34(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u64)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder34(_input))?,
+    })
 }
 
 fn Decoder33<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
@@ -3934,48 +3902,30 @@ fn Decoder36<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
 }
 
 fn Decoder37<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(4)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder35(_input))?,
+    let _ = _input.skip_align(4)?;
+    PResult::Ok(match is_be {
+        true => (Decoder35(_input))?,
 
-                false => (Decoder36(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u32)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder36(_input))?,
+    })
 }
 
 fn Decoder38<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(8)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder33(_input))?,
+    let _ = _input.skip_align(8)?;
+    PResult::Ok(match is_be {
+        true => (Decoder33(_input))?,
 
-                false => (Decoder34(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u64)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder34(_input))?,
+    })
 }
 
 fn Decoder39<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(8)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder33(_input))?,
+    let _ = _input.skip_align(8)?;
+    PResult::Ok(match is_be {
+        true => (Decoder33(_input))?,
 
-                false => (Decoder34(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u64)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder34(_input))?,
+    })
 }
 
 fn Decoder40<'input>(
@@ -4161,18 +4111,12 @@ fn Decoder46<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, Pa
 }
 
 fn Decoder47<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
-    let inner = {
-        let field0 = ((|| PResult::Ok(_input.skip_align(2)?))())?;
-        let field1 = ((|| {
-            PResult::Ok(match is_be {
-                true => (Decoder48(_input))?,
+    let _ = _input.skip_align(2)?;
+    PResult::Ok(match is_be {
+        true => (Decoder48(_input))?,
 
-                false => (Decoder49(_input))?,
-            })
-        })())?;
-        (field0, field1)
-    };
-    PResult::Ok(((|x: ((), u16)| PResult::Ok(x.1.clone()))(inner))?)
+        false => (Decoder49(_input))?,
+    })
 }
 
 fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
@@ -22763,14 +22707,14 @@ fn Decoder205<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_gzip_inSeq
                 })())?;
                 let fname = ((|| {
                     PResult::Ok(if header.file_flags.fname.clone() != 0u8 {
-                        Some((Decoder207(_input))?)
+                        Some((Decoder206(_input))?)
                     } else {
                         None
                     })
                 })())?;
                 let fcomment = ((|| {
                     PResult::Ok(if header.file_flags.fcomment.clone() != 0u8 {
-                        Some((Decoder208(_input))?)
+                        Some((Decoder207(_input))?)
                     } else {
                         None
                     })
@@ -22807,8 +22751,17 @@ fn Decoder205<'input>(_input: &mut Parser<'input>) -> Result<Vec<main_gzip_inSeq
     PResult::Ok(accum)
 }
 
-fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<main_tar, ParseError> {
-    let contents = ((|| {
+fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
+    PResult::Ok((Decoder209(_input))?)
+}
+
+fn Decoder207<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fcomment, ParseError> {
+    let comment = ((|| PResult::Ok((Decoder208(_input))?))())?;
+    PResult::Ok(main_gzip_inSeq_fcomment { comment })
+}
+
+fn Decoder208<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
+    let string = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
             while _input.remaining() > 0 {
@@ -22817,12 +22770,12 @@ fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<main_tar, ParseErro
                     let b = _input.read_byte()?;
                     {
                         let ret = match b {
-                            0u8 => 0,
+                            tmp if (tmp != 0) => 0,
 
-                            tmp if (tmp != 0) => 1,
+                            0u8 => 1,
 
                             _ => {
-                                return Err(ParseError::ExcludedBranch(5876973260510944493u64));
+                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
                             }
                         };
                         _input.close_peek_context()?;
@@ -22830,55 +22783,12 @@ fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<main_tar, ParseErro
                     }
                 };
                 if matching_ix == 0 {
-                    if accum.is_empty() {
-                        return Err(ParseError::InsufficientRepeats);
-                    } else {
-                        break;
-                    }
-                } else {
-                    let next_elem = (Decoder55(_input))?;
-                    accum.push(next_elem);
-                }
-            }
-            accum
-        })
-    })())?;
-    let __padding = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            for _ in 0..1024u32 {
-                accum.push({
-                    let b = _input.read_byte()?;
-                    if b == 0 {
-                        b
-                    } else {
-                        return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-                    }
-                });
-            }
-            accum
-        })
-    })())?;
-    let __trailing = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    let b = _input.read_byte()?;
-                    {
-                        let ret = if b == 0 { 0 } else { 1 };
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
                     let next_elem = {
                         let b = _input.read_byte()?;
-                        if b == 0 {
+                        if b != 0 {
                             b
                         } else {
-                            return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
                         }
                     };
                     accum.push(next_elem);
@@ -22889,20 +22799,17 @@ fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<main_tar, ParseErro
             accum
         })
     })())?;
-    PResult::Ok(main_tar {
-        contents,
-        __padding,
-        __trailing,
-    })
-}
-
-fn Decoder207<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
-    PResult::Ok((Decoder210(_input))?)
-}
-
-fn Decoder208<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fcomment, ParseError> {
-    let comment = ((|| PResult::Ok((Decoder209(_input))?))())?;
-    PResult::Ok(main_gzip_inSeq_fcomment { comment })
+    let null = ((|| {
+        PResult::Ok({
+            let b = _input.read_byte()?;
+            if b == 0 {
+                b
+            } else {
+                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+            }
+        })
+    })())?;
+    PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
 fn Decoder209<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
@@ -22957,59 +22864,7 @@ fn Decoder209<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fna
     PResult::Ok(main_gzip_inSeq_fname { string, null })
 }
 
-fn Decoder210<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fname, ParseError> {
-    let string = ((|| {
-        PResult::Ok({
-            let mut accum = Vec::new();
-            while _input.remaining() > 0 {
-                let matching_ix = {
-                    _input.open_peek_context();
-                    let b = _input.read_byte()?;
-                    {
-                        let ret = match b {
-                            tmp if (tmp != 0) => 0,
-
-                            0u8 => 1,
-
-                            _ => {
-                                return Err(ParseError::ExcludedBranch(13862338712518612949u64));
-                            }
-                        };
-                        _input.close_peek_context()?;
-                        ret
-                    }
-                };
-                if matching_ix == 0 {
-                    let next_elem = {
-                        let b = _input.read_byte()?;
-                        if b != 0 {
-                            b
-                        } else {
-                            return Err(ParseError::ExcludedBranch(8606461246239977862u64));
-                        }
-                    };
-                    accum.push(next_elem);
-                } else {
-                    break;
-                }
-            }
-            accum
-        })
-    })())?;
-    let null = ((|| {
-        PResult::Ok({
-            let b = _input.read_byte()?;
-            if b == 0 {
-                b
-            } else {
-                return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-            }
-        })
-    })())?;
-    PResult::Ok(main_gzip_inSeq_fname { string, null })
-}
-
-fn Decoder211<'input>(_input: &mut Parser<'input>) -> Result<main_gif_header, ParseError> {
+fn Decoder210<'input>(_input: &mut Parser<'input>) -> Result<main_gif_header, ParseError> {
     let signature = ((|| {
         PResult::Ok({
             let field0 = ((|| {
@@ -23057,13 +22912,13 @@ fn Decoder211<'input>(_input: &mut Parser<'input>) -> Result<main_gif_header, Pa
     PResult::Ok(main_gif_header { signature, version })
 }
 
-fn Decoder212<'input>(_input: &mut Parser<'input>) -> Result<main_gif_logical_screen, ParseError> {
-    let descriptor = ((|| PResult::Ok((Decoder228(_input))?))())?;
+fn Decoder211<'input>(_input: &mut Parser<'input>) -> Result<main_gif_logical_screen, ParseError> {
+    let descriptor = ((|| PResult::Ok((Decoder227(_input))?))())?;
     let global_color_table = ((|| {
         PResult::Ok(if descriptor.flags.table_flag.clone() != 0u8 {
             let mut accum = Vec::new();
             for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
-                accum.push((Decoder226(_input))?);
+                accum.push((Decoder225(_input))?);
             }
             Some(accum)
         } else {
@@ -23076,7 +22931,7 @@ fn Decoder212<'input>(_input: &mut Parser<'input>) -> Result<main_gif_logical_sc
     })
 }
 
-fn Decoder213<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inSeq, ParseError> {
+fn Decoder212<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inSeq, ParseError> {
     let tree_index = {
         _input.open_peek_context();
         let b = _input.read_byte()?;
@@ -23111,12 +22966,12 @@ fn Decoder213<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inS
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder215(_input))?;
+            let inner = (Decoder214(_input))?;
             main_gif_blocks_inSeq::graphic_block(inner)
         }
 
         1 => {
-            let inner = (Decoder216(_input))?;
+            let inner = (Decoder215(_input))?;
             main_gif_blocks_inSeq::special_purpose_block(inner)
         }
 
@@ -23126,7 +22981,7 @@ fn Decoder213<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inS
     })
 }
 
-fn Decoder214<'input>(_input: &mut Parser<'input>) -> Result<main_gif_trailer, ParseError> {
+fn Decoder213<'input>(_input: &mut Parser<'input>) -> Result<main_gif_trailer, ParseError> {
     let separator = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
@@ -23140,7 +22995,7 @@ fn Decoder214<'input>(_input: &mut Parser<'input>) -> Result<main_gif_trailer, P
     PResult::Ok(main_gif_trailer { separator })
 }
 
-fn Decoder215<'input>(
+fn Decoder214<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_graphic_block, ParseError> {
     let graphic_control_extension = ((|| {
@@ -23177,7 +23032,7 @@ fn Decoder215<'input>(
             };
             match tree_index {
                 0 => {
-                    let inner = (Decoder221(_input))?;
+                    let inner = (Decoder220(_input))?;
                     main_gif_blocks_inSeq_graphic_block_graphic_control_extension::some(inner)
                 }
 
@@ -23189,14 +23044,14 @@ fn Decoder215<'input>(
             }
         })
     })())?;
-    let graphic_rendering_block = ((|| PResult::Ok((Decoder222(_input))?))())?;
+    let graphic_rendering_block = ((|| PResult::Ok((Decoder221(_input))?))())?;
     PResult::Ok(main_gif_blocks_inSeq_graphic_block {
         graphic_control_extension,
         graphic_rendering_block,
     })
 }
 
-fn Decoder216<'input>(
+fn Decoder215<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_special_purpose_block, ParseError> {
     let tree_index = {
@@ -23223,12 +23078,12 @@ fn Decoder216<'input>(
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder217(_input))?;
+            let inner = (Decoder216(_input))?;
             main_gif_blocks_inSeq_special_purpose_block::application_extension(inner)
         }
 
         1 => {
-            let inner = (Decoder218(_input))?;
+            let inner = (Decoder217(_input))?;
             main_gif_blocks_inSeq_special_purpose_block::comment_extension(inner)
         }
 
@@ -23238,7 +23093,7 @@ fn Decoder216<'input>(
     })
 }
 
-fn Decoder217<'input>(
+fn Decoder216<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_special_purpose_block_application_extension, ParseError> {
     let separator = ((|| {
@@ -23311,7 +23166,7 @@ fn Decoder217<'input>(
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder219(_input))?;
+                    let next_elem = (Decoder218(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -23320,7 +23175,7 @@ fn Decoder217<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder220(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder219(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_special_purpose_block_application_extension {
             separator,
@@ -23334,7 +23189,7 @@ fn Decoder217<'input>(
     )
 }
 
-fn Decoder218<'input>(
+fn Decoder217<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_special_purpose_block_comment_extension, ParseError> {
     let separator = ((|| {
@@ -23379,7 +23234,7 @@ fn Decoder218<'input>(
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder219(_input))?;
+                    let next_elem = (Decoder218(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -23388,7 +23243,7 @@ fn Decoder218<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder220(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder219(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_special_purpose_block_comment_extension {
             separator,
@@ -23399,7 +23254,7 @@ fn Decoder218<'input>(
     )
 }
 
-fn Decoder219<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq, ParseError>{
+fn Decoder218<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq, ParseError>{
     let len_bytes = ((|| {
         PResult::Ok({
             let b = _input.read_byte()?;
@@ -23422,7 +23277,7 @@ fn Decoder219<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inS
     PResult::Ok(main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension_plain_text_data_inSeq { len_bytes, data })
 }
 
-fn Decoder220<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder219<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     let b = _input.read_byte()?;
     PResult::Ok(if b == 0 {
         b
@@ -23431,7 +23286,7 @@ fn Decoder220<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
     })
 }
 
-fn Decoder221<'input>(
+fn Decoder220<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some, ParseError> {
     let separator = ((|| {
@@ -23484,7 +23339,7 @@ fn Decoder221<'input>(
     })())?;
     let delay_time = ((|| PResult::Ok((Decoder49(_input))?))())?;
     let transparent_color_index = ((|| PResult::Ok((Decoder23(_input))?))())?;
-    let terminator = ((|| PResult::Ok((Decoder220(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder219(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some {
             separator,
@@ -23498,7 +23353,7 @@ fn Decoder221<'input>(
     )
 }
 
-fn Decoder222<'input>(
+fn Decoder221<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_graphic_block_graphic_rendering_block, ParseError> {
     let tree_index = {
@@ -23520,12 +23375,12 @@ fn Decoder222<'input>(
     };
     PResult::Ok(match tree_index {
         0 => {
-            let inner = (Decoder223(_input))?;
+            let inner = (Decoder222(_input))?;
             main_gif_blocks_inSeq_graphic_block_graphic_rendering_block::table_based_image(inner)
         }
 
         1 => {
-            let inner = (Decoder224(_input))?;
+            let inner = (Decoder223(_input))?;
             main_gif_blocks_inSeq_graphic_block_graphic_rendering_block::plain_text_extension(inner)
         }
 
@@ -23535,23 +23390,23 @@ fn Decoder222<'input>(
     })
 }
 
-fn Decoder223<'input>(
+fn Decoder222<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image, ParseError>
 {
-    let descriptor = ((|| PResult::Ok((Decoder225(_input))?))())?;
+    let descriptor = ((|| PResult::Ok((Decoder224(_input))?))())?;
     let local_color_table = ((|| {
         PResult::Ok(if descriptor.flags.table_flag.clone() != 0u8 {
             let mut accum = Vec::new();
             for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
-                accum.push((Decoder226(_input))?);
+                accum.push((Decoder225(_input))?);
             }
             Some(accum)
         } else {
             None
         })
     })())?;
-    let data = ((|| PResult::Ok((Decoder227(_input))?))())?;
+    let data = ((|| PResult::Ok((Decoder226(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image {
             descriptor,
@@ -23561,7 +23416,7 @@ fn Decoder223<'input>(
     )
 }
 
-fn Decoder224<'input>(
+fn Decoder223<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<
     main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension,
@@ -23627,7 +23482,7 @@ fn Decoder224<'input>(
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder219(_input))?;
+                    let next_elem = (Decoder218(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -23636,7 +23491,7 @@ fn Decoder224<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder220(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder219(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_plain_text_extension {
             separator,
@@ -23656,7 +23511,7 @@ fn Decoder224<'input>(
     )
 }
 
-fn Decoder225<'input>(
+fn Decoder224<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<
     main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_descriptor,
@@ -23699,7 +23554,7 @@ fn Decoder225<'input>(
     )
 }
 
-fn Decoder226<'input>(
+fn Decoder225<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_logical_screen_global_color_table_inSeq, ParseError> {
     let r = ((|| PResult::Ok((Decoder23(_input))?))())?;
@@ -23708,7 +23563,7 @@ fn Decoder226<'input>(
     PResult::Ok(main_gif_logical_screen_global_color_table_inSeq { r, g, b })
 }
 
-fn Decoder227<'input>(
+fn Decoder226<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<
     main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_data,
@@ -23737,7 +23592,7 @@ fn Decoder227<'input>(
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder219(_input))?;
+                    let next_elem = (Decoder218(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -23746,7 +23601,7 @@ fn Decoder227<'input>(
             accum
         })
     })())?;
-    let terminator = ((|| PResult::Ok((Decoder220(_input))?))())?;
+    let terminator = ((|| PResult::Ok((Decoder219(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_data {
             lzw_min_code_size,
@@ -23756,7 +23611,7 @@ fn Decoder227<'input>(
     )
 }
 
-fn Decoder228<'input>(
+fn Decoder227<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_logical_screen_descriptor, ParseError> {
     let screen_width = ((|| PResult::Ok((Decoder49(_input))?))())?;
@@ -23788,7 +23643,7 @@ fn Decoder228<'input>(
     })
 }
 
-fn Decoder229<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
+fn Decoder228<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
     let inner = {
         let field0 = ((|| {
             PResult::Ok({

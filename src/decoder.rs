@@ -647,6 +647,7 @@ pub enum Decoder {
     ForEach(Expr, Label, Box<Decoder>),
     SkipRemainder,
     DecodeBytes(Expr, Box<Decoder>),
+    LetFormat(Box<Decoder>, Label, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
@@ -948,6 +949,12 @@ impl<'a> Compiler<'a> {
                 Ok(Decoder::Dynamic(name.clone(), dynformat.clone(), da))
             }
             Format::Apply(name) => Ok(Decoder::Apply(name.clone())),
+            Format::LetFormat(first, name, second) => {
+                let a_next = Next::Cat(MaybeTyped::Untyped(second), next.clone());
+                let da = Box::new(self.compile_format(first, Rc::new(a_next))?);
+                let db = Box::new(self.compile_format(second, next.clone())?);
+                Ok(Decoder::LetFormat(da, name.clone(), db))
+            }
         }
     }
 }
@@ -1250,6 +1257,11 @@ impl Decoder {
                     }
                     None => Ok((va, input)),
                 }
+            }
+            Decoder::LetFormat(da, name, db) => {
+                let (va, input) = da.parse(program, scope, input)?;
+                let new_scope = Scope::Single(SingleScope::new(scope, &name, &va));
+                db.parse(program, &new_scope, input)
             }
             Decoder::ForEach(expr, lbl, a) => {
                 let mut input = input;

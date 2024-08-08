@@ -508,6 +508,18 @@ impl CodeGen {
                     )
                 )
             }
+            TypedDecoder::LetFormat(_t, f0, name, f) => {
+                let cl_f0 = self.translate(f0.get_dec());
+                let cl_f = self.translate(f.get_dec());
+                CaseLogic::Other(
+                    OtherLogic::LetFormat(
+                        Box::new(cl_f0),
+                        name.clone(),
+                        Box::new(cl_f),
+                    )
+                )
+
+            }
             TypedDecoder::Match(_t, scrutinee, cases) => {
                 let scrutinized = embed_expr(scrutinee, ExprInfo::Natural);
                 let head = match scrutinee.get_type().unwrap().as_ref() {
@@ -2174,6 +2186,7 @@ enum OtherLogic<ExprT> {
         Vec<(MatchCaseLHS, CaseLogic<ExprT>)>,
         Refutability,
     ),
+    LetFormat(Box<CaseLogic<ExprT>>, Label, Box<CaseLogic<ExprT>>),
 }
 
 impl<ExprT> ToAst for OtherLogic<ExprT>
@@ -2235,6 +2248,19 @@ where
                 };
                 let ret = RustExpr::Control(Box::new(RustControl::Match(expr.clone(), match_body)));
                 (vec![], Some(ret))
+            }
+            OtherLogic::LetFormat(prior, name, inner) => {
+                let prior_block = prior.to_ast(ctxt);
+                let preamble: RustExpr = prior_block.into();
+                let (init, last) = inner.to_ast(ctxt);
+                (
+                    Iterator::chain(
+                        std::iter::once(RustStmt::assign(name.clone(), preamble)),
+                        init.into_iter(),
+                    )
+                    .collect(),
+                    last,
+                )
             }
         }
     }
@@ -3078,6 +3104,13 @@ impl<'a> Elaborator<'a> {
                     .unwrap_or_else(|| panic!("missing dynformat {lbl}"));
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Apply(gt, lbl.clone(), t_dynf)
+            }
+            Format::LetFormat(f0, name, f) => {
+                let index = self.get_and_increment_index();
+                let t_f0 = self.elaborate_format(f0, dyns);
+                let t_f = self.elaborate_format(f, dyns);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::LetFormat(gt, Box::new(t_f0), name.clone(), Box::new(t_f))
             }
         }
     }

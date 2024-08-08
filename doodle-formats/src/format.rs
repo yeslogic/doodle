@@ -38,20 +38,18 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let tgz = {
         module.define_format(
             "tgz.main",
-            record([
-                ("__gzip-raw", gzip.call()),
-                (
-                    "tgz-data",
-                    for_each(
-                        var("__gzip-raw"),
-                        "item",
-                        Format::DecodeBytes(
-                            record_projs(var("item"), &["data", "inflate"]),
-                            Box::new(tar.call()),
-                        ),
+            chain(
+                gzip.call(),
+                "gzip-raw",
+                for_each(
+                    var("gzip-raw"),
+                    "item",
+                    Format::DecodeBytes(
+                        record_projs(var("item"), &["data", "inflate"]),
+                        Box::new(tar.call()),
                     ),
                 ),
-            ]),
+            ),
         )
     };
 
