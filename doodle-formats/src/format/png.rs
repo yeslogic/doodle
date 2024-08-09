@@ -12,7 +12,7 @@ fn null_terminated(f: Format) -> Format {
 
 pub fn main(
     module: &mut FormatModule,
-    _deflate: FormatRef,
+    zlib: FormatRef,
     utf8text: FormatRef,
     utf8text_nz: FormatRef,
     base: &BaseModule,
@@ -32,9 +32,6 @@ pub fn main(
             ("crc", base.u32be()), // FIXME check this
         ])
     };
-
-    // FIXME: implement an actual zlib-style DEFLATE specification once we know how to do that
-    let zlib = module.define_format("png.zlib", repeat(base.u8()));
 
     // PNG keyword for iTXt, zTXt, tEXt, and other contexts
     //   - Length >= 1, < 80 characters
@@ -145,6 +142,15 @@ pub fn main(
 
     let gama = module.define_format("png.gama", chunk(is_bytes(b"gAMA"), gama_data));
 
+    let zlib_utf8text = chain(
+        zlib.call(),
+        "zlib",
+        Format::DecodeBytes(
+            record_projs(var("zlib"), &["data", "inflate"]),
+            Box::new(utf8text_nz.call()),
+        ),
+    );
+
     let itxt_data = record([
         ("keyword", null_terminated(keyword.call())),
         ("compression-flag", byte_in([0, 1])),
@@ -158,7 +164,7 @@ pub fn main(
                     Box::new(var("compression-flag")),
                     Box::new(Expr::U8(1)),
                 ),
-                Format::Variant("compressed".into(), Box::new(zlib.call())),
+                Format::Variant("compressed".into(), Box::new(zlib_utf8text)),
                 Format::Variant("uncompressed".into(), Box::new(utf8text.call())),
             )
         }),
@@ -235,10 +241,19 @@ pub fn main(
         chunk(is_bytes(b"tRNS"), trns_data),
     );
 
+    let zlib_latin1 = chain(
+        zlib.call(),
+        "zlib",
+        Format::DecodeBytes(
+            record_projs(var("zlib"), &["data", "inflate"]),
+            Box::new(base.asciiz_string()),
+        ),
+    );
+
     let ztxt_data = record([
         ("keyword", null_terminated(keyword.call())),
         ("compression-method", is_byte(0)),
-        ("compressed-text", zlib.call()),
+        ("compressed-text", zlib_latin1),
     ]);
 
     let ztxt = module.define_format("png.ztxt", chunk(is_bytes(b"zTXt"), ztxt_data));
