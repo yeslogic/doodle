@@ -108,15 +108,15 @@ pub mod png_metrics {
     }
 
     pub fn collate_png_table<S: std::fmt::Display>(samples: &[(S, PngMetrics)]) {
-        let header = ["File", "bKGD", "cHRM", "gAMA", "iCCP", "iTXt", "pHYs", "tEXt", "tIME", "tRNS", "zTXt"];
+        let header = ["bKGD", "cHRM", "gAMA", "iCCP", "iTXt", "pHYs", "tEXt", "tIME", "tRNS", "zTXt", "Filename"];
         let header_line = header.join("\t");
 
         fn write_metrics(buf: &mut String, metrics: &PngMetrics) {
             let show_count = |buf: &mut String, metrics: &GenericMetrics| {
                 match metrics.count {
-                    0 => buf.push_str("\t❌"),
-                    1 => buf.push_str("\t✅"),
-                    2.. => buf.push_str("\t➕"),
+                    0 => buf.push_str("❌\t"),
+                    1 => buf.push_str("✅\t"),
+                    2.. => buf.push_str("➕\t"),
                 }
             };
 
@@ -128,10 +128,10 @@ pub mod png_metrics {
                     any = any || m.is_compressed;
                 }
                 match (all, any) {
-                    (true, false) => buf.push_str("\t❌"), // only possible when empty
-                    (true, true) => buf.push_str("\t✅"),
-                    (false, true) => buf.push_str("\t⭕"),
-                    (false, false) => buf.push_str("\t❓"),
+                    (true, false) => buf.push_str("❌\t"), // only possible when empty
+                    (true, true) => buf.push_str("✅\t"),
+                    (false, true) => buf.push_str("⭕\t"),
+                    (false, false) => buf.push_str("❓\t"),
                 }
             };
 
@@ -149,9 +149,9 @@ pub mod png_metrics {
 
         println!("{header_line}");
         for (sample, metrics) in samples.iter() {
-            let mut line = format!("{sample}");
+            let mut line = String::new();
             write_metrics(&mut line, metrics);
-            println!("{line}");
+            println!("{line}{sample}");
         }
     }
 }
