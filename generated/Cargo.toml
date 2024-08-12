@@ -7,6 +7,10 @@ edition = "2021"
 bench = false
 path = "sample_codegen.rs"
 
+[[bin]]
+path = "bin/pnginfo.rs"
+name = "pnginfo"
+
 [[bench]]
 name = "gen_benchmark"
 path = "benches/gen_benchmark.rs"
