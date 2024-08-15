@@ -46,10 +46,6 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
         return Format::Compute(Expr::U8(0));
     }
 
-    let mut fs = Vec::with_capacity(n);
-    for _ in 0..n {
-        fs.push(base.bit());
-    }
     map(
         tuple_repeat(n, base.bit()),
         lambda("bits", bits_value_u8("bits", n)),
@@ -485,7 +481,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (
                                             Pattern::U16(270),
                                             format_some(length_record_fixed(
-                                                23,
+                                                24,
                                                 base,
                                                 2,
                                                 distance_record,
@@ -644,6 +640,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::Int(Bounds::new(257, 285)), reference_record()),
+                                (Pattern::Int(Bounds::new(286, 287)), Expr::Seq(vec![])), // 286, 287 are illegal but we don't want to fail completely
                                 (
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![variant(
