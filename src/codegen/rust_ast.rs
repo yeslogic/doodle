@@ -179,12 +179,14 @@ impl ToFragment for RustImport {
 pub(crate) enum RustImportItems {
     /// Glob-imports from a single module
     Wildcard,
+    Singleton(Label),
 }
 
 impl ToFragment for RustImportItems {
     fn to_fragment(&self) -> Fragment {
         match self {
-            Self::Wildcard => Fragment::Char('*'),
+            RustImportItems::Wildcard => Fragment::Char('*'),
+            RustImportItems::Singleton(lbl) => Fragment::String(lbl.clone()),
         }
     }
 }

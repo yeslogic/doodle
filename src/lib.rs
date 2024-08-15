@@ -150,9 +150,15 @@ impl ValueType {
 
     fn unify(&self, other: &ValueType) -> Result<ValueType, UnificationError<ValueType>> {
         match (self, other) {
+            (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
+
+            // NOTE - we have to specify these patterns before the similar cases for Empty because we want (Empty, Any) in either order to yield Empty
             (ValueType::Any, rhs) => Ok(rhs.clone()),
             (lhs, ValueType::Any) => Ok(lhs.clone()),
-            (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
+
+            (ValueType::Empty, rhs) => Ok(rhs.clone()),
+            (lhs, ValueType::Empty) => Ok(lhs.clone()),
+
             (ValueType::Base(b1), ValueType::Base(b2)) => {
                 if b1 == b2 {
                     Ok(ValueType::Base(*b1))

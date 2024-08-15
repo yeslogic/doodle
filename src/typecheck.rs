@@ -2639,7 +2639,7 @@ impl TypeChecker {
     pub fn reify(&self, t: Rc<UType>) -> Option<ValueType> {
         match t.as_ref() {
             UType::Hole => {
-                // REVIEW - should this simply return None instead?
+                // REVIEW - should this simply return None instead? or maybe ValueType::Any?
                 unreachable!("reify: UType::Hole should be erased by any non-Hole unification!");
             }
             &UType::Var(uv) => {

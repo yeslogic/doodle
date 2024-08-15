@@ -394,13 +394,21 @@ impl Expr {
                 })
             }
 
-            Expr::AsU8(x) => Cow::Owned(match x.eval_value(scope) {
-                Value::U8(x) => Value::U8(x),
-                Value::U16(x) => Value::U8(u8::try_from(x).unwrap()),
-                Value::U32(x) => Value::U8(u8::try_from(x).unwrap()),
-                Value::U64(x) => Value::U8(u8::try_from(x).unwrap()),
-                x => panic!("cannot convert {x:?} to U8"),
-            }),
+            Expr::AsU8(x) => {
+                Cow::Owned(match x.eval_value(scope) {
+                    Value::U8(x) => Value::U8(x),
+                    Value::U16(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on u16 {x}: {err}")
+                    })),
+                    Value::U32(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on u32 {x}: {err}")
+                    })),
+                    Value::U64(x) => Value::U8(u8::try_from(x).unwrap_or_else(|err| {
+                        panic!("cannot perform AsU8 cast on u64 {x}: {err}")
+                    })),
+                    x => panic!("cannot convert {x:?} to U8"),
+                })
+            }
             Expr::AsU16(x) => Cow::Owned(match x.eval_value(scope) {
                 Value::U8(x) => Value::U16(u16::from(x)),
                 Value::U16(x) => Value::U16(x),

@@ -7,6 +7,16 @@ pub use crate::parser::{
     Parser,
 };
 
+#[macro_export]
+macro_rules! try_sub {
+    ( $x:expr, $y:expr ) => {
+        (match $x.checked_sub($y) {
+            Some(z) => z,
+            None => return Err(ParseError::UnsoundOperation),
+        })
+    };
+}
+
 pub fn u16le(input: (u8, u8)) -> u16 {
     u16::from_le_bytes([input.0, input.1])
 }
@@ -101,10 +111,22 @@ pub fn parse_huffman(
             new_lengths
         }
     };
-    make_huffman_decoder(&lengths)
+    join_fallible(make_huffman_decoder(&lengths))
 }
 
-pub fn make_huffman_decoder(lengths: &[usize]) -> impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16> {
+fn join_fallible<'f, F>(rf: PResult<F>) -> Box<dyn 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>>
+where
+    F: 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>,
+{
+    match rf {
+        Ok(f) => Box::new(f),
+        Err(e) => Box::new(move |_| Err(e)),
+    }
+}
+
+pub fn make_huffman_decoder(
+    lengths: &[usize],
+) -> PResult<impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16>> {
     let max_length = *lengths.iter().max().unwrap();
     let mut bl_count = [0].repeat(max_length + 1);
 
@@ -125,16 +147,16 @@ pub fn make_huffman_decoder(lengths: &[usize]) -> impl for<'a> Fn(&mut Parser<'a
 
     for (n, &len) in lengths.iter().enumerate() {
         if len != 0 {
-            driver.push(bit_range(len, next_code[len]), n.try_into().unwrap());
+            driver.push(bit_range(len, next_code[len]), n.try_into().unwrap())?;
             next_code[len] += 1;
         }
     }
 
-    move |p: &mut Parser<'_>| driver.parse_one(p)
+    Ok(move |p: &mut Parser<'_>| driver.parse_one(p))
 }
 
 mod huffman {
-    use super::{PResult, Parser};
+    use super::{PResult, ParseError, Parser};
 
     #[derive(Clone, Debug)]
     pub(super) struct HuffmanDriver {
@@ -163,23 +185,29 @@ mod huffman {
             value
         }
 
-        pub fn insert(&mut self, suffix: &[u8], value: u16) {
+        pub fn insert(&mut self, suffix: &[u8], value: u16) -> PResult<()> {
             match (self, suffix) {
                 (this @ &mut HuffmanNode::Empty, []) => {
                     *this = HuffmanNode::Leaf(value);
+                    Ok(())
                 }
-                (_, []) | (HuffmanNode::Leaf(..), &[_, ..]) => {
-                    unreachable!("Huffman tree generator encountered collision")
-                }
+                (_, []) | (HuffmanNode::Leaf(..), &[_, ..]) => Err(ParseError::UnsoundOperation),
                 (this @ &mut HuffmanNode::Empty, &[b @ (0 | 1), ..]) => {
                     let mut children = [Box::new(HuffmanNode::Empty), Box::new(HuffmanNode::Empty)];
-                    (&mut children[b as usize]).insert(&suffix[1..], value);
+                    match (&mut children[b as usize]).insert(&suffix[1..], value) {
+                        Ok(()) => {}
+                        Err(_e) => {
+                            eprintln!("{:?}", this);
+                            return Err(_e);
+                        }
+                    }
                     *this = HuffmanNode::Branch { children };
+                    Ok(())
                 }
                 (HuffmanNode::Branch { children }, &[b @ (0 | 1), ..]) => {
                     (&mut children[b as usize]).insert(&suffix[1..], value)
                 }
-                _ => unreachable!("huffman non-bit value encountered"),
+                _ => Err(ParseError::UnsoundOperation),
             }
         }
 
@@ -199,7 +227,7 @@ mod huffman {
             }
         }
 
-        pub fn push(&mut self, code: Vec<u8>, value: u16) {
+        pub fn push(&mut self, code: Vec<u8>, value: u16) -> PResult<()> {
             self.tree_root.insert(&code[..], value)
         }
 
@@ -266,9 +294,26 @@ pub fn slice_ext<T: Copy>(vs: &Vec<T>, range: std::ops::Range<usize>) -> Cow<'_,
 }
 
 #[inline]
+/// Returns a boolean indicating whether we are finished processing a bounded repetition ([`Format::RepeatBetween`])
+/// given whether the following element matches (`next_match`), whether we have repeated at least the minimum required
+/// number of times (`ge_min`), and whether we have repeated exactly the maximum required number of times (`eq_max`).
+///
+/// Will return an error if we have run out of elements but the minimum repetition requirement is not met.
 pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> PResult<bool> {
     if next_match && !ge_min {
         return Err(ParseError::InsufficientRepeats);
     };
     Ok(next_match || eq_max)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_make_huffman_decoder() -> PResult<()> {
+        let lengths = [0, 0, 0, 0, 1, 1, 5, 4, 4, 5, 0, 1, 0, 0, 0, 0, 1, 2, 0];
+        let _huffman = make_huffman_decoder(&lengths)?;
+        Ok(())
+    }
 }

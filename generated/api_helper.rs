@@ -30,10 +30,7 @@ pub fn try_decode_gzip(test_file: &str) -> TestResult<Vec<GzipChunk>> {
     }
 }
 
-
 pub mod png_metrics {
-    use doodle::output::Fragment;
-
     use super::*;
 
     #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
@@ -41,14 +38,15 @@ pub mod png_metrics {
         count: usize,
     }
 
-
     #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
     pub struct OptZlibMetrics {
         is_compressed: bool,
     }
 
-
-
+    pub type SbitMetrics = GenericMetrics;
+    pub type SpltMetrics = GenericMetrics;
+    pub type HistMetrics = GenericMetrics;
+    pub type SrgbMetrics = GenericMetrics;
     pub type BkgdMetrics = GenericMetrics;
     pub type ChrmMetrics = GenericMetrics;
     pub type GamaMetrics = GenericMetrics;
@@ -62,20 +60,22 @@ pub mod png_metrics {
     pub type TimeMetrics = GenericMetrics;
     pub type TrnsMetrics = GenericMetrics;
 
-
-
     #[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
     pub struct PngMetrics {
-        bKGD: BkgdMetrics,
+        tRNS: TrnsMetrics,
         cHRM: ChrmMetrics,
         gAMA: GamaMetrics,
         iCCP: IccpMetrics,
+        sBIT: SbitMetrics,
+        sRGB: SrgbMetrics,
         iTXt: ItxtMetrics,
-        pHYs: PhysMetrics,
         tEXt: TextMetrics,
-        tIME: TimeMetrics,
-        tRNS: TrnsMetrics,
         zTXt: ZtxtMetrics,
+        bKGD: BkgdMetrics,
+        hIST: HistMetrics,
+        pHYs: PhysMetrics,
+        sPLT: SpltMetrics,
+        tIME: TimeMetrics,
     }
 
     pub fn analyze_png(test_file: &str) -> TestResult<PngMetrics> {
@@ -86,38 +86,45 @@ pub mod png_metrics {
         for chunk in dat.chunks.iter().chain(dat.more_chunks.iter()) {
             match chunk {
                 main_png_chunks_inSeq::PLTE(_) => (), // ignoring critical chunk PLTE
+                main_png_chunks_inSeq::sRGB(_) => metrics.sRGB.count += 1,
                 main_png_chunks_inSeq::bKGD(_) => metrics.bKGD.count += 1,
                 main_png_chunks_inSeq::cHRM(_) => metrics.cHRM.count += 1,
                 main_png_chunks_inSeq::gAMA(_) => metrics.gAMA.count += 1,
                 main_png_chunks_inSeq::iCCP(_) => metrics.iCCP.count += 1,
-                main_png_chunks_inSeq::iTXt(x) => {
-                    match x.data.compression_flag {
-                        0 => metrics.iTXt.push(OptZlibMetrics { is_compressed: false }),
-                        1 => metrics.iTXt.push(OptZlibMetrics { is_compressed: true }),
-                        other => unreachable!("compression flag {other} is not recognized"),
-                    }
-                }
+                main_png_chunks_inSeq::iTXt(x) => match x.data.compression_flag {
+                    0 => metrics.iTXt.push(OptZlibMetrics {
+                        is_compressed: false,
+                    }),
+                    1 => metrics.iTXt.push(OptZlibMetrics {
+                        is_compressed: true,
+                    }),
+                    other => unreachable!("compression flag {other} is not recognized"),
+                },
                 main_png_chunks_inSeq::pHYs(_) => metrics.pHYs.count += 1,
                 main_png_chunks_inSeq::tEXt(_) => metrics.tEXt.count += 1,
                 main_png_chunks_inSeq::tIME(_) => metrics.tIME.count += 1,
                 main_png_chunks_inSeq::tRNS(_) => metrics.tRNS.count += 1,
                 main_png_chunks_inSeq::zTXt(_) => metrics.zTXt.count += 1,
+                main_png_chunks_inSeq::hIST(_) => metrics.hIST.count += 1,
+                main_png_chunks_inSeq::sBIT(_) => metrics.sBIT.count += 1,
+                main_png_chunks_inSeq::sPLT(_) => metrics.sPLT.count += 1,
             }
         }
         Ok(metrics)
     }
 
     pub fn collate_png_table<S: std::fmt::Display>(samples: &[(S, PngMetrics)]) {
-        let header = ["bKGD", "cHRM", "gAMA", "iCCP", "iTXt", "pHYs", "tEXt", "tIME", "tRNS", "zTXt", "Filename"];
+        let header = [
+            "bKGD", "cHRM", "gAMA", "hIST", "iCCP", "iTXt", "pHYs", "sBIT", "sPLT", "sRGB", "tEXt",
+            "tIME", "tRNS", "zTXt", "Filename",
+        ];
         let header_line = header.join("\t");
 
         fn write_metrics(buf: &mut String, metrics: &PngMetrics) {
-            let show_count = |buf: &mut String, metrics: &GenericMetrics| {
-                match metrics.count {
-                    0 => buf.push_str("❌\t"),
-                    1 => buf.push_str("✅\t"),
-                    2.. => buf.push_str("➕\t"),
-                }
+            let show_count = |buf: &mut String, metrics: &GenericMetrics| match metrics.count {
+                0 => buf.push_str("❌\t"),
+                1 => buf.push_str("✅\t"),
+                2.. => buf.push_str("➕\t"),
             };
 
             let show_count_optzlib = |buf: &mut String, metrics: &Vec<OptZlibMetrics>| {
@@ -138,9 +145,13 @@ pub mod png_metrics {
             show_count(buf, &metrics.bKGD);
             show_count(buf, &metrics.cHRM);
             show_count(buf, &metrics.gAMA);
+            show_count(buf, &metrics.hIST);
             show_count(buf, &metrics.iCCP);
             show_count_optzlib(buf, &metrics.iTXt);
             show_count(buf, &metrics.pHYs);
+            show_count(buf, &metrics.sBIT);
+            show_count(buf, &metrics.sPLT);
+            show_count(buf, &metrics.sRGB);
             show_count(buf, &metrics.tEXt);
             show_count(buf, &metrics.tIME);
             show_count(buf, &metrics.tRNS);

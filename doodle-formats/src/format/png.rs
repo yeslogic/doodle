@@ -246,7 +246,8 @@ pub fn main(
         "zlib",
         Format::DecodeBytes(
             record_projs(var("zlib"), &["data", "inflate"]),
-            Box::new(base.asciiz_string()),
+            // FIXME - we need to define a new format for latin1 without a null terminal (viz. why asciiz_string won't work)
+            Box::new(utf8text.call()),
         ),
     );
 
@@ -256,23 +257,152 @@ pub fn main(
         ("compressed-text", zlib_latin1),
     ]);
 
+    // rendering intent constants for sRGB
+    const RENDINT_PERCEPTUAL: u8 = 0; // perceptual
+    const RENDINT_RELCOLOR: u8 = 1; // relative colorimetric
+    const RENDINT_SATURATION: u8 = 2; // saturation
+    const RENDINT_ABSCOLOR: u8 = 3; // absolute colorimetric
+
+    let srgb_data = record([(
+        "rendering-intent",
+        where_between(
+            base.u8(),
+            Expr::U8(RENDINT_PERCEPTUAL),
+            Expr::U8(RENDINT_ABSCOLOR),
+        ),
+    )]);
+
+    let srgb = module.define_format("png.srgb", chunk(is_bytes(b"sRGB"), srgb_data));
+
+    let sbit_data = match_variant(
+        record_proj(record_proj(var("ihdr"), "data"), "color-type"),
+        vec![
+            (
+                Pattern::U8(0),
+                "color-type-0",
+                record([("sig-greyscale-bits", base.u8())]),
+            ),
+            (
+                Pattern::U8(2),
+                "color-type-2",
+                record([
+                    ("sig-red-bits", base.u8()),
+                    ("sig-green-bits", base.u8()),
+                    ("sig-blue-bits", base.u8()),
+                ]),
+            ),
+            (
+                Pattern::U8(3),
+                "color-type-3",
+                record([
+                    ("sig-red-bits", base.u8()),
+                    ("sig-green-bits", base.u8()),
+                    ("sig-blue-bits", base.u8()),
+                ]),
+            ),
+            (
+                Pattern::U8(4),
+                "color-type-4",
+                record([
+                    ("sig-greyscale-bits", base.u8()),
+                    ("sig-alpha-bits", base.u8()),
+                ]),
+            ),
+            (
+                Pattern::U8(6),
+                "color-type-6",
+                record([
+                    ("sig-red-bits", base.u8()),
+                    ("sig-green-bits", base.u8()),
+                    ("sig-blue-bits", base.u8()),
+                    ("sig-alpha-bits", base.u8()),
+                ]),
+            ),
+        ],
+    );
+
+    let sbit = module.define_format_args(
+        "png.sbit",
+        vec![("ihdr".into(), ihdr_type.clone())],
+        chunk(is_bytes(b"sBIT"), sbit_data),
+    );
+
     let ztxt = module.define_format("png.ztxt", chunk(is_bytes(b"zTXt"), ztxt_data));
+
+    let hist_data = record([("histogram", repeat(base.u16be()))]);
+
+    let hist = module.define_format("png.hist", chunk(is_bytes(b"hIST"), hist_data));
+
+    let palette_entries = |depth: Expr| {
+        // NOTE - the only constraint on the sequence of entries (aside from implicitly sharing the same depth) is that they are in descending frequency order
+        match_variant(
+            depth,
+            [
+                (
+                    Pattern::U8(8),
+                    "sample-depth-u8",
+                    repeat(record([
+                        ("red", base.u8()),
+                        ("green", base.u8()),
+                        ("blue", base.u8()),
+                        ("alpha", base.u8()),
+                        ("frequency", base.u16be()),
+                    ])),
+                ),
+                (
+                    Pattern::U8(16),
+                    "sample-depth-u16",
+                    repeat(record([
+                        ("red", base.u16be()),
+                        ("green", base.u16be()),
+                        ("blue", base.u16be()),
+                        ("alpha", base.u16be()),
+                        ("frequency", base.u16be()),
+                    ])),
+                ),
+            ],
+        )
+    };
+
+    let splt_data = record([
+        ("pallette-name", null_terminated(keyword.call())),
+        // Sample depth is 8 or 16
+        (
+            "sample-depth",
+            where_lambda(
+                base.u8(),
+                "x",
+                or(
+                    expr_eq(var("x"), Expr::U8(8)),
+                    expr_eq(var("x"), Expr::U8(16)),
+                ),
+            ),
+        ),
+        ("pallette", palette_entries(var("sample-depth"))),
+    ]);
+
+    let splt = module.define_format("png.splt", chunk(is_bytes(b"sPLT"), splt_data));
 
     let png_chunk = module.define_format_args(
         "png.chunk",
         vec![("ihdr".into(), ihdr_type)],
         alts([
-            ("bKGD", bkgd.call_args(vec![var("ihdr")])),
-            ("cHRM", chrm.call()),
-            ("iCCP", iccp.call()),
-            ("iTXt", itxt.call()),
-            ("gAMA", gama.call()),
-            ("pHYs", phys.call()),
             ("PLTE", plte.call()),
-            ("tEXt", text.call()),
-            ("tIME", time.call()),
             ("tRNS", trns.call_args(vec![var("ihdr")])),
+            ("cHRM", chrm.call()),
+            ("gAMA", gama.call()),
+            ("iCCP", iccp.call()),
+            ("sBIT", sbit.call_args(vec![var("ihdr")])),
+            ("sRGB", srgb.call()),
+            ("iTXt", itxt.call()),
+            ("tEXt", text.call()),
             ("zTXt", ztxt.call()),
+            ("bKGD", bkgd.call_args(vec![var("ihdr")])),
+            // FIXME - hist can only occur when there is a PLTE chunk to correspond it to
+            ("hIST", hist.call()),
+            ("pHYs", phys.call()),
+            ("sPLT", splt.call()),
+            ("tIME", time.call()),
             // FIXME - add remainder of extant tags (besides IHDR/IDAT/IEND)
         ]),
     );

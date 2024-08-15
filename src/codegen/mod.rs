@@ -803,8 +803,9 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     .collect()
             ).call_method("to_vec")
         }
-        TypedExpr::Arith(_, arith, lhs, rhs) => {
+        TypedExpr::Arith(_gt, arith, lhs, rhs) => {
             // NOTE - because arith only deals with Copy types, we oughtn't need any embedded clones
+            let mut alt = None;
             let x = embed_expr_dft(lhs);
             let y = embed_expr_dft(rhs);
             let op = match arith {
@@ -813,14 +814,26 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 Arith::BoolAnd => Operator::BoolAnd,
                 Arith::BoolOr => Operator::BoolOr,
                 Arith::Add => Operator::Add,
-                Arith::Sub => Operator::Sub,
+                Arith::Sub => {
+                    alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone()]));
+                    Operator::Sub
+                }
                 Arith::Mul => Operator::Mul,
-                Arith::Div => Operator::Div,
-                Arith::Rem => Operator::Rem,
+                Arith::Div => {
+                    // TODO - implement try_div! to avoid panic on divide-by-zero
+                    Operator::Div
+                }
+                Arith::Rem => {
+                    // TODO - implement try_rem! to avoid panic on remainder-by-zero
+                    Operator::Rem
+                }
                 Arith::Shl => Operator::Shl,
                 Arith::Shr => Operator::Shr,
             };
-            RustExpr::infix(x, op, y)
+            match alt {
+                Some(alt) => alt,
+                None => RustExpr::infix(x, op, y),
+            }
         }
 
         TypedExpr::IntRel(_, rel, lhs, rhs) => {
@@ -2562,6 +2575,10 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     content.add_import(RustImport {
         path: vec!["doodle".into(), "prelude".into()],
         uses: RustImportItems::Wildcard,
+    });
+    content.add_import(RustImport {
+        path: vec!["doodle".into()],
+        uses: RustImportItems::Singleton(Label::Borrowed("try_sub")),
     });
     for attr_string in ["non_camel_case_types", "non_snake_case", "dead_code"].into_iter() {
         content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
