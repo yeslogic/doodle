@@ -608,3 +608,8 @@ pub fn chain(f0: Format, name: impl IntoLabel, f: Format) -> Format {
 pub fn void(f: Format) -> Format {
     chain(f, "_", Format::EMPTY)
 }
+
+/// Shortcut for matching an explicit pattern of bytes wrapped in a sequence.
+pub fn pattern_bytestring(bytes: &[u8]) -> Pattern {
+    Pattern::Seq(bytes.into_iter().map(|b| Pattern::U8(*b)).collect())
+}

@@ -1786,10 +1786,10 @@ impl ToFragmentExt for RustExpr {
                 .to_fragment_precedence(Precedence::Projection)
                 .intervene(Fragment::Char('.'), name.to_fragment()),
             RustExpr::FunctionCall(f, args) => cond_paren(
-                f.to_fragment_precedence(prec)
+                f.to_fragment_precedence(Precedence::INVOKE)
                     .cat(ToFragmentExt::paren_list_prec(args, Precedence::Top)),
                 prec,
-                Precedence::Calculus,
+                Precedence::INVOKE,
             ),
             RustExpr::Tuple(elts) => match elts.as_slice() {
                 [elt] => elt
