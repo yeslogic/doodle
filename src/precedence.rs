@@ -19,11 +19,18 @@ pub(crate) enum Precedence {
     LogicalInfix(LogicalLevel),
     /// Unchainable quantitative comparison, such as inequality and equality operations
     Comparison(CompareLevel),
-    /// Functional abstractions such as `match` expressions and closures
-    Calculus,
+    /// Functional abstractions such as `match` expressions, lambda abstractions, and invocations of anonymous functions
+    Calculus(CalculusLevel),
     /// Lowest natural precedence - used for individual operands in the parameter list of a function call, or when no particular precedence is required or known
     #[default]
     Top,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum CalculusLevel {
+    Invoke, // Highest calculus precedence
+    Lambda,
+    Match,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -93,6 +100,21 @@ impl IntransitiveOrd for CompareLevel {
     }
 }
 
+impl IntransitiveOrd for CalculusLevel {
+    fn relate(&self, other: &Self) -> Relation {
+        match (self, other) {
+            (Self::Invoke, Self::Invoke)
+            | (Self::Lambda, Self::Lambda)
+            | (Self::Match, Self::Match) => Relation::Congruent,
+            (Self::Lambda, Self::Invoke) => Relation::Inferior,
+            (Self::Invoke, Self::Lambda) => Relation::Superior,
+            (Self::Lambda, Self::Match) | (Self::Match, Self::Lambda) => Relation::Disjoint,
+            (Self::Invoke, Self::Match) => Relation::Superior,
+            (Self::Match, Self::Invoke) => Relation::Inferior,
+        }
+    }
+}
+
 impl IntransitiveOrd for ArithLevel {
     fn relate(&self, other: &Self) -> Relation {
         match (self, other) {
@@ -133,7 +155,6 @@ impl IntransitiveOrd for Precedence {
             (Self::Atomic, Self::Atomic) => Relation::Congruent,
             (Self::Projection, Self::Projection) => Relation::Congruent,
             (Self::Prefix, Self::Prefix) => Relation::Congruent,
-            (Self::Calculus, Self::Calculus) => Relation::Congruent,
             (Self::Top, Self::Top) => Relation::Congruent,
 
             // Descending relations
@@ -147,10 +168,9 @@ impl IntransitiveOrd for Precedence {
             // Ascending relations
             (Self::Top, _) => Relation::Inferior,
             (_, Self::Top) => Relation::Superior,
-            (Self::Calculus, _) => Relation::Inferior,
-            (_, Self::Calculus) => Relation::Superior,
 
             // Implications
+            (Self::Calculus(x), Self::Calculus(y)) => x.relate(y),
             (Self::ArithInfix(x), Self::ArithInfix(y)) => x.relate(y),
             (Self::BitwiseInfix(x), Self::BitwiseInfix(y)) => x.relate(y),
             (Self::LogicalInfix(x), Self::LogicalInfix(y)) => x.relate(y),
@@ -159,6 +179,9 @@ impl IntransitiveOrd for Precedence {
             // Ascending relations (continued)
             (Self::Comparison(_), _) => Relation::Inferior,
             (_, Self::Comparison(_)) => Relation::Superior,
+
+            (Self::Calculus(_), _) => Relation::Inferior,
+            (_, Self::Calculus(_)) => Relation::Superior,
 
             // Disjunctions
             (Self::ArithInfix(_), Self::BitwiseInfix(_)) => Relation::Disjoint,
@@ -175,8 +198,9 @@ impl IntransitiveOrd for Precedence {
 
 impl Precedence {
     pub(crate) const TOP: Self = Precedence::Top;
-    pub(crate) const ARROW: Self = Precedence::Calculus;
-    pub(crate) const MATCH: Self = Precedence::Calculus;
+    pub(crate) const ARROW: Self = Precedence::Calculus(CalculusLevel::Lambda);
+    pub(crate) const MATCH: Self = Precedence::Calculus(CalculusLevel::Match);
+    pub(crate) const INVOKE: Self = Precedence::Calculus(CalculusLevel::Invoke);
     pub(crate) const COMPARE: Self = Precedence::Comparison(CompareLevel::Comparison);
     pub(crate) const EQUALITY: Self = Precedence::Comparison(CompareLevel::Equality);
     pub(crate) const BITOR: Self = Precedence::BitwiseInfix(BitwiseLevel::Or);
@@ -188,7 +212,7 @@ impl Precedence {
     pub(crate) const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
     pub(crate) const BITSHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);
     pub(crate) const FUNAPP: Self = Precedence::Prefix;
-    pub(crate) const CAST_INFIX: Self = Precedence::Calculus;
+    pub(crate) const CAST_INFIX: Self = Precedence::Calculus(CalculusLevel::Invoke);
     pub(crate) const CAST_PREFIX: Self = Precedence::Prefix;
     pub(crate) const PROJ: Self = Precedence::Projection;
     pub(crate) const ATOM: Self = Precedence::Atomic;

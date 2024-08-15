@@ -84,14 +84,14 @@ pub mod png_metrics {
         let dat = Decoder9(&mut input)?;
         let mut metrics = PngMetrics::default();
         for chunk in dat.chunks.iter().chain(dat.more_chunks.iter()) {
-            match chunk {
-                main_png_chunks_inSeq::PLTE(_) => (), // ignoring critical chunk PLTE
-                main_png_chunks_inSeq::sRGB(_) => metrics.sRGB.count += 1,
-                main_png_chunks_inSeq::bKGD(_) => metrics.bKGD.count += 1,
-                main_png_chunks_inSeq::cHRM(_) => metrics.cHRM.count += 1,
-                main_png_chunks_inSeq::gAMA(_) => metrics.gAMA.count += 1,
-                main_png_chunks_inSeq::iCCP(_) => metrics.iCCP.count += 1,
-                main_png_chunks_inSeq::iTXt(x) => match x.data.compression_flag {
+            match &chunk.data {
+                main_png_chunks_inSeq_data::PLTE(_) => (), // ignoring critical chunk PLTE
+                main_png_chunks_inSeq_data::sRGB(_) => metrics.sRGB.count += 1,
+                main_png_chunks_inSeq_data::bKGD(_) => metrics.bKGD.count += 1,
+                main_png_chunks_inSeq_data::cHRM(_) => metrics.cHRM.count += 1,
+                main_png_chunks_inSeq_data::gAMA(_) => metrics.gAMA.count += 1,
+                main_png_chunks_inSeq_data::iCCP(_) => metrics.iCCP.count += 1,
+                main_png_chunks_inSeq_data::iTXt(x) => match x.compression_flag {
                     0 => metrics.iTXt.push(OptZlibMetrics {
                         is_compressed: false,
                     }),
@@ -100,14 +100,18 @@ pub mod png_metrics {
                     }),
                     other => unreachable!("compression flag {other} is not recognized"),
                 },
-                main_png_chunks_inSeq::pHYs(_) => metrics.pHYs.count += 1,
-                main_png_chunks_inSeq::tEXt(_) => metrics.tEXt.count += 1,
-                main_png_chunks_inSeq::tIME(_) => metrics.tIME.count += 1,
-                main_png_chunks_inSeq::tRNS(_) => metrics.tRNS.count += 1,
-                main_png_chunks_inSeq::zTXt(_) => metrics.zTXt.count += 1,
-                main_png_chunks_inSeq::hIST(_) => metrics.hIST.count += 1,
-                main_png_chunks_inSeq::sBIT(_) => metrics.sBIT.count += 1,
-                main_png_chunks_inSeq::sPLT(_) => metrics.sPLT.count += 1,
+                main_png_chunks_inSeq_data::pHYs(_) => metrics.pHYs.count += 1,
+                main_png_chunks_inSeq_data::tEXt(_) => metrics.tEXt.count += 1,
+                main_png_chunks_inSeq_data::tIME(_) => metrics.tIME.count += 1,
+                main_png_chunks_inSeq_data::tRNS(_) => metrics.tRNS.count += 1,
+                main_png_chunks_inSeq_data::zTXt(_) => metrics.zTXt.count += 1,
+                main_png_chunks_inSeq_data::hIST(_) => metrics.hIST.count += 1,
+                main_png_chunks_inSeq_data::sBIT(_) => metrics.sBIT.count += 1,
+                main_png_chunks_inSeq_data::sPLT(_) => metrics.sPLT.count += 1,
+                main_png_chunks_inSeq_data::unknown(_) => eprintln!(
+                    "unknown png chunk type: {}",
+                    String::from_utf8_lossy(&chunk.tag)
+                ),
             }
         }
         Ok(metrics)
