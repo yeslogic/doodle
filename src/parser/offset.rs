@@ -357,7 +357,7 @@ impl BufferOffset {
             Ok(self.current_offset.increment_assign_by(delta))
         } else {
             if self.current_limit() < self.max_offset {
-                Err(ParseError::Overrun(super::error::OverrunKind::EndOfSlice))
+                Err(ParseError::Overrun(super::error::OverrunKind::EndOfSlice { max_offset: self.current_limit() }))
             } else {
                 Err(ParseError::Overrun(super::error::OverrunKind::EndOfStream))
             }

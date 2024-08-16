@@ -1,7 +1,9 @@
+use super::offset::ByteOffset;
+
 pub type PResult<T> = Result<T, ParseError>;
 
 /// General error type for both recoverable and unrecoverable errors encountered during parsing operations
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ParseError {
     /// Explicit `Format::Fail` or any of its derived equivalents
     FailToken,
@@ -24,12 +26,12 @@ pub enum ParseError {
 }
 
 /// Error-kind indicator that distinguishes between different Overrun errors.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OverrunKind {
     /// Indicates that an overrun error occurred due to the absolute boundary of the full parse-buffer
     EndOfStream,
     /// Indicates that an overrun error occurred due to the relative boundary of a context-local slice
-    EndOfSlice,
+    EndOfSlice { max_offset: ByteOffset },
 }
 
 impl std::fmt::Display for ParseError {
@@ -51,7 +53,7 @@ impl std::fmt::Display for ParseError {
             ),
             ParseError::Overrun(k) => match k {
                 OverrunKind::EndOfStream => write!(f, "offset would extend past end of stream"),
-                OverrunKind::EndOfSlice => write!(f, "offset would extend past end of slice"),
+                OverrunKind::EndOfSlice { max_offset } => write!(f, "offset would extend past end of slice[max-offset: {max_offset}]"),
             },
             ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {}", e)
         }
