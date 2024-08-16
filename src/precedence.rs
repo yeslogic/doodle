@@ -108,7 +108,7 @@ impl IntransitiveOrd for CalculusLevel {
             | (Self::Match, Self::Match) => Relation::Congruent,
             (Self::Lambda, Self::Invoke) => Relation::Inferior,
             (Self::Invoke, Self::Lambda) => Relation::Superior,
-            (Self::Lambda, Self::Match) | (Self::Match, Self::Lambda) => Relation::Disjoint,
+            (Self::Lambda, Self::Match) | (Self::Match, Self::Lambda) => Relation::Congruent,
             (Self::Invoke, Self::Match) => Relation::Superior,
             (Self::Match, Self::Invoke) => Relation::Inferior,
         }
@@ -147,6 +147,7 @@ impl IntransitiveOrd for BitwiseLevel {
 ///   Atomic .> Proj .> Prefix .> *Infix .> Comparison .> Calculus .> Top
 ///   rel(x, y) = rel(ArithInfix(x), ArithInfix(y))
 ///   rel(x, y) = rel(BitwiseInfix(x), BitwiseInfix(y))
+///   rel(x, y) = rel(Calculus(x), Calculus(y))
 ///   Bitwise(_) >< Arith(_)
 impl IntransitiveOrd for Precedence {
     fn relate(&self, other: &Self) -> Relation {
@@ -177,11 +178,10 @@ impl IntransitiveOrd for Precedence {
             (Self::Comparison(x), Self::Comparison(y)) => x.relate(y),
 
             // Ascending relations (continued)
-            (Self::Comparison(_), _) => Relation::Inferior,
-            (_, Self::Comparison(_)) => Relation::Superior,
-
             (Self::Calculus(_), _) => Relation::Inferior,
             (_, Self::Calculus(_)) => Relation::Superior,
+            (Self::Comparison(_), _) => Relation::Inferior,
+            (_, Self::Comparison(_)) => Relation::Superior,
 
             // Disjunctions
             (Self::ArithInfix(_), Self::BitwiseInfix(_)) => Relation::Disjoint,

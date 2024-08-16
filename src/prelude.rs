@@ -319,11 +319,10 @@ mod tests {
     use super::*;
 
     // REVIEW - check whether this is actually a bad tree by definition or in our logic
-    #[should_panic = "this tree may be invalid"]
+    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: UnsoundOperation(Some(\"huffman code collision\"))")]
     #[test]
-    fn test_make_huffman_decoder() -> PResult<()> {
+    fn test_make_huffman_decoder() {
         let lengths = [0, 0, 0, 0, 1, 1, 5, 4, 4, 5, 0, 1, 0, 0, 0, 0, 1, 2, 0];
-        let _huffman = make_huffman_decoder(&lengths)?;
-        Ok(())
+        let _huffman = make_huffman_decoder(&lengths).unwrap();
     }
 }

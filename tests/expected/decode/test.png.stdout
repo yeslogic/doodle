@@ -15,79 +15,79 @@
 │       │   └── crc <- base.u32be := 1592150037
 │       ├── chunks <- repeat png.chunk(...) :=
 │       │   ├── 0 <- png.chunk(...) :=
-│       │   │   └── PLTE <- png.plte :=
-│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 87
-│       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice length (repeat1 { ... }) :=
-│       │   │       │   └──    r   g   b
-│       │   │       │        192 192 192
-│       │   │       │        162 161 162
-│       │   │       │        158 157 158
-│       │   │       │        114 117 117
-│       │   │       │        124 126 126
-│       │   │       │        132 134 134
-│       │   │       │        205 206 206
-│       │   │       │        196 197 197
-│       │   │       │        173 174 174
-│       │   │       │        143 144 144
-│       │   │       │        152 150 151
-│       │   │       │        149 159 157
-│       │   │       │        212 229 225
-│       │   │       │         52  56  55
-│       │   │       │         88  92  91
-│       │   │       │        231 239 237
-│       │   │       │        156 170 166
-│       │   │       │         72  75  74
-│       │   │       │        179 182 181
-│       │   │       │        103 105 104
-│       │   │       │        191 193 192
-│       │   │       │        211 212 211
-│       │   │       │        218 218 217
-│       │   │       │        226 224 223
-│       │   │       │        231 229 229
-│       │   │       │        187 186 186
-│       │   │       │        168 167 167
-│       │   │       │        201 201 201
-│       │   │       │        138 138 138
-│       │   │       └── crc <- base.u32be := 1943707985
+│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 87
+│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "PLTE"
+│       │   │   ├── data <- slice length (match tag { ... }) :=
+│       │   │   │   └── PLTE <- png.plte :=
+│       │   │   │       └──    r   g   b
+│       │   │   │            192 192 192
+│       │   │   │            162 161 162
+│       │   │   │            158 157 158
+│       │   │   │            114 117 117
+│       │   │   │            124 126 126
+│       │   │   │            132 134 134
+│       │   │   │            205 206 206
+│       │   │   │            196 197 197
+│       │   │   │            173 174 174
+│       │   │   │            143 144 144
+│       │   │   │            152 150 151
+│       │   │   │            149 159 157
+│       │   │   │            212 229 225
+│       │   │   │             52  56  55
+│       │   │   │             88  92  91
+│       │   │   │            231 239 237
+│       │   │   │            156 170 166
+│       │   │   │             72  75  74
+│       │   │   │            179 182 181
+│       │   │   │            103 105 104
+│       │   │   │            191 193 192
+│       │   │   │            211 212 211
+│       │   │   │            218 218 217
+│       │   │   │            226 224 223
+│       │   │   │            231 229 229
+│       │   │   │            187 186 186
+│       │   │   │            168 167 167
+│       │   │   │            201 201 201
+│       │   │   │            138 138 138
+│       │   │   └── crc <- base.u32be := 1943707985
 │       │   ├── 1 <- png.chunk(...) :=
-│       │   │   └── tRNS <- png.trns(...) :=
-│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
-│       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
-│       │   │       │   └── color-type-3 <- repeat { ... } :=
-│       │   │       │       └──  palette-index
-│       │   │       │                        0
-│       │   │       └── crc <- base.u32be := 1088870502
+│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
+│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tRNS"
+│       │   │   ├── data <- slice length (match tag { ... }) :=
+│       │   │   │   └── tRNS <- png.trns(...) :=
+│       │   │   │       └── color-type-3 <- repeat { ... } :=
+│       │   │   │           └──  palette-index
+│       │   │   │                            0
+│       │   │   └── crc <- base.u32be := 1088870502
 │       │   ├── 2 <- png.chunk(...) :=
-│       │   │   └── bKGD <- png.bkgd(...) :=
-│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
-│       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice length (match ihdr.data.color-type { ... }) :=
-│       │   │       │   └── color-type-3 <- { ... } :=
-│       │   │       │       └── palette-index <- base.u8 := 0
-│       │   │       └── crc <- base.u32be := 2282036552
+│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 1
+│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "bKGD"
+│       │   │   ├── data <- slice length (match tag { ... }) :=
+│       │   │   │   └── bKGD <- png.bkgd(...) :=
+│       │   │   │       └── color-type-3 <- { ... } :=
+│       │   │   │           └── palette-index <- base.u8 := 0
+│       │   │   └── crc <- base.u32be := 2282036552
 │       │   ├── 3 <- png.chunk(...) :=
-│       │   │   └── pHYs <- png.phys :=
-│       │   │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 9
-│       │   │       ├── tag <- (...)
-│       │   │       ├── data <- slice length { ... } :=
-│       │   │       │   ├── pixels-per-unit-x <- base.u32be := 2835
-│       │   │       │   ├── pixels-per-unit-y <- base.u32be := 2835
-│       │   │       │   └── unit-specifier <- base.u8 := 1
-│       │   │       └── crc <- base.u32be := 10132504
+│       │   │   ├── length <- assert (length -> length <= 2147483647) base.u32be := 9
+│       │   │   ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "pHYs"
+│       │   │   ├── data <- slice length (match tag { ... }) :=
+│       │   │   │   └── pHYs <- png.phys :=
+│       │   │   │       ├── pixels-per-unit-x <- base.u32be := 2835
+│       │   │   │       ├── pixels-per-unit-y <- base.u32be := 2835
+│       │   │   │       └── unit-specifier <- base.u8 := 1
+│       │   │   └── crc <- base.u32be := 10132504
 │       │   └── 4 <- png.chunk(...) :=
-│       │       └── tIME <- png.time :=
-│       │           ├── length <- assert (length -> length <= 2147483647) base.u32be := 7
-│       │           ├── tag <- (...)
-│       │           ├── data <- slice length { ... } :=
-│       │           │   ├── year <- base.u16be := 2005
-│       │           │   ├── month <- base.u8 := 11
-│       │           │   ├── day <- base.u8 := 1
-│       │           │   ├── hour <- base.u8 := 23
-│       │           │   ├── minute <- base.u8 := 55
-│       │           │   └── second <- base.u8 := 34
-│       │           └── crc <- base.u32be := 491070829
+│       │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 7
+│       │       ├── tag <- let-format _ (peek-not [= 73]) (repeat-count 4 base.ascii-char.strict) := "tIME"
+│       │       ├── data <- slice length (match tag { ... }) :=
+│       │       │   └── tIME <- png.time :=
+│       │       │       ├── year <- base.u16be := 2005
+│       │       │       ├── month <- base.u8 := 11
+│       │       │       ├── day <- base.u8 := 1
+│       │       │       ├── hour <- base.u8 := 23
+│       │       │       ├── minute <- base.u8 := 55
+│       │       │       └── second <- base.u8 := 34
+│       │       └── crc <- base.u32be := 491070829
 │       ├── idat <- repeat1 png.idat :=
 │       │   └── 0 <- png.idat :=
 │       │       ├── length <- assert (length -> length <= 2147483647) base.u32be := 1168
