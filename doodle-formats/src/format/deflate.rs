@@ -481,7 +481,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (
                                             Pattern::U16(270),
                                             format_some(length_record_fixed(
-                                                24,
+                                                23,
                                                 base,
                                                 2,
                                                 distance_record,
