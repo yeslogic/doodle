@@ -12,7 +12,11 @@ macro_rules! try_sub {
     ( $x:expr, $y:expr ) => {
         (match $x.checked_sub($y) {
             Some(z) => z,
-            None => return Err(ParseError::UnsoundOperation(Some("underflow on subtraction"))),
+            None => {
+                return Err(ParseError::UnsoundOperation(Some(
+                    "underflow on subtraction",
+                )))
+            }
         })
     };
 }
@@ -191,7 +195,9 @@ mod huffman {
                     *this = HuffmanNode::Leaf(value);
                     Ok(())
                 }
-                (_, []) | (HuffmanNode::Leaf(..), &[_, ..]) => Err(ParseError::UnsoundOperation(Some("huffman code collision"))),
+                (_, []) | (HuffmanNode::Leaf(..), &[_, ..]) => {
+                    Err(ParseError::UnsoundOperation(Some("huffman code collision")))
+                }
                 (this @ &mut HuffmanNode::Empty, &[b @ (0 | 1), ..]) => {
                     let mut children = [Box::new(HuffmanNode::Empty), Box::new(HuffmanNode::Empty)];
                     match (&mut children[b as usize]).insert(&suffix[1..], value) {
@@ -207,7 +213,9 @@ mod huffman {
                 (HuffmanNode::Branch { children }, &[b @ (0 | 1), ..]) => {
                     (&mut children[b as usize]).insert(&suffix[1..], value)
                 }
-                (_, &[other, ..]) => unreachable!("suffix of huffman code begins with {other} != 0, 1"),
+                (_, &[other, ..]) => {
+                    unreachable!("suffix of huffman code begins with {other} != 0, 1")
+                }
             }
         }
 
