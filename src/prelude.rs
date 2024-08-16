@@ -318,6 +318,8 @@ pub fn repeat_between_finished(next_match: bool, ge_min: bool, eq_max: bool) -> 
 mod tests {
     use super::*;
 
+    // REVIEW - check whether this is actually a bad tree by definition or in our logic
+    #[should_panic = "this tree may be invalid"]
     #[test]
     fn test_make_huffman_decoder() -> PResult<()> {
         let lengths = [0, 0, 0, 0, 1, 1, 5, 4, 4, 5, 0, 1, 0, 0, 0, 0, 1, 2, 0];
