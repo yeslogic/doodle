@@ -20,7 +20,7 @@ pub enum ParseError {
     /// Any unrecoverable error in the state of the Parser itself.
     InternalError(StateError),
     /// An operation performed on values derived via parsing is not sound, mostly due to a bad assumption of the format for what is being parsed
-    UnsoundOperation,
+    UnsoundOperation(Option<&'static str>),
 }
 
 /// Error-kind indicator that distinguishes between different Overrun errors.
@@ -36,7 +36,8 @@ impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ParseError::FailToken => write!(f, "reached Fail token"),
-            ParseError::UnsoundOperation => write!(f, "attempted unsound operation during speculative parse"),
+            ParseError::UnsoundOperation(Some(mesg)) => write!(f, "attempted unsound operation: {mesg}"),
+            ParseError::UnsoundOperation(None) => write!(f, "attempted unsound operation"),
             ParseError::FalsifiedWhere => write!(f, "parsed value deemed invalid by Where lambda"),
             ParseError::InsufficientRepeats => write!(
                 f,
