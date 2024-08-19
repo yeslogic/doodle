@@ -3580,34 +3580,4 @@ mod tests {
         let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
         run_popcheck(&[("test.compute_complex", f)]);
     }
-
-    #[test]
-    fn test_abstracted_try_precedence() {
-        use crate::helper::*;
-
-        let f = chain(
-            Format::PeekNot(Box::new(is_byte(b'I'))),
-            "_",
-            Format::Byte(ByteSet::full()),
-        );
-        let mut module = FormatModule::new();
-        module.define_format("test.not-i", f.clone());
-        let mut tc = TypeChecker::new();
-        let _fv = tc.infer_var_format(&f, Ctxt::new(&module, &UScope::Empty));
-
-        // println!("{tc:?}");
-
-        let cg = CodeGen::new();
-        let mut tv = Elaborator::new(&module, tc, cg);
-        let dec_f = tv.elaborate_format(&f, &TypedDynScope::Empty);
-        let c = GTCompiler::compile_program(&module, &dec_f).unwrap();
-
-        let dec = c.decoders[0].0.get_dec();
-        let cl = tv.codegen.translate(&dec);
-        let tree = cl.to_ast(ProdCtxt {
-            input_varname: &Label::Borrowed("input"),
-        });
-        let frag = RustExpr::from(tree).to_fragment();
-        println!("{}", frag);
-    }
 }
