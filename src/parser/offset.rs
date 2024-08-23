@@ -1,4 +1,4 @@
-use super::error::{PResult, ParseError, StateError};
+use super::error::{OverrunKind, PResult, ParseError, StateError};
 use std::cmp::Ordering;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -341,9 +341,10 @@ impl BufferOffset {
         self.current_offset
     }
 
-    /// Increments the current offset by `delta` if it is legal to do so, and returns the old offset.
+    /// Increments the current offset by `delta` if it is legal to do so (determined in part by whether or not we are intending to read,
+    /// as flagged by `will_read`.
     ///
-    /// Instead returns `Err` if it is not legal to increment by `delta`.
+    /// Returns the old offset if successful, or `Err` if the increment is not allowed.
     ///
     /// # Note
     ///
@@ -351,19 +352,28 @@ impl BufferOffset {
     /// In most cases this will be bytes, but within a `Format::Bits` context, delta will measure
     /// bits within each byte.
     pub(crate) fn try_increment(&mut self, delta: usize) -> PResult<ByteOffset> {
-        let lim = self.current_limit();
+        let slice_limit = self.view_stack.get_limit();
         let after_increment = self.current_offset.increment_by(delta);
-        if !(after_increment > lim) {
-            Ok(self.current_offset.increment_assign_by(delta))
-        } else {
-            if self.current_limit() < self.max_offset {
-                Err(ParseError::Overrun(super::error::OverrunKind::EndOfSlice {
-                    max_offset: self.current_limit(),
-                }))
-            } else {
-                Err(ParseError::Overrun(super::error::OverrunKind::EndOfStream))
+
+        match slice_limit {
+            Some(max_offset) => {
+                if after_increment > max_offset {
+                    return Err(ParseError::Overrun(OverrunKind::EndOfSlice {
+                        offset: after_increment,
+                        max_offset,
+                    }));
+                }
+            }
+            None => {
+                if after_increment > self.max_offset {
+                    return Err(ParseError::Overrun(OverrunKind::EndOfStream {
+                        offset: after_increment,
+                        max_offset: self.max_offset,
+                    }));
+                }
             }
         }
+        Ok(self.current_offset.increment_assign_by(delta))
     }
 
     /// Switches from reading byte-by-byte to reading bit-by-bit.
@@ -445,7 +455,24 @@ impl BufferOffset {
                 self.view_stack = stack;
                 Ok(endpoint)
             }
-            _ => Err(ParseError::InternalError(StateError::MissingSlice)),
+            (stack, Some(Lens::Alts { .. })) => {
+                // NOTE - if we nest a non-det union within a slice, we are closing it implicitly by precluding further fallthrough
+                self.view_stack = stack;
+                self.close_slice()
+            }
+            (_, None) => Err(ParseError::InternalError(StateError::MissingSlice)),
+            (_, Some(Lens::PeekNot { checkpoint })) => {
+                unreachable!(
+                    "[STATE]: close-slice @{}: unexpected PeekNot <-@{}",
+                    self.current_offset, checkpoint
+                );
+            }
+            (_, Some(Lens::Peek { checkpoint })) => {
+                unreachable!(
+                    "[STATE]: close-slice @{}: unexpected Peek <-@{}",
+                    self.current_offset, checkpoint
+                );
+            }
         }
     }
 

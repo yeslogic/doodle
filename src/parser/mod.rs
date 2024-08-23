@@ -56,7 +56,9 @@ impl<'a> Parser<'a> {
     /// Otherwise, it will be an entire byte.
     pub fn read_byte(&mut self) -> Result<u8, ParseError> {
         let (ix, sub_bit) = self.offset.try_increment(1)?.as_bytes();
-        let byte = self.buffer[ix];
+        let Some(&byte) = self.buffer.get(ix) else {
+            return Err(ParseError::InternalError(StateError::OutOfBoundsRead));
+        };
         let ret = if let Some(n) = sub_bit {
             let i = n as u8;
             (byte & (1 << i)) >> i

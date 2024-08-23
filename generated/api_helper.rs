@@ -32,6 +32,30 @@ pub fn try_decode_gzip(test_file: &str) -> TestResult<Vec<GzipChunk>> {
 
 pub mod png_metrics {
     use super::*;
+    use std::fmt::Write;
+
+    fn abbrev(buf: &mut String, data: &[u8]) -> std::fmt::Result {
+        const CUTOFF: usize = 16;
+        const MARGIN: usize = 4;
+        write!(buf, "[")?;
+        if data.len() > CUTOFF {
+            let lead = &data[..MARGIN];
+            let trail = &data[data.len() - MARGIN..];
+            let skip = data.len() - 2 * MARGIN;
+            for byte in lead {
+                write!(buf, "{:02x}", byte)?;
+            }
+            write!(buf, "...({} bytes skipped)...", skip)?;
+            for byte in trail {
+                write!(buf, "{:02x}", byte)?;
+            }
+        } else {
+            for byte in data {
+                write!(buf, "{:02x}", byte)?;
+            }
+        }
+        write!(buf, "]")
+    }
 
     #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
     pub struct GenericMetrics {
@@ -43,6 +67,12 @@ pub mod png_metrics {
         is_compressed: bool,
     }
 
+    #[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+    pub struct SingleZlibMetrics {
+        is_present: bool,
+        opt_invalid_bytes: Option<Vec<u8>>,
+    }
+
     pub type SbitMetrics = GenericMetrics;
     pub type SpltMetrics = GenericMetrics;
     pub type HistMetrics = GenericMetrics;
@@ -50,7 +80,7 @@ pub mod png_metrics {
     pub type BkgdMetrics = GenericMetrics;
     pub type ChrmMetrics = GenericMetrics;
     pub type GamaMetrics = GenericMetrics;
-    pub type IccpMetrics = GenericMetrics;
+    pub type IccpMetrics = SingleZlibMetrics;
     pub type PhysMetrics = GenericMetrics;
 
     pub type ItxtMetrics = Vec<OptZlibMetrics>;
@@ -90,7 +120,15 @@ pub mod png_metrics {
                 main_png_chunks_inSeq_data::bKGD(_) => metrics.bKGD.count += 1,
                 main_png_chunks_inSeq_data::cHRM(_) => metrics.cHRM.count += 1,
                 main_png_chunks_inSeq_data::gAMA(_) => metrics.gAMA.count += 1,
-                main_png_chunks_inSeq_data::iCCP(_) => metrics.iCCP.count += 1,
+                main_png_chunks_inSeq_data::iCCP(x) => {
+                    match &x.compressed_profile {
+                        main_png_chunks_inSeq_data_iCCP_compressed_profile::invalid(bytes) => {
+                            metrics.iCCP.opt_invalid_bytes.replace(bytes.clone());
+                        }
+                        main_png_chunks_inSeq_data_iCCP_compressed_profile::valid(_) => (),
+                    }
+                    metrics.iCCP.is_present = true;
+                }
                 main_png_chunks_inSeq_data::iTXt(x) => match x.compression_flag {
                     0 => metrics.iTXt.push(OptZlibMetrics {
                         is_compressed: false,
@@ -131,6 +169,15 @@ pub mod png_metrics {
                 2.. => buf.push_str("➕\t"),
             };
 
+            let show_single_zlib =
+                |buf: &mut String, metrics: &SingleZlibMetrics| match metrics.is_present {
+                    true => match metrics.opt_invalid_bytes.is_some() {
+                        true => buf.push_str("⚠️\t"),
+                        false => buf.push_str("✅\t"),
+                    },
+                    false => buf.push_str("❌\t"),
+                };
+
             let show_count_optzlib = |buf: &mut String, metrics: &Vec<OptZlibMetrics>| {
                 let mut all = true;
                 let mut any = false;
@@ -150,7 +197,7 @@ pub mod png_metrics {
             show_count(buf, &metrics.cHRM);
             show_count(buf, &metrics.gAMA);
             show_count(buf, &metrics.hIST);
-            show_count(buf, &metrics.iCCP);
+            show_single_zlib(buf, &metrics.iCCP);
             show_count_optzlib(buf, &metrics.iTXt);
             show_count(buf, &metrics.pHYs);
             show_count(buf, &metrics.sBIT);

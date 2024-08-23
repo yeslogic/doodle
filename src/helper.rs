@@ -67,6 +67,11 @@ pub fn variant<Name: IntoLabel>(name: Name, value: Expr) -> Expr {
     Expr::Variant(name.into(), Box::new(value))
 }
 
+/// Helper-function for [`Format::Variant`].
+pub fn fmt_variant<Name: IntoLabel>(name: Name, fmt: Format) -> Format {
+    Format::Variant(name.into(), Box::new(fmt))
+}
+
 /// Helper-function for [`Pattern::Binding`] that can take `&'static str`, `String`, or `Label` parameters.
 pub fn bind<Name: IntoLabel>(name: Name) -> Pattern {
     Pattern::binding(name)
@@ -612,4 +617,30 @@ pub fn void(f: Format) -> Format {
 /// Shortcut for matching an explicit pattern of bytes wrapped in a sequence.
 pub fn pattern_bytestring(bytes: &[u8]) -> Pattern {
     Pattern::Seq(bytes.into_iter().map(|b| Pattern::U8(*b)).collect())
+}
+
+/// Constructs a format that will fallback to parsing an abstracted byte-sequence if the given Format `f`
+/// fails to parse.
+pub fn binary_fallback(f: Format) -> Format {
+    union_nondet([
+        ("valid", f),
+        ("invalid", repeat(Format::Byte(ByteSet::full()))),
+    ])
+}
+
+/// Helper for the identity function as an Expr::Lambda
+pub fn f_id() -> Expr {
+    lambda("x", var("x"))
+}
+
+/// Given an expression of type `Seq(Seq(T))`, return an expression of type `Seq(T)` corresponding to the concatenation
+/// of each sub-list in turn.
+#[inline]
+pub fn concat(xs: Expr) -> Expr {
+    flat_map(f_id(), xs)
+}
+
+/// Helper for the lambda-abstracted form of [`concat`].
+pub fn f_concat() -> Expr {
+    lambda("xs", concat(var("xs")))
 }
