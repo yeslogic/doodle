@@ -70,7 +70,7 @@ pub mod png_metrics {
     #[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
     pub struct SingleZlibMetrics {
         is_present: bool,
-        opt_invalid_bytes: Option<Vec<u8>>,
+        // opt_invalid_bytes: Option<Vec<u8>>,
     }
 
     pub type SbitMetrics = GenericMetrics;
@@ -120,13 +120,7 @@ pub mod png_metrics {
                 main_png_chunks_inSeq_data::bKGD(_) => metrics.bKGD.count += 1,
                 main_png_chunks_inSeq_data::cHRM(_) => metrics.cHRM.count += 1,
                 main_png_chunks_inSeq_data::gAMA(_) => metrics.gAMA.count += 1,
-                main_png_chunks_inSeq_data::iCCP(x) => {
-                    match &x.compressed_profile {
-                        main_png_chunks_inSeq_data_iCCP_compressed_profile::invalid(bytes) => {
-                            metrics.iCCP.opt_invalid_bytes.replace(bytes.clone());
-                        }
-                        main_png_chunks_inSeq_data_iCCP_compressed_profile::valid(_) => (),
-                    }
+                main_png_chunks_inSeq_data::iCCP(_) => {
                     metrics.iCCP.is_present = true;
                 }
                 main_png_chunks_inSeq_data::iTXt(x) => match x.compression_flag {
@@ -171,12 +165,9 @@ pub mod png_metrics {
 
             let show_single_zlib =
                 |buf: &mut String, metrics: &SingleZlibMetrics| match metrics.is_present {
-                    true => match metrics.opt_invalid_bytes.is_some() {
-                        true => buf.push_str("⚠️\t"),
-                        false => buf.push_str("✅\t"),
-                    },
+                    true => buf.push_str("✅\t"),
                     false => buf.push_str("❌\t"),
-                };
+            };
 
             let show_count_optzlib = |buf: &mut String, metrics: &Vec<OptZlibMetrics>| {
                 let mut all = true;
