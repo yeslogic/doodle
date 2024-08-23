@@ -366,7 +366,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Pattern::U8(29),
                     distance_record0.call_args(vec![Expr::U8(13), Expr::U16(24577)]),
                 ),
-                (Pattern::Int(Bounds::new(30, 31)), Format::Fail),
+                (Pattern::Int(Bounds::new(30, 31)), Format::Fail), // 30 and 31 are reserved symbols in the DEFLATE distance code alphabet
             ],
         ),
     );

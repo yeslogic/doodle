@@ -480,10 +480,7 @@ pub fn main(
                         ),
                     ),
                     "idat",
-                    Format::DecodeBytes(
-                        var("idat"),
-                        Box::new(zlib.call()),
-                    ),
+                    Format::DecodeBytes(var("idat"), Box::new(zlib.call())),
                 ),
             ),
             (
