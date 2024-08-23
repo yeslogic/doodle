@@ -107,6 +107,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // Invalid Data Encoding
     const ELF_DATA_NONE: u8 = 0;
     // 2's Complement, Little Endian
+    #[allow(dead_code)]
     const ELF_DATA_2LSB: u8 = 1;
     // 2's Complement, Big Endian
     const ELF_DATA_2MSB: u8 = 2;
@@ -158,8 +159,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // SECTION - ELF Header - (File) Type
 
     const ET_NONE: u16 = 0; // no file type
+    #[allow(dead_code)]
     const ET_REL: u16 = 1; // relocatable file
+    #[allow(dead_code)]
     const ET_EXEC: u16 = 2; // executable file
+    #[allow(dead_code)]
     const ET_DYN: u16 = 3; // shared object file
     const ET_CORE: u16 = 4; // core file
     const ET_LOOS: u16 = 0xfe00; // OS-specific
@@ -181,11 +185,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         Pattern::Int(Bounds::new(ET_NONE as usize, ET_CORE as usize)),
                         Expr::Bool(true),
                     ), // non-processor-specific
-                    (Pattern::U16(ET_LOOS), Expr::Bool(true)), // OS-specific
-                    (Pattern::U16(ET_HIOS), Expr::Bool(true)), // OS-specific
-                    (Pattern::U16(ET_LOPROC), Expr::Bool(true)), // processor-specific
-                    (Pattern::U16(ET_HIPROC), Expr::Bool(true)), // processor-specific
-                    (Pattern::Wildcard, Expr::Bool(false)),    // not a recognized object filetype
+                    (
+                        Pattern::Int(Bounds::new(ET_LOOS as usize, ET_HIOS as usize)),
+                        Expr::Bool(true),
+                    ), // OS-specific
+                    (
+                        Pattern::Int(Bounds::new(ET_LOPROC as usize, ET_HIPROC as usize)),
+                        Expr::Bool(true),
+                    ), // processor-specific
+                    (Pattern::Wildcard, Expr::Bool(false)), // not a recognized object filetype
                 ],
             ),
         ),
@@ -327,31 +335,50 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // SECTION - Section Header Type
 
     const SHT_NULL: u32 = 0; // no associated section
+    #[allow(dead_code)]
     const SHT_PROGBITS: u32 = 1; // program-specific data
+    #[allow(dead_code)]
     const SHT_SYMTAB: u32 = 2; // symbols for link editing (multiple disallowed)
+    #[allow(dead_code)]
     const SHT_STRTAB: u32 = 3; // string table
+    #[allow(dead_code)]
     const SHT_RELA: u32 = 4; // relocation entries with addends (multiple allowed)
+    #[allow(dead_code)]
     const SHT_HASH: u32 = 5; // symbol hash table (multiple disallowed)
+    #[allow(dead_code)]
     const SHT_DYNAMIC: u32 = 6; // information for dynamic linking (multiple disallowed)
+    #[allow(dead_code)]
     const SHT_NOTE: u32 = 7; // notes section
+    #[allow(dead_code)]
     const SHT_NOBITS: u32 = 8; // like PROGBITS, but occupying no space in the file (sh_offset indicates conceptual file offset)
+    #[allow(dead_code)]
     const SHT_REL: u32 = 9; // relocation entries (multiple allowed)
+    #[allow(dead_code)]
     const SHT_SHLIB: u32 = 10; // reserved, unspecified semantics
+    #[allow(dead_code)]
     const SHT_DYNSYM: u32 = 11; // symbol hash table (multiple disallowed)
                                 // NOTE - range-gap for [12,13]
+    #[allow(dead_code)]
     const SHT_INIT_ARRAY: u32 = 14; // array of pointers to initialization functions
+    #[allow(dead_code)]
     const SHT_FINI_ARRAY: u32 = 15; // array of pointers to termination functions
+    #[allow(dead_code)]
     const SHT_PREINIT_ARRAY: u32 = 16; // array of pointers to pre-initialization functions
+    #[allow(dead_code)]
     const SHT_GROUP: u32 = 17; // section group (may only appear in ET_REL ELF files, and must precede all other entries of the given group)
     const SHT_SYMTAB_SHNDX: u32 = 18; // Extended section-header indexes associated with an SHT_SYMTAB section, indicating a symbol table entry (and occurring in the same order)
 
     // NOTE - the following constants are range endpoints and not implicit singletons
     const SHT_LOOS: u32 = 0x60000000; // OS-specific range (lower bounds)
+    #[allow(dead_code)]
     const SHT_HIOS: u32 = 0x6fffffff; // OS-specific range (upper bounds)
 
+    #[allow(dead_code)]
     const SHT_LOPROC: u32 = 0x70000000; // processor-specific range (lower bounds)
+    #[allow(dead_code)]
     const SHT_HIPROC: u32 = 0x7fffffff; // processor-specific range (upper bounds)
 
+    #[allow(dead_code)]
     const SHT_LOUSER: u32 = 0x80000000; // application-specific range (lower bounds)
     const SHT_HIUSER: u32 = 0xffffffff; // application-specific range (upper bounds)
 

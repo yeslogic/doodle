@@ -454,6 +454,18 @@ pub enum Constraint {
     Proj(ProjShape), // constraints implied by projections
 }
 
+impl Constraint {
+    /// Returns true if the constraint is vacuous and therefore equivalent to `Constraints::Indefinite`
+    ///
+    /// Specifically checks for `Equiv` over `UType::Hole` or `UType::Empty`.
+    pub fn is_vacuous(&self) -> bool {
+        match self {
+            Constraint::Equiv(ut) => matches!(ut.as_ref(), UType::Hole | UType::Empty),
+            _ => false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProjShape {
     TupleWith(BTreeMap<usize, UVar>), // required associations of metavars at given indices of an uncertain tuple
@@ -1297,6 +1309,8 @@ impl TypeChecker {
             }
             (UType::Hole, _) => Ok(right),
             (_, UType::Hole) => Ok(left),
+            (UType::Empty, _) => Ok(right),
+            (_, UType::Empty) => Ok(left),
             (UType::Seq(e1), UType::Seq(e2)) => {
                 if e1 == e2 {
                     Ok(left)
@@ -2258,24 +2272,32 @@ impl TypeChecker {
                 Ok(&self.constraints[v1.0])
             }
             (Constraints::Variant(vmid), Constraints::Invariant(c)) => {
-                return Err(TCErrorKind::VarianceMismatch(
-                    Ord::min(v1, v2),
-                    *vmid,
-                    self.varmaps.get_varmap(*vmid).clone(),
-                    c.clone(),
-                    Polarity::Contravariant,
-                )
-                .into());
+                if c.is_vacuous() {
+                    Ok(&self.constraints[v1.0])
+                } else {
+                    Err(TCErrorKind::VarianceMismatch(
+                        Ord::min(v1, v2),
+                        *vmid,
+                        self.varmaps.get_varmap(*vmid).clone(),
+                        c.clone(),
+                        Polarity::Contravariant,
+                    )
+                    .into())
+                }
             }
             (Constraints::Invariant(c), Constraints::Variant(vmid)) => {
-                return Err(TCErrorKind::VarianceMismatch(
-                    Ord::min(v1, v2),
-                    *vmid,
-                    self.varmaps.get_varmap(*vmid).clone(),
-                    c.clone(),
-                    Polarity::Provariant,
-                )
-                .into());
+                if c.is_vacuous() {
+                    Ok(&self.constraints[v2.0])
+                } else {
+                    Err(TCErrorKind::VarianceMismatch(
+                        Ord::min(v1, v2),
+                        *vmid,
+                        self.varmaps.get_varmap(*vmid).clone(),
+                        c.clone(),
+                        Polarity::Provariant,
+                    )
+                    .into())
+                }
             }
             (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
                 let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;

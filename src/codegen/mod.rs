@@ -2483,12 +2483,22 @@ impl ToAst for DerivedLogic<GTExpr> {
                 )
             }
             DerivedLogic::UnitVariantOf(constr, inner) => {
-                match RustStmt::assign_and_forget(RustExpr::from(inner.to_ast(ctxt))) {
-                    Some(inner) => (
-                        vec![inner],
-                        Some(RustExpr::local(Label::from(constr.clone()))),
-                    ),
-                    None => (vec![], Some(RustExpr::local(Label::from(constr.clone())))),
+                let (stmts, val) = inner.to_ast(ctxt);
+                if stmts
+                    .last()
+                    .is_some_and(|s| matches!(s, RustStmt::Return(ReturnKind::Keyword, _)))
+                {
+                    debug_assert!(val.is_none(), "explicit return precedes implicitly returned value in block-scope expression");
+                    // NOTE - if the last statement is an explicit return, pass-through as-is because there is no variant to construct
+                    (stmts, val)
+                } else {
+                    match RustStmt::assign_and_forget(RustExpr::from((stmts, val))) {
+                        Some(inner) => (
+                            vec![inner],
+                            Some(RustExpr::local(Label::from(constr.clone()))),
+                        ),
+                        None => (vec![], Some(RustExpr::local(Label::from(constr.clone())))),
+                    }
                 }
             }
             DerivedLogic::MapOf(f, inner) => {

@@ -159,7 +159,9 @@ pub fn make_huffman_decoder(
     Ok(move |p: &mut Parser<'_>| driver.parse_one(p))
 }
 
-mod huffman {
+pub(crate) mod huffman {
+    use crate::parser::error::StateError;
+
     use super::{PResult, ParseError, Parser};
 
     #[derive(Clone, Debug)]
@@ -219,11 +221,26 @@ mod huffman {
             }
         }
 
-        pub fn follow(&self, b: u8) -> &Self {
+        pub fn follow(&self, b: u8) -> Result<&Self, DescentError> {
             match self {
-                HuffmanNode::Empty => unreachable!("empty tree encountered after construction"),
-                HuffmanNode::Leaf(_) => unreachable!("impossible descent from leaf"),
-                HuffmanNode::Branch { children } => &*children[b as usize],
+                HuffmanNode::Empty => Err(DescentError::FromEmpty),
+                HuffmanNode::Leaf(_) => Err(DescentError::FromLeaf),
+                HuffmanNode::Branch { children } => Ok(&*children[b as usize]),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Copy)]
+    pub enum DescentError {
+        FromLeaf,
+        FromEmpty,
+    }
+
+    impl std::fmt::Display for DescentError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                DescentError::FromLeaf => write!(f, "attempted to descend from a leaf node"),
+                DescentError::FromEmpty => write!(f, "attempted to descend from an empty node"),
             }
         }
     }
@@ -241,9 +258,18 @@ mod huffman {
 
         pub fn parse_one(&self, p: &mut Parser<'_>) -> PResult<u16> {
             let mut node = &self.tree_root;
+
             while !node.is_leaf() {
                 let b = p.read_byte()?;
-                node = node.follow(b);
+
+                node = match node.follow(b) {
+                    Ok(node) => node,
+                    Err(e) => {
+                        return Err(ParseError::InternalError(StateError::HuffmanDescentError(
+                            e,
+                        )))
+                    }
+                }
             }
             Ok(node.unpack())
         }
@@ -319,7 +345,9 @@ mod tests {
     use super::*;
 
     // REVIEW - check whether this is actually a bad tree by definition or in our logic
-    #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: UnsoundOperation(Some(\"huffman code collision\"))")]
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: UnsoundOperation(Some(\"huffman code collision\"))"
+    )]
     #[test]
     fn test_make_huffman_decoder() {
         let lengths = [0, 0, 0, 0, 1, 1, 5, 4, 4, 5, 0, 1, 0, 0, 0, 0, 1, 2, 0];

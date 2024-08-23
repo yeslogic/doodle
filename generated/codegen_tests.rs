@@ -5,7 +5,6 @@ use super::*;
 fn testpath(filename: &str) -> String {
     format!("../{filename}")
 }
-
 #[test]
 fn test_png_signature_decoder() {
     // PNG signature

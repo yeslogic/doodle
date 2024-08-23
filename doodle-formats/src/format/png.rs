@@ -165,7 +165,10 @@ pub fn main(
                         Box::new(var("compression-flag")),
                         Box::new(Expr::U8(1)),
                     ),
-                    Format::Variant("compressed".into(), Box::new(zlib_utf8text)),
+                    Format::UnionNondet(vec![
+                        fmt_variant("compressed", fmt_variant("valid", zlib_utf8text)),
+                        fmt_variant("compressed", fmt_variant("invalid", repeat(base.u8()))),
+                    ]),
                     Format::Variant("uncompressed".into(), Box::new(utf8text.call())),
                 )
             }),
@@ -263,7 +266,9 @@ pub fn main(
 
     // rendering intent constants for sRGB
     const RENDINT_PERCEPTUAL: u8 = 0; // perceptual
+    #[allow(dead_code)]
     const RENDINT_RELCOLOR: u8 = 1; // relative colorimetric
+    #[allow(dead_code)]
     const RENDINT_SATURATION: u8 = 2; // saturation
     const RENDINT_ABSCOLOR: u8 = 3; // absolute colorimetric
 
@@ -464,7 +469,23 @@ pub fn main(
             ("signature", png_signature.call()),
             ("ihdr", ihdr.call()),
             ("chunks", repeat(png_chunk.call_args(vec![var("ihdr")]))),
-            ("idat", repeat1(idat.call())),
+            (
+                "idat",
+                chain(
+                    map(
+                        repeat1(idat.call()),
+                        lambda(
+                            "xs",
+                            flat_map(lambda("x", record_proj(var("x"), "data")), var("xs")),
+                        ),
+                    ),
+                    "idat",
+                    Format::DecodeBytes(
+                        var("idat"),
+                        Box::new(zlib.call()),
+                    ),
+                ),
+            ),
             (
                 "more-chunks",
                 repeat(png_chunk.call_args(vec![var("ihdr")])),

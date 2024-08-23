@@ -30,6 +30,17 @@ fn bits_value_u8(name: &'static str, n: usize) -> Expr {
     }
 }
 
+fn dist_value_u8(name: &'static str, n: usize) -> Expr {
+    if n > 1 {
+        bit_or(
+            tuple_proj(var(name), n - 1),
+            shl_u8(dist_value_u8(name, n - 1), 1),
+        )
+    } else {
+        tuple_proj(var(name), 0)
+    }
+}
+
 fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     if n > 1 {
         bit_or(
@@ -39,6 +50,14 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     } else {
         as_u16(tuple_proj(var(name), 0))
     }
+}
+
+// Read a fixed 5-bit distance code
+fn dist8(base: &BaseModule) -> Format {
+    map(
+        tuple_repeat(5, base.bit()),
+        lambda("bits", dist_value_u8("bits", 5)),
+    )
 }
 
 fn bits8(n: usize, base: &BaseModule) -> Format {
@@ -104,7 +123,7 @@ fn length_record_fixed(
                 as_u16(var("length-extra-bits")),
             )),
         ),
-        ("distance-code", bits8(5, base)),
+        ("distance-code", dist8(base)),
         (
             "distance-record",
             distance_record.call_args(vec![as_u16(var("distance-code"))]),
@@ -320,6 +339,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Pattern::U8(29),
                     distance_record0.call_args(vec![Expr::U8(13), Expr::U16(24577)]),
                 ),
+                (Pattern::Int(Bounds::new(30, 31)), Format::Fail),
             ],
         ),
     );
@@ -1204,17 +1224,26 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("final", base.bit()),
             ("type", bits2.clone()),
-            (
-                "data",
-                match_variant(
+            ("data", {
+                Format::Match(
                     var("type"),
                     vec![
-                        (Pattern::U8(0), "uncompressed", uncompressed.call()),
-                        (Pattern::U8(1), "fixed_huffman", fixed_huffman.call()),
-                        (Pattern::U8(2), "dynamic_huffman", dynamic_huffman.call()),
+                        (
+                            Pattern::U8(0),
+                            fmt_variant("uncompressed", uncompressed.call()),
+                        ),
+                        (
+                            Pattern::U8(1),
+                            fmt_variant("fixed_huffman", fixed_huffman.call()),
+                        ),
+                        (
+                            Pattern::U8(2),
+                            fmt_variant("dynamic_huffman", dynamic_huffman.call()),
+                        ),
+                        // (Pattern::U8(3), Format::Fail), // Reserved - never constructed due to Fail, so no variant needed
                     ],
-                ),
-            ),
+                )
+            }),
         ]),
     );
 

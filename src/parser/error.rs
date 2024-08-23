@@ -15,7 +15,7 @@ pub enum ParseError {
     NegatedSuccess,
     /// Used for any logical branch without a handler, such as a refuted Expr::Match or MatchTree descent; u64 value is a trace mechanic for determining which error was triggered
     ExcludedBranch(u64),
-    /// Attempted read would overrun either the overall buffer, or a context-local `Format::Slice`.
+    /// Attempted offset-increment would run past the last legal offset of either the overall buffer, or a context-local `Format::Slice`.
     Overrun(OverrunKind),
     /// A `Format::EndOfInput` token occurring anywhere except the final offset of a Slice or the overall buffer.
     IncompleteParse { bytes_remaining: usize },
@@ -29,9 +29,15 @@ pub enum ParseError {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OverrunKind {
     /// Indicates that an overrun error occurred due to the absolute boundary of the full parse-buffer
-    EndOfStream,
+    EndOfStream {
+        offset: ByteOffset,
+        max_offset: ByteOffset,
+    },
     /// Indicates that an overrun error occurred due to the relative boundary of a context-local slice
-    EndOfSlice { max_offset: ByteOffset },
+    EndOfSlice {
+        offset: ByteOffset,
+        max_offset: ByteOffset,
+    },
 }
 
 impl std::fmt::Display for ParseError {
@@ -52,8 +58,8 @@ impl std::fmt::Display for ParseError {
                 "incomplete parse: expected end-of-stream, but {n} bytes remain unconsumed"
             ),
             ParseError::Overrun(k) => match k {
-                OverrunKind::EndOfStream => write!(f, "offset would extend past end of stream"),
-                OverrunKind::EndOfSlice { max_offset } => write!(f, "offset would extend past end of slice[max-offset: {max_offset}]"),
+                OverrunKind::EndOfStream { offset, max_offset }=> write!(f, "attempted offset-advance to {offset} would overrun end of stream[max-offset: {max_offset}]"),
+                OverrunKind::EndOfSlice { offset, max_offset } => write!(f, "attempted offset-advance to {offset} would overrun end of slice[max-offset: {max_offset}]"),
             },
             ParseError::InternalError(e) => write!(f, "unrecoverable internal error: {}", e)
         }
@@ -86,6 +92,10 @@ pub enum StateError {
     MissingSlice,
     /// The current offset somehow exceeded the limit of an extant slice
     SliceOverrun,
+    /// Reading one byte is not possible because we are outside of the buffer bounds
+    OutOfBoundsRead,
+    /// No corresponding path for decoding a prefix code according to a constructed HuffmanNode-tree.
+    HuffmanDescentError(crate::prelude::huffman::DescentError),
 }
 
 impl std::fmt::Display for StateError {
@@ -105,6 +115,10 @@ impl std::fmt::Display for StateError {
                     "cannot close slice properly, as it has already been overrun"
                 )
             }
+            StateError::OutOfBoundsRead => {
+                write!(f, "unguarded illegal read operation (out of bounds)")
+            }
+            StateError::HuffmanDescentError(e) => write!(f, "{e}"),
         }
     }
 }
