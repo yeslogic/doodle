@@ -1517,32 +1517,26 @@ pub struct main_png_chunks_inSeq_data_hIST {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags {
+pub struct main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags {
     compression_info: u8,
     compression_method: u8,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_flags {
+pub struct main_png_chunks_inSeq_data_iCCP_compressed_profile_flags {
     flevel: u8,
     fdict: u8,
     fcheck: u8,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_png_chunks_inSeq_data_iCCP_compressed_profile_valid {
+pub struct main_png_chunks_inSeq_data_iCCP_compressed_profile {
     compression_method_flags:
-        main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags,
-    flags: main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_flags,
+        main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags,
+    flags: main_png_chunks_inSeq_data_iCCP_compressed_profile_flags,
     dict_id: Option<u32>,
     data: main_gzip_inSeq_data,
     adler32: u32,
-}
-
-#[derive(Debug, Clone)]
-pub enum main_png_chunks_inSeq_data_iCCP_compressed_profile {
-    invalid(Vec<u8>),
-    valid(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid),
 }
 
 #[derive(Debug, Clone)]
@@ -1679,7 +1673,7 @@ pub enum main_png_chunks_inSeq_data_tRNS {
 pub struct main_png_chunks_inSeq_data_zTXt {
     keyword: Vec<u8>,
     compression_method: u8,
-    compressed_text: main_png_chunks_inSeq_data_iTXt_text_compressed,
+    compressed_text: Vec<char>,
 }
 
 #[derive(Debug, Clone)]
@@ -2475,113 +2469,81 @@ fn Decoder9<'input>(_input: &mut Parser<'input>) -> Result<main_png, ParseError>
         })
     })())?;
     let idat = ((|| {
-        let idat = {
-            let inner = {
-                let mut accum = Vec::new();
-                while _input.remaining() > 0 {
-                    let matching_ix = {
-                        _input.open_peek_context();
-                        _input.read_byte()?;
-                        _input.read_byte()?;
-                        _input.read_byte()?;
-                        _input.read_byte()?;
-                        let b = _input.read_byte()?;
-                        {
-                            let ret = match b {
-                                73u8 => {
-                                    let b = _input.read_byte()?;
-                                    match b {
-                                        69u8 => 0,
+        PResult::Ok({
+            let idat = {
+                let inner = {
+                    let mut accum = Vec::new();
+                    while _input.remaining() > 0 {
+                        let matching_ix = {
+                            _input.open_peek_context();
+                            _input.read_byte()?;
+                            _input.read_byte()?;
+                            _input.read_byte()?;
+                            _input.read_byte()?;
+                            let b = _input.read_byte()?;
+                            {
+                                let ret = match b {
+                                    73u8 => {
+                                        let b = _input.read_byte()?;
+                                        match b {
+                                            69u8 => 0,
 
-                                        68u8 => 1,
+                                            68u8 => 1,
 
-                                        _ => {
-                                            return Err(ParseError::ExcludedBranch(
-                                                8806068124070768035u64,
-                                            ));
+                                            _ => {
+                                                return Err(ParseError::ExcludedBranch(
+                                                    8806068124070768035u64,
+                                                ));
+                                            }
                                         }
                                     }
-                                }
 
-                                tmp if ((ByteSet::from_bits([
-                                    18446744069414594048,
-                                    18446744073709551103,
-                                    0,
-                                    0,
-                                ]))
-                                .contains(tmp)) =>
-                                {
-                                    0
-                                }
+                                    tmp if ((ByteSet::from_bits([
+                                        18446744069414594048,
+                                        18446744073709551103,
+                                        0,
+                                        0,
+                                    ]))
+                                    .contains(tmp)) =>
+                                    {
+                                        0
+                                    }
 
-                                _ => {
-                                    return Err(ParseError::ExcludedBranch(
-                                        17936225909659650574u64,
-                                    ));
-                                }
-                            };
-                            _input.close_peek_context()?;
-                            ret
-                        }
-                    };
-                    if matching_ix == 0 {
-                        if accum.is_empty() {
-                            return Err(ParseError::InsufficientRepeats);
+                                    _ => {
+                                        return Err(ParseError::ExcludedBranch(
+                                            17936225909659650574u64,
+                                        ));
+                                    }
+                                };
+                                _input.close_peek_context()?;
+                                ret
+                            }
+                        };
+                        if matching_ix == 0 {
+                            if accum.is_empty() {
+                                return Err(ParseError::InsufficientRepeats);
+                            } else {
+                                break;
+                            }
                         } else {
-                            break;
+                            let next_elem = (Decoder69(_input))?;
+                            accum.push(next_elem);
                         }
-                    } else {
-                        let next_elem = (Decoder69(_input))?;
-                        accum.push(next_elem);
                     }
-                }
-                accum
+                    accum
+                };
+                ((|xs: Vec<base_u32be>| {
+                    PResult::Ok(
+                        (try_flat_map_vec(xs.iter().cloned(), |x: base_u32be| {
+                            PResult::Ok(x.data.clone())
+                        }))?,
+                    )
+                })(inner))?
             };
-            ((|xs: Vec<base_u32be>| {
-                PResult::Ok(
-                    (try_flat_map_vec(xs.iter().cloned(), |x: base_u32be| {
-                        PResult::Ok(x.data.clone())
-                    }))?,
-                )
-            })(inner))?
-        };
-        let mut tmp = Parser::new(idat.as_slice());
-        let reparser = &mut tmp;
-        reparser.start_alt();
-        {
-            let mut f_tmp = || {
-                PResult::Ok({
-                    let inner = (Decoder70(reparser))?;
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile::valid(inner)
-                })
-            };
-            match f_tmp() {
-                Ok(inner) => {
-                    return PResult::Ok(inner);
-                }
-
-                Err(_e) => {
-                    reparser.next_alt(true)?;
-                }
-            }
-        };
-        {
-            let mut f_tmp = || {
-                PResult::Ok({
-                    let inner = idat.clone();
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile::invalid(inner)
-                })
-            };
-            match f_tmp() {
-                Ok(inner) => {
-                    return PResult::Ok(inner);
-                }
-
-                Err(_e) => {
-                    return Err(_e);
-                }
-            }
-        };
+            let mut tmp = Parser::new(idat.as_slice());
+            let reparser = &mut tmp;
+            (Decoder70(reparser))?
+        })
     })())?;
     let more_chunks = ((|| {
         PResult::Ok({
@@ -5870,7 +5832,7 @@ fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<base_u32be, ParseErr
 
 fn Decoder70<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile_valid, ParseError> {
+) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile, ParseError> {
     let compression_method_flags = ((|| {
         PResult::Ok({
             let inner = {
@@ -5879,10 +5841,10 @@ fn Decoder70<'input>(
                     b
                 };
                 ((|packedbits: u8| {
-                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
+                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
                 })(inner))?
             };
-            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
+            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere);
@@ -5896,13 +5858,11 @@ return Err(ParseError::FalsifiedWhere);
                 b
             };
             ((|packedbits: u8| {
-                PResult::Ok(
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_flags {
-                        flevel: packedbits >> 6u8 & 3u8,
-                        fdict: packedbits >> 5u8 & 1u8,
-                        fcheck: packedbits >> 0u8 & 31u8,
-                    },
-                )
+                PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_flags {
+                    flevel: packedbits >> 6u8 & 3u8,
+                    fdict: packedbits >> 5u8 & 1u8,
+                    fcheck: packedbits >> 0u8 & 31u8,
+                })
             })(inner))?
         })
     })())?;
@@ -5922,7 +5882,7 @@ return Err(ParseError::FalsifiedWhere);
         })
     })())?;
     let adler32 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid {
+    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile {
         compression_method_flags,
         flags,
         dict_id,
@@ -6369,14 +6329,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6412,14 +6369,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6455,14 +6409,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6498,14 +6449,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6541,14 +6489,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6584,14 +6529,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6627,14 +6569,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6670,14 +6609,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6723,14 +6659,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6776,14 +6709,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6829,14 +6759,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6882,14 +6809,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6939,14 +6863,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6996,14 +6917,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7053,14 +6971,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7110,14 +7025,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7173,14 +7085,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7236,14 +7145,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7299,14 +7205,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7362,14 +7265,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7428,14 +7328,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7494,14 +7391,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7560,14 +7454,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7626,14 +7517,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7695,14 +7583,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7764,14 +7649,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7833,14 +7715,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7902,14 +7781,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7945,14 +7821,11 @@ fn Decoder78<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone()
-                                                        | (bits.3.clone()
-                                                            | (bits.2.clone()
-                                                                | (bits.1.clone()
-                                                                    | bits.0.clone() << 1u8)
-                                                                    << 1u8)
-                                                                << 1u8)
-                                                            << 1u8,
+                                                    bits.0.clone() << 4u8
+                                                        | bits.1.clone() << 3u8
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 1u8
+                                                        | bits.4.clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -9106,6 +8979,8 @@ v => {
                                 ((|val: main_gzip_inSeq_data_blocks_inSeq_data_dynamic_huffman_codes_inSeq_extra| PResult::Ok(Some(val)))(inner))?
                             }
 
+                            286u16..=287u16 => None,
+
                             _ => None,
                         })
                     })())?;
@@ -9147,6 +9022,10 @@ _ => {
 return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 }
 }
+},
+
+286u16..=287u16 => {
+[].to_vec()
 },
 
 _ => {
@@ -9827,66 +9706,7 @@ fn Decoder89<'input>(
             }
         })
     })())?;
-    let compressed_profile = ((|| {
-        _input.start_alt();
-        {
-            let mut f_tmp = || {
-                PResult::Ok({
-                    let inner = (Decoder112(_input))?;
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile::valid(inner)
-                })
-            };
-            match f_tmp() {
-                Ok(inner) => {
-                    return PResult::Ok(inner);
-                }
-
-                Err(_e) => {
-                    _input.next_alt(true)?;
-                }
-            }
-        };
-        {
-            let mut f_tmp = || {
-                PResult::Ok({
-                    let inner = {
-                        let mut accum = Vec::new();
-                        while _input.remaining() > 0 {
-                            let matching_ix = {
-                                _input.open_peek_context();
-                                _input.read_byte()?;
-                                {
-                                    let ret = 0;
-                                    _input.close_peek_context()?;
-                                    ret
-                                }
-                            };
-                            if matching_ix == 0 {
-                                let next_elem = {
-                                    let b = _input.read_byte()?;
-                                    b
-                                };
-                                accum.push(next_elem);
-                            } else {
-                                break;
-                            }
-                        }
-                        accum
-                    };
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile::invalid(inner)
-                })
-            };
-            match f_tmp() {
-                Ok(inner) => {
-                    return PResult::Ok(inner);
-                }
-
-                Err(_e) => {
-                    return Err(_e);
-                }
-            }
-        };
-    })())?;
+    let compressed_profile = ((|| PResult::Ok((Decoder112(_input))?))())?;
     PResult::Ok(main_png_chunks_inSeq_data_iCCP {
         profile_name,
         compression_method,
@@ -10215,69 +10035,12 @@ fn Decoder94<'input>(
         })
     })())?;
     let compressed_text = ((|| {
-        _input.start_alt();
-        {
-            let mut f_tmp = || {
-                PResult::Ok({
-                    let inner = {
-                        let zlib = (Decoder102(_input))?;
-                        let mut tmp = Parser::new(zlib.data.inflate.as_slice());
-                        let reparser = &mut tmp;
-                        (Decoder103(reparser))?
-                    };
-                    main_png_chunks_inSeq_data_iTXt_text_compressed::valid(inner)
-                })
-            };
-            match f_tmp() {
-                Ok(inner) => {
-                    return PResult::Ok(inner);
-                }
-
-                Err(_e) => {
-                    _input.next_alt(true)?;
-                }
-            }
-        };
-        {
-            let mut f_tmp = || {
-                PResult::Ok({
-                    let inner = {
-                        let mut accum = Vec::new();
-                        while _input.remaining() > 0 {
-                            let matching_ix = {
-                                _input.open_peek_context();
-                                _input.read_byte()?;
-                                {
-                                    let ret = 0;
-                                    _input.close_peek_context()?;
-                                    ret
-                                }
-                            };
-                            if matching_ix == 0 {
-                                let next_elem = {
-                                    let b = _input.read_byte()?;
-                                    b
-                                };
-                                accum.push(next_elem);
-                            } else {
-                                break;
-                            }
-                        }
-                        accum
-                    };
-                    main_png_chunks_inSeq_data_iTXt_text_compressed::invalid(inner)
-                })
-            };
-            match f_tmp() {
-                Ok(inner) => {
-                    return PResult::Ok(inner);
-                }
-
-                Err(_e) => {
-                    return Err(_e);
-                }
-            }
-        };
+        PResult::Ok({
+            let zlib = (Decoder102(_input))?;
+            let mut tmp = Parser::new(zlib.data.inflate.as_slice());
+            let reparser = &mut tmp;
+            (Decoder103(reparser))?
+        })
     })())?;
     PResult::Ok(main_png_chunks_inSeq_data_zTXt {
         keyword,
@@ -12740,7 +12503,7 @@ return Err(ParseError::ExcludedBranch(7279863718715306056u64));
 
 fn Decoder102<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile_valid, ParseError> {
+) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile, ParseError> {
     let compression_method_flags = ((|| {
         PResult::Ok({
             let inner = {
@@ -12749,10 +12512,10 @@ fn Decoder102<'input>(
                     b
                 };
                 ((|packedbits: u8| {
-                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
+                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
                 })(inner))?
             };
-            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
+            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere);
@@ -12766,13 +12529,11 @@ return Err(ParseError::FalsifiedWhere);
                 b
             };
             ((|packedbits: u8| {
-                PResult::Ok(
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_flags {
-                        flevel: packedbits >> 6u8 & 3u8,
-                        fdict: packedbits >> 5u8 & 1u8,
-                        fcheck: packedbits >> 0u8 & 31u8,
-                    },
-                )
+                PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_flags {
+                    flevel: packedbits >> 6u8 & 3u8,
+                    fdict: packedbits >> 5u8 & 1u8,
+                    fcheck: packedbits >> 0u8 & 31u8,
+                })
             })(inner))?
         })
     })())?;
@@ -12792,7 +12553,7 @@ return Err(ParseError::FalsifiedWhere);
         })
     })())?;
     let adler32 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid {
+    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile {
         compression_method_flags,
         flags,
         dict_id,
@@ -15181,7 +14942,7 @@ fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseErr
 
 fn Decoder109<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile_valid, ParseError> {
+) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile, ParseError> {
     let compression_method_flags = ((|| {
         PResult::Ok({
             let inner = {
@@ -15190,10 +14951,10 @@ fn Decoder109<'input>(
                     b
                 };
                 ((|packedbits: u8| {
-                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
+                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
                 })(inner))?
             };
-            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
+            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere);
@@ -15207,13 +14968,11 @@ return Err(ParseError::FalsifiedWhere);
                 b
             };
             ((|packedbits: u8| {
-                PResult::Ok(
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_flags {
-                        flevel: packedbits >> 6u8 & 3u8,
-                        fdict: packedbits >> 5u8 & 1u8,
-                        fcheck: packedbits >> 0u8 & 31u8,
-                    },
-                )
+                PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_flags {
+                    flevel: packedbits >> 6u8 & 3u8,
+                    fdict: packedbits >> 5u8 & 1u8,
+                    fcheck: packedbits >> 0u8 & 31u8,
+                })
             })(inner))?
         })
     })())?;
@@ -15233,7 +14992,7 @@ return Err(ParseError::FalsifiedWhere);
         })
     })())?;
     let adler32 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid {
+    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile {
         compression_method_flags,
         flags,
         dict_id,
@@ -16403,7 +16162,7 @@ return Err(ParseError::ExcludedBranch(7279863718715306056u64));
 
 fn Decoder112<'input>(
     _input: &mut Parser<'input>,
-) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile_valid, ParseError> {
+) -> Result<main_png_chunks_inSeq_data_iCCP_compressed_profile, ParseError> {
     let compression_method_flags = ((|| {
         PResult::Ok({
             let inner = {
@@ -16412,10 +16171,10 @@ fn Decoder112<'input>(
                     b
                 };
                 ((|packedbits: u8| {
-                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
+                    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags { compression_info: packedbits >> 4u8 & 15u8, compression_method: packedbits >> 0u8 & 15u8 })
                 })(inner))?
             };
-            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
+            if ((|method_info: main_png_chunks_inSeq_data_iCCP_compressed_profile_compression_method_flags| PResult::Ok(method_info.compression_method.clone() == 8u8))(inner.clone()))? {
 inner
 } else {
 return Err(ParseError::FalsifiedWhere);
@@ -16429,13 +16188,11 @@ return Err(ParseError::FalsifiedWhere);
                 b
             };
             ((|packedbits: u8| {
-                PResult::Ok(
-                    main_png_chunks_inSeq_data_iCCP_compressed_profile_valid_flags {
-                        flevel: packedbits >> 6u8 & 3u8,
-                        fdict: packedbits >> 5u8 & 1u8,
-                        fcheck: packedbits >> 0u8 & 31u8,
-                    },
-                )
+                PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_flags {
+                    flevel: packedbits >> 6u8 & 3u8,
+                    fdict: packedbits >> 5u8 & 1u8,
+                    fcheck: packedbits >> 0u8 & 31u8,
+                })
             })(inner))?
         })
     })())?;
@@ -16455,7 +16212,7 @@ return Err(ParseError::FalsifiedWhere);
         })
     })())?;
     let adler32 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile_valid {
+    PResult::Ok(main_png_chunks_inSeq_data_iCCP_compressed_profile {
         compression_method_flags,
         flags,
         dict_id,
