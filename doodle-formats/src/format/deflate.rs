@@ -19,6 +19,13 @@ where
     N::try_from(x).unwrap()
 }
 
+/// Maps an `Expr::Tuple` consisting of `n` bit-values into a `u8`-typed Expr
+/// where the first tuple position is the LSB and the last tuple
+/// position is the MSB.
+///
+/// This is suitable for 'number'-kinded values injected into a deflate bitstream.
+///
+/// Auto-recursive for n > 1, using a successively smaller prefix of the tuple expression.
 fn bits_value_u8(name: &'static str, n: usize) -> Expr {
     if n > 1 {
         bit_or(
@@ -30,6 +37,15 @@ fn bits_value_u8(name: &'static str, n: usize) -> Expr {
     }
 }
 
+/// Maps an `Expr::Tuple` consisting of `n` bit-values into the `u8`-typed Expr
+/// where the first tuple position is the MSB and the last tuple position is the LSB.
+///
+/// This is specifically engineered for translating bit distance prefix-codes into their 5-bit symbols from 0-29 (30 and 31 being reserved)
+/// in fixed Huffman (TYPE==1) blocks.
+///
+/// Auto-recursive definition to avoid complex inline Expr boilerplate.
+///
+/// Should only be called from outside with `n == 5`.
 fn dist_value_u8(name: &'static str, n: usize) -> Expr {
     if n > 1 {
         bit_or(
@@ -41,6 +57,13 @@ fn dist_value_u8(name: &'static str, n: usize) -> Expr {
     }
 }
 
+/// Maps an `Expr::Tuple` consisting of `n` bit-values into a `u16`-typed Expr
+/// where the first tuple position is the LSB and the last tuple
+/// position is the MSB.
+///
+/// This is suitable for 'number'-kinded values injected into a deflate bitstream.
+///
+/// Auto-recursive for n > 1, using a successively smaller prefix of the tuple expression.
 fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     if n > 1 {
         bit_or(
@@ -52,7 +75,7 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
     }
 }
 
-// Read a fixed 5-bit distance code
+/// Parse a 5-bit Fixed Huffman distance-code and map it into its corresponding distance-symbol
 fn dist8(base: &BaseModule) -> Format {
     map(
         tuple_repeat(5, base.bit()),
@@ -60,6 +83,8 @@ fn dist8(base: &BaseModule) -> Format {
     )
 }
 
+/// Parses `n` bits and maps them into a `u8`-typed Value according to the
+/// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
 fn bits8(n: usize, base: &BaseModule) -> Format {
     if n == 0 {
         return Format::Compute(Expr::U8(0));
@@ -71,6 +96,8 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
     )
 }
 
+/// Parses `n` bits and maps them into a `u16`-typed Value according to the
+/// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
 fn bits16(n: usize, base: &BaseModule) -> Format {
     if n == 0 {
         return Format::Compute(Expr::U16(0));
@@ -1184,6 +1211,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                     distance_record,
                                                 )),
                                             ),
+                                            // NOTE - currently no difference in behavior compared to wildcard pattern, but adds specificity/clarity, and gives us an easy hook to treat as erroneous
+                                            (Pattern::Int(Bounds::new(286, 287)), format_none()),
                                             (Pattern::Wildcard, format_none()),
                                         ],
                                     ),
@@ -1203,6 +1232,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             vec![
                                 (Pattern::U16(256), Expr::Seq(vec![])),
                                 (Pattern::Int(Bounds::new(257, 285)), reference_record()),
+                                // NOTE - whether or not we might see 286 or 287, we should elide them for code-value interpretation purposes
+                                (Pattern::Int(Bounds::new(286, 287)), Expr::Seq(vec![])),
                                 (
                                     Pattern::Wildcard,
                                     Expr::Seq(vec![variant(
