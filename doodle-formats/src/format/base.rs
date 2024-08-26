@@ -86,7 +86,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u16be = module.define_format(
         "base.u16be",
         map(
-            tuple([u8.call(), u8.call()]),
+            tuple_repeat(2, u8.call()),
             lambda("x", Expr::U16Be(Box::new(var("x")))),
         ),
     );
@@ -94,7 +94,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u16le = module.define_format(
         "base.u16le",
         map(
-            tuple([u8.call(), u8.call()]),
+            tuple_repeat(2, u8.call()),
             lambda("x", Expr::U16Le(Box::new(var("x")))),
         ),
     );
@@ -102,7 +102,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u32be = module.define_format(
         "base.u32be",
         map(
-            tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
+            tuple_repeat(4, u8.call()),
             lambda("x", Expr::U32Be(Box::new(var("x")))),
         ),
     );
@@ -110,7 +110,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u32le = module.define_format(
         "base.u32le",
         map(
-            tuple([u8.call(), u8.call(), u8.call(), u8.call()]),
+            tuple_repeat(4, u8.call()),
             lambda("x", Expr::U32Le(Box::new(var("x")))),
         ),
     );
@@ -118,16 +118,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u64be = module.define_format(
         "base.u64be",
         map(
-            tuple([
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-            ]),
+            tuple_repeat(8, u8.call()),
             lambda("x", Expr::U64Be(Box::new(var("x")))),
         ),
     );
@@ -135,16 +126,7 @@ pub fn main(module: &mut FormatModule) -> BaseModule {
     let u64le = module.define_format(
         "base.u64le",
         map(
-            tuple([
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-                u8.call(),
-            ]),
+            tuple_repeat(8, u8.call()),
             lambda("x", Expr::U64Le(Box::new(var("x")))),
         ),
     );

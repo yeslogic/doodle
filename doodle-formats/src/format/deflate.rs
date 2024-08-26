@@ -743,41 +743,35 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "y",
                             expr_gte(
                                 seq_length(flat_map_accum(
-                                    lambda(
-                                        "x",
+                                    lambda_tuple(
+                                        ["last-symbol", "cl-code-extra"],
                                         expr_match(
-                                            as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
+                                            as_u8(record_proj(var("cl-code-extra"), "code")),
                                             vec![
                                                 (
                                                     Pattern::U8(16),
                                                     Expr::Tuple(vec![
-                                                        tuple_proj(var("x"), 0),
+                                                        var("last-symbol"),
                                                         dup(
                                                             as_u32(add(
                                                                 record_proj(
-                                                                    tuple_proj(var("x"), 1),
+                                                                    var("cl-code-extra"),
                                                                     "extra",
                                                                 ),
                                                                 Expr::U8(3),
                                                             )),
-                                                            expr_match(
-                                                                tuple_proj(var("x"), 0),
-                                                                vec![(
-                                                                    pat_some(Pattern::binding("y")),
-                                                                    var("y"),
-                                                                )],
-                                                            ),
+                                                            expr_unwrap(var("last-symbol")),
                                                         ),
                                                     ]),
                                                 ),
                                                 (
                                                     Pattern::U8(17),
                                                     Expr::Tuple(vec![
-                                                        tuple_proj(var("x"), 0),
+                                                        expr_some(Expr::U8(0)),
                                                         dup(
                                                             as_u32(add(
                                                                 record_proj(
-                                                                    tuple_proj(var("x"), 1),
+                                                                    var("cl-code-extra"),
                                                                     "extra",
                                                                 ),
                                                                 Expr::U8(3),
@@ -789,11 +783,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 (
                                                     Pattern::U8(18),
                                                     Expr::Tuple(vec![
-                                                        tuple_proj(var("x"), 0),
+                                                        expr_some(Expr::U8(0)),
                                                         dup(
                                                             as_u32(add(
                                                                 record_proj(
-                                                                    tuple_proj(var("x"), 1),
+                                                                    var("cl-code-extra"),
                                                                     "extra",
                                                                 ),
                                                                 Expr::U8(11),
@@ -840,39 +834,31 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "literal-length-distance-alphabet-code-lengths-value",
                 Format::Compute(flat_map_accum(
-                    lambda(
-                        "x",
+                    lambda_tuple(
+                        ["last-symbol", "cl-code-extra"],
                         expr_match(
-                            as_u8(record_proj(tuple_proj(var("x"), 1), "code")),
+                            as_u8(record_proj(var("cl-code-extra"), "code")),
                             vec![
                                 (
                                     Pattern::U8(16),
                                     Expr::Tuple(vec![
-                                        tuple_proj(var("x"), 0),
+                                        var("last-symbol"),
                                         dup(
                                             as_u32(add(
-                                                record_proj(tuple_proj(var("x"), 1), "extra"),
+                                                record_proj(var("cl-code-extra"), "extra"),
                                                 Expr::U8(3),
                                             )),
-                                            expr_match(
-                                                tuple_proj(var("x"), 0),
-                                                vec![(
-                                                    Pattern::Option(Some(Box::new(
-                                                        Pattern::binding("y"),
-                                                    ))),
-                                                    var("y"),
-                                                )],
-                                            ),
+                                            expr_unwrap(var("last-symbol")),
                                         ),
                                     ]),
                                 ),
                                 (
                                     Pattern::U8(17),
                                     Expr::Tuple(vec![
-                                        tuple_proj(var("x"), 0),
+                                        expr_some(Expr::U8(0)),
                                         dup(
                                             as_u32(add(
-                                                record_proj(tuple_proj(var("x"), 1), "extra"),
+                                                record_proj(var("cl-code-extra"), "extra"),
                                                 Expr::U8(3),
                                             )),
                                             Expr::U8(0),
@@ -882,7 +868,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::U8(18),
                                     Expr::Tuple(vec![
-                                        tuple_proj(var("x"), 0),
+                                        expr_some(Expr::U8(0)),
                                         dup(
                                             as_u32(add(
                                                 record_proj(tuple_proj(var("x"), 1), "extra"),
@@ -1313,10 +1299,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "inflate",
                 Format::Compute(flat_map_list(
-                    lambda(
-                        "x",
+                    lambda_tuple(
+                        ["buffer", "symbol"],
                         expr_match(
-                            tuple_proj(var("x"), 1),
+                            var("symbol"),
                             vec![
                                 (
                                     Pattern::variant("literal", Pattern::binding("b")),
@@ -1325,9 +1311,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::variant("reference", Pattern::binding("r")),
                                     sub_seq_inflate(
-                                        tuple_proj(var("x"), 0),
+                                        var("buffer"),
                                         sub(
-                                            seq_length(tuple_proj(var("x"), 0)),
+                                            seq_length(var("buffer")),
                                             as_u32(record_proj(var("r"), "distance")),
                                         ),
                                         as_u32(record_proj(var("r"), "length")),

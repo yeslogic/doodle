@@ -734,6 +734,13 @@ pub fn fmt_unwrap(expr: Expr) -> Format {
     )
 }
 
+/// Performs a fallible destructuring of the provided `expr` within the Expr layer,
+/// either extracting the contents of a `Some(_)` value, or resulting in an ExcludedBranch
+/// error at runtime due to a fallible pattern-match.
+pub fn expr_unwrap(expr: Expr) -> Expr {
+    Expr::Match(Box::new(expr), vec![(pat_some(bind("x")), var("x"))])
+}
+
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
 ///
 /// This will result in a runtime panic during parse-evaluation if the index is out of bounds.
@@ -766,4 +773,15 @@ pub fn seq_proj(seq: Expr, index: usize) -> Expr {
         .try_into()
         .expect("seq_proj index larger than U32::MAX is not supported");
     index_unchecked(seq, Expr::U32(index))
+}
+
+/// Boilerplate helper for simulating multi-argument lambda via pattern-match tuple destruction
+pub fn lambda_tuple<const N: usize>(names: [&'static str; N], body: Expr) -> Expr {
+    lambda(
+        "tuple_var",
+        expr_match(
+            var("tuple_var"),
+            [(Pattern::Tuple(names.into_iter().map(bind).collect()), body)],
+        ),
+    )
 }
