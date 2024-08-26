@@ -199,23 +199,17 @@ impl Expr {
             Expr::Tuple(exprs) => Cow::Owned(Value::Tuple(
                 exprs.iter().map(|expr| expr.eval_value(scope)).collect(),
             )),
-            Expr::TupleProj(head, index) => match head.eval(scope) {
-                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
-            },
+            Expr::TupleProj(head, index) => cow_map(head.eval(scope), |v| {
+                v.coerce_mapped_value().tuple_proj(*index)
+            }),
             Expr::Record(fields) => Cow::Owned(Value::record(
                 fields
                     .iter()
                     .map(|(label, expr)| (label.clone(), expr.eval_value(scope))),
             )),
-            Expr::RecordProj(head, label) => match head.eval(scope) {
-                Cow::Owned(v) => {
-                    Cow::Owned(v.coerce_mapped_value().record_proj(label.as_ref()).clone())
-                }
-                Cow::Borrowed(v) => {
-                    Cow::Borrowed(v.coerce_mapped_value().record_proj(label.as_ref()))
-                }
-            },
+            Expr::RecordProj(head, label) => cow_map(head.eval(scope), |v| {
+                v.coerce_mapped_value().record_proj(label.as_ref())
+            }),
             Expr::Variant(label, expr) => {
                 Cow::Owned(Value::variant(label.clone(), expr.eval_value(scope)))
             }
@@ -492,13 +486,15 @@ impl Expr {
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
-            Expr::SeqIx(seq, index) => match seq.eval(scope).coerce_mapped_value().get_sequence() {
-                Some(values) => {
-                    let index = index.eval_value(scope).unwrap_usize();
-                    Cow::Owned(values[index].clone())
+            Expr::SeqIx(seq, index) => cow_map(seq.eval(scope), |v| {
+                match v.coerce_mapped_value().get_sequence() {
+                    Some(values) => {
+                        let index = index.eval_value(scope).unwrap_usize();
+                        &values[index]
+                    }
+                    _ => panic!("SeqIx: expected Seq"),
                 }
-                _ => panic!("SeqIx: expected Seq"),
-            },
+            }),
             Expr::SubSeq(seq, start, length) => {
                 match seq.eval(scope).coerce_mapped_value().get_sequence() {
                     Some(values) => {
@@ -1530,6 +1526,19 @@ fn bit_range(n: usize, bits: usize) -> Format {
 
 fn is_bit(b: bool) -> Format {
     Format::Byte(ByteSet::from([if b { 1 } else { 0 }]))
+}
+
+/// Applies a lifetime-preserving transformation to a reference held behind a [`std::borrow::Cow`],
+/// referencing when possible and forcing ownership only when necessary.
+pub(crate) fn cow_map<'a, T, U>(x: Cow<'a, T>, f: impl for<'i> Fn(&'i T) -> &'i U) -> Cow<'a, U>
+where
+    T: 'static + Clone,
+    U: 'static + Clone + ToOwned,
+{
+    match x {
+        Cow::Borrowed(x) => Cow::Borrowed(f(x)),
+        Cow::Owned(x) => Cow::Owned(f(&x).to_owned()),
+    }
 }
 
 #[cfg(test)]

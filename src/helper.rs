@@ -650,7 +650,13 @@ pub fn f_concat() -> Expr {
 /// depending on if it is true (`if_true`) or false (`if_false`)
 #[inline]
 pub fn expr_if_else(scrutinee: Expr, if_true: Expr, if_false: Expr) -> Expr {
-    expr_match(scrutinee, [(Pattern::Bool(true), if_true), (Pattern::Bool(false), if_false)])
+    expr_match(
+        scrutinee,
+        [
+            (Pattern::Bool(true), if_true),
+            (Pattern::Bool(false), if_false),
+        ],
+    )
 }
 
 /// Helper function simulating the `bool::then` function that returns either `Some(if_true)` or `None` according
@@ -719,7 +725,13 @@ pub fn seq_to_opt(empty_or_singleton: Expr) -> Expr {
 /// either extracting the contents of a `Some(_)` value, or poisoning the current parse-state
 /// via `Format::Fail` if it is `None`.
 pub fn fmt_unwrap(expr: Expr) -> Format {
-    Format::Match(expr, vec![(pat_some(bind("x")), Format::Compute(var("x"))), (pat_none(), Format::Fail)])
+    Format::Match(
+        expr,
+        vec![
+            (pat_some(bind("x")), Format::Compute(var("x"))),
+            (pat_none(), Format::Fail),
+        ],
+    )
 }
 
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
@@ -734,10 +746,7 @@ pub fn index_unchecked(seq: Expr, index: Expr) -> Expr {
 pub fn index_checked(seq: Expr, index: Expr) -> Expr {
     let len = seq_length(seq.clone());
     let is_sound = expr_lt(index.clone(), len);
-    expr_opt_if(
-        is_sound,
-        index_unchecked(seq, index)
-    )
+    expr_opt_if(is_sound, index_unchecked(seq, index))
 }
 
 /// Performs a guarded index operation within the Format layer, returning `elt` if the index is in bounds,
@@ -753,6 +762,8 @@ pub fn fmt_try_index(seq: Expr, index: Expr) -> Format {
 #[inline]
 pub fn seq_proj(seq: Expr, index: usize) -> Expr {
     // FIXME - this extra step can be avoided by adding something like `Int(usize)` to our set of Expr const-primitives
-    let index: u32 = index.try_into().expect("seq_proj index larger than U32::MAX is not supported");
+    let index: u32 = index
+        .try_into()
+        .expect("seq_proj index larger than U32::MAX is not supported");
     index_unchecked(seq, Expr::U32(index))
 }
