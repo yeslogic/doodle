@@ -1,3 +1,4 @@
+use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
 use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 
@@ -643,4 +644,56 @@ pub fn concat(xs: Expr) -> Expr {
 /// Helper for the lambda-abstracted form of [`concat`].
 pub fn f_concat() -> Expr {
     lambda("xs", concat(var("xs")))
+}
+
+/// Performs a table lookup operation over a sequence of entries `seq` of type `elem_type`.
+///
+/// Uses `f_getkey` to map from each entry to its key, and `query_key` as the query key.
+///
+/// Even if mulitple matching entries exist, only the first one is returned, as an Option.
+pub fn table_find(
+    seq: Expr,
+    elem_type: ValueType,
+    f_getkey: impl Fn(Expr) -> Expr,
+    query_key: Expr,
+) -> Expr {
+    let match0_or1 = flat_map_list(
+        lambda(
+            "list-entry",
+            expr_match(
+                seq_length(tuple_proj(var("list-entry"), 0)),
+                [
+                    (Pattern::Int(Bounds::at_least(1)), Expr::Seq(Vec::new())),
+                    (
+                        Pattern::Wildcard,
+                        expr_match(
+                            expr_eq(f_getkey(tuple_proj(var("list-entry"), 1)), query_key),
+                            [
+                                (Pattern::Bool(true), Expr::Seq(vec![var("entry")])),
+                                (Pattern::Bool(false), Expr::Seq(Vec::new())),
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+        ),
+        elem_type,
+        seq,
+    );
+    seq_to_opt(match0_or1)
+}
+
+/// Performs the natural transformation from a singleton-or-empty `Expr::Seq` into `Option`.
+///
+/// # Notes
+///
+/// Not well-formed (i.e. will result in a runtime error) if the provided Expr can ever be a sequence of length 2 or higher.
+pub fn seq_to_opt(empty_or_singleton: Expr) -> Expr {
+    expr_match(
+        empty_or_singleton,
+        [
+            (Pattern::Seq(vec![bind("x")]), expr_some(var("x"))),
+            (Pattern::Seq(Vec::new()), expr_none()),
+        ],
+    )
 }

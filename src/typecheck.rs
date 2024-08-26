@@ -1872,6 +1872,18 @@ impl TypeChecker {
                 self.unify_var_proj_elem(seq_var, elem_var)?;
                 newvar
             }
+            Expr::SeqIx(seq_expr, index_expr) => {
+                let newvar = self.get_new_uvar();
+                let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
+
+                let index_t = self.infer_utype_expr(index_expr.as_ref(), scope)?;
+                self.unify_utype_baseset(index_t, BaseSet::USome)?;
+
+                // directly project newvar as the element-type of seq_var
+                self.unify_var_proj_elem(seq_var, newvar)?;
+
+                newvar
+            }
             Expr::SubSeq(seq_expr, start_expr, len_expr) => {
                 let newvar = self.get_new_uvar();
                 let seq_var = self.infer_var_expr(seq_expr.as_ref(), scope)?;
@@ -1882,7 +1894,7 @@ impl TypeChecker {
                 self.unify_utype_baseset(start_t, BaseSet::USome)?;
                 self.unify_utype_baseset(len_t, BaseSet::USome)?;
 
-                // ensure that seq_t is a sequence type, and then equate it to newvar
+                // ensure that seq_t is a sequence type, and then equate seq_t to newvar
                 let elem_var = self.get_new_uvar();
                 self.unify_var_proj_elem(seq_var, elem_var)?;
                 self.unify_var_pair(newvar, seq_var)?;
