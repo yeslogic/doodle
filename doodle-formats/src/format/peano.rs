@@ -9,7 +9,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                 repeat_between(Expr::U16(0), Expr::U16(9), is_byte(b'S')),
                 is_byte(b'Z'),
             ])),
-            lambda("x", seq_length(Expr::TupleProj(Box::new(var("x")), 0))),
+            lambda_tuple(["s", "_z"], seq_length(var("s"))),
         ),
     );
     module.define_format("peano.sequence", repeat1(peano_number.call()))

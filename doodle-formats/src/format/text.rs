@@ -31,16 +31,7 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, Format
 
     let utf8_2 = map(
         tuple([drop_n_msb(3, byte_in(0xC2..=0xDF)), utf8_tail.call()]),
-        lambda(
-            "bytes",
-            expr_match(
-                var("bytes"),
-                vec![(
-                    Pattern::Tuple(vec![bind("x1"), bind("x0")]),
-                    shift6_2(var("x1"), var("x0")),
-                )],
-            ),
-        ),
+        lambda_tuple(["x1", "x0"], shift6_2(var("x1"), var("x0"))),
     );
 
     let utf8_3 = map(
@@ -66,15 +57,9 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, Format
                 utf8_tail.call(),
             ]),
         ]),
-        lambda(
-            "bytes",
-            expr_match(
-                var("bytes"),
-                vec![(
-                    Pattern::Tuple(vec![bind("x2"), bind("x1"), bind("x0")]),
-                    shift6_3(var("x2"), var("x1"), var("x0")),
-                )],
-            ),
+        lambda_tuple(
+            ["x2", "x1", "x0"],
+            shift6_3(var("x2"), var("x1"), var("x0")),
         ),
     );
 
@@ -99,15 +84,9 @@ pub fn main(module: &mut FormatModule, _base: &BaseModule) -> (FormatRef, Format
                 utf8_tail.call(),
             ]),
         ]),
-        lambda(
-            "bytes",
-            expr_match(
-                var("bytes"),
-                vec![(
-                    Pattern::Tuple(vec![bind("x3"), bind("x2"), bind("x1"), bind("x0")]),
-                    shift6_4(var("x3"), var("x2"), var("x1"), var("x0")),
-                )],
-            ),
+        lambda_tuple(
+            ["x3", "x2", "x1", "x0"],
+            shift6_4(var("x3"), var("x2"), var("x1"), var("x0")),
         ),
     );
 

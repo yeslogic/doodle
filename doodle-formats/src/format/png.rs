@@ -6,7 +6,7 @@ use doodle::{Expr, Format, FormatModule, FormatRef, Pattern};
 fn null_terminated(f: Format) -> Format {
     map(
         tuple(vec![f, is_byte(0)]),
-        lambda("x", Expr::TupleProj(Box::new(var("x")), 0)),
+        lambda_tuple(["x", "__null"], var("x")),
     )
 }
 
