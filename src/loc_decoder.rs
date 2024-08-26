@@ -3,7 +3,7 @@ use crate::decoder::{Compiler, ScopeEntry};
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
 use crate::{
-    decoder::{Decoder, Program, Value},
+    decoder::{cow_map, Decoder, Program, Value},
     pattern::Pattern,
     Arith, DynFormat, Expr, Format, IntRel, Label,
 };
@@ -497,23 +497,17 @@ impl Expr {
                     .map(|expr| expr.eval_value_with_loc(scope))
                     .collect(),
             ))),
-            Expr::TupleProj(head, index) => match head.eval_with_loc(scope) {
-                Cow::Owned(v) => Cow::Owned(v.coerce_mapped_value().tuple_proj(*index).clone()),
-                Cow::Borrowed(v) => Cow::Borrowed(v.coerce_mapped_value().tuple_proj(*index)),
-            },
+            Expr::TupleProj(head, index) => cow_map(head.eval_with_loc(scope), |v| {
+                v.coerce_mapped_value().tuple_proj(*index)
+            }),
             Expr::Record(fields) => Cow::Owned(ParsedValue::from_evaluated(Value::record(
                 fields
                     .iter()
                     .map(|(label, expr)| (label.clone(), expr.eval_value_with_loc(scope))),
             ))),
-            Expr::RecordProj(head, label) => match head.eval_with_loc(scope) {
-                Cow::Owned(v) => {
-                    Cow::Owned(v.coerce_mapped_value().record_proj(label.as_ref()).clone())
-                }
-                Cow::Borrowed(v) => {
-                    Cow::Borrowed(v.coerce_mapped_value().record_proj(label.as_ref()))
-                }
-            },
+            Expr::RecordProj(head, label) => cow_map(head.eval_with_loc(scope), |v| {
+                v.coerce_mapped_value().record_proj(label.as_ref())
+            }),
             Expr::Variant(label, expr) => Cow::Owned(ParsedValue::from_evaluated(Value::variant(
                 label.clone(),
                 expr.eval_value_with_loc(scope),
@@ -816,19 +810,15 @@ impl Expr {
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
-            Expr::SeqIx(seq, index) => {
-                match seq
-                    .eval_with_loc(scope)
-                    .coerce_mapped_value()
-                    .get_sequence()
-                {
+            Expr::SeqIx(seq, index) => cow_map(seq.eval_with_loc(scope), |v| {
+                match v.coerce_mapped_value().get_sequence() {
                     Some(values) => {
                         let index = index.eval_value_with_loc(scope).unwrap_usize();
-                        Cow::Owned(values[index].clone())
+                        &values[index]
                     }
                     _ => panic!("SeqIx: expected Seq"),
                 }
-            }
+            }),
             Expr::SubSeq(seq, start, length) => {
                 match seq
                     .eval_with_loc(scope)
