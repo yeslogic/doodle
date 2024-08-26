@@ -646,6 +646,23 @@ pub fn f_concat() -> Expr {
     lambda("xs", concat(var("xs")))
 }
 
+/// Shorthand for matching on a boolean-typed Expr `scrutinee` and returning one of two values
+/// depending on if it is true (`if_true`) or false (`if_false`)
+#[inline]
+pub fn expr_if_else(scrutinee: Expr, if_true: Expr, if_false: Expr) -> Expr {
+    expr_match(scrutinee, [(Pattern::Bool(true), if_true), (Pattern::Bool(false), if_false)])
+}
+
+/// Helper function simulating the `bool::then` function that returns either `Some(if_true)` or `None` according
+/// to the boolean value of `scrutinee`.
+///
+/// Note that `if_true` is interpreted as having the parametric type of the resulting `Option<T>`. If the value
+/// we want to return is already an Option, use [`expr_if_else`] instead.
+#[inline]
+pub fn expr_opt_if(scrutinee: Expr, if_true: Expr) -> Expr {
+    expr_if_else(scrutinee, expr_some(if_true), expr_none())
+}
+
 /// Performs a table lookup operation over a sequence of entries `seq` of type `elem_type`.
 ///
 /// Uses `f_getkey` to map from each entry to its key, and `query_key` as the query key.
@@ -696,4 +713,46 @@ pub fn seq_to_opt(empty_or_singleton: Expr) -> Expr {
             (Pattern::Seq(Vec::new()), expr_none()),
         ],
     )
+}
+
+/// Performs a fallible destructuring of the provided `expr` within the Format layer,
+/// either extracting the contents of a `Some(_)` value, or poisoning the current parse-state
+/// via `Format::Fail` if it is `None`.
+pub fn fmt_unwrap(expr: Expr) -> Format {
+    Format::Match(expr, vec![(pat_some(bind("x")), Format::Compute(var("x"))), (pat_none(), Format::Fail)])
+}
+
+/// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
+///
+/// This will result in a runtime panic during parse-evaluation if the index is out of bounds.
+pub fn index_unchecked(seq: Expr, index: Expr) -> Expr {
+    Expr::SeqIx(Box::new(seq), Box::new(index))
+}
+
+/// Performs a guarded index operation on an expression `seq` with an index `index`, returning `Some(elt)`
+/// if the index is in-bounds, or `None` otherwise.
+pub fn index_checked(seq: Expr, index: Expr) -> Expr {
+    let len = seq_length(seq.clone());
+    let is_sound = expr_lt(index.clone(), len);
+    expr_opt_if(
+        is_sound,
+        index_unchecked(seq, index)
+    )
+}
+
+/// Performs a guarded index operation within the Format layer, returning `elt` if the index is in bounds,
+/// or causing parse-failure if it is out of bounds.
+pub fn fmt_try_index(seq: Expr, index: Expr) -> Format {
+    fmt_unwrap(index_checked(seq, index))
+}
+
+/// Performs an equivalent operation to `tuple_proj` under the transformation between fixed-length sequences
+/// and homogeneously-typed tuples.
+///
+/// The resulting Expr may panic upon evaluation if the provided index is not statically guaranteed to be in-bounds.
+#[inline]
+pub fn seq_proj(seq: Expr, index: usize) -> Expr {
+    // FIXME - this extra step can be avoided by adding something like `Int(usize)` to our set of Expr const-primitives
+    let index: u32 = index.try_into().expect("seq_proj index larger than U32::MAX is not supported");
+    index_unchecked(seq, Expr::U32(index))
 }

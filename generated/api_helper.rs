@@ -167,7 +167,7 @@ pub mod png_metrics {
                 |buf: &mut String, metrics: &SingleZlibMetrics| match metrics.is_present {
                     true => buf.push_str("✅\t"),
                     false => buf.push_str("❌\t"),
-            };
+                };
 
             let show_count_optzlib = |buf: &mut String, metrics: &Vec<OptZlibMetrics>| {
                 let mut all = true;

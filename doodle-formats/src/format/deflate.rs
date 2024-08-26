@@ -45,11 +45,11 @@ fn bits_value_u8(name: &'static str, n: usize) -> Expr {
 ///
 /// A tuple whose arity is not 5 will be mishandled by this function given its specialization.
 fn dist_value_u8(x: &'static str) -> Expr {
-    let b4 = shl_u8(tuple_proj(var(x), 0), 4);
-    let b3 = shl_u8(tuple_proj(var(x), 1), 3);
-    let b2 = shl_u8(tuple_proj(var(x), 2), 2);
-    let b1 = shl_u8(tuple_proj(var(x), 3), 1);
-    let b0 = tuple_proj(var(x), 4);
+    let b4 = shl_u8(seq_proj(var(x), 0), 4);
+    let b3 = shl_u8(seq_proj(var(x), 1), 3);
+    let b2 = shl_u8(seq_proj(var(x), 2), 2);
+    let b1 = shl_u8(seq_proj(var(x), 3), 1);
+    let b0 = seq_proj(var(x), 4);
     bit_or(bit_or(b4, b3), bit_or(bit_or(b2, b1), b0))
 }
 
@@ -74,7 +74,7 @@ fn bits_value_u16(name: &'static str, n: usize) -> Expr {
 /// Parse a 5-bit Fixed Huffman distance-code and map it into its corresponding distance-symbol
 fn dist8(base: &BaseModule) -> Format {
     map(
-        tuple_repeat(5, base.bit()),
+        repeat_count(Expr::U32(5), base.bit()),
         lambda("bits", dist_value_u8("bits")),
     )
 }
