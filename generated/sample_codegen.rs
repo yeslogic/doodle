@@ -6315,25 +6315,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6355,25 +6349,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6395,25 +6383,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6435,25 +6417,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6475,25 +6451,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6515,25 +6485,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6555,25 +6519,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6595,25 +6553,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6645,25 +6597,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6695,25 +6641,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6745,25 +6685,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6795,25 +6729,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6849,25 +6777,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6903,25 +6825,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -6957,25 +6873,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7011,25 +6921,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7071,25 +6975,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7131,25 +7029,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7191,25 +7083,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7251,25 +7137,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7314,25 +7194,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7377,25 +7251,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7440,25 +7308,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7503,25 +7365,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7569,25 +7425,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7635,25 +7485,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7701,25 +7545,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7767,25 +7605,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })
@@ -7807,25 +7639,19 @@ fn Decoder78<'input>(
                                     let distance_code = ((|| {
                                         PResult::Ok({
                                             let inner = {
-                                                let field0 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field1 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field2 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field3 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                let field4 =
-                                                    ((|| PResult::Ok((Decoder76(_input))?))())?;
-                                                (field0, field1, field2, field3, field4)
+                                                let mut accum = Vec::new();
+                                                for _ in 0..5u32 {
+                                                    accum.push((Decoder76(_input))?);
+                                                }
+                                                accum
                                             };
-                                            ((|bits: (u8, u8, u8, u8, u8)| {
+                                            ((|bits: Vec<u8>| {
                                                 PResult::Ok(
-                                                    bits.0.clone() << 4u8
-                                                        | bits.1.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
-                                                        | bits.3.clone() << 1u8
-                                                        | bits.4.clone(),
+                                                    bits[0u32 as usize].clone() << 4u8
+                                                        | bits[1u32 as usize].clone() << 3u8
+                                                        | bits[2u32 as usize].clone() << 2u8
+                                                        | bits[3u32 as usize].clone() << 1u8
+                                                        | bits[4u32 as usize].clone(),
                                                 )
                                             })(inner))?
                                         })

@@ -1857,7 +1857,7 @@ impl ToFragmentExt for RustExpr {
             RustExpr::Control(ctrl) => ctrl.to_fragment(),
             RustExpr::Closure(cl) => cl.to_fragment_precedence(prec),
             RustExpr::Index(expr, ix) => expr.to_fragment_precedence(Precedence::Projection).cat(
-                ix.to_fragment()
+                ix.to_fragment_precedence(Precedence::Top)
                     .delimit(Fragment::Char('['), Fragment::Char(']')),
             ),
             RustExpr::Slice(expr, start, stop) => expr
