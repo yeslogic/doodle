@@ -816,6 +816,19 @@ impl Expr {
                 }
                 _ => panic!("SeqLength: expected Seq"),
             },
+            Expr::SeqIx(seq, index) => {
+                match seq
+                    .eval_with_loc(scope)
+                    .coerce_mapped_value()
+                    .get_sequence()
+                {
+                    Some(values) => {
+                        let index = index.eval_value_with_loc(scope).unwrap_usize();
+                        Cow::Owned(values[index].clone())
+                    }
+                    _ => panic!("SeqIx: expected Seq"),
+                }
+            }
             Expr::SubSeq(seq, start, length) => {
                 match seq
                     .eval_with_loc(scope)

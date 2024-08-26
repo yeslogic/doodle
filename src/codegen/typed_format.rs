@@ -479,6 +479,7 @@ pub enum TypedExpr<TypeRep> {
     U64Le(Box<TypedExpr<TypeRep>>),
 
     SeqLength(Box<TypedExpr<TypeRep>>),
+    SeqIx(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
     SubSeq(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -564,6 +565,10 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
             | TypedExpr::U64Be(inner)
             | TypedExpr::U64Le(inner)
             | TypedExpr::SeqLength(inner) => inner.hash(state),
+            TypedExpr::SeqIx(_, sq, ix) => {
+                sq.hash(state);
+                ix.hash(state);
+            }
             TypedExpr::SubSeq(_, sq, start, len) | TypedExpr::SubSeqInflate(_, sq, start, len) => {
                 sq.hash(state);
                 start.hash(state);
@@ -630,6 +635,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::RecordProj(gt, _, _)
             | TypedExpr::Variant(gt, _, _)
             | TypedExpr::Seq(gt, _)
+            | TypedExpr::SeqIx(gt, _, _)
             | TypedExpr::Match(gt, _, _)
             | TypedExpr::IntRel(gt, _, _, _)
             | TypedExpr::Arith(gt, _, _, _)
@@ -775,6 +781,7 @@ mod __impls {
                 TypedExpr::U64Be(x) => Expr::U64Be(rebox(x)),
                 TypedExpr::U64Le(x) => Expr::U64Le(rebox(x)),
                 TypedExpr::SeqLength(x) => Expr::SeqLength(rebox(x)),
+                TypedExpr::SeqIx(_, seq, index) => Expr::SeqIx(rebox(seq), rebox(index)),
                 TypedExpr::SubSeq(_, seq, start, len) => {
                     Expr::SubSeq(rebox(seq), rebox(start), rebox(len))
                 }

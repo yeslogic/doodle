@@ -1186,6 +1186,7 @@ pub(crate) enum RustExpr {
     BlockScope(Vec<RustStmt>, Box<RustExpr>), // scoped block with a final value as an implicit return
     Control(Box<RustControl>),                // for control blocks that return a value
     Closure(RustClosure),                     // only simple lambdas for now
+    Index(Box<RustExpr>, Box<RustExpr>),      // object, index
     Slice(Box<RustExpr>, Box<RustExpr>, Box<RustExpr>), // object, start ix, end ix (exclusive)
     RangeExclusive(Box<RustExpr>, Box<RustExpr>),
 }
@@ -1559,6 +1560,13 @@ impl RustExpr {
         }
     }
 
+    pub fn index(self, ix: RustExpr) -> RustExpr {
+        match self {
+            Self::CloneOf(this) => Self::CloneOf(Box::new(this.index(ix))),
+            other => Self::Index(Box::new(other), Box::new(ix)),
+        }
+    }
+
     pub fn call_with(self, args: impl IntoIterator<Item = Self>) -> Self {
         Self::FunctionCall(Box::new(self), args.into_iter().collect())
     }
@@ -1658,6 +1666,19 @@ impl RustExpr {
             }
             // FIXME - this is complicated enough we won't bother implementing anything for this for now
             RustExpr::FieldAccess(..) => None,
+            RustExpr::Index(seq, index) => {
+                match &**seq {
+                    RustExpr::ArrayLit(lits) => {
+                        if index.try_get_primtype() == Some(PrimType::Usize) {
+                            lits[0].try_get_primtype()
+                        } else {
+                            None
+                        }
+                    }
+                    // FIXME - Anything more complex than an array literal may not be worth sinking excess effort for a minor QoL improvement
+                    _ => None,
+                }
+            }
             // FIXME - there may be some functions we can predict the return values of, but for now we can leave this alone
             RustExpr::FunctionCall(..) => None,
             RustExpr::Tuple(tuple) => match &tuple[..] {
@@ -1742,8 +1763,8 @@ impl RustExpr {
             RustExpr::Control(..) => false,
             // NOTE - closures never appear in a context where elision is a possibility to consider so this result doesn't actually need to be refined further
             RustExpr::Closure(..) => false,
-            // NOTE - slices exprs can always be out-of-bounds so they cannot be elided without changing program behavior
-            RustExpr::Slice(..) => false,
+            // NOTE - slice/index exprs can always be out-of-bounds so they cannot be elided without changing program behavior
+            RustExpr::Slice(..) | RustExpr::Index(..) => false,
             // NOTE - ranges can only ever be language-level errors if the endpoint types are not the same
             RustExpr::RangeExclusive(start, end) => {
                 start.is_pure()
@@ -1835,6 +1856,10 @@ impl ToFragmentExt for RustExpr {
             }
             RustExpr::Control(ctrl) => ctrl.to_fragment(),
             RustExpr::Closure(cl) => cl.to_fragment_precedence(prec),
+            RustExpr::Index(expr, ix) => expr.to_fragment_precedence(Precedence::Projection).cat(
+                ix.to_fragment()
+                    .delimit(Fragment::Char('['), Fragment::Char(']')),
+            ),
             RustExpr::Slice(expr, start, stop) => expr
                 .to_fragment_precedence(Precedence::Projection)
                 .cat(Fragment::seq(

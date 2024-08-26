@@ -285,11 +285,19 @@ pub enum Expr {
     U64Le(Box<Expr>),
 
     SeqLength(Box<Expr>),
+    /// SubSeq :: [T] -> start:U32 -> length:U32 -> [T] (start >= 0, length >= 0, start + length <= length of sequence)
     SubSeq(Box<Expr>, Box<Expr>, Box<Expr>),
+    /// SeqIx :: [T] -> ix:U32 -> T [panic on unguarded OOB index]
+    SeqIx(Box<Expr>, Box<Expr>),
+    /// SubSeqInflate :: [T] -> start:U32 -> length:U32 -> [T] (start >= 0, length >= 0)
     SubSeqInflate(Box<Expr>, Box<Expr>, Box<Expr>),
+    /// FlatMap :: (T -> [U]) -> [T] -> [U]
     FlatMap(Box<Expr>, Box<Expr>),
+    /// FlatMapAccum :: ((V, T) -> (V, [U])) -> V -> TypeRep V -> [T] -> [U]
     FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
+    /// FlatMapList :: (([U], T) -> [U]) -> TypeRep U -> [T] -> [U]
     FlatMapList(Box<Expr>, ValueType, Box<Expr>),
+    /// Dup :: U32 -> T -> [T]
     Dup(Box<Expr>, Box<Expr>),
 
     LiftOption(Option<Box<Expr>>),
@@ -478,6 +486,18 @@ impl Expr {
             Expr::SeqLength(seq) => match seq.infer_type(scope)? {
                 ValueType::Seq(_t) => Ok(ValueType::Base(BaseType::U32)),
                 other => Err(anyhow!("seq-length called on non-sequence type: {other:?}")),
+            },
+            Expr::SeqIx(seq, index) => match seq.infer_type(scope)? {
+                ValueType::Seq(t) => {
+                    let index_type = index.infer_type(scope)?;
+                    if index_type != ValueType::Base(BaseType::U32) {
+                        return Err(anyhow!(
+                            "SeqIx `index` param: expected U32, found {index_type:?}"
+                        ));
+                    }
+                    Ok(ValueType::clone(&t))
+                }
+                other => Err(anyhow!("SeqIx: expected Seq, found {other:?}")),
             },
             Expr::SubSeq(seq, start, length) => match seq.infer_type(scope)? {
                 ValueType::Seq(t) => {

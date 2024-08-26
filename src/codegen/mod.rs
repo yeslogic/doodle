@@ -792,6 +792,10 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
         TypedExpr::TupleProj(_, expr_tup, ix) => {
             embed_expr(expr_tup, ExprInfo::EmbedCloned).nth(*ix)
         }
+        TypedExpr::SeqIx(_, expr_seq, ix) => {
+            let ix_expr = RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(ix)), PrimType::Usize.into()));
+            embed_expr(expr_seq, ExprInfo::EmbedCloned).index(ix_expr)
+        }
         TypedExpr::RecordProj(_, expr_rec, fld) => {
             embed_expr(expr_rec, ExprInfo::EmbedCloned).field(fld.clone())
         }
@@ -883,6 +887,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 )
             )
         }
+
         TypedExpr::SubSeq(_, seq, ix, len) => {
             let start_expr = embed_expr_dft(ix);
             let bind_ix = RustStmt::assign(
@@ -3155,13 +3160,13 @@ impl<'a> Elaborator<'a> {
         match expr {
             Expr::Var(lbl) => {
                 let gt = self.get_gt_from_index(index);
-                GTExpr::Var(gt, lbl.clone())
+                TypedExpr::Var(gt, lbl.clone())
             }
-            Expr::Bool(b) => GTExpr::Bool(*b),
-            Expr::U8(n) => GTExpr::U8(*n),
-            Expr::U16(n) => GTExpr::U16(*n),
-            Expr::U32(n) => GTExpr::U32(*n),
-            Expr::U64(n) => GTExpr::U64(*n),
+            Expr::Bool(b) => TypedExpr::Bool(*b),
+            Expr::U8(n) => TypedExpr::U8(*n),
+            Expr::U16(n) => TypedExpr::U16(*n),
+            Expr::U32(n) => TypedExpr::U32(*n),
+            Expr::U64(n) => TypedExpr::U64(*n),
             Expr::Tuple(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
                 for elt in elts {
@@ -3169,12 +3174,18 @@ impl<'a> Elaborator<'a> {
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
-                GTExpr::Tuple(gt, t_elts)
+                TypedExpr::Tuple(gt, t_elts)
             }
             Expr::TupleProj(e, ix) => {
                 let t_e = self.elaborate_expr(e);
                 let gt = self.get_gt_from_index(index);
-                GTExpr::TupleProj(gt, Box::new(t_e), *ix)
+                TypedExpr::TupleProj(gt, Box::new(t_e), *ix)
+            }
+            Expr::SeqIx(e, ix) => {
+                let t_e = self.elaborate_expr(e);
+                let t_ix = self.elaborate_expr(ix);
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::SeqIx(gt, Box::new(t_e), Box::new(t_ix))
             }
             Expr::Record(flds) => {
                 let mut t_flds = Vec::with_capacity(flds.len());

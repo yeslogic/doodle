@@ -1524,6 +1524,11 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FUNAPP,
             ),
+            Expr::SeqIx(seq, index) => cond_paren(
+                self.compile_prefix("seq-ix", Some(&[index]), seq),
+                prec,
+                Precedence::FUNAPP,
+            ),
             Expr::SubSeq(seq, start, length) => cond_paren(
                 self.compile_prefix("sub-seq", Some(&[start, length]), seq),
                 prec,
