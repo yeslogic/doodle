@@ -871,7 +871,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         expr_some(Expr::U8(0)),
                                         dup(
                                             as_u32(add(
-                                                record_proj(tuple_proj(var("x"), 1), "extra"),
+                                                record_proj(var("cl-code-extra"), "extra"),
                                                 Expr::U8(11),
                                             )),
                                             Expr::U8(0),

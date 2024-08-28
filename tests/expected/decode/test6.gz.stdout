@@ -67,7 +67,7 @@ some "test6"
 │           │   │   ├── 9 := { literal := 17 }
 │           │   │   ~
 │           │   │   └── 2047 := { literal := 194 }
-│           │   └── inflate <- compute flat-map-list (x -> match x.1 { ... }) codes :=
+│           │   └── inflate <- compute flat-map-list (tuple_var -> match tuple_var { ... }) codes :=
 │           │       ├── 0 := 13
 │           │       ├── 1 := 60
 │           │       ├── 2 := 105

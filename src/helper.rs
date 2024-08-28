@@ -786,10 +786,11 @@ pub fn seq_proj(seq: Expr, index: usize) -> Expr {
 
 /// Boilerplate helper for simulating multi-argument lambda via pattern-match tuple destruction
 pub fn lambda_tuple<const N: usize>(names: [&'static str; N], body: Expr) -> Expr {
+    const HEAD_VAR: &str = "tuple_var";
     lambda(
-        "tuple_var",
+        HEAD_VAR,
         expr_match(
-            var("tuple_var"),
+            var(HEAD_VAR),
             [(Pattern::Tuple(names.into_iter().map(bind).collect()), body)],
         ),
     )
