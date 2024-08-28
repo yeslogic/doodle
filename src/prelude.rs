@@ -7,6 +7,7 @@ pub use crate::parser::{
     Parser,
 };
 
+/// Performs a checked_sub operation, returning an error if the result would be negative
 #[macro_export]
 macro_rules! try_sub {
     ( $x:expr, $y:expr ) => {
@@ -21,18 +22,9 @@ macro_rules! try_sub {
     };
 }
 
-pub fn u16le(input: (u8, u8)) -> u16 {
-    u16::from_le_bytes([input.0, input.1])
-}
-
-pub fn u16be(input: (u8, u8)) -> u16 {
-    u16::from_be_bytes([input.0, input.1])
-}
-
-pub fn u32le(input: (u8, u8, u8, u8)) -> u32 {
-    u32::from_le_bytes([input.0, input.1, input.2, input.3])
-}
-
+/// Performs a flat-map operation taking an iterator over `T` and returning a vector over `U`.
+///
+/// Will short-circuit if `f` returns an `Err` at any point, preserving the error returned.
 pub fn try_flat_map_vec<T, U, E, F>(iter: impl Iterator<Item = T>, f: F) -> Result<Vec<U>, E>
 where
     F: Fn(T) -> Result<Vec<U>, E>,
@@ -45,6 +37,10 @@ where
     Ok(res)
 }
 
+/// Performs a flat-map operation where the function `f` that successively yields each new span of new elements
+/// to append, relies in some fashion on the current value of the accumulated list being extended.
+///
+/// Like [`try_flat_map_vec`], will short-circuit if `f` returns an `Err` at any point, preserving the error returned.
 pub fn try_flat_map_append_vec<T, U, E, F>(iter: impl Iterator<Item = T>, f: F) -> Result<Vec<U>, E>
 where
     F: Fn((&Vec<U>, T)) -> Result<Vec<U>, E>,
@@ -57,6 +53,30 @@ where
     Ok(res)
 }
 
+/// Performs a fold/reduce-style operation on a given list, starting from an initial accumulator value
+/// and replacing it with the evaluation of `f(accum, elem)` for each element in the iterator, in order.
+///
+/// Will short-circuit if `f` ever returns `Err(_)`, preserving the error returned.
+pub fn try_fold_left_curried<T, V, E, F>(
+    iter: impl Iterator<Item = T>,
+    init: V,
+    f: F,
+) -> Result<V, E>
+where
+    F: Fn((V, T)) -> Result<V, E>,
+{
+    let mut accum = init;
+    for x in iter {
+        let new_accum = f((accum, x))?;
+        accum = new_accum;
+    }
+    Ok(accum)
+}
+
+/// Performs a flat-map using an auxiliary accumulator, which is updated by `f(accum, elem)` after each step
+/// but ultimately discarded, leaving only the flattened list of `U`-values.
+///
+/// Will short-circuit if `f` ever returns `Err(_)`, preserving the error returned.
 pub fn try_fold_map_curried<T, U, V, E, F>(
     iter: impl Iterator<Item = T>,
     init: V,
@@ -75,6 +95,18 @@ where
     Ok(res)
 }
 
+pub fn u16le(input: (u8, u8)) -> u16 {
+    u16::from_le_bytes([input.0, input.1])
+}
+
+pub fn u16be(input: (u8, u8)) -> u16 {
+    u16::from_be_bytes([input.0, input.1])
+}
+
+pub fn u32le(input: (u8, u8, u8, u8)) -> u32 {
+    u32::from_le_bytes([input.0, input.1, input.2, input.3])
+}
+
 pub fn u32be(input: (u8, u8, u8, u8)) -> u32 {
     u32::from_be_bytes([input.0, input.1, input.2, input.3])
 }
@@ -91,10 +123,23 @@ pub fn u64be(input: (u8, u8, u8, u8, u8, u8, u8, u8)) -> u64 {
     ])
 }
 
+/// Constructs a new vector containing `value` repeated `count` times.
+///
+/// For compatibility reasons with the code-generator layer, `count` is a `u32`
+/// to avoid having to cast it to `usize` in advance.
 pub fn dup32<T: Clone>(count: u32, value: T) -> Vec<T> {
     Vec::from_iter(std::iter::repeat(value).take(count as usize))
 }
 
+/// Parses a DEFLATE-style huffman code-length table, with optional code-value table to reconsider the lengths
+/// passed in as applying to a custom ordering of the available symbols whose lengths we are interested in.
+///
+/// For Fixed Huffman, lengths will be the standard `[8+, 9+, 7+, 8+]` sequence directly specifying LL code-lengths in order.
+///
+/// For Dynamic Huffman, lengths initially be the CL code-lengths reordered by `code_values` according to the shuffle
+/// `[16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]`. Once the CL table is parsed and expanded,
+/// this function will be re-used for each of the dynamic LL code-length and distance code-length tables, independently,
+/// and code_values unset.
 pub fn parse_huffman(
     lengths: impl AsRef<[u8]>,
     code_values: Option<Vec<u8>>,
@@ -118,6 +163,9 @@ pub fn parse_huffman(
     join_fallible(make_huffman_decoder(&lengths))
 }
 
+/// Monad-joins `PResult<impl Fn(&mut Parser) -> PResult<u16>>` into either the exact closure passed in,
+/// or a closure that always returns the error passed in.
+// NOTE - this is monomorphized to u16, but could be polymorphic if necessary
 fn join_fallible<'f, F>(rf: PResult<F>) -> Box<dyn 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>>
 where
     F: 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>,
@@ -128,6 +176,8 @@ where
     }
 }
 
+/// Constructs and returns a parse-function for a given natural-order prefix-code-length table, according
+/// to the canonical prefix-code reconstruction algorithm used in DEFLATE.
 pub fn make_huffman_decoder(
     lengths: &[usize],
 ) -> PResult<impl for<'a> Fn(&mut Parser<'a>) -> PResult<u16>> {

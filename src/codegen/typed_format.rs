@@ -500,6 +500,13 @@ pub enum TypedExpr<TypeRep> {
         ValueType,
         Box<TypedExpr<TypeRep>>,
     ),
+    LeftFold(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        ValueType,
+        Box<TypedExpr<TypeRep>>,
+    ),
     FlatMapList(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
@@ -583,6 +590,11 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 acc.hash(state);
                 seq.hash(state);
             }
+            TypedExpr::LeftFold(_, f, acc, _vt, seq) => {
+                f.hash(state);
+                acc.hash(state);
+                seq.hash(state);
+            }
             TypedExpr::FlatMapList(_, f, _vt, seq) => {
                 f.hash(state);
                 seq.hash(state);
@@ -643,6 +655,7 @@ impl TypedExpr<GenType> {
             | TypedExpr::SubSeqInflate(gt, _, _, _)
             | TypedExpr::FlatMap(gt, _, _)
             | TypedExpr::FlatMapAccum(gt, _, _, _, _)
+            | TypedExpr::LeftFold(gt, _, _, _, _)
             | TypedExpr::FlatMapList(gt, _, _, _)
             | TypedExpr::LiftOption(gt, _)
             | TypedExpr::Dup(gt, _, _) => Some(Cow::Borrowed(gt)),
@@ -791,6 +804,9 @@ mod __impls {
                 TypedExpr::FlatMap(_, lambda, seq) => Expr::FlatMap(rebox(lambda), rebox(seq)),
                 TypedExpr::FlatMapAccum(_, lambda, acc, vt, seq) => {
                     Expr::FlatMapAccum(rebox(lambda), rebox(acc), vt, rebox(seq))
+                }
+                TypedExpr::LeftFold(_, lambda, acc, vt, seq) => {
+                    Expr::LeftFold(rebox(lambda), rebox(acc), vt, rebox(seq))
                 }
                 TypedExpr::FlatMapList(_, lambda, vt, seq) => {
                     Expr::FlatMapList(rebox(lambda), vt, rebox(seq))

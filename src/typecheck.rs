@@ -1957,6 +1957,26 @@ impl TypeChecker {
 
                 ys_var
             }
+            Expr::LeftFold(f_expr, acc_expr, acc_vt, seq_expr) => {
+                // NOTE - ((acc, x) -> acc) -> acc -> Vt(acc) -> [x] -> acc
+                let newvar = self.get_new_uvar();
+
+                let (acc_x_var, ret_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
+                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt, scope)?;
+                let xs_var = self.infer_var_expr(seq_expr, scope)?;
+                let x_var = self.get_new_uvar();
+
+                self.unify_var_proj_elem(xs_var, x_var)?;
+
+                self.unify_var_utype(
+                    acc_x_var,
+                    Rc::new(UType::Tuple(vec![acc_var.into(), x_var.into()])),
+                )?;
+                self.unify_var_pair(acc_var, ret_var)?;
+                self.unify_var_pair(newvar, acc_var)?;
+
+                newvar
+            }
             Expr::FlatMapList(f_expr, ret_type, seq_expr) => {
                 // NOTE - (([y], x) -> [y]) -> Vt(y) -> [x] -> [y]
                 let ys_var = self.get_new_uvar();
