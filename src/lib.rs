@@ -75,8 +75,18 @@ pub enum ValueType {
     Option(Box<ValueType>),
 }
 
+impl From<BaseType> for ValueType {
+    fn from(b: BaseType) -> Self {
+        ValueType::Base(b)
+    }
+}
+
 impl ValueType {
     pub const BOOL: Self = ValueType::Base(BaseType::Bool);
+
+    // NOTE - should be updated if we ever add new integer types
+    /// Alias for the widest (unsigned) integer type we support as a ValueType
+    pub const UMAX: Self = ValueType::Base(BaseType::U64);
 }
 
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
@@ -297,6 +307,10 @@ pub enum Expr {
     FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
     /// FlatMapList :: (([U], T) -> [U]) -> TypeRep U -> [T] -> [U]
     FlatMapList(Box<Expr>, ValueType, Box<Expr>),
+
+    /// LeftFold :: ((U, T) -> U) -> U -> [T} -> U
+    LeftFold(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
+
     /// Dup :: U32 -> T -> [T]
     Dup(Box<Expr>, Box<Expr>),
 
@@ -571,6 +585,19 @@ impl Expr {
                     other => Err(anyhow!("FlatMapAccum: expected Seq, found {other:?}")),
                 },
                 other => Err(anyhow!("FlatMapAccum: expected Lambda, found {other:?}")),
+            },
+            Expr::LeftFold(expr, accum, accum_type, seq) => match expr.as_ref() {
+                Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
+                    ValueType::Seq(t) => {
+                        let accum_type = accum.infer_type(scope)?.unify(accum_type)?;
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope
+                            .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
+                        Ok(expr.infer_type(&child_scope)?.unify(&accum_type)?)
+                    }
+                    other => Err(anyhow!("LeftFold: expected Seq, found {other:?}")),
+                },
+                other => Err(anyhow!("LeftFold: expected Lambda, found {other:?}")),
             },
             Expr::FlatMapList(expr, ret_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {

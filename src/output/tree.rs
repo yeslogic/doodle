@@ -1549,6 +1549,11 @@ impl<'module> MonoidalPrinter<'module> {
                 prec,
                 Precedence::FUNAPP,
             ),
+            Expr::LeftFold(expr, accum, _accum_type, seq) => cond_paren(
+                self.compile_prefix("left-fold", Some(&[expr, accum]), seq),
+                prec,
+                Precedence::FUNAPP,
+            ),
             Expr::FlatMapList(expr, _ret_type, seq) => cond_paren(
                 self.compile_prefix("flat-map-list", Some(&[expr]), seq),
                 prec,

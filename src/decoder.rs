@@ -562,6 +562,17 @@ impl Expr {
                 }
                 _ => panic!("FlatMapAccum: expected Seq"),
             },
+            Expr::LeftFold(expr, accum, _accum_type, seq) => match seq.eval_value(scope) {
+                Value::Seq(values) => {
+                    let mut accum = accum.eval_value(scope);
+                    for v in values {
+                        let tmp = expr.eval_lambda(scope, &Value::Tuple(vec![accum, v]));
+                        accum = tmp
+                    }
+                    Cow::Owned(accum)
+                }
+                _ => panic!("LeftFold: expected Seq"),
+            },
             Expr::FlatMapList(expr, _ret_type, seq) => match seq.eval_value(scope) {
                 Value::Seq(values) => {
                     let mut vs = Vec::new();

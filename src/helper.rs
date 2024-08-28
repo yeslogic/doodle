@@ -1,6 +1,6 @@
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
+use crate::{Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 
 /// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
 /// are `u8`-valued sub-masks of the original byte.
@@ -741,6 +741,15 @@ pub fn expr_unwrap(expr: Expr) -> Expr {
     Expr::Match(Box::new(expr), vec![(pat_some(bind("x")), var("x"))])
 }
 
+/// Performs an infallible destructuring of the provided `expr` within the Expr layer,
+/// either extracting the contents of a `Some(_)` value, or returning `default` if it is `None`.
+pub fn expr_unwrap_or(expr: Expr, default: Expr) -> Expr {
+    Expr::Match(
+        Box::new(expr),
+        vec![(pat_some(bind("x")), var("x")), (pat_none(), default)],
+    )
+}
+
 /// Performs an index operation on an expression `seq` with an index `index`, without checking for OOB array access.
 ///
 /// This will result in a runtime panic during parse-evaluation if the index is out of bounds.
@@ -784,4 +793,181 @@ pub fn lambda_tuple<const N: usize>(names: [&'static str; N], body: Expr) -> Exp
             [(Pattern::Tuple(names.into_iter().map(bind).collect()), body)],
         ),
     )
+}
+
+/// Shorthand for Expr::LeftFold
+pub fn left_fold(f: Expr, init: Expr, init_vt: ValueType, seq: Expr) -> Expr {
+    Expr::LeftFold(Box::new(f), Box::new(init), init_vt, Box::new(seq))
+}
+
+/// Computes the larger of two given `Expr`s, let-biased if equal
+pub fn expr_max(a: Expr, b: Expr) -> Expr {
+    expr_if_else(expr_gte(a.clone(), b.clone()), a, b)
+}
+
+/// Returns whichever of two pair-typed values has a larger first element, left-biased if equal
+pub fn expr_max_keyval(a: Expr, b: Expr) -> Expr {
+    expr_if_else(
+        expr_gte(tuple_proj(a.clone(), 0), tuple_proj(b.clone(), 0)),
+        a,
+        b,
+    )
+}
+
+/// Analogue of [`std::option::Option::map_or`] expressed within the Expr model.
+///
+/// Given a default value `dft` of type `Expr@T`, and a callable `f` mapping `Expr@T -> Expr@U`,
+/// as well as a value `x` of type `Expr@Option(T)`, computes the value of type `Expr@U`
+/// corresponding to `f` applied to the `Some(_)` case, or dft if `x` is `None`.
+pub fn expr_option_map_or(dft: Expr, f: impl FnOnce(Expr) -> Expr, x: Expr) -> Expr {
+    expr_match(x, [(pat_some(bind("x")), f(var("x"))), (pat_none(), dft)])
+}
+
+/// Computes the largest element of a Seq(U*)-typed expression,
+/// wrapped in an Option (None if the list is empty)
+///
+/// Requires an explicit parameter `t_param` to determine the monomorphic type of both the sequence
+/// being processed and the Option being returned
+pub fn expr_maximum(seq: Expr, t_param: ValueType) -> Expr {
+    left_fold(
+        lambda_tuple(
+            ["acc", "y"],
+            expr_match(
+                var("acc"),
+                [
+                    (pat_some(bind("x")), expr_some(expr_max(var("x"), var("y")))),
+                    (pat_none(), expr_some(var("y"))),
+                ],
+            ),
+        ),
+        expr_none(),
+        ValueType::Option(Box::new(t_param)),
+        seq,
+    )
+}
+
+/// Given a keying function `f_key` that produces a value of type U*, along with type-hints `vt_key` and `vt_elem`,
+/// returns the element of a sequence of type `vt_elem` with the largest key of type `vt_key` as computed by `f_key`.
+///
+/// The return-value is wrapped in an `Option` layer, or `None` if the sequence is empty.
+// REVIEW - if we ever make it possible to call lambdas directly, we should use that instead of `impl Fn`
+pub fn expr_maximum_by(
+    f_key: impl FnOnce(Expr) -> Expr,
+    vt_key: ValueType,
+    vt_elem: ValueType,
+    seq: Expr,
+) -> Expr {
+    let keyed = flat_map(lambda("x", singleton(pair(f_key(var("x")), var("x")))), seq);
+    let max_keyed = left_fold(
+        lambda_tuple(
+            ["acc", "y"],
+            expr_match(
+                var("acc"),
+                [
+                    (
+                        pat_some(bind("x")),
+                        expr_some(expr_max_keyval(var("x"), var("y"))),
+                    ),
+                    (pat_none(), expr_some(var("y"))),
+                ],
+            ),
+        ),
+        expr_none(),
+        ValueType::Option(Box::new(ValueType::Tuple(vec![vt_key, vt_elem]))),
+        keyed,
+    );
+    expr_match(
+        max_keyed,
+        [
+            (
+                pat_some(Pattern::Tuple(vec![Pattern::Wildcard, bind("x")])),
+                expr_some(var("x")),
+            ),
+            (pat_none(), expr_none()),
+        ],
+    )
+}
+
+/// Computes the summation of all elements in a Seq(U*)-typed expression,
+/// unified to U64 to allay the immediate need for overflow-checking.
+pub fn expr_sum_as_u64(seq: Expr) -> Expr {
+    left_fold(
+        lambda_tuple(
+            ["acc", "y"],
+            add(var("acc"), Expr::AsU64(Box::new(var("y")))),
+        ),
+        Expr::U64(0),
+        ValueType::UMAX,
+        seq,
+    )
+}
+
+/// Evaluates to `true` if any element of `haystack` equals `needle`, otherwise `false`.
+pub fn is_elem(needle: Expr, haystack: Expr) -> Expr {
+    left_fold(
+        lambda_tuple(
+            ["acc", "stalk"],
+            expr_if_else(var("acc"), Expr::Bool(true), expr_eq(var("stalk"), needle)),
+        ),
+        Expr::Bool(false),
+        ValueType::Base(BaseType::Bool),
+        haystack,
+    )
+}
+
+/// Returns a copied sequence with only the first occurrence of any given element modulo integer equality.
+pub fn dedup(seq: Expr, vt_elem: ValueType) -> Expr {
+    flat_map_list(
+        lambda_tuple(
+            ["prefix", "x"],
+            expr_if_else(
+                is_elem(var("x"), var("prefix")),
+                seq_empty(),
+                singleton(var("x")),
+            ),
+        ),
+        vt_elem,
+        seq,
+    )
+}
+
+/// Returns a duplicated sequence that elides all elements for which `f(x)` evaluates to `false`.
+// REVIEW - if we ever make it possible to call lambdas directly, we should use that instead of `impl Fn`
+pub fn filter(f: impl FnOnce(Expr) -> Expr, seq: Expr) -> Expr {
+    flat_map(
+        lambda(
+            "x",
+            expr_if_else(f(var("x")), singleton(var("x")), seq_empty()),
+        ),
+        seq,
+    )
+}
+
+/// Returns a version of a list where each element appears after its index (U32), within a 2-tuple
+///
+/// Semantically equivalent to `Iterator::enumerate`
+pub fn enumerate_u32(seq: Expr, vt_elem: ValueType) -> Expr {
+    flat_map_list(
+        lambda_tuple(
+            ["prev", "elem"],
+            singleton(pair(seq_length(var("prev")), var("elem"))),
+        ),
+        ValueType::Tuple(vec![ValueType::Base(BaseType::U32), vt_elem]),
+        seq,
+    )
+}
+
+/// Helper for constructing an `Expr::Seq` of length == 0
+pub const fn seq_empty() -> Expr {
+    Expr::Seq(Vec::new())
+}
+
+/// Helper for constructing an `Expr::Seq` of length == 1
+pub fn singleton(value: Expr) -> Expr {
+    Expr::Seq(vec![value])
+}
+
+/// Helper for constructing an `Expr::Tuple` of arity == 2
+pub fn pair(x: Expr, y: Expr) -> Expr {
+    Expr::Tuple(vec![x, y])
 }

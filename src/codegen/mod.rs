@@ -950,6 +950,14 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                     embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
                 ])
                 .wrap_try(),
+        TypedExpr::LeftFold(_, f, acc_init, _acc_type, seq) =>
+            RustExpr::local("try_fold_left_curried")
+                .call_with([
+                    embed_expr(seq, ExprInfo::Natural).call_method("iter").call_method("cloned"),
+                    embed_expr(acc_init, ExprInfo::EmbedCloned),
+                    embed_lambda(f, ClosureKind::Transform, true, ExprInfo::EmbedCloned),
+                ])
+                .wrap_try(),
         TypedExpr::FlatMapList(_, f, _ret_type, seq) =>
             RustExpr::local("try_flat_map_append_vec")
                 .call_with([
@@ -3357,6 +3365,21 @@ impl<'a> Elaborator<'a> {
 
                 let gt = self.get_gt_from_index(index);
                 GTExpr::FlatMapAccum(
+                    gt,
+                    Box::new(t_lambda),
+                    Box::new(t_acc),
+                    _acc_vt.clone(),
+                    Box::new(t_seq),
+                )
+            }
+            Expr::LeftFold(lambda, acc, _acc_vt, seq) => {
+                let t_lambda = self.elaborate_expr_lambda(lambda);
+                let t_acc = self.elaborate_expr(acc);
+                let t_seq = self.elaborate_expr(seq);
+                self.increment_index();
+                let gt = self.get_gt_from_index(index);
+
+                TypedExpr::LeftFold(
                     gt,
                     Box::new(t_lambda),
                     Box::new(t_acc),
