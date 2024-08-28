@@ -669,6 +669,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("section_headers", elf_sh),
             (
                 "sections",
+                // FIXME: this suggests the definition of a Format-level Option::map helper
                 Format::Match(
                     var("section_headers"),
                     vec![

@@ -665,6 +665,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                                 distance_record,
                                             )),
                                         ),
+                                        // REVIEW - consider whether we want to use Format::Fail instead
+                                        (Pattern::Int(Bounds::new(286, 287)), format_none()),
                                         (Pattern::Wildcard, format_none()),
                                     ],
                                 ),
