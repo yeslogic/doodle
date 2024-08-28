@@ -41,7 +41,7 @@ some "test5"
 │           │   │   │           │   ├── 9 := 3
 │           │   │   │           │   ~
 │           │   │   │           │   └── 13 := 5
-│           │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> match tuple_var { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │           │   │   │           │   ├── 0 :=
 │           │   │   │           │   │   ├── code <- apply := 17
 │           │   │   │           │   │   └── extra <- match (as-u8 code) { ... } := 7
@@ -76,7 +76,7 @@ some "test5"
 │           │   │   │           │   └── 115 :=
 │           │   │   │           │       ├── code <- apply := 6
 │           │   │   │           │       └── extra <- match (as-u8 code) { ... } := 0
-│           │   │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
+│           │   │   │           ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> match tuple_var { ... }, none) literal-length-distance-alphabet-code-lengths :=
 │           │   │   │           │   ├── 0 := 0
 │           │   │   │           │   ├── 1 := 0
 │           │   │   │           │   ├── 2 := 0
@@ -184,7 +184,7 @@ some "test5"
 │           │   │               │   ├── 9 := 3
 │           │   │               │   ~
 │           │   │               │   └── 13 := 5
-│           │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│           │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> match tuple_var { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │           │   │               │   ├── 0 :=
 │           │   │               │   │   ├── code <- apply := 18
 │           │   │               │   │   └── extra <- match (as-u8 code) { ... } := 37
@@ -219,7 +219,7 @@ some "test5"
 │           │   │               │   └── 59 :=
 │           │   │               │       ├── code <- apply := 5
 │           │   │               │       └── extra <- match (as-u8 code) { ... } := 0
-│           │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
+│           │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> match tuple_var { ... }, none) literal-length-distance-alphabet-code-lengths :=
 │           │   │               │   ├── 0 := 0
 │           │   │               │   ├── 1 := 0
 │           │   │               │   ├── 2 := 0
@@ -345,7 +345,7 @@ some "test5"
 │           │   │       └── reference :=
 │           │   │           ├── length := 4
 │           │   │           └── distance := 16499
-│           │   └── inflate <- compute flat-map-list (x -> match x.1 { ... }) codes :=
+│           │   └── inflate <- compute flat-map-list (tuple_var -> match tuple_var { ... }) codes :=
 │           │       ├── 0 := 35
 │           │       ├── 1 := 32
 │           │       ├── 2 := 84

@@ -120,7 +120,7 @@
 │       │   │   │               │   ├── 9 := 3
 │       │   │   │               │   ~
 │       │   │   │               │   └── 13 := 4
-│       │   │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (x -> match as-u8 (x.1.code) { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
+│       │   │   │               ├── literal-length-distance-alphabet-code-lengths <- dynamic code-length-alphabet-format huffman (repeat-until-seq (y -> seq-length (flat-map-accum (tuple_var -> match tuple_var { ... }, none) y) >= as-u32 (hlit + hdist) + 258) { ... }) :=
 │       │   │   │               │   ├── 0 :=
 │       │   │   │               │   │   ├── code <- apply := 5
 │       │   │   │               │   │   └── extra <- match (as-u8 code) { ... } := 0
@@ -155,7 +155,7 @@
 │       │   │   │               │   └── 65 :=
 │       │   │   │               │       ├── code <- apply := 5
 │       │   │   │               │       └── extra <- match (as-u8 code) { ... } := 0
-│       │   │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (x -> match as-u8 (x.1.code) { ... }, none) literal-length-distance-alphabet-code-lengths :=
+│       │   │   │               ├── literal-length-distance-alphabet-code-lengths-value <- compute flat-map-accum (tuple_var -> match tuple_var { ... }, none) literal-length-distance-alphabet-code-lengths :=
 │       │   │   │               │   ├── 0 := 5
 │       │   │   │               │   ├── 1 := 5
 │       │   │   │               │   ├── 2 := 5
@@ -274,7 +274,7 @@
 │       │   │   │       └── reference :=
 │       │   │   │           ├── length := 60
 │       │   │   │           └── distance := 1
-│       │   │   └── inflate <- compute flat-map-list (x -> match x.1 { ... }) codes :=
+│       │   │   └── inflate <- compute flat-map-list (tuple_var -> match tuple_var { ... }) codes :=
 │       │   │       ├── 0 := 0
 │       │   │       ├── 1 := 0
 │       │   │       ├── 2 := 18
