@@ -1,19 +1,64 @@
 use crate::format::BaseModule;
-use doodle::{helper::*, Label};
+use doodle::prelude::ByteSet;
+use doodle::{helper::*, Expr, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
+// helper to turn b"..." literals into u32 at compile-time
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
 }
 
+const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U64));
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
+    let tag = module.define_format(
+        "opentype.types.tag",
+        map(
+            tuple_repeat(4, Format::Byte(ByteSet::from(0x20..=0x7E))),
+            lambda("x", Expr::U32Be(Box::new(var("x")))),
+        ),
+    );
+
+    let table_record = module.define_format_args(
+        "opentype.table_record",
+        vec![START_ARG],
+        record([
+            ("table_id", tag.call()), // should be ascending within the repetition "table_records" field in table_directory
+            ("checksum", base.u32be()),
+            ("offset", base.u32be()),
+            ("length", base.u32be()),
+        ]),
+    );
+
     let table_directory = module.define_format_args(
         "opentype.table_directory",
         vec![START_ARG],
-        // FIXME - stub
-        Format::SkipRemainder,
+        record([
+            (
+                "sfnt_version",
+                where_lambda(
+                    base.u32be(),
+                    "v",
+                    or(
+                        expr_eq(var("v"), Expr::U32(0x00010000)),
+                        expr_eq(var("v"), Expr::U32(magic(b"OTTO"))),
+                    ),
+                ),
+            ),
+            ("num_tables", base.u16be()), // number of tables in directory
+            ("search_range", base.u16be()), // TODO[validation] - should be (maximum power of 2 <= num_tables) x 16
+            ("entry_selector", base.u16be()), // TODO[validation] - should be Log2(maximum power of 2 <= num_tables)
+            ("range_shift", base.u16be()), // TODO[validation] - should be (NumTables x 16) - searchRange
+            (
+                "table_records",
+                repeat_count(
+                    var("num_tables"),
+                    table_record.call_args(vec![var("start")]),
+                ),
+            ),
+            // FIXME - stub! add `table_links`
+        ]),
     );
 
     let ttc_header = module.define_format_args(
@@ -29,7 +74,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "opentype.font",
         vec![START_ARG],
         record([
-            ("magic", base.u32be()),
+            ("magic", Format::Peek(Box::new(base.u32be()))),
             (
                 "directory",
                 match_variant(
