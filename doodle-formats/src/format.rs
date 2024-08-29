@@ -10,6 +10,7 @@ mod gif;
 mod gzip;
 mod jpeg;
 mod mpeg4;
+mod opentype;
 mod peano;
 mod png;
 mod riff;
@@ -18,7 +19,6 @@ mod text;
 mod tiff;
 mod waldo;
 mod zlib;
-mod opentype;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);

@@ -1,4 +1,3 @@
-
 use crate::format::BaseModule;
 use doodle::{helper::*, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
@@ -17,7 +16,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         Format::SkipRemainder,
     );
 
-    let ttc_header =  module.define_format_args(
+    let ttc_header = module.define_format_args(
         "opentype.ttc_header",
         vec![START_ARG],
         // FIXME - stub
@@ -26,22 +25,36 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let unknown_table = Format::SkipRemainder;
 
-
     let opentype_font = module.define_format_args(
         "opentype.font",
         vec![START_ARG],
         record([
             ("magic", base.u32be()),
-            ("directory", match_variant(var("magic"),
-                [
-                    (Pattern::U32(0x00010000), "TableDirectory", table_directory.call_args(vec![var("start")])),
-                    (Pattern::U32(magic(b"OTTO")), "TableDirectory", table_directory.call_args(vec![var("start")])),
-                    (Pattern::U32(magic(b"ttcf")), "TTCHeader", ttc_header.call_args(vec![var("start")])),
-                    (Pattern::Wildcard, "UnknownTable", unknown_table),
-                ])
+            (
+                "directory",
+                match_variant(
+                    var("magic"),
+                    [
+                        (
+                            Pattern::U32(0x00010000),
+                            "TableDirectory",
+                            table_directory.call_args(vec![var("start")]),
+                        ),
+                        (
+                            Pattern::U32(magic(b"OTTO")),
+                            "TableDirectory",
+                            table_directory.call_args(vec![var("start")]),
+                        ),
+                        (
+                            Pattern::U32(magic(b"ttcf")),
+                            "TTCHeader",
+                            ttc_header.call_args(vec![var("start")]),
+                        ),
+                        (Pattern::Wildcard, "UnknownTable", unknown_table),
+                    ],
+                ),
             ),
-            ]
-        )
+        ]),
     );
 
     module.define_format(
@@ -49,10 +62,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("start", Format::Pos),
             ("font", opentype_font.call_args(vec![var("start")])),
-        ])
+        ]),
     )
 }
-
 
 /*
     //! # OpenType Font File Format
