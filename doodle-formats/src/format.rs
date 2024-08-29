@@ -18,6 +18,7 @@ mod text;
 mod tiff;
 mod waldo;
 mod zlib;
+mod opentype;
 
 pub fn main(module: &mut FormatModule) -> FormatRef {
     let base = base::main(module);
@@ -38,6 +39,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
     let tar = tar::main(module, &base);
     let elf = elf::main(module, &base);
     let waldo = waldo::main(module, &base);
+    let opentype = opentype::main(module, &base);
 
     let tgz = {
         module.define_format(
@@ -75,6 +77,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     ("tiff", tiff.call()),
                     ("tar", tar.call()),
                     ("elf", elf.call()),
+                    ("opentype", opentype.call()),
                     ("text", text.call()),
                 ]),
             ),
