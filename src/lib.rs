@@ -1161,12 +1161,59 @@ impl FormatModule {
                 let t = self.infer_format_type(scope, a)?;
                 Ok(ValueType::Seq(Box::new(t)))
             }
-            Format::RepeatCount(_, a)
-            | Format::RepeatBetween(_, _, a)
-            | Format::RepeatUntilLast(_, a)
-            | Format::RepeatUntilSeq(_, a) => {
-                let t = self.infer_format_type(scope, a)?;
-                Ok(ValueType::Seq(Box::new(t)))
+            Format::RepeatCount(count, a) => {
+                match count.infer_type(scope)? {
+                    ValueType::Base(b) if b.is_numeric() => {
+                        let t = self.infer_format_type(scope, a)?;
+                        Ok(ValueType::Seq(Box::new(t)))
+                    }
+                    other => Err(anyhow!("RepeatCount first argument type should be numeric, found {other:?} instead")),
+                }
+            }
+
+            Format::RepeatBetween(min, max, a) => {
+                match min.infer_type(scope)? {
+                    ref t0 @ ValueType::Base(b0) if b0.is_numeric() => {
+                        match max.infer_type(scope)? {
+                            ValueType::Base(b1) if b0 == b1 => {
+                                let t = self.infer_format_type(scope, a)?;
+                                Ok(ValueType::Seq(Box::new(t)))
+                            }
+                            other => return Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
+                        }
+                    }
+                    other => return Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
+                }
+            }
+            Format::RepeatUntilLast(lambda_elem, a) => {
+                match lambda_elem {
+                    Expr::Lambda(head, expr) => {
+                        let t = self.infer_format_type(scope, a)?;
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(head.clone(), t.clone());
+                        let ret_type = expr.infer_type(&child_scope)?;
+                        match ret_type {
+                            ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                            other => Err(anyhow!("RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead")),
+                        }
+                    }
+                    other => return Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
+                }
+            }
+            Format::RepeatUntilSeq(lambda_seq, a) => {
+                match lambda_seq {
+                    Expr::Lambda(head, expr) => {
+                        let t = self.infer_format_type(scope, a)?;
+                        let mut child_scope = TypeScope::child(scope);
+                        child_scope.push(head.clone(), ValueType::Seq(Box::new(t.clone())));
+                        let ret_type = expr.infer_type(&child_scope)?;
+                        match ret_type {
+                            ValueType::Base(BaseType::Bool) => Ok(ValueType::Seq(Box::new(t))),
+                            other => Err(anyhow!("RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead")),
+                        }
+                    }
+                    other => return Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
+                }
             }
             Format::Maybe(x, a) => match x.infer_type(scope)? {
                 ValueType::Base(BaseType::Bool) => {
