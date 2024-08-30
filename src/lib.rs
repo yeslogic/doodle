@@ -630,6 +630,55 @@ impl Expr {
         }
     }
 
+    pub fn is_shadowed_by(&self, name: &str) -> bool {
+        match self {
+            Expr::Var(vname) => vname == name,
+            Expr::Lambda(hvar, body) => {
+                if hvar == name {
+                    false
+                } else {
+                    body.is_shadowed_by(name)
+                }
+            }
+            Expr::Arith(_, x, y) | Expr::IntRel(_, x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
+            Expr::Dup(x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
+            Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) | Expr::U64(_) => false,
+            Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),
+            Expr::TupleProj(tup, _) => tup.is_shadowed_by(name),
+            Expr::Record(fs) => {
+                for (fname, fexpr) in fs.iter() {
+                    if fexpr.is_shadowed_by(name) {
+                        // NOTE - the first field-expr that is shadowed by `name` wins
+                        return true;
+                    } else if fname == name {
+                        // NOTE - if a field-name matches `name` exactly, then it itself will shadow any binding of `name` external to the record
+                        return false;
+                    }
+                }
+                return false;
+            }
+            Expr::RecordProj(rec, _) => rec.is_shadowed_by(name),
+            Expr::Variant(_, inner) => inner.is_shadowed_by(name),
+            Expr::Seq(elts) => elts.iter().any(|x| x.is_shadowed_by(name)),
+            Expr::Match(head, arms) => {
+                head.is_shadowed_by(name) || arms.iter().any(|(pat, x)| !pat.shadows(name) && x.is_shadowed_by(name))
+            }
+            | Expr::AsU8(x) | Expr::AsU16(x) | Expr::AsU32(x) | Expr::AsU64(x) | Expr::AsChar(x)
+            | Expr::U16Be(x)
+            | Expr::U16Le(x)
+            | Expr::U32Be(x)
+            | Expr::U32Le(x)
+            | Expr::U64Be(x)
+            | Expr::U64Le(x)
+            | Expr::SeqLength(x) => x.is_shadowed_by(name),
+            Expr::SubSeq(x, s, l) | Expr::SubSeqInflate(x, s, l) => x.is_shadowed_by(name) || s.is_shadowed_by(name) || l.is_shadowed_by(name),
+            Expr::SeqIx(x, i) => x.is_shadowed_by(name) || i.is_shadowed_by(name),
+            Expr::FlatMap(f, x) | Expr::FlatMapList(f, _, x) => f.is_shadowed_by(name) || x.is_shadowed_by(name),
+            Expr::FlatMapAccum(f, z, _, x) | Expr::LeftFold(f, z, _, x) => f.is_shadowed_by(name) || z.is_shadowed_by(name) || x.is_shadowed_by(name),
+            Expr::LiftOption(opt_x) => opt_x.as_ref().is_some_and(|x| x.is_shadowed_by(name)),
+        }
+    }
+
     /// Conservative bounds for unsigned numeric expressions
     fn bounds(&self) -> Bounds {
         match self {
@@ -2334,5 +2383,38 @@ impl<'a> TypeScope<'a> {
         } else {
             panic!("variable not found: {name}");
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use decoder::Program;
+
+    use super::*;
+
+    #[test]
+    fn format_let_eval_precedence() {
+        let fmt = Format::Let(
+            Label::Borrowed("y"),
+            Expr::U8(10),
+            Box::new(
+                Format::Let(
+                    Label::Borrowed("x"),
+                    Expr::Var("y"),
+                    Box::new(
+                        Format::Record(vec![
+                            (Label::Borrowed("y"), Format::Compute(Expr::U8(5))),
+                            (Label::Borrowed("z"), Format::Compute(Expr::Var("x")))]
+                        )
+                    )
+                )
+            )
+        );
+        let mut module = FormatModule::new();
+        let fref = module.define_format("test", fmt);
+        let prog = super::decoder::Compiler::compile_program(&module, &fref.call());
+        let buf = ReadCtxt::new(&[]);
+        let ret = prog.run(buf).unwrap();
+        println!("ret: {ret:?}");
     }
 }

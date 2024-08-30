@@ -3,6 +3,12 @@ use doodle::prelude::ByteSet;
 use doodle::{helper::*, Expr, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
+fn shadow_check(x: &Expr, name: &'static str) {
+    if x.is_shadowed_by(name) {
+        panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
+    }
+}
+
 // helper to turn b"..." literals into u32 at compile-time
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
@@ -10,6 +16,72 @@ const fn magic(tag: &'static [u8; 4]) -> u32 {
 
 const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U64));
+
+// FIXME - this is a crude approximation that could be improved with the right primitives in-hand
+fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
+    // TODO: accelerate using binary search
+    // TODO: make use of `search_range` etc.
+    let matches_query = |table_record: Expr| expr_eq(record_proj(table_record, "table_id"), Expr::U32(query_table_id));
+    let matching_tables = flat_map(lambda("table", expr_if_else(matches_query(var("table")), singleton(var("table")), seq_empty())), table_records);
+    expr_match(matching_tables,
+        [
+            (Pattern::Seq(vec![bind("match")]), expr_some(var("match"))),
+            (Pattern::Seq(vec![]), expr_none()),
+            // NOTE - we leave out a wildcard pattern here to signal that a multi-element match is not considered valid
+        ]
+    )
+}
+
+fn link_offset(sof_offset: Expr, table_offset: Expr, format: Format) -> Format {
+    let rel_offset = |sof_offset: Expr, here_offset: Expr, target_offset: Expr| -> Expr {
+        /*
+         * Here := here_offset (abs)
+         * SOF  := sof_offset (abs)
+         * Tgt  := target_offset (rel)
+         *
+         * We want to return X such that
+         *   Here (abs) + X (rel) == SOF (abs) + Tgt (rel)
+         * so we compute
+         *   X (rel) := SOF + Tgt - Here
+         */
+        relativize_offset(add(sof_offset, target_offset), here_offset)
+    };
+    chain(
+        Format::Pos,
+        "offset",
+        Format::WithRelativeOffset(
+            rel_offset(sof_offset, var("offset"), table_offset),
+            Box::new(format)
+        )
+    )
+}
+
+/// Converts an absolute offset (or, relative to SOF) into a relative offset
+/// given the absolute file-offset we are currently parsing from.
+fn relativize_offset(abs_offset: Expr, here: Expr) -> Expr {
+    sub(abs_offset, here)
+}
+
+/// Parse a format at a given (absolute) file offset
+fn link(abs_offset: Expr, format: Format) -> Format {
+    chain(
+        Format::Pos,
+        "__here",
+        Format::WithRelativeOffset(
+            relativize_offset(abs_offset, var("__here")),
+            Box::new(format)
+        )
+    )
+}
+
+fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
+    shadow_check(&base_offset, "offset");
+    record([
+        ("offset", base.u32be()),
+        ("link", if_then_else(is_nonzero_u32(var("offset")), link(add(base_offset, var("offset")), format), Format::EMPTY)),
+    ])
+}
+
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let tag = module.define_format(
@@ -30,6 +102,99 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("length", base.u32be()),
         ]),
     );
+
+    let table_type = module.get_format_type(table_record.get_level()).clone();
+
+    let table_links = {
+        fn required_table(sof_offset_var: &'static str, table_records_var: &'static str, id: u32, table_format: Format) -> Format {
+            Format::Let(
+                Label::Borrowed("matching_table"),
+                expr_unwrap(find_table(var(table_records_var), id)),
+                Box::new(link_offset(var(sof_offset_var), record_proj(var("matching_table"), "offset"), Format::Slice(record_proj(var("matching_table"), "length"), Box::new(table_format))))
+            )
+        }
+
+        fn required_table_with_len(sof_offset_var: &'static str, table_records_var: &'static str, id: u32, table_format: impl FnOnce(Expr) -> Format) -> Format {
+            Format::Let(
+                Label::Borrowed("matching_table"),
+                expr_unwrap(find_table(var(table_records_var), id)),
+                Box::new(link_offset(var(sof_offset_var), record_proj(var("matching_table"), "offset"), Format::Slice(record_proj(var("matching_table"), "length"), Box::new(table_format(record_proj(var("matching_table"), "length"))))))
+            )
+        }
+
+        fn optional_table(sof_offset_var: &'static str, table_records_var: &'static str, id: u32, table_format: Format) -> Format {
+            Format::Let(
+                Label::Borrowed("matching_table"),
+                find_table(var(table_records_var), id),
+                Box::new(Format::Match(
+                    var("matching_table"),
+                    vec![
+                        (pat_some(bind("table")), format_some(link_offset(var(sof_offset_var), record_proj(var("table"), "offset"), Format::Slice(record_proj(var("table"), "length"), Box::new(table_format))))),
+                        (pat_none(), format_none()),
+                    ]
+                ))
+            )
+        }
+
+        let encoding_id = |_platform_id: Expr| base.u16be();
+
+        let cmap_language_id = |_platform_id: Expr| base.u16be();
+
+        let small_glyph_id = base.u8();
+
+        // Format 0 : Byte encoding table
+        let cmap_subtable_format0 = module.define_format_args(
+            "opentype.cmap_subtable.format0",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            record([
+                ("length", base.u16be()),
+                ("language", cmap_language_id(var("platform"))),
+                ("glyph_id_array", repeat_count(Expr::U16(256), small_glyph_id)),
+            ])
+        );
+
+        let cmap_subtable = module.define_format_args(
+            "opentype.cmap_subtable",
+            vec![START_ARG, (Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            record([
+                ("table_start", Format::Pos),
+                ("format", base.u16be()),
+                ("data", Format::Match(var("format"), vec![
+                    (Pattern::U8(0), cmap_subtable_format0.call_args(vec![var("platform")])),
+                    // STUB - add remaining match-arms
+                ]))
+            ])
+        );
+
+        let encoding_record = module.define_format_args(
+            "opentype.encoding_record",
+            vec![START_ARG],
+            record([
+                ("platform", base.u16be()), // platform identifier
+                // NOTE - encoding_id nominally depends on platform_id but no recorded dependencies in fathom def
+                ("encoding", encoding_id(var("platform_id"))), // encoding identifier
+                ("subtable_offset", offset32(START_VAR, cmap_subtable.call_args(vec![var("platform")]), base)),
+            ]),
+        );
+
+        // character mapping table
+        let cmap_table = record([
+            ("table_start", Format::Pos), // start of character mapping table
+            ("version", base.u16be()), // version of the the character
+            ("num_tables", base.u16be()), // number of subsequent encoding tables
+            ("encoding_records", repeat_count(var("num_tables"), encoding_record.call_args(vec![var("table_start")]))),
+        ]);
+
+        module.define_format_args(
+            "opentype.table_directory.table_links",
+            vec![START_ARG, (Label::Borrowed("tables"), ValueType::Seq(Box::new(table_type)))],
+            record([
+                ("cmap", required_table("start", "tables", magic(b"cmap"), cmap_table)),
+                // STUB - add more tables
+                ("__skip", Format::SkipRemainder)
+            ])
+        )
+    };
 
     let table_directory = module.define_format_args(
         "opentype.table_directory",
@@ -57,7 +222,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     table_record.call_args(vec![var("start")]),
                 ),
             ),
-            // FIXME - stub! add `table_links`
+            ("table_links", table_links.call_args(vec![START_VAR, var("table_records")])),
         ]),
     );
 

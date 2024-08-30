@@ -522,6 +522,10 @@ pub fn is_nonzero_u16(expr: Expr) -> Expr {
     expr_ne(expr, Expr::U16(0))
 }
 
+/// Returns an Expr that evaluates to `true` if the given U32-typed expression is non-zero
+pub fn is_nonzero_u32(expr: Expr) -> Expr {
+    expr_ne(expr, Expr::U32(0))
+}
 /// Helper for constructing `Option::None` within the Expr model-language.
 pub const fn expr_none() -> Expr {
     Expr::LiftOption(None)
