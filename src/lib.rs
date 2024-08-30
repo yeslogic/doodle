@@ -2450,7 +2450,7 @@ impl<'a> TypeScope<'a> {
 
 #[cfg(test)]
 mod test {
-    use decoder::Program;
+    use decoder::Value;
 
     use super::*;
 
@@ -2461,18 +2461,24 @@ mod test {
             Expr::U8(10),
             Box::new(Format::Let(
                 Label::Borrowed("x"),
-                Expr::Var("y"),
+                Expr::Var(Label::Borrowed("y")),
                 Box::new(Format::Record(vec![
                     (Label::Borrowed("y"), Format::Compute(Expr::U8(5))),
-                    (Label::Borrowed("z"), Format::Compute(Expr::Var("x"))),
+                    (Label::Borrowed("z"), Format::Compute(Expr::Var(Label::Borrowed("x")))),
                 ])),
             )),
         );
         let mut module = FormatModule::new();
         let fref = module.define_format("test", fmt);
-        let prog = super::decoder::Compiler::compile_program(&module, &fref.call());
+        let prog = super::decoder::Compiler::compile_program(&module, &fref.call()).unwrap();
         let buf = ReadCtxt::new(&[]);
-        let ret = prog.run(buf).unwrap();
-        println!("ret: {ret:?}");
+        let (ret, _) = prog.run(buf).unwrap();
+        let expected = Value::Record(
+            vec![
+                (Label::Borrowed("y"), Value::U8(5)),
+                (Label::Borrowed("z"), Value::U8(10)),
+            ]
+        );
+        assert_eq!(expected, ret);
     }
 }

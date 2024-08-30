@@ -9,13 +9,18 @@ fn shadow_check(x: &Expr, name: &'static str) {
     }
 }
 
+/// Gets the current stream-position and casts down from U64->U32
+fn pos32() -> Format {
+    map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
+}
+
 // helper to turn b"..." literals into u32 at compile-time
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
 }
 
 const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
-const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U64));
+const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
 // FIXME - this is a crude approximation that could be improved with the right primitives in-hand
 fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
@@ -63,7 +68,7 @@ fn link_offset(sof_offset: Expr, table_offset: Expr, format: Format) -> Format {
         relativize_offset(add(sof_offset, target_offset), here_offset)
     };
     chain(
-        Format::Pos,
+        pos32(),
         "offset",
         Format::WithRelativeOffset(
             rel_offset(sof_offset, var("offset"), table_offset),
@@ -81,7 +86,7 @@ fn relativize_offset(abs_offset: Expr, here: Expr) -> Expr {
 /// Parse a format at a given (absolute) file offset
 fn link(abs_offset: Expr, format: Format) -> Format {
     chain(
-        Format::Pos,
+        pos32(),
         "__here",
         Format::WithRelativeOffset(
             relativize_offset(abs_offset, var("__here")),
@@ -98,8 +103,8 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
             "link",
             if_then_else(
                 is_nonzero_u32(var("offset")),
-                link(add(base_offset, var("offset")), format),
-                Format::EMPTY,
+                link(add(base_offset, var("offset")), format_some(format)),
+                format_none(),
             ),
         ),
     ])
@@ -129,7 +134,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
     let table_links = {
         fn required_table(
-            sof_offset_var: &'static str,
+            sof_offset32_vname: &'static str,
             table_records_var: &'static str,
             id: u32,
             table_format: Format,
@@ -138,7 +143,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 Label::Borrowed("matching_table"),
                 expr_unwrap(find_table(var(table_records_var), id)),
                 Box::new(link_offset(
-                    var(sof_offset_var),
+                    var(sof_offset32_vname),
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
                         record_proj(var("matching_table"), "length"),
@@ -219,12 +224,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
         let cmap_subtable = module.define_format_args(
             "opentype.cmap_subtable",
-            vec![
-                START_ARG,
-                (Label::Borrowed("platform"), ValueType::Base(BaseType::U16)),
-            ],
+            vec![ (Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
             record([
-                ("table_start", Format::Pos),
+                ("table_start", pos32()),
                 ("format", base.u16be()),
                 (
                     "data",
@@ -232,7 +234,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         var("format"),
                         vec![
                             (
-                                Pattern::U8(0),
+                                Pattern::U16(0),
                                 cmap_subtable_format0.call_args(vec![var("platform")]),
                             ),
                             // STUB - add remaining match-arms
@@ -248,7 +250,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             record([
                 ("platform", base.u16be()), // platform identifier
                 // NOTE - encoding_id nominally depends on platform_id but no recorded dependencies in fathom def
-                ("encoding", encoding_id(var("platform_id"))), // encoding identifier
+                ("encoding", encoding_id(var("platform"))), // encoding identifier
                 (
                     "subtable_offset",
                     offset32(
@@ -262,7 +264,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
         // character mapping table
         let cmap_table = record([
-            ("table_start", Format::Pos), // start of character mapping table
+            ("table_start", pos32()), // start of character mapping table
             ("version", base.u16be()),    // version of the the character
             ("num_tables", base.u16be()), // number of subsequent encoding tables
             (
@@ -334,7 +336,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         Format::SkipRemainder,
     );
 
-    let unknown_table = Format::SkipRemainder;
+    // NOTE - we have to fail to let text have its chance to parse
+    let unknown_table = Format::Fail;
 
     let opentype_font = module.define_format_args(
         "opentype.font",
@@ -371,7 +374,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     module.define_format(
         "opentype.main",
         record([
-            ("start", Format::Pos),
+            ("start", pos32()),
             ("font", opentype_font.call_args(vec![var("start")])),
         ]),
     )
