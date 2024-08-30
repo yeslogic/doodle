@@ -104,4 +104,23 @@ impl Pattern {
         self.build_scope(&mut pattern_scope, head_type);
         module.infer_format_type(&pattern_scope, format)
     }
+
+    /// Returns `true` if the pattern shadows the given name.
+    pub(crate) fn shadows(&self, name: &str) -> bool {
+        match self {
+            Pattern::Binding(n) => n == name,
+            Pattern::Wildcard => false,
+            Pattern::Bool(_)
+            | Pattern::U8(_)
+            | Pattern::U16(_)
+            | Pattern::U32(_)
+            | Pattern::U64(_)
+            | Pattern::Int(_)
+            | Pattern::Char(_) => false,
+            Pattern::Tuple(ts) => ts.iter().any(|p| p.shadows(name)),
+            Pattern::Variant(_, p) => p.shadows(name),
+            Pattern::Seq(ps) => ps.iter().any(|p| p.shadows(name)),
+            Pattern::Option(opt_p) => opt_p.as_ref().is_some_and(|p| p.shadows(name)),
+        }
+    }
 }
