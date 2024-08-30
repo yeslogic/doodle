@@ -671,7 +671,6 @@ pub fn left_fold(f: Expr, init: Expr, init_vt: ValueType, seq: Expr) -> Expr {
     Expr::LeftFold(Box::new(f), Box::new(init), init_vt, Box::new(seq))
 }
 
-
 /// Helper for constructing an `Expr::Seq` of length == 0
 pub const fn seq_empty() -> Expr {
     Expr::Seq(Vec::new())
