@@ -78,7 +78,7 @@ impl Pattern {
                     panic!("no {label} in {branches:?}");
                 }
             }
-            _ => panic!("pattern build_scope failed"),
+            (l, r) => panic!("pattern build_scope failed: ({l:?}, {r:?})"),
         }
     }
 
