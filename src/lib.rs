@@ -2464,7 +2464,10 @@ mod test {
                 Expr::Var(Label::Borrowed("y")),
                 Box::new(Format::Record(vec![
                     (Label::Borrowed("y"), Format::Compute(Expr::U8(5))),
-                    (Label::Borrowed("z"), Format::Compute(Expr::Var(Label::Borrowed("x")))),
+                    (
+                        Label::Borrowed("z"),
+                        Format::Compute(Expr::Var(Label::Borrowed("x"))),
+                    ),
                 ])),
             )),
         );
@@ -2473,12 +2476,10 @@ mod test {
         let prog = super::decoder::Compiler::compile_program(&module, &fref.call()).unwrap();
         let buf = ReadCtxt::new(&[]);
         let (ret, _) = prog.run(buf).unwrap();
-        let expected = Value::Record(
-            vec![
-                (Label::Borrowed("y"), Value::U8(5)),
-                (Label::Borrowed("z"), Value::U8(10)),
-            ]
-        );
+        let expected = Value::Record(vec![
+            (Label::Borrowed("y"), Value::U8(5)),
+            (Label::Borrowed("z"), Value::U8(10)),
+        ]);
         assert_eq!(expected, ret);
     }
 }

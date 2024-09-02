@@ -396,6 +396,14 @@ pub fn sub(x: Expr, y: Expr) -> Expr {
     Expr::Arith(Arith::Sub, Box::new(x), Box::new(y))
 }
 
+pub fn mul(x: Expr, y: Expr) -> Expr {
+    Expr::Arith(Arith::Mul, Box::new(x), Box::new(y))
+}
+
+pub fn div(x: Expr, y: Expr) -> Expr {
+    Expr::Arith(Arith::Div, Box::new(x), Box::new(y))
+}
+
 pub fn rem(x: Expr, y: Expr) -> Expr {
     Expr::Arith(Arith::Rem, Box::new(x), Box::new(y))
 }
@@ -684,4 +692,9 @@ pub fn singleton(value: Expr) -> Expr {
 /// Helper for constructing an `Expr::Tuple` of arity == 2
 pub fn pair(x: Expr, y: Expr) -> Expr {
     Expr::Tuple(vec![x, y])
+}
+
+/// Computes the larger of two given `Expr`s, left-biased if equal
+pub fn expr_max(a: Expr, b: Expr) -> Expr {
+    expr_if_else(expr_gte(a.clone(), b.clone()), a, b)
 }
