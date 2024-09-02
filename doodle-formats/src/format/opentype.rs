@@ -19,6 +19,29 @@ const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
 }
 
+// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option)
+fn subheader_index(seq: Expr) -> Expr {
+    // REVIEW - because of how narrow the use-case is, we might be able to use 0 as the init-accum value and avoid Option entirely
+    expr_unwrap(left_fold(
+        lambda_tuple(
+            ["acc", "y"],
+            expr_match(
+                var("acc"),
+                [
+                    (
+                        pat_some(bind("x")),
+                        expr_some(expr_max(var("x"), div(var("y"), Expr::U16(8)))),
+                    ),
+                    (pat_none(), expr_some(div(var("y"), Expr::U16(8)))),
+                ],
+            ),
+        ),
+        expr_none(),
+        ValueType::Option(Box::new(ValueType::Base(BaseType::U16))),
+        seq,
+    ))
+}
+
 const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
@@ -222,22 +245,85 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ]),
         );
 
+        // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
+        let i16be = base.u16be();
+
+        let subheader = record([
+            ("first_code", base.u16be()),
+            ("entry_count", base.u16be()),
+            ("id_delta", i16be),
+            ("id_range_offset", base.u16be()),
+        ]);
+
+        let format2_glyph_table_entries = |length: Expr, n_subheaders: Expr| -> Expr {
+            // Length = 3 x (Size(U16) := 2) + 256 x (Size(U16) := 2) + n_subheaders x (Size(SubHeader) := 4 x Size(U16) := 8) + GlyphTableBytes
+            // GlyphTableBytes = Length - (518 + n_subheaders * 8)
+            // GlyphTableEntries = GlyphTableBytes / 2 (must have no remainder)
+            sub(length, add(Expr::U16(518), mul(n_subheaders, Expr::U16(8))))
+        };
+
+        // Format 2: High-byte mapping through table
+        let cmap_subtable_format2 = module.define_format_args(
+            "opentype.cmap_subtable.format2",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            record([
+                (
+                    "length",
+                    where_lambda(
+                        base.u16be(),
+                        "l",
+                        and(
+                            // NOTE - strictly speaking we don't expect length == 518 exactly, but this is a rough check
+                            expr_gte(var("l"), Expr::U16(518)),
+                            // NOTE - all fields are entirely comprised of 16-bit tokens, so overall length must be a multiple of 2
+                            expr_eq(rem(var("l"), Expr::U16(2)), Expr::U16(0)),
+                        ),
+                    ),
+                ),
+                ("language", cmap_language_id(var("platform"))),
+                (
+                    "sub_header_keys",
+                    repeat_count(Expr::U16(256), base.u16be()),
+                ),
+                (
+                    "__n_subheaders",
+                    Format::Compute(add(Expr::U16(1), subheader_index(var("sub_header_keys")))),
+                ),
+                (
+                    "sub_headers",
+                    repeat_count(var("__n_subheaders"), subheader),
+                ),
+                (
+                    "glyph_array",
+                    repeat_count(
+                        format2_glyph_table_entries(var("length"), var("__n_subheaders")),
+                        base.u16be(),
+                    ),
+                ),
+            ]),
+        );
+
         let cmap_subtable = module.define_format_args(
             "opentype.cmap_subtable",
-            vec![ (Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
             record([
                 ("table_start", pos32()),
                 ("format", base.u16be()),
                 (
                     "data",
-                    Format::Match(
+                    match_variant(
                         var("format"),
-                        vec![
+                        [
                             (
                                 Pattern::U16(0),
+                                "Format0",
                                 cmap_subtable_format0.call_args(vec![var("platform")]),
                             ),
-                            // STUB - add remaining match-arms
+                            (
+                                Pattern::U16(2),
+                                "Format2",
+                                cmap_subtable_format2.call_args(vec![var("platform")]),
+                            ), // STUB - add remaining match-arms
                         ],
                     ),
                 ),
@@ -264,7 +350,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
         // character mapping table
         let cmap_table = record([
-            ("table_start", pos32()), // start of character mapping table
+            ("table_start", pos32()),     // start of character mapping table
             ("version", base.u16be()),    // version of the the character
             ("num_tables", base.u16be()), // number of subsequent encoding tables
             (

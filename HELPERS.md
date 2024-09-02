@@ -1,11 +1,6 @@
 # Helper Function Definitions
 
 ```rust
-/// Computes the larger of two given `Expr`s, left-biased if equal
-pub fn expr_max(a: Expr, b: Expr) -> Expr {
-    expr_if_else(expr_gte(a.clone(), b.clone()), a, b)
-}
-
 /// Returns whichever of two pair-typed values has a larger first element, left-biased if equal
 pub fn expr_max_keyval(a: Expr, b: Expr) -> Expr {
     expr_if_else(
