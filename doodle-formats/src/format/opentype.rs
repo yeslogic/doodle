@@ -1,6 +1,6 @@
 use crate::format::BaseModule;
 use doodle::prelude::ByteSet;
-use doodle::{helper::*, Expr, Label};
+use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
 fn shadow_check(x: &Expr, name: &'static str) {
@@ -17,6 +17,35 @@ fn pos32() -> Format {
 // helper to turn b"..." literals into u32 at compile-time
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
+}
+
+fn slice_record<Name, const N: usize>(
+    length_field: &'static str,
+    fields: [(Name, Format); N],
+) -> Format
+where
+    Name: IntoLabel + Clone + AsRef<str>,
+{
+    let mut prefix = Vec::new();
+    let mut full = Vec::with_capacity(fields.len());
+
+    let mut prefix_done = false;
+
+    for (name, format) in fields.into_iter() {
+        if !prefix_done {
+            prefix.push((name.clone(), format.clone()));
+            if name.as_ref() == length_field {
+                prefix_done = true;
+            }
+        }
+        full.push((name, format));
+    }
+
+    chain(
+        Format::Peek(Box::new(record(prefix))),
+        "x",
+        Format::Slice(record_proj(var("x"), length_field), Box::new(record(full))),
+    )
 }
 
 // Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option)
@@ -235,14 +264,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let cmap_subtable_format0 = module.define_format_args(
             "opentype.cmap_subtable.format0",
             vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            record([
-                ("length", base.u16be()),
-                ("language", cmap_language_id(var("platform"))),
-                (
-                    "glyph_id_array",
-                    repeat_count(Expr::U16(256), small_glyph_id),
-                ),
-            ]),
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()), // == 0
+                    ("length", base.u16be()),
+                    ("language", cmap_language_id(var("platform"))),
+                    (
+                        "glyph_id_array",
+                        repeat_count(Expr::U16(256), small_glyph_id),
+                    ),
+                ],
+            ),
         );
 
         // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
@@ -255,52 +288,97 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("id_range_offset", base.u16be()),
         ]);
 
-        let format2_glyph_table_entries = |length: Expr, n_subheaders: Expr| -> Expr {
-            // Length = 3 x (Size(U16) := 2) + 256 x (Size(U16) := 2) + n_subheaders x (Size(SubHeader) := 4 x Size(U16) := 8) + GlyphTableBytes
-            // GlyphTableBytes = Length - (518 + n_subheaders * 8)
-            // GlyphTableEntries = GlyphTableBytes / 2 (must have no remainder)
-            sub(length, add(Expr::U16(518), mul(n_subheaders, Expr::U16(8))))
-        };
-
         // Format 2: High-byte mapping through table
         let cmap_subtable_format2 = module.define_format_args(
             "opentype.cmap_subtable.format2",
             vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            record([
-                (
-                    "length",
-                    where_lambda(
-                        base.u16be(),
-                        "l",
-                        and(
-                            // NOTE - strictly speaking we don't expect length == 518 exactly, but this is a rough check
-                            expr_gte(var("l"), Expr::U16(518)),
-                            // NOTE - all fields are entirely comprised of 16-bit tokens, so overall length must be a multiple of 2
-                            expr_eq(rem(var("l"), Expr::U16(2)), Expr::U16(0)),
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()), // == 2
+                    (
+                        "length",
+                        where_lambda(
+                            base.u16be(),
+                            "l",
+                            and(
+                                // NOTE - strictly speaking we don't expect length == 518 exactly, but this is a rough check
+                                expr_gte(var("l"), Expr::U16(518)),
+                                // NOTE - all fields are entirely comprised of 16-bit tokens, so overall length must be a multiple of 2
+                                expr_eq(rem(var("l"), Expr::U16(2)), Expr::U16(0)),
+                            ),
                         ),
                     ),
-                ),
-                ("language", cmap_language_id(var("platform"))),
-                (
-                    "sub_header_keys",
-                    repeat_count(Expr::U16(256), base.u16be()),
-                ),
-                (
-                    "__n_subheaders",
-                    Format::Compute(add(Expr::U16(1), subheader_index(var("sub_header_keys")))),
-                ),
-                (
-                    "sub_headers",
-                    repeat_count(var("__n_subheaders"), subheader),
-                ),
-                (
-                    "glyph_array",
-                    repeat_count(
-                        format2_glyph_table_entries(var("length"), var("__n_subheaders")),
-                        base.u16be(),
+                    ("language", cmap_language_id(var("platform"))),
+                    (
+                        "sub_header_keys",
+                        repeat_count(Expr::U16(256), base.u16be()),
                     ),
-                ),
-            ]),
+                    (
+                        "sub_headers",
+                        repeat_count(
+                            add(Expr::U16(1), subheader_index(var("sub_header_keys"))),
+                            subheader,
+                        ),
+                    ),
+                    ("glyph_array", repeat(base.u16be())),
+                ],
+            ),
+        );
+
+        // # Format 4: Segment mapping to delta values
+        let cmap_subtable_format4 = module.define_format_args(
+            "opentype.cmap_subtable.format4",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()), // == 4
+                    ("length", base.u16be()),
+                    ("language", cmap_language_id(var("platform"))),
+                    (
+                        "seg_count",
+                        map(
+                            base.u16be(),
+                            lambda("seg_count_x2", div(var("seg_count_x2"), Expr::U16(2))),
+                        ),
+                    ),
+                    ("search_range", base.u16be()), // := 2x the maximum power of 2 <= seg_count
+                    ("entry_selector", base.u16be()), // := ilog2(seg_count)
+                    ("range_shift", base.u16be()),  // := seg_count * 2 - search_range
+                    ("end_code", repeat_count(var("seg_count"), base.u16be())), // end charcode for each seg, last is 0xFFFF
+                    (
+                        "__reserved_pad",
+                        where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(0))),
+                    ), // should be equal to 0
+                    ("start_code", repeat_count(var("seg_count"), base.u16be())),
+                    ("id_delta", repeat_count(var("seg_count"), base.u16be())), // ought to be signed but will work if we perform as unsigned addition mod-0xFFFF
+                    (
+                        "id_range_offset",
+                        repeat_count(var("seg_count"), base.u16be()),
+                    ), // offsets into glyphIdArray or 0
+                    ("glyph_array", repeat(base.u16be())),
+                ],
+            ),
+        );
+
+        let cmap_subtable_format6 = module.define_format_args(
+            "opentype.cmap_subtable.format6",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()), // == 6
+                    ("length", base.u16be()),
+                    ("language", cmap_language_id(var("platform"))),
+                    ("first_code", base.u16be()),
+                    ("entry_count", base.u16be()),
+                    (
+                        "glyph_id_array",
+                        repeat_count(var("entry_count"), base.u16be()),
+                    ),
+                ],
+            ),
         );
 
         let cmap_subtable = module.define_format_args(
@@ -308,7 +386,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
             record([
                 ("table_start", pos32()),
-                ("format", base.u16be()),
+                ("format", Format::Peek(Box::new(base.u16be()))),
                 (
                     "data",
                     match_variant(
@@ -323,6 +401,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 Pattern::U16(2),
                                 "Format2",
                                 cmap_subtable_format2.call_args(vec![var("platform")]),
+                            ),
+                            (
+                                Pattern::U16(4),
+                                "Format4",
+                                cmap_subtable_format4.call_args(vec![var("platform")]),
+                            ),
+                            (
+                                Pattern::U16(6),
+                                "Format6",
+                                cmap_subtable_format6.call_args(vec![var("platform")]),
                             ), // STUB - add remaining match-arms
                         ],
                     ),
