@@ -19,6 +19,17 @@ const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
 }
 
+fn reserved_u16be() -> Format {
+    map(
+        where_lambda(
+            tuple_repeat(2, Format::Byte(ByteSet::full())),
+            "x",
+            expr_eq(Expr::U16Be(Box::new(var("x"))), Expr::U16(0)),
+        ),
+        lambda("_", Expr::UNIT),
+    )
+}
+
 fn slice_record<Name, const N: usize>(
     length_field: &'static str,
     fields: [(Name, Format); N],
@@ -256,7 +267,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
         let encoding_id = |_platform_id: Expr| base.u16be();
 
-        let cmap_language_id = |_platform_id: Expr| base.u16be();
+        let cmap_language_id = |_platform: Expr| base.u16be();
+        let cmap_language_id32 = |_platform: Expr| base.u32be();
 
         let small_glyph_id = base.u8();
 
@@ -347,10 +359,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("entry_selector", base.u16be()), // := ilog2(seg_count)
                     ("range_shift", base.u16be()),  // := seg_count * 2 - search_range
                     ("end_code", repeat_count(var("seg_count"), base.u16be())), // end charcode for each seg, last is 0xFFFF
-                    (
-                        "__reserved_pad",
-                        where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(0))),
-                    ), // should be equal to 0
+                    ("__reserved_pad", reserved_u16be()),
                     ("start_code", repeat_count(var("seg_count"), base.u16be())),
                     ("id_delta", repeat_count(var("seg_count"), base.u16be())), // ought to be signed but will work if we perform as unsigned addition mod-0xFFFF
                     (
@@ -376,6 +385,33 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         "glyph_id_array",
                         repeat_count(var("entry_count"), base.u16be()),
+                    ),
+                ],
+            ),
+        );
+
+        let sequential_map_group = record([
+            ("start_char_code", base.u32be()),
+            ("end_char_code", base.u32be()),
+            ("start_glyph_id", base.u32be()),
+        ]);
+
+        let cmap_subtable_format8 = module.define_format_args(
+            "opentype.cmap_subtable.format8",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()), // == 8
+                    ("__reserved", reserved_u16be()),
+                    ("length", base.u32be()),
+                    ("language", cmap_language_id32(var("platform"))),
+                    // REVIEW - should this be 8x as long and consist of bits?
+                    ("is32", repeat_count(Expr::U16(8192), base.u8())), // packed bit-array where a bit at index `i` signals whether the 16-bit value index `i` is the start of a 32-bit character code
+                    ("num_groups", base.u32be()),
+                    (
+                        "groups",
+                        repeat_count(var("num_groups"), sequential_map_group),
                     ),
                 ],
             ),
@@ -411,7 +447,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 Pattern::U16(6),
                                 "Format6",
                                 cmap_subtable_format6.call_args(vec![var("platform")]),
-                            ), // STUB - add remaining match-arms
+                            ),
+                            (
+                                Pattern::U16(8),
+                                "Format8",
+                                cmap_subtable_format8.call_args(vec![var("platform")]),
+                            ),
                         ],
                     ),
                 ),
