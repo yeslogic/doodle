@@ -14,6 +14,18 @@ fn pos32() -> Format {
     map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
 }
 
+fn u24be(base: &BaseModule) -> Format {
+    map(
+        Format::Tuple(vec![
+            Format::Compute(Expr::U8(0)),
+            base.u8(),
+            base.u8(),
+            base.u8(),
+        ]),
+        lambda("x", Expr::U32Be(Box::new(var("x")))),
+    )
+}
+
 // helper to turn b"..." literals into u32 at compile-time
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
@@ -390,11 +402,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
         );
 
-        let sequential_map_group = record([
-            ("start_char_code", base.u32be()),
-            ("end_char_code", base.u32be()),
-            ("start_glyph_id", base.u32be()),
-        ]);
+        let sequential_map_group = module.define_format(
+            "opentype.types.sequential_map_record",
+            record([
+                ("start_char_code", base.u32be()),
+                ("end_char_code", base.u32be()),
+                ("start_glyph_id", base.u32be()),
+            ]),
+        );
 
         let cmap_subtable_format8 = module.define_format_args(
             "opentype.cmap_subtable.format8",
@@ -411,7 +426,132 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("num_groups", base.u32be()),
                     (
                         "groups",
-                        repeat_count(var("num_groups"), sequential_map_group),
+                        repeat_count(var("num_groups"), sequential_map_group.call()),
+                    ),
+                ],
+            ),
+        );
+
+        let cmap_subtable_format10 = module.define_format_args(
+            "opentype.cmap_subtable.format10",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()),
+                    ("__reserved", reserved_u16be()),
+                    ("length", base.u32be()),
+                    ("language", cmap_language_id32(var("platform"))),
+                    ("start_char_code", base.u32be()),
+                    ("num_chars", base.u32be()),
+                    (
+                        "glyph_id_array",
+                        repeat_count(var("num_chars"), base.u16be()),
+                    ),
+                ],
+            ),
+        );
+
+        let cmap_subtable_format12 = module.define_format_args(
+            "opentype.cmap_subtable.format12",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()),
+                    ("__reserved", reserved_u16be()),
+                    ("length", base.u32be()),
+                    ("language", cmap_language_id32(var("platform"))),
+                    ("num_groups", base.u32be()),
+                    (
+                        "groups",
+                        repeat_count(var("num_groups"), sequential_map_group.call()),
+                    ),
+                ],
+            ),
+        );
+
+        let constant_map_group = sequential_map_group.call();
+
+        let cmap_subtable_format13 = module.define_format_args(
+            "opentype.cmap_subtable.format13",
+            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()),
+                    ("__reserved", reserved_u16be()),
+                    ("length", base.u32be()),
+                    ("language", cmap_language_id32(var("platform"))),
+                    ("num_groups", base.u32be()),
+                    (
+                        "groups",
+                        repeat_count(var("num_groups"), constant_map_group),
+                    ),
+                ],
+            ),
+        );
+
+        let unicode_range = record([
+            ("start_unicode_value", u24be(base)),
+            ("additional_count", base.u8()),
+        ]);
+
+        let uvs_mapping = record([("unicode_value", u24be(base)), ("glyph_id", base.u16be())]);
+
+        let default_uvs_table = record([
+            ("num_unicode_value_ranges", base.u32be()),
+            (
+                "ranges",
+                repeat_count(var("num_unicode_value_ranges"), unicode_range),
+            ),
+        ]);
+
+        let non_default_uvs_table = record([
+            ("num_uvs_mappings", base.u32be()),
+            (
+                "uvs_mappings",
+                repeat_count(var("num_uvs_mappings"), uvs_mapping),
+            ),
+        ]);
+
+        let variation_selector = module.define_format_args(
+            "opentype.variation_selector",
+            vec![(
+                Label::Borrowed("table_start"),
+                ValueType::Base(BaseType::U32),
+            )],
+            record([
+                ("var_selector", u24be(base)),
+                (
+                    "default_uvs_offset",
+                    offset32(var("table_start"), default_uvs_table, base),
+                ),
+                (
+                    "non_default_uvs_offset",
+                    offset32(var("table_start"), non_default_uvs_table, base),
+                ),
+            ]),
+        );
+
+        let cmap_subtable_format14 = module.define_format_args(
+            "opentype.cmap_subtable.format14",
+            vec![(
+                Label::Borrowed("table_start"),
+                ValueType::Base(BaseType::U32),
+            )],
+            slice_record(
+                "length",
+                [
+                    ("format", base.u16be()),
+                    ("length", base.u32be()),
+                    ("num_var_selector_records", base.u32be()),
+                    (
+                        "var_selector",
+                        repeat_count(
+                            var("num_var_selector_records"),
+                            variation_selector.call_args(vec![var("table_start")]),
+                        ),
                     ),
                 ],
             ),
@@ -453,6 +593,27 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 "Format8",
                                 cmap_subtable_format8.call_args(vec![var("platform")]),
                             ),
+                            (
+                                Pattern::U16(10),
+                                "Format10",
+                                cmap_subtable_format10.call_args(vec![var("platform")]),
+                            ),
+                            (
+                                Pattern::U16(12),
+                                "Format12",
+                                cmap_subtable_format12.call_args(vec![var("platform")]),
+                            ),
+                            (
+                                Pattern::U16(13),
+                                "Format13",
+                                cmap_subtable_format13.call_args(vec![var("platform")]),
+                            ),
+                            (
+                                Pattern::U16(14),
+                                "Format14",
+                                cmap_subtable_format14.call_args(vec![var("table_start")]),
+                            ),
+                            // FIXME - leaving out unknown-table for now
                         ],
                     ),
                 ),
