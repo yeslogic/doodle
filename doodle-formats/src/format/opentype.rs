@@ -14,6 +14,27 @@ fn pos32() -> Format {
     map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
 }
 
+/// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
+fn fixed32be(base: &BaseModule) -> Format {
+    map(
+        base.u32be(),
+        lambda(
+            "x",
+            Expr::Variant(Label::Borrowed("Fixed32"), Box::new(var("x"))),
+        ),
+    )
+}
+
+/// FIXME - scaffolding to signal intent to use i16 format before it is implemented
+fn s16be(base: &BaseModule) -> Format {
+    base.u16be()
+}
+
+/// FIXME - scaffolding to signal intent to use i64 format before it is implemented
+fn s64be(base: &BaseModule) -> Format {
+    base.u64be()
+}
+
 fn u24be(base: &BaseModule) -> Format {
     map(
         Format::Tuple(vec![
@@ -31,15 +52,9 @@ const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
 }
 
-fn reserved_u16be() -> Format {
-    map(
-        where_lambda(
-            tuple_repeat(2, Format::Byte(ByteSet::full())),
-            "x",
-            expr_eq(Expr::U16Be(Box::new(var("x"))), Expr::U16(0)),
-        ),
-        lambda("_", Expr::UNIT),
-    )
+/// Parses a `U16Be` value that is expected to be equal to `val`
+fn expect_u16be(base: &BaseModule, val: u16) -> Format {
+    where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
 }
 
 fn slice_record<Name, const N: usize>(
@@ -277,380 +292,466 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         }
 
-        let encoding_id = |_platform_id: Expr| base.u16be();
-
-        let cmap_language_id = |_platform: Expr| base.u16be();
-        let cmap_language_id32 = |_platform: Expr| base.u32be();
-
-        let small_glyph_id = base.u8();
-
-        // Format 0 : Byte encoding table
-        let cmap_subtable_format0 = module.define_format_args(
-            "opentype.cmap_subtable.format0",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()), // == 0
-                    ("length", base.u16be()),
-                    ("language", cmap_language_id(var("platform"))),
-                    (
-                        "glyph_id_array",
-                        repeat_count(Expr::U16(256), small_glyph_id),
-                    ),
-                ],
-            ),
-        );
-
-        // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
-        let i16be = base.u16be();
-
-        let subheader = record([
-            ("first_code", base.u16be()),
-            ("entry_count", base.u16be()),
-            ("id_delta", i16be),
-            ("id_range_offset", base.u16be()),
-        ]);
-
-        // Format 2: High-byte mapping through table
-        let cmap_subtable_format2 = module.define_format_args(
-            "opentype.cmap_subtable.format2",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()), // == 2
-                    (
-                        "length",
-                        where_lambda(
-                            base.u16be(),
-                            "l",
-                            and(
-                                // NOTE - strictly speaking we don't expect length == 518 exactly, but this is a rough check
-                                expr_gte(var("l"), Expr::U16(518)),
-                                // NOTE - all fields are entirely comprised of 16-bit tokens, so overall length must be a multiple of 2
-                                expr_eq(rem(var("l"), Expr::U16(2)), Expr::U16(0)),
-                            ),
-                        ),
-                    ),
-                    ("language", cmap_language_id(var("platform"))),
-                    (
-                        "sub_header_keys",
-                        repeat_count(Expr::U16(256), base.u16be()),
-                    ),
-                    (
-                        "sub_headers",
-                        repeat_count(
-                            add(Expr::U16(1), subheader_index(var("sub_header_keys"))),
-                            subheader,
-                        ),
-                    ),
-                    ("glyph_array", repeat(base.u16be())),
-                ],
-            ),
-        );
-
-        // # Format 4: Segment mapping to delta values
-        let cmap_subtable_format4 = module.define_format_args(
-            "opentype.cmap_subtable.format4",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()), // == 4
-                    ("length", base.u16be()),
-                    ("language", cmap_language_id(var("platform"))),
-                    (
-                        "seg_count",
-                        map(
-                            base.u16be(),
-                            lambda("seg_count_x2", div(var("seg_count_x2"), Expr::U16(2))),
-                        ),
-                    ),
-                    ("search_range", base.u16be()), // := 2x the maximum power of 2 <= seg_count
-                    ("entry_selector", base.u16be()), // := ilog2(seg_count)
-                    ("range_shift", base.u16be()),  // := seg_count * 2 - search_range
-                    ("end_code", repeat_count(var("seg_count"), base.u16be())), // end charcode for each seg, last is 0xFFFF
-                    ("__reserved_pad", reserved_u16be()),
-                    ("start_code", repeat_count(var("seg_count"), base.u16be())),
-                    ("id_delta", repeat_count(var("seg_count"), base.u16be())), // ought to be signed but will work if we perform as unsigned addition mod-0xFFFF
-                    (
-                        "id_range_offset",
-                        repeat_count(var("seg_count"), base.u16be()),
-                    ), // offsets into glyphIdArray or 0
-                    ("glyph_array", repeat(base.u16be())),
-                ],
-            ),
-        );
-
-        let cmap_subtable_format6 = module.define_format_args(
-            "opentype.cmap_subtable.format6",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()), // == 6
-                    ("length", base.u16be()),
-                    ("language", cmap_language_id(var("platform"))),
-                    ("first_code", base.u16be()),
-                    ("entry_count", base.u16be()),
-                    (
-                        "glyph_id_array",
-                        repeat_count(var("entry_count"), base.u16be()),
-                    ),
-                ],
-            ),
-        );
-
-        let sequential_map_group = module.define_format(
-            "opentype.types.sequential_map_record",
-            record([
-                ("start_char_code", base.u32be()),
-                ("end_char_code", base.u32be()),
-                ("start_glyph_id", base.u32be()),
-            ]),
-        );
-
-        let cmap_subtable_format8 = module.define_format_args(
-            "opentype.cmap_subtable.format8",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()), // == 8
-                    ("__reserved", reserved_u16be()),
-                    ("length", base.u32be()),
-                    ("language", cmap_language_id32(var("platform"))),
-                    // REVIEW - should this be 8x as long and consist of bits?
-                    ("is32", repeat_count(Expr::U16(8192), base.u8())), // packed bit-array where a bit at index `i` signals whether the 16-bit value index `i` is the start of a 32-bit character code
-                    ("num_groups", base.u32be()),
-                    (
-                        "groups",
-                        repeat_count(var("num_groups"), sequential_map_group.call()),
-                    ),
-                ],
-            ),
-        );
-
-        let cmap_subtable_format10 = module.define_format_args(
-            "opentype.cmap_subtable.format10",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()),
-                    ("__reserved", reserved_u16be()),
-                    ("length", base.u32be()),
-                    ("language", cmap_language_id32(var("platform"))),
-                    ("start_char_code", base.u32be()),
-                    ("num_chars", base.u32be()),
-                    (
-                        "glyph_id_array",
-                        repeat_count(var("num_chars"), base.u16be()),
-                    ),
-                ],
-            ),
-        );
-
-        let cmap_subtable_format12 = module.define_format_args(
-            "opentype.cmap_subtable.format12",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()),
-                    ("__reserved", reserved_u16be()),
-                    ("length", base.u32be()),
-                    ("language", cmap_language_id32(var("platform"))),
-                    ("num_groups", base.u32be()),
-                    (
-                        "groups",
-                        repeat_count(var("num_groups"), sequential_map_group.call()),
-                    ),
-                ],
-            ),
-        );
-
-        let constant_map_group = sequential_map_group.call();
-
-        let cmap_subtable_format13 = module.define_format_args(
-            "opentype.cmap_subtable.format13",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()),
-                    ("__reserved", reserved_u16be()),
-                    ("length", base.u32be()),
-                    ("language", cmap_language_id32(var("platform"))),
-                    ("num_groups", base.u32be()),
-                    (
-                        "groups",
-                        repeat_count(var("num_groups"), constant_map_group),
-                    ),
-                ],
-            ),
-        );
-
-        let unicode_range = record([
-            ("start_unicode_value", u24be(base)),
-            ("additional_count", base.u8()),
-        ]);
-
-        let uvs_mapping = record([("unicode_value", u24be(base)), ("glyph_id", base.u16be())]);
-
-        let default_uvs_table = record([
-            ("num_unicode_value_ranges", base.u32be()),
-            (
-                "ranges",
-                repeat_count(var("num_unicode_value_ranges"), unicode_range),
-            ),
-        ]);
-
-        let non_default_uvs_table = record([
-            ("num_uvs_mappings", base.u32be()),
-            (
-                "uvs_mappings",
-                repeat_count(var("num_uvs_mappings"), uvs_mapping),
-            ),
-        ]);
-
-        let variation_selector = module.define_format_args(
-            "opentype.variation_selector",
-            vec![(
-                Label::Borrowed("table_start"),
-                ValueType::Base(BaseType::U32),
-            )],
-            record([
-                ("var_selector", u24be(base)),
-                (
-                    "default_uvs_offset",
-                    offset32(var("table_start"), default_uvs_table, base),
-                ),
-                (
-                    "non_default_uvs_offset",
-                    offset32(var("table_start"), non_default_uvs_table, base),
-                ),
-            ]),
-        );
-
-        let cmap_subtable_format14 = module.define_format_args(
-            "opentype.cmap_subtable.format14",
-            vec![(
-                Label::Borrowed("table_start"),
-                ValueType::Base(BaseType::U32),
-            )],
-            slice_record(
-                "length",
-                [
-                    ("format", base.u16be()),
-                    ("length", base.u32be()),
-                    ("num_var_selector_records", base.u32be()),
-                    (
-                        "var_selector",
-                        repeat_count(
-                            var("num_var_selector_records"),
-                            variation_selector.call_args(vec![var("table_start")]),
-                        ),
-                    ),
-                ],
-            ),
-        );
-
-        let cmap_subtable = module.define_format_args(
-            "opentype.cmap_subtable",
-            vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
-            record([
-                ("table_start", pos32()),
-                ("format", Format::Peek(Box::new(base.u16be()))),
-                (
-                    "data",
-                    match_variant(
-                        var("format"),
-                        [
-                            (
-                                Pattern::U16(0),
-                                "Format0",
-                                cmap_subtable_format0.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(2),
-                                "Format2",
-                                cmap_subtable_format2.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(4),
-                                "Format4",
-                                cmap_subtable_format4.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(6),
-                                "Format6",
-                                cmap_subtable_format6.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(8),
-                                "Format8",
-                                cmap_subtable_format8.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(10),
-                                "Format10",
-                                cmap_subtable_format10.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(12),
-                                "Format12",
-                                cmap_subtable_format12.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(13),
-                                "Format13",
-                                cmap_subtable_format13.call_args(vec![var("platform")]),
-                            ),
-                            (
-                                Pattern::U16(14),
-                                "Format14",
-                                cmap_subtable_format14.call_args(vec![var("table_start")]),
-                            ),
-                            // FIXME - leaving out unknown-table for now
-                        ],
-                    ),
-                ),
-            ]),
-        );
-
-        let encoding_record = module.define_format_args(
-            "opentype.encoding_record",
-            vec![START_ARG],
-            record([
-                ("platform", base.u16be()), // platform identifier
-                // NOTE - encoding_id nominally depends on platform_id but no recorded dependencies in fathom def
-                ("encoding", encoding_id(var("platform"))), // encoding identifier
-                (
-                    "subtable_offset",
-                    offset32(
-                        START_VAR,
-                        cmap_subtable.call_args(vec![var("platform")]),
-                        base,
-                    ),
-                ),
-            ]),
-        );
-
         // character mapping table
-        let cmap_table = record([
-            ("table_start", pos32()),     // start of character mapping table
-            ("version", base.u16be()),    // version of the the character
-            ("num_tables", base.u16be()), // number of subsequent encoding tables
-            (
-                "encoding_records",
-                repeat_count(
-                    var("num_tables"),
-                    encoding_record.call_args(vec![var("table_start")]),
+        let cmap_table = {
+            let encoding_id = |_platform_id: Expr| base.u16be();
+
+            let cmap_language_id = |_platform: Expr| base.u16be();
+            let cmap_language_id32 = |_platform: Expr| base.u32be();
+
+            let small_glyph_id = base.u8();
+
+            // Format 0 : Byte encoding table
+            let cmap_subtable_format0 = module.define_format_args(
+                "opentype.cmap_subtable.format0",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", base.u16be()), // == 0
+                        ("length", base.u16be()),
+                        ("language", cmap_language_id(var("platform"))),
+                        (
+                            "glyph_id_array",
+                            repeat_count(Expr::U16(256), small_glyph_id),
+                        ),
+                    ],
                 ),
-            ),
-        ]);
+            );
+
+            // FIXME - this is actually a signed 16-bit value but we don't support that; it can be unsigned as long as we do the right wrapping addition
+
+            let subheader = record([
+                ("first_code", base.u16be()),
+                ("entry_count", base.u16be()),
+                ("id_delta", s16be(base)),
+                ("id_range_offset", base.u16be()),
+            ]);
+
+            // Format 2: High-byte mapping through table
+            let cmap_subtable_format2 = module.define_format_args(
+                "opentype.cmap_subtable.format2",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 2)),
+                        (
+                            "length",
+                            where_lambda(
+                                base.u16be(),
+                                "l",
+                                and(
+                                    // NOTE - strictly speaking we don't expect length == 518 exactly, but this is a rough check
+                                    expr_gte(var("l"), Expr::U16(518)),
+                                    // NOTE - all fields are entirely comprised of 16-bit tokens, so overall length must be a multiple of 2
+                                    expr_eq(rem(var("l"), Expr::U16(2)), Expr::U16(0)),
+                                ),
+                            ),
+                        ),
+                        ("language", cmap_language_id(var("platform"))),
+                        (
+                            "sub_header_keys",
+                            repeat_count(Expr::U16(256), base.u16be()),
+                        ),
+                        (
+                            "sub_headers",
+                            repeat_count(
+                                add(Expr::U16(1), subheader_index(var("sub_header_keys"))),
+                                subheader,
+                            ),
+                        ),
+                        ("glyph_array", repeat(base.u16be())),
+                    ],
+                ),
+            );
+
+            // # Format 4: Segment mapping to delta values
+            let cmap_subtable_format4 = module.define_format_args(
+                "opentype.cmap_subtable.format4",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 4)),
+                        ("length", base.u16be()),
+                        ("language", cmap_language_id(var("platform"))),
+                        (
+                            "seg_count",
+                            map(
+                                base.u16be(),
+                                lambda("seg_count_x2", div(var("seg_count_x2"), Expr::U16(2))),
+                            ),
+                        ),
+                        ("search_range", base.u16be()), // := 2x the maximum power of 2 <= seg_count
+                        ("entry_selector", base.u16be()), // := ilog2(seg_count)
+                        ("range_shift", base.u16be()),  // := seg_count * 2 - search_range
+                        ("end_code", repeat_count(var("seg_count"), base.u16be())), // end charcode for each seg, last is 0xFFFF
+                        ("__reserved_pad", expect_u16be(base, 0)),
+                        ("start_code", repeat_count(var("seg_count"), base.u16be())),
+                        ("id_delta", repeat_count(var("seg_count"), base.u16be())), // ought to be signed but will work if we perform as unsigned addition mod-0xFFFF
+                        (
+                            "id_range_offset",
+                            repeat_count(var("seg_count"), base.u16be()),
+                        ), // offsets into glyphIdArray or 0
+                        ("glyph_array", repeat(base.u16be())),
+                    ],
+                ),
+            );
+
+            let cmap_subtable_format6 = module.define_format_args(
+                "opentype.cmap_subtable.format6",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 6)),
+                        ("length", base.u16be()),
+                        ("language", cmap_language_id(var("platform"))),
+                        ("first_code", base.u16be()),
+                        ("entry_count", base.u16be()),
+                        (
+                            "glyph_id_array",
+                            repeat_count(var("entry_count"), base.u16be()),
+                        ),
+                    ],
+                ),
+            );
+
+            let sequential_map_group = module.define_format(
+                "opentype.types.sequential_map_record",
+                record([
+                    ("start_char_code", base.u32be()),
+                    ("end_char_code", base.u32be()),
+                    ("start_glyph_id", base.u32be()),
+                ]),
+            );
+
+            let cmap_subtable_format8 = module.define_format_args(
+                "opentype.cmap_subtable.format8",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 8)),
+                        ("__reserved", expect_u16be(base, 0)),
+                        ("length", base.u32be()),
+                        ("language", cmap_language_id32(var("platform"))),
+                        // REVIEW - should this be 8x as long and consist of bits?
+                        ("is32", repeat_count(Expr::U16(8192), base.u8())), // packed bit-array where a bit at index `i` signals whether the 16-bit value index `i` is the start of a 32-bit character code
+                        ("num_groups", base.u32be()),
+                        (
+                            "groups",
+                            repeat_count(var("num_groups"), sequential_map_group.call()),
+                        ),
+                    ],
+                ),
+            );
+
+            let cmap_subtable_format10 = module.define_format_args(
+                "opentype.cmap_subtable.format10",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 10)),
+                        ("__reserved", expect_u16be(base, 0)),
+                        ("length", base.u32be()),
+                        ("language", cmap_language_id32(var("platform"))),
+                        ("start_char_code", base.u32be()),
+                        ("num_chars", base.u32be()),
+                        (
+                            "glyph_id_array",
+                            repeat_count(var("num_chars"), base.u16be()),
+                        ),
+                    ],
+                ),
+            );
+
+            let cmap_subtable_format12 = module.define_format_args(
+                "opentype.cmap_subtable.format12",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 12)),
+                        ("__reserved", expect_u16be(base, 0)),
+                        ("length", base.u32be()),
+                        ("language", cmap_language_id32(var("platform"))),
+                        ("num_groups", base.u32be()),
+                        (
+                            "groups",
+                            repeat_count(var("num_groups"), sequential_map_group.call()),
+                        ),
+                    ],
+                ),
+            );
+
+            let constant_map_group = sequential_map_group.call();
+
+            let cmap_subtable_format13 = module.define_format_args(
+                "opentype.cmap_subtable.format13",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 13)),
+                        ("__reserved", expect_u16be(base, 0)),
+                        ("length", base.u32be()),
+                        ("language", cmap_language_id32(var("platform"))),
+                        ("num_groups", base.u32be()),
+                        (
+                            "groups",
+                            repeat_count(var("num_groups"), constant_map_group),
+                        ),
+                    ],
+                ),
+            );
+
+            let unicode_range = record([
+                ("start_unicode_value", u24be(base)),
+                ("additional_count", base.u8()),
+            ]);
+
+            let uvs_mapping = record([("unicode_value", u24be(base)), ("glyph_id", base.u16be())]);
+
+            let default_uvs_table = record([
+                ("num_unicode_value_ranges", base.u32be()),
+                (
+                    "ranges",
+                    repeat_count(var("num_unicode_value_ranges"), unicode_range),
+                ),
+            ]);
+
+            let non_default_uvs_table = record([
+                ("num_uvs_mappings", base.u32be()),
+                (
+                    "uvs_mappings",
+                    repeat_count(var("num_uvs_mappings"), uvs_mapping),
+                ),
+            ]);
+
+            let variation_selector = module.define_format_args(
+                "opentype.variation_selector",
+                vec![(
+                    Label::Borrowed("table_start"),
+                    ValueType::Base(BaseType::U32),
+                )],
+                record([
+                    ("var_selector", u24be(base)),
+                    (
+                        "default_uvs_offset",
+                        offset32(var("table_start"), default_uvs_table, base),
+                    ),
+                    (
+                        "non_default_uvs_offset",
+                        offset32(var("table_start"), non_default_uvs_table, base),
+                    ),
+                ]),
+            );
+
+            let cmap_subtable_format14 = module.define_format_args(
+                "opentype.cmap_subtable.format14",
+                vec![(
+                    Label::Borrowed("table_start"),
+                    ValueType::Base(BaseType::U32),
+                )],
+                slice_record(
+                    "length",
+                    [
+                        ("format", expect_u16be(base, 14)),
+                        ("length", base.u32be()),
+                        ("num_var_selector_records", base.u32be()),
+                        (
+                            "var_selector",
+                            repeat_count(
+                                var("num_var_selector_records"),
+                                variation_selector.call_args(vec![var("table_start")]),
+                            ),
+                        ),
+                    ],
+                ),
+            );
+
+            let cmap_subtable = module.define_format_args(
+                "opentype.cmap_subtable",
+                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                record([
+                    ("table_start", pos32()),
+                    ("format", Format::Peek(Box::new(base.u16be()))),
+                    (
+                        "data",
+                        match_variant(
+                            var("format"),
+                            [
+                                (
+                                    Pattern::U16(0),
+                                    "Format0",
+                                    cmap_subtable_format0.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(2),
+                                    "Format2",
+                                    cmap_subtable_format2.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(4),
+                                    "Format4",
+                                    cmap_subtable_format4.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(6),
+                                    "Format6",
+                                    cmap_subtable_format6.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(8),
+                                    "Format8",
+                                    cmap_subtable_format8.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(10),
+                                    "Format10",
+                                    cmap_subtable_format10.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(12),
+                                    "Format12",
+                                    cmap_subtable_format12.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(13),
+                                    "Format13",
+                                    cmap_subtable_format13.call_args(vec![var("platform")]),
+                                ),
+                                (
+                                    Pattern::U16(14),
+                                    "Format14",
+                                    cmap_subtable_format14.call_args(vec![var("table_start")]),
+                                ),
+                                // FIXME - leaving out unknown-table for now
+                            ],
+                        ),
+                    ),
+                ]),
+            );
+
+            let encoding_record = module.define_format_args(
+                "opentype.encoding_record",
+                vec![START_ARG],
+                record([
+                    ("platform", base.u16be()), // platform identifier
+                    // NOTE - encoding_id nominally depends on platform_id but no recorded dependencies in fathom def
+                    ("encoding", encoding_id(var("platform"))), // encoding identifier
+                    (
+                        "subtable_offset",
+                        offset32(
+                            START_VAR,
+                            cmap_subtable.call_args(vec![var("platform")]),
+                            base,
+                        ),
+                    ),
+                ]),
+            );
+
+            module.define_format(
+                "opentype.cmap_table",
+                record([
+                    ("table_start", pos32()),     // start of character mapping table
+                    ("version", base.u16be()),    // version of the the character
+                    ("num_tables", base.u16be()), // number of subsequent encoding tables
+                    (
+                        "encoding_records",
+                        repeat_count(
+                            var("num_tables"),
+                            encoding_record.call_args(vec![var("table_start")]),
+                        ),
+                    ),
+                ]),
+            )
+        };
+
+        let head_table = {
+            // FIXME - replace with packed_bits_u16 of fields if appropriate
+            let head_table_flags = base.u16be();
+
+            let long_date_time = module.define_format(
+                "opentype.types.long_date_time",
+                // FIXME - should be signed?
+                s64be(base),
+            );
+
+            let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], s16be(base));
+
+            let head_table_style_flags = where_lambda(
+                packed_bits_u16(
+                    [9, 1, 1, 1, 1, 1, 1, 1],
+                    [
+                        "__reserved",
+                        "extended",
+                        "condensed",
+                        "shadow",
+                        "outline",
+                        "underline",
+                        "italic",
+                        "bold",
+                    ],
+                ),
+                "x",
+                expr_eq(record_proj(var("x"), "__reserved"), Expr::U16(0)),
+            );
+
+            // NOTE - deprecated (==2) but we can refine to the original def for backwards compatibility
+            /* ConstEnum(s16be) {
+             *     Mixed    =  0,
+             *     StrongLR =  1,
+             *     WeakLR   =  2,
+             *     StrongRL = -1,
+             *     WeakRL   = -2,
+             * }
+             */
+            let glyph_dir_hint = expect_u16be(base, 2);
+
+            const SHORT_OFFSET16: u16 = 0;
+            const LONG_OFFSET32: u16 = 1;
+
+            module.define_format(
+                "opentype.head_table",
+                record([
+                    (
+                        "major_version",
+                        where_lambda(base.u16be(), "v", expr_eq(var("v"), Expr::U16(1))),
+                    ),
+                    (
+                        "minor_version",
+                        where_lambda(base.u16be(), "v", expr_eq(var("v"), Expr::U16(0))),
+                    ),
+                    ("font_revision", fixed32be(base)),
+                    ("checksum_adjustment", base.u32be()),
+                    ("magic_number", is_bytes(&[0x5F, 0x0F, 0x3C, 0xF5])),
+                    ("flags", head_table_flags),
+                    (
+                        "units_per_em",
+                        where_between(base.u16be(), Expr::U16(16), Expr::U16(16384)),
+                    ),
+                    ("created", long_date_time.call()),
+                    ("modified", long_date_time.call()),
+                    ("glyph_extents", xy_min_max),
+                    ("mac_style", head_table_style_flags),
+                    ("lowest_rec_ppem", base.u16be()),
+                    ("font_direction_hint", glyph_dir_hint),
+                    (
+                        "index_to_loc_format",
+                        where_between(
+                            base.u16be(),
+                            Expr::U16(SHORT_OFFSET16),
+                            Expr::U16(LONG_OFFSET32),
+                        ),
+                    ),
+                    ("glyph_data_format", expect_u16be(base, 0)),
+                ]),
+            )
+        };
 
         module.define_format_args(
             "opentype.table_directory.table_links",
@@ -664,7 +765,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             record([
                 (
                     "cmap",
-                    required_table("start", "tables", magic(b"cmap"), cmap_table),
+                    required_table("start", "tables", magic(b"cmap"), cmap_table.call()),
+                ),
+                (
+                    "head",
+                    required_table("start", "tables", magic(b"head"), head_table.call()),
                 ),
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),

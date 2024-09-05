@@ -14,6 +14,8 @@ use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 /// # Notes
 ///
 /// Requires that the total length of all fields is 8 bits, and panics otherwise.
+///
+/// Due to implementation details, will break if there is a single 8-bit field.
 pub fn packed_bits_u8<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
@@ -44,6 +46,53 @@ fn mask_bits(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
     let shift = 8 - high_bits_used - nbits;
     let mask = (1 << nbits) - 1;
     bit_and(shr(x, Expr::U8(shift)), Expr::U8(mask))
+}
+
+fn mask_bits16(x: Expr, high_bits_used: u8, nbits: u8) -> Expr {
+    let shift = 16 - (high_bits_used + nbits) as u16;
+    let mask = (1u16 << nbits) - 1;
+    bit_and(shr(x, Expr::U16(shift)), Expr::U16(mask))
+}
+
+/// Constructs a Format that expands a parsed 2-byte value into a multi-field record whose elements
+/// are `u16`-valued sub-masks of the original u16 (big-endian) order.
+///
+/// Currently supports only static-string names for the sub-fields.
+///
+/// The order in which the fields are listed, both in the `field_bit_lengths` and `field_names` parameters,
+/// is to be understood as a MSB-to-LSB order partition of the 16-bit big-endian value.
+///
+/// Zero-bit field-lengths are not explicitly supported, but 'just work' as implemented.
+///
+/// # Notes
+///
+/// Requires that the total length of all fields is 16 (bits), and panics otherwise.
+pub fn packed_bits_u16<const N: usize>(
+    field_bit_lengths: [u8; N],
+    field_names: [&'static str; N],
+) -> Format {
+    const BINDING_NAME: &'static str = "packedbits";
+    let _totlen: u8 = field_bit_lengths.iter().sum();
+    assert_eq!(
+        _totlen, 16,
+        "bad packed-bits field-lengths: total length {_totlen} of {field_bit_lengths:?} != 16"
+    );
+    let mut fields = Vec::new();
+    let mut high_bits_used = 0;
+    for (nbits, name) in Iterator::zip(field_bit_lengths.into_iter(), field_names.into_iter()) {
+        fields.push((
+            Label::Borrowed(name),
+            mask_bits16(var(BINDING_NAME), high_bits_used, nbits),
+        ));
+        high_bits_used += nbits;
+    }
+    map(
+        map(
+            tuple_repeat(2, Format::Byte(ByteSet::full())),
+            lambda("x", Expr::U16Be(Box::new(var("x")))),
+        ),
+        lambda(BINDING_NAME, Expr::Record(fields)),
+    )
 }
 
 /// Returns an [`Expr`] that refers to a (hopefully) in-scope variable by name.
@@ -520,6 +569,14 @@ pub fn tuple_repeat(count: usize, format: Format) -> Format {
     Format::Tuple(iter.collect())
 }
 
+/// Homogenous-format record whose fields all have the same Format `format`, with each of the names of `field_names` in order
+pub fn record_repeat<const N: usize>(field_names: [&'static str; N], format: Format) -> Format {
+    let iter = field_names
+        .iter()
+        .map(|name| (Label::Borrowed(name), format.clone()));
+    Format::Record(iter.collect())
+}
+
 /// Returns an Expr that evaluates to `true` if the given U8-typed expression is non-zero
 pub fn is_nonzero_u8(expr: Expr) -> Expr {
     expr_ne(expr, Expr::U8(0))
@@ -577,7 +634,6 @@ pub fn where_nonzero_u16(format: Format) -> Format {
     where_lambda(format, "x", is_nonzero_u16(var("x")))
 }
 
-/// Helper for constructing `Format::ForEach`
 /// Helper for constructing `Format::ForEach`
 pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
     Format::ForEach(seq, name.into(), Box::new(inner))
