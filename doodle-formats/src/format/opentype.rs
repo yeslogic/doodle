@@ -718,14 +718,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             module.define_format(
                 "opentype.head_table",
                 record([
-                    (
-                        "major_version",
-                        where_lambda(base.u16be(), "v", expr_eq(var("v"), Expr::U16(1))),
-                    ),
-                    (
-                        "minor_version",
-                        where_lambda(base.u16be(), "v", expr_eq(var("v"), Expr::U16(0))),
-                    ),
+                    ("major_version", expect_u16be(base, 1)),
+                    ("minor_version", expect_u16be(base, 0)),
                     ("font_revision", fixed32be(base)),
                     ("checksum_adjustment", base.u32be()),
                     ("magic_number", is_bytes(&[0x5F, 0x0F, 0x3C, 0xF5])),
@@ -753,6 +747,30 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let hhea_table = {
+            module.define_format(
+                "opentype.hhea_table",
+                record([
+                    ("major_version", expect_u16be(base, 1)),
+                    ("minor_version", expect_u16be(base, 0)),
+                    ("ascent", s16be(base)), // distance from baseline to highest ascender, in font design units
+                    ("descent", s16be(base)), // distance from baseline to lowest descender, in font design units
+                    ("line_gap", s16be(base)), // intended gap between baselines, in font design units
+                    ("advance_width_max", base.u16be()), // must be consistent with horizontal metrics
+                    ("min_left_side_bearing", s16be(base)), // must be consistent with horizontal metrics
+                    ("min_right_side_bearing", s16be(base)), // must be consistent with horizontal metrics
+                    ("x_max_extent", s16be(base)), // `max(left_side_bearing + (x_max - x_min))`
+                    // slope of the caret (rise/run), (1/0) for vertical caret
+                    ("caret_slope", record_repeat(["rise", "run"], s16be(base))),
+                    ("caret_offset", s16be(base)), // 0 for non-slanted fonts
+                    ("__reservedX4", tuple_repeat(4, expect_u16be(base, 0))), // NOTE: 4 separate isolated fields in fathom
+                    ("metric_data_format", expect_u16be(base, 0)),
+                    // number of `long_horizontal_metric` records in the `htmx_table`
+                    ("number_of_long_horizontal_metrics", base.u16be()),
+                ]),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -770,6 +788,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "head",
                     required_table("start", "tables", magic(b"head"), head_table.call()),
+                ),
+                (
+                    "hhea",
+                    required_table("start", "tables", magic(b"hhea"), hhea_table.call()),
                 ),
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
