@@ -47,6 +47,11 @@ fn u24be(base: &BaseModule) -> Format {
     )
 }
 
+// Placeholder for a `(u16, u16)` value-pair packed as a big-endian u32
+fn version16_16(base: &BaseModule) -> Format {
+    base.u32be()
+}
+
 // helper to turn b"..." literals into u32 at compile-time
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
@@ -675,11 +680,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             // FIXME - replace with packed_bits_u16 of fields if appropriate
             let head_table_flags = base.u16be();
 
-            let long_date_time = module.define_format(
-                "opentype.types.long_date_time",
-                // FIXME - should be signed?
-                s64be(base),
-            );
+            let long_date_time = module.define_format("opentype.types.long_date_time", s64be(base));
 
             let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], s16be(base));
 
@@ -771,6 +772,59 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let maxp_table = {
+            const NO_Z0: u16 = 1;
+            const YES_Z0: u16 = 2;
+
+            let maxp_version_1 = module.define_format(
+                "opentype.maxp_table.version1",
+                record([
+                    ("max_points", base.u16be()),
+                    ("max_contours", base.u16be()),
+                    ("max_composite_points", base.u16be()),
+                    ("max_composite_contours", base.u16be()),
+                    (
+                        "max_zones",
+                        where_between(base.u16be(), Expr::U16(NO_Z0), Expr::U16(YES_Z0)),
+                    ),
+                    ("max_twilight_points", base.u16be()),
+                    ("max_storage", base.u16be()),
+                    ("max_function_defs", base.u16be()),
+                    ("max_instruction_defs", base.u16be()),
+                    ("max_stack_elements", base.u16be()),
+                    ("max_size_of_instructions", base.u16be()),
+                    ("max_component_elements", base.u16be()),
+                    (
+                        "max_component_depth",
+                        where_between(base.u16be(), Expr::U16(0), Expr::U16(16)),
+                    ),
+                ]),
+            );
+
+            module.define_format(
+                "opentype.maxp_table",
+                record([
+                    ("version", version16_16(base)),
+                    ("num_glyphs", base.u16be()),
+                    (
+                        "data",
+                        match_variant(
+                            var("version"),
+                            [
+                                (Pattern::U32(0x0001_0000), "MaxpV1", maxp_version_1.call()),
+                                (Pattern::U32(0x0000_5000), "MaxpPostScript", Format::EMPTY),
+                                (
+                                    bind("unknown"),
+                                    "MaxpUnknown",
+                                    Format::Compute(var("unknown")),
+                                ), // FIXME - do we need this at all?
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -792,6 +846,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "hhea",
                     required_table("start", "tables", magic(b"hhea"), hhea_table.call()),
+                ),
+                (
+                    "maxp",
+                    required_table("start", "tables", magic(b"maxp"), maxp_table.call()),
                 ),
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
