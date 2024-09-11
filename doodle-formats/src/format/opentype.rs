@@ -273,7 +273,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             sof_offset_var: &'static str,
             table_records_var: &'static str,
             id: u32,
-            table_format: impl FnOnce(Expr) -> Format,
+            table_format_ref: FormatRef,
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
@@ -283,7 +283,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
                         record_proj(var("matching_table"), "length"),
-                        Box::new(table_format(record_proj(var("matching_table"), "length"))),
+                        Box::new(
+                            table_format_ref
+                                .call_args(vec![record_proj(var("matching_table"), "length")]),
+                        ),
                     ),
                 )),
             )
@@ -320,16 +323,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
         let encoding_id = |_platform_id: Expr| base.u16be();
 
-        /// # Language identifiers
-        ///
-        /// This must be set to `0` for all subtables that have a platform ID other than
-        /// ‘Macintosh’.
-        ///
-        /// ## References
-        ///
-        /// - [Microsoft's OpenType Spec: Use of the language field in 'cmap' subtables](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#use-of-the-language-field-in-cmap-subtables)
-        /// - [Apple's TrueType Reference Manual: The `'cmap'` table and language codes](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html)
-        ///
+        // # Language identifiers
+        //
+        // This must be set to `0` for all subtables that have a platform ID other than
+        // ‘Macintosh’.
+        //
+        // ## References
+        //
+        // - [Microsoft's OpenType Spec: Use of the language field in 'cmap' subtables](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#use-of-the-language-field-in-cmap-subtables)
+        // - [Apple's TrueType Reference Manual: The `'cmap'` table and language codes](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html)
+        //
         // TODO: add more details to docs
         let language_id = || base.u16be();
 
@@ -1009,6 +1012,100 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let os2_table = {
+            let version_record = |version_ident: &'static str, table_length: Expr| -> Format {
+                const V0_MIN_LENGTH: u32 = 78;
+                cond_maybe(
+                    or(
+                        is_nonzero_u16(var(version_ident)),
+                        expr_gte(table_length, Expr::U32(V0_MIN_LENGTH)),
+                    ),
+                    record([
+                        ("s_typo_ascender", s16be(base)),
+                        ("s_typo_descender", s16be(base)),
+                        ("s_typo_line_gap", s16be(base)),
+                        ("us_win_ascent", base.u16be()),
+                        ("us_win_descent", base.u16be()),
+                        (
+                            "extra_fields_v1",
+                            cond_maybe(
+                                expr_gte(var(version_ident), Expr::U16(1)),
+                                record([
+                                    ("ul_code_page_range_1", base.u32be()),
+                                    ("ul_code_page_range_2", base.u32be()),
+                                    (
+                                        "extra_fields_v2",
+                                        cond_maybe(
+                                            expr_gte(var(version_ident), Expr::U16(2)),
+                                            record([
+                                                ("sx_height", s16be(base)),
+                                                ("s_cap_height", s16be(base)),
+                                                ("us_default_char", base.u16be()),
+                                                ("us_break_char", base.u16be()),
+                                                ("us_max_context", base.u16be()),
+                                                (
+                                                    "extra_fields_v5",
+                                                    cond_maybe(
+                                                        expr_gte(var(version_ident), Expr::U16(5)),
+                                                        record([
+                                                            (
+                                                                "us_lower_optical_point_size",
+                                                                base.u16be(),
+                                                            ),
+                                                            (
+                                                                "us_upper_optical_point_size",
+                                                                base.u16be(),
+                                                            ),
+                                                        ]),
+                                                    ),
+                                                ),
+                                            ]),
+                                        ),
+                                    ),
+                                ]),
+                            ),
+                        ),
+                    ]),
+                )
+            };
+
+            module.define_format_args(
+                "opentype.os2_table",
+                vec![(
+                    Label::Borrowed("table_length"),
+                    ValueType::Base(BaseType::U32),
+                )],
+                record([
+                    ("version", base.u16be()),
+                    ("x_avg_char_width", s16be(base)),
+                    ("us_weight_class", base.u16be()),
+                    ("us_width_class", base.u16be()),
+                    ("fs_type", base.u16be()),
+                    ("y_subscript_x_size", s16be(base)),
+                    ("y_subscript_y_size", s16be(base)),
+                    ("y_subscript_x_offset", s16be(base)),
+                    ("y_subscript_y_offset", s16be(base)),
+                    ("y_superscript_x_size", s16be(base)),
+                    ("y_superscript_y_size", s16be(base)),
+                    ("y_superscript_x_offset", s16be(base)),
+                    ("y_superscript_y_offset", s16be(base)),
+                    ("y_strikeout_size", s16be(base)),
+                    ("y_strikeout_position", s16be(base)),
+                    ("s_family_class", s16be(base)),
+                    ("panose", repeat_count(Expr::U8(10), base.u8())),
+                    ("ul_unicode_range1", base.u32be()),
+                    ("ul_unicode_range2", base.u32be()),
+                    ("ul_unicode_range3", base.u32be()),
+                    ("ul_unicode_range4", base.u32be()),
+                    ("ach_vend_id", tag.call()),
+                    ("fs_selection", base.u16be()),
+                    ("us_first_char_index", base.u16be()),
+                    ("us_last_char_index", base.u16be()),
+                    ("data", version_record("version", var("table_length"))),
+                ]),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -1050,6 +1147,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "name",
                     required_table("start", "tables", magic(b"name"), name_table.call()),
+                ),
+                (
+                    "os2",
+                    required_table_with_len("start", "tables", magic(b"OS/2"), os2_table),
                 ),
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
