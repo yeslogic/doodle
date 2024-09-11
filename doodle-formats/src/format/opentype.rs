@@ -9,6 +9,10 @@ fn shadow_check(x: &Expr, name: &'static str) {
     }
 }
 
+fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
+    add(pos32, Expr::AsU32(Box::new(offset16)))
+}
+
 /// Gets the current stream-position and casts down from U64->U32
 fn pos32() -> Format {
     map(Format::Pos, lambda("x", Expr::AsU32(Box::new(var("x")))))
@@ -190,6 +194,23 @@ fn link(abs_offset: Expr, format: Format) -> Format {
     )
 }
 
+// FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
+fn offset16(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
+    shadow_check(&base_offset, "offset");
+    record([
+        ("offset", base.u16be()),
+        (
+            "link",
+            if_then_else(
+                is_nonzero_u16(var("offset")),
+                link(pos_add_u16(base_offset, var("offset")), format_some(format)),
+                format_none(),
+            ),
+        ),
+    ])
+}
+
+// FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
 fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
     record([
@@ -297,11 +318,24 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         }
 
+        let encoding_id = |_platform_id: Expr| base.u16be();
+
+        /// # Language identifiers
+        ///
+        /// This must be set to `0` for all subtables that have a platform ID other than
+        /// ‘Macintosh’.
+        ///
+        /// ## References
+        ///
+        /// - [Microsoft's OpenType Spec: Use of the language field in 'cmap' subtables](https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#use-of-the-language-field-in-cmap-subtables)
+        /// - [Apple's TrueType Reference Manual: The `'cmap'` table and language codes](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html)
+        ///
+        // TODO: add more details to docs
+        let language_id = || base.u16be();
+
         // character mapping table
         let cmap_table = {
-            let encoding_id = |_platform_id: Expr| base.u16be();
-
-            let cmap_language_id = |_platform: Expr| base.u16be();
+            let cmap_language_id = |_platform: Expr| language_id();
             let cmap_language_id32 = |_platform: Expr| base.u32be();
 
             let small_glyph_id = base.u8();
@@ -825,6 +859,156 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let hmtx_table = {
+            let long_horizontal_metric = record([
+                ("advance_width", base.u16be()),
+                ("left_side_bearing", s16be(base)),
+            ]);
+
+            module.define_format_args(
+                "opentype.hmtx_table",
+                vec![
+                    (
+                        Label::Borrowed("num_h_metrics"),
+                        ValueType::Base(BaseType::U16),
+                    ),
+                    (
+                        Label::Borrowed("num_glyphs"),
+                        ValueType::Base(BaseType::U16),
+                    ),
+                ],
+                record([
+                    (
+                        "h_metrics",
+                        repeat_count(var("num_h_metrics"), long_horizontal_metric),
+                    ),
+                    (
+                        "left_side_bearings",
+                        repeat_count(sub(var("num_glyphs"), var("num_h_metrics")), s16be(base)),
+                    ),
+                ]),
+            )
+        };
+
+        let name_table = {
+            #[allow(dead_code)]
+            let name_id = {
+                const NID_COPYRIGHT_NOTICE: u16 = 0;
+                const NID_FAMILY_NAME: u16 = 1;
+                const NID_SUBFAMILY_NAME: u16 = 2;
+                const NID_UNIQUE_FONT_IDENTIFICATION: u16 = 4;
+                const NID_FULL_FONT_NAME: u16 = 4;
+                const NID_VERSION_STRING: u16 = 5;
+                const NID_POSTSCRIPT_NAME: u16 = 6;
+                const NID_TRADEMARK: u16 = 7;
+                const NID_MANUFACTURER_NAME: u16 = 8;
+                const NID_DESIGNER_NAME: u16 = 9;
+                const NID_DESCRIPTION: u16 = 10;
+                const NID_VENDOR_URL: u16 = 11;
+                const NID_DESIGNER_URL: u16 = 12;
+                const NID_LICENSE_DESCRIPTION: u16 = 13;
+                const NID_LICENSE_INFO_URL: u16 = 14;
+                // 15 - reserved
+                const NID_TYPOGRAPHIC_FAMILY_NAME: u16 = 16;
+                const NID_TYPOGRAPHIC_SUBFAMILY_NAME: u16 = 17;
+                const NID_COMPAT_FULL_NAME: u16 = 18;
+                const NID_SAMPLE_TEXT: u16 = 19;
+                const NID_POSTSCRIPT_FONT_NAME: u16 = 20;
+                const NID_WWS_FAMILY_NAME: u16 = 21;
+                const NID_WWS_SUBFAMILY_NAME: u16 = 22;
+                const NID_LIGHT_BACKGROUND_PALETTE: u16 = 23;
+                const NID_DARK_BACKGROUND_PALETTE: u16 = 24;
+                const NID_VARIATIONS_POSTSCRIPT_NAME_PREFIX: u16 = 25;
+                // 26..=255 - reserved
+                // 256..=32767 - font-specific names
+
+                base.u16be()
+            };
+
+            let name_record = |storage_start: Expr| -> Format {
+                record([
+                    ("platform", base.u16be()),
+                    ("encoding", encoding_id(var("platform"))),
+                    ("language", language_id()),
+                    ("name_id", name_id),
+                    ("length", base.u16be()),
+                    (
+                        "offset",
+                        offset16(storage_start, repeat_count(var("length"), base.u8()), base),
+                    ),
+                ])
+            };
+
+            let name_version_1 = {
+                let lang_tag_record = |storage_start: Expr| -> Format {
+                    record([
+                        ("length", base.u16be()),
+                        (
+                            "offset",
+                            offset16(storage_start, repeat_count(var("length"), base.u8()), base),
+                        ),
+                    ])
+                };
+
+                module.define_format_args(
+                    "opentype.name_table.name_version_1",
+                    vec![(
+                        Label::Borrowed("storage_start"),
+                        ValueType::Base(BaseType::U32),
+                    )],
+                    record([
+                        ("lang_tag_count", base.u16be()),
+                        (
+                            "lang_tag_records",
+                            repeat_count(
+                                var("lang_tag_count"),
+                                lang_tag_record(var("storage_start")),
+                            ),
+                        ),
+                    ]),
+                )
+            };
+
+            module.define_format(
+                "opentype.name_table",
+                record([
+                    ("table_start", pos32()),
+                    ("version", base.u16be()),
+                    ("name_count", base.u16be()),
+                    ("storage_offset", base.u16be()),
+                    (
+                        "name_records",
+                        repeat_count(
+                            var("name_count"),
+                            name_record(pos_add_u16(var("table_start"), var("storage_offset"))),
+                        ),
+                    ),
+                    (
+                        "data",
+                        match_variant(
+                            var("version"),
+                            [
+                                (Pattern::U16(0), "NameVersion0", Format::EMPTY),
+                                (
+                                    Pattern::U16(1),
+                                    "NameVersion1",
+                                    name_version_1.call_args(vec![pos_add_u16(
+                                        var("table_start"),
+                                        var("storage_offset"),
+                                    )]),
+                                ),
+                                (
+                                    Pattern::binding("unknown"),
+                                    "NameVersionUnknown",
+                                    Format::Compute(var("unknown")),
+                                ),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -850,6 +1034,22 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "maxp",
                     required_table("start", "tables", magic(b"maxp"), maxp_table.call()),
+                ),
+                (
+                    "hmtx",
+                    required_table(
+                        "start",
+                        "tables",
+                        magic(b"hmtx"),
+                        hmtx_table.call_args(vec![
+                            record_proj(var("hhea"), "number_of_long_horizontal_metrics"),
+                            record_proj(var("maxp"), "num_glyphs"),
+                        ]),
+                    ),
+                ),
+                (
+                    "name",
+                    required_table("start", "tables", magic(b"name"), name_table.call()),
                 ),
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
