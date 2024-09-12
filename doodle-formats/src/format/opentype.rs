@@ -1,4 +1,5 @@
 use crate::format::BaseModule;
+use doodle::bounds::Bounds;
 use doodle::prelude::ByteSet;
 use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
@@ -27,6 +28,11 @@ fn fixed32be(base: &BaseModule) -> Format {
             Expr::Variant(Label::Borrowed("Fixed32"), Box::new(var("x"))),
         ),
     )
+}
+
+/// FIXME - scaffolding to signal intent to use i8 format before it is implemented
+fn s8(base: &BaseModule) -> Format {
+    base.u8()
 }
 
 /// FIXME - scaffolding to signal intent to use i16 format before it is implemented
@@ -1106,6 +1112,114 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let post_table = {
+            let postv2 = record([
+                ("num_glyphs", base.u16be()),
+                (
+                    "glyph_name_index",
+                    repeat_count(var("num_glyphs"), base.u16be()),
+                ),
+                ("string_data", pos32()),
+            ]);
+
+            let postv2dot5 = record([
+                ("num_glyphs", base.u16be()),
+                ("offset", repeat_count(var("num_glyphs"), s8(base))),
+            ]);
+
+            module.define_format(
+                "opentype.post_table",
+                record([
+                    ("version", version16_16(base)),
+                    ("italic_angle", fixed32be(base)),
+                    ("underline_position", s16be(base)),
+                    ("is_fixed_pitch", base.u32be()), // nonzero <=> fixed pitch
+                    ("min_mem_type42", base.u32be()),
+                    ("max_mem_type42", base.u32be()),
+                    ("min_mem_type1", base.u32be()),
+                    ("max_mem_type1", base.u32be()),
+                    (
+                        "names",
+                        match_variant(
+                            var("version"),
+                            [
+                                (Pattern::U32(0x0001_0000), "Version1", Format::EMPTY),
+                                (Pattern::U32(0x0002_0000), "Version2", postv2),
+                                (Pattern::U32(0x0002_5000), "Version2Dot5", postv2dot5),
+                                (Pattern::U32(0x0003_0000), "Version3", Format::EMPTY),
+                                (
+                                    bind("unknown"),
+                                    "VersionUnknown",
+                                    Format::Compute(var("unknown")),
+                                ),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
+
+        let cvt_table = repeat(s16be(base));
+        let fpgm_table = repeat(base.u8());
+        let glyf_table = {
+            let simple_glyf_table = |n_contours: Expr| {
+                record([
+                    (
+                        "end_points_of_contour",
+                        repeat_count(n_contours, base.u16be()),
+                    ),
+                    ("instruction_length", base.u16be()),
+                    (
+                        "instructions",
+                        repeat_count(var("instruction_length"), base.u8()),
+                    ),
+                    // STUB - flags, x- and y-coordinate fields are too hard to implement as-is
+                ])
+            };
+
+            let composite_glyf_table = |n_contours: Expr| {
+                // STUB - review the docs at [https://learn.microsoft.com/en-us/typography/opentype/spec/glyf] and implement as appropriate
+                Format::EMPTY
+            };
+
+            let glyf_description = |n_contours: Expr| {
+                match_variant(
+                    n_contours.clone(),
+                    [
+                        (Pattern::U16(0), "HeaderOnly", Format::EMPTY),
+                        (
+                            Pattern::Int(Bounds::new(1, (i16::MAX as usize))),
+                            "Simple",
+                            simple_glyf_table(n_contours.clone()),
+                        ),
+                        (
+                            Pattern::Wildcard,
+                            "Composite",
+                            composite_glyf_table(n_contours),
+                        ),
+                    ],
+                )
+            };
+
+            let glyf_table_entry = record([
+                ("number_of_contours", s16be(base)),
+                ("x_min", s16be(base)),
+                ("y_min", s16be(base)),
+                ("x_max", s16be(base)),
+                ("y_max", s16be(base)),
+                ("description", glyf_description(var("number_of_contours"))),
+            ]);
+
+            module.define_format_args(
+                "opentype.glyf_table",
+                vec![(
+                    Label::Borrowed("num_glyphs"),
+                    ValueType::Base(BaseType::U16),
+                )],
+                repeat_count(var("num_glyphs"), glyf_table_entry),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -1152,6 +1266,29 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "os2",
                     required_table_with_len("start", "tables", magic(b"OS/2"), os2_table),
                 ),
+                (
+                    "post",
+                    required_table("start", "tables", magic(b"post"), post_table.call()),
+                ),
+                // SECTION - truetype outline tables
+                (
+                    "cvt",
+                    optional_table("start", "tables", magic(b"cvt "), cvt_table),
+                ),
+                (
+                    "fpgm",
+                    optional_table("start", "tables", magic(b"fpgm"), fpgm_table),
+                ),
+                (
+                    "glyf",
+                    optional_table(
+                        "start",
+                        "tables",
+                        magic(b"glyf"),
+                        glyf_table.call_args(vec![record_proj(var("maxp"), "num_glyphs")]),
+                    ),
+                ),
+                // !SECTION
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
             ]),
