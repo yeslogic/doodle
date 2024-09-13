@@ -10,7 +10,7 @@ fn test_png_signature_decoder() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parser = Parser::new(input);
-    let ret = Decoder66(&mut parser);
+    let ret = Decoder99(&mut parser);
     assert!(ret.is_ok());
 }
 
@@ -26,6 +26,22 @@ fn test_decoder_tgz() -> TestResult {
         );
         println!("File: {:#?}", String::from_utf8_lossy(&block.file));
     }
+    Ok(())
+}
+
+fn show_opentype_stats(parsed_data: &OpentypeData) {
+    // STUB - show more specific data
+    println!("{:?}", parsed_data);
+}
+
+#[test]
+fn test_decoder_font() -> TestResult {
+    let buffer = std::fs::read(std::path::Path::new(&testpath(
+        "../prince/tests/data/fonts/lsansuni.ttf",
+    )))?;
+    let mut input = Parser::new(&buffer);
+    let parsed_data = Decoder14(&mut input)?;
+    show_opentype_stats(&parsed_data);
     Ok(())
 }
 
@@ -168,7 +184,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder55(&mut input)?;
+    let parsed_data = Decoder88(&mut input)?;
     match parsed_data {
         TarBlock {
             header,

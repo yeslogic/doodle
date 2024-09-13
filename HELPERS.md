@@ -227,17 +227,7 @@ pub fn seq_to_opt(empty_or_singleton: Expr) -> Expr {
     )
 }
 
-/// Given an expression of type `Seq(Seq(T))`, return an expression of type `Seq(T)` corresponding to the concatenation
-/// of each sub-list in turn.
-#[inline]
-pub fn concat(xs: Expr) -> Expr {
-    flat_map(f_id(), xs)
-}
 
-/// Helper for the lambda-abstracted form of [`concat`].
-pub fn f_concat() -> Expr {
-    lambda("xs", concat(var("xs")))
-}
 
 /// Shortcut for discarding a Format's return value but perserving its effect on the overall parse
 pub fn void(f: Format) -> Format {

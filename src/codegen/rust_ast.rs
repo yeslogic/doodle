@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
@@ -595,6 +596,15 @@ impl RustType {
                 _ => None,
             },
             _ => None,
+        }
+    }
+
+    /// Returns `true` if `self` is a known-`Copy` `RustType`.
+    pub(crate) fn is_copy(&self) -> bool {
+        match self.try_as_primtype() {
+            // NOTE - all PrimTypes are Copy, and only PrimTypes are statically determinable to be Copy
+            Some(_pt) => true,
+            _ => false,
         }
     }
 }
@@ -1777,6 +1787,18 @@ impl RustExpr {
             }
         }
     }
+
+    /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
+    pub(crate) fn make_persistent<'a>(&'a self) -> Cow<'a, Self> {
+        match self {
+            RustExpr::Entity(..) => Cow::Borrowed(self),
+            // REVIEW - consider which non-entity cases are already 'peristent'
+            _ => Cow::Owned(RustExpr::BlockScope(
+                vec![RustStmt::assign("tmp", self.clone())],
+                Box::new(RustExpr::local("tmp")),
+            )),
+        }
+    }
 }
 
 impl ToFragmentExt for RustExpr {
@@ -2104,10 +2126,8 @@ impl ToFragment for RustPattern {
             }
             RustPattern::Fill => Fragment::String("..".into()),
             RustPattern::CatchAll(None) => Fragment::Char('_'),
-            RustPattern::CatchAll(Some(lab)) => Fragment::String(lab.clone()),
-            RustPattern::BindRef(lab) => {
-                Fragment::string("ref ").cat(Fragment::String(lab.clone()))
-            }
+            RustPattern::CatchAll(Some(lab)) => lab.to_fragment(),
+            RustPattern::BindRef(lab) => Fragment::string("ref ").cat(lab.to_fragment()),
             RustPattern::Option(None) => Fragment::string("None"),
             RustPattern::Option(Some(pat)) => Fragment::string("Some").cat(
                 pat.to_fragment()

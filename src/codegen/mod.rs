@@ -603,13 +603,19 @@ fn embed_pattern_t(pat: &GTPattern) -> RustPattern {
             }
         },
         TypedPattern::Option(gt, inner) => match gt {
-            GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Option(..)))) => {
+            GenType::Inline(RustType::Atom(AtomType::Comp(CompType::Option(t)))) => {
                 match inner.as_ref() {
                     Some(inner_pat) => {
-                        RustPattern::Option(Some(Box::new(
-                            // FIXME - this is a hack to get `Some(ref x)` when matching on Option
-                            embed_pattern_t(inner_pat).ref_hack(),
-                        )))
+                        RustPattern::Option(Some(Box::new({
+                            let tmp = embed_pattern_t(inner_pat);
+                            // NOTE - when T is Copy, we want `Option<T>` to be destructed to allow direct arithmetic
+                            if t.is_copy() {
+                                tmp
+                            } else {
+                                // FIXME - this is a hack to get `Some(ref x)` when matching on Option over non-Copy types
+                                tmp.ref_hack()
+                            }
+                        })))
                     }
                     None => RustPattern::Option(None),
                 }
@@ -756,7 +762,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                             | CompType::Vec(..)
                         ),
                     ),
-                ) => scrutinized.call_method("as_ref"),
+                ) => scrutinized.make_persistent().into_owned().call_method("as_slice"),
                 _ => scrutinized,
             };
             let ck = refutability_check(

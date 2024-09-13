@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::byte_set::ByteSet;
 use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 
@@ -753,4 +755,36 @@ pub fn pair(x: Expr, y: Expr) -> Expr {
 /// Computes the larger of two given `Expr`s, left-biased if equal
 pub fn expr_max(a: Expr, b: Expr) -> Expr {
     expr_if_else(expr_gte(a.clone(), b.clone()), a, b)
+}
+
+/// Convenience tool for cloning a subset of a record-typed Expr's field-set in an arbitrary order
+///
+/// # Notes
+/// The list of fields must all appear in the original, and should contain no duplicates
+pub fn subset_fields<const N: usize>(original: Expr, field_set: [&'static str; N]) -> Expr {
+    let mut accum_fields = Vec::with_capacity(N);
+    let mut included_fields = BTreeSet::new();
+
+    for field_name in field_set.into_iter() {
+        if !included_fields.insert(field_name) {
+            unreachable!("duplicate field in subset_fields: `{field_name}`");
+        }
+        accum_fields.push((
+            Label::Borrowed(field_name),
+            record_proj(original.clone(), field_name),
+        ));
+    }
+    Expr::Record(accum_fields)
+}
+
+/// Given an expression of type `Seq(Seq(T))`, return an expression of type `Seq(T)` corresponding to the concatenation
+/// of each sub-list in turn.
+#[inline]
+pub fn concat(xs: Expr) -> Expr {
+    flat_map(f_id(), xs)
+}
+
+/// Helper for the lambda-abstracted form of [`concat`].
+pub fn f_concat() -> Expr {
+    lambda("xs", concat(var("xs")))
 }

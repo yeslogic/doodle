@@ -1424,7 +1424,7 @@ impl Decoder {
                 let (v, input) = d.parse(program, scope, input)?;
                 match expr.eval_lambda(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::fail(scope, input)),
+                    false => Err(DecodeError::bad_where(scope, expr.clone(), v)),
                 }
             }
             Decoder::Compute(expr) => {

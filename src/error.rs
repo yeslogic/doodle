@@ -2,7 +2,7 @@ use crate::byte_set::ByteSet;
 use crate::decoder::{Scope, ScopeEntry, Value};
 use crate::loc_decoder::{LocScope, ParsedValue};
 use crate::read::ReadCtxt;
-use crate::Label;
+use crate::{Expr, Label};
 
 pub type DecodeResult<T> = Result<T, DecodeError>;
 pub type LocDecodeError<T> = Result<T, DecodeError<crate::loc_decoder::ParsedValue>>;
@@ -11,8 +11,13 @@ pub type LocDecodeError<T> = Result<T, DecodeError<crate::loc_decoder::ParsedVal
 pub enum DecodeError<V: Clone = Value> {
     Fail {
         bindings: Vec<(Label, ScopeEntry<V>)>,
-        buffer: Vec<u8>,
         offset: usize,
+        buffer: Vec<u8>,
+    },
+    BadWhere {
+        bindings: Vec<(Label, ScopeEntry<V>)>,
+        assertion: Expr,
+        exception: V,
     },
     Trailing {
         byte: u8,
@@ -46,6 +51,16 @@ impl<V: std::fmt::Debug + Clone> std::fmt::Display for DecodeError<V> {
                 write!(
                     f,
                     "decode failure at Offset={offset}, Buffer={buffer:#?} (Scope: {bindings:?})"
+                )
+            }
+            Self::BadWhere {
+                bindings,
+                assertion,
+                exception,
+            } => {
+                write!(
+                    f,
+                    "invalidated Format::Where: assertion `{assertion:?}` does not hold for observed value `{exception:?} (Scope: {bindings:?})`"
                 )
             }
             Self::Trailing { byte, offset } => {
@@ -92,12 +107,22 @@ impl DecodeError<Value> {
     pub fn fail(scope: &Scope<'_>, input: ReadCtxt<'_>) -> DecodeError<Value> {
         let mut bindings = Vec::new();
         scope.get_bindings(&mut bindings);
-        let buffer = input.input.to_owned();
         let offset = input.offset;
+        let buffer = input.input.to_owned();
         DecodeError::Fail {
             bindings,
-            buffer,
             offset,
+            buffer,
+        }
+    }
+
+    pub fn bad_where(scope: &Scope<'_>, assertion: Expr, exception: Value) -> DecodeError<Value> {
+        let mut bindings = Vec::new();
+        scope.get_bindings(&mut bindings);
+        DecodeError::BadWhere {
+            bindings,
+            assertion,
+            exception,
         }
     }
 }
@@ -112,6 +137,20 @@ impl DecodeError<ParsedValue> {
             bindings,
             buffer,
             offset,
+        }
+    }
+
+    pub fn loc_bad_where(
+        scope: &LocScope<'_>,
+        assertion: Expr,
+        exception: ParsedValue,
+    ) -> DecodeError<ParsedValue> {
+        let mut bindings = Vec::new();
+        scope.get_bindings(&mut bindings);
+        DecodeError::BadWhere {
+            bindings,
+            assertion,
+            exception,
         }
     }
 }
