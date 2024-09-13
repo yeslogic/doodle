@@ -1,6 +1,5 @@
 use crate::format::BaseModule;
 use doodle::bounds::Bounds;
-use doodle::prelude::ByteSet;
 use doodle::{helper::*, Expr, IntoLabel, Label};
 use doodle::{BaseType, Format, FormatModule, FormatRef, Pattern, ValueType};
 
@@ -8,6 +7,28 @@ fn shadow_check(x: &Expr, name: &'static str) {
     if x.is_shadowed_by(name) {
         panic!("Shadow! Variable-name {name} already occurs in Expr {x:?}!");
     }
+}
+
+fn last_elem(seq_var: &'static str) -> Expr {
+    let last_ix = sub(seq_length(var(seq_var)), Expr::U32(1));
+    index_unchecked(var(seq_var), last_ix)
+}
+
+fn u8_to_i16(x: Expr, pos_bit: Expr) -> Expr {
+    expr_match(
+        pos_bit,
+        [
+            (Pattern::U8(1), Expr::AsU16(Box::new(x.clone()))),
+            // FIXME - this will be off if `x == 0`
+            (
+                Pattern::U8(0),
+                sub(
+                    Expr::U16(u16::MAX),
+                    sub(Expr::AsU16(Box::new(x)), Expr::U16(1)),
+                ),
+            ),
+        ],
+    )
 }
 
 fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
@@ -148,14 +169,8 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
         ),
         table_records,
     );
-    expr_match(
-        matching_tables,
-        [
-            (Pattern::Seq(vec![bind("match")]), expr_some(var("match"))),
-            (Pattern::Seq(vec![]), expr_none()),
-            // NOTE - we leave out a wildcard pattern here to signal that a multi-element match is not considered valid
-        ],
-    )
+    // FIXME - we need either an Expr::Let or Expr::ListToOption primitive to distinguish no-match, 1-match, and multi-match
+    index_checked(matching_tables, Expr::U32(0))
 }
 
 fn link_offset(sof_offset: Expr, table_offset: Expr, format: Format) -> Format {
@@ -233,13 +248,11 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
 }
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
-    let tag = module.define_format(
-        "opentype.types.tag",
-        map(
-            tuple_repeat(4, Format::Byte(ByteSet::from(0x20..=0x7E))),
-            lambda("x", Expr::U32Be(Box::new(var("x")))),
-        ),
-    );
+    // NOTE - Microsoft defines a tag as consisting on printable ascii characters in the range 0x20 -- 0x7E (inclusive), but some vendors are non-standard so we accept anything
+    let tag = module.define_format("opentype.types.tag", base.u32be());
+
+    const SHORT_OFFSET16: u16 = 0;
+    const LONG_OFFSET32: u16 = 1;
 
     let table_record = module.define_format_args(
         "opentype.table_record",
@@ -745,7 +758,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 expr_eq(record_proj(var("x"), "__reserved"), Expr::U16(0)),
             );
 
-            // NOTE - deprecated (==2) but we can refine to the original def for backwards compatibility
+            // NOTE - Should be 2 for modern fonts but we shouldn't enforce that too strongly
             /* ConstEnum(s16be) {
              *     Mixed    =  0,
              *     StrongLR =  1,
@@ -754,10 +767,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
              *     WeakRL   = -2,
              * }
              */
-            let glyph_dir_hint = expect_u16be(base, 2);
-
-            const SHORT_OFFSET16: u16 = 0;
-            const LONG_OFFSET32: u16 = 1;
+            let glyph_dir_hint = s16be(base);
 
             module.define_format(
                 "opentype.head_table",
@@ -1162,6 +1172,160 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let cvt_table = repeat(s16be(base));
         let fpgm_table = repeat(base.u8());
         let glyf_table = {
+            // NOTE - variable-length expanded version of the packed flags being parsed
+            let glyf_flags_simple = |num_coordinates: Expr| -> Format {
+                // individual flag-set we are parsing
+                let flags = packed_bits_u8(
+                    [1; 8],
+                    [
+                        "__reserved",
+                        "overlap_simple",
+                        "y_is_same_or_positive_y_short_vector",
+                        "x_is_same_or_positive_x_short_vector",
+                        "repeat_flag",
+                        "y_short_vector",
+                        "x_short_vector",
+                        "on_curve_point",
+                    ],
+                );
+                // Format that parses a flag-entry into its conditionally-parsed repetition-count and relevant, reordered fields
+                let flag_list_entry = chain(
+                    flags,
+                    "flags",
+                    record([
+                        // NOTE - indicates number of additional repeats, base value 0 for singleton or N for run of N+1 overall
+                        (
+                            "repeats",
+                            if_then_else(
+                                is_nonzero_u8(record_proj(var("flags"), "repeat_flag")),
+                                base.u8(),
+                                Format::Compute(Expr::U8(0)),
+                            ),
+                        ),
+                        (
+                            "field_set",
+                            Format::Compute(subset_fields(
+                                var("flags"),
+                                [
+                                    "on_curve_point",
+                                    "x_short_vector",
+                                    "y_short_vector",
+                                    "x_is_same_or_positive_x_short_vector",
+                                    "y_is_same_or_positive_y_short_vector",
+                                    "overlap_simple",
+                                ],
+                            )),
+                        ),
+                    ]),
+                );
+                // Lambda that tells us whether we are done reading flags
+                let is_finished = lambda(
+                    "seq",
+                    expr_gte(
+                        left_fold(
+                            lambda_tuple(
+                                ["acc", "x"],
+                                add(
+                                    var("acc"),
+                                    add(
+                                        Expr::AsU16(Box::new(record_proj(var("x"), "repeats"))),
+                                        Expr::U16(1),
+                                    ),
+                                ),
+                            ),
+                            Expr::U16(0),
+                            ValueType::Base(BaseType::U16),
+                            var("seq"),
+                        ),
+                        num_coordinates,
+                    ),
+                );
+                // FIXME - this currently mandates quadratic performance of a linear computation
+                // Format that parses the flags as a packed (unexpanded repeats) array
+                let raw_flags = repeat_until_seq(is_finished, flag_list_entry);
+                // helper for turning a list of packed flags into its nominal expanded sequence-form as x -> Seq(Seq(x.field_set))
+                let unpack = |packed: Expr| -> Format {
+                    Format::Let(
+                        Label::Borrowed("count"),
+                        add(
+                            Expr::AsU32(Box::new(record_proj(packed.clone(), "repeats"))),
+                            Expr::U32(1),
+                        ),
+                        Box::new(repeat_count(
+                            var("count"),
+                            Format::Compute(record_proj(packed, "field_set")),
+                        )),
+                    )
+                };
+                // Perform the appropriate map-and-concat over the raw flags we parse as a first-pass
+                map(
+                    chain(
+                        raw_flags,
+                        "packed_flags",
+                        for_each(var("packed_flags"), "packed", unpack(var("packed"))),
+                    ),
+                    f_concat(),
+                )
+            };
+
+            let x_coords = |field_set: Expr| -> Format {
+                if_then_else(
+                    is_nonzero_u8(record_proj(field_set.clone(), "x_short_vector")),
+                    // this wants to be i16
+                    map(
+                        base.u8(),
+                        lambda(
+                            "abs",
+                            u8_to_i16(
+                                var("abs"),
+                                record_proj(
+                                    field_set.clone(),
+                                    "x_is_same_or_positive_x_short_vector",
+                                ),
+                            ),
+                        ),
+                    ),
+                    if_then_else(
+                        is_nonzero_u8(record_proj(
+                            field_set.clone(),
+                            "x_is_same_or_positive_x_short_vector",
+                        )),
+                        // this wants to be i16
+                        Format::Compute(Expr::U16(0)),
+                        s16be(base),
+                    ),
+                )
+            };
+
+            let y_coords = |field_set: Expr| -> Format {
+                if_then_else(
+                    is_nonzero_u8(record_proj(field_set.clone(), "y_short_vector")),
+                    // this wants to be i16
+                    map(
+                        base.u8(),
+                        lambda(
+                            "abs",
+                            u8_to_i16(
+                                var("abs"),
+                                record_proj(
+                                    field_set.clone(),
+                                    "y_is_same_or_positive_y_short_vector",
+                                ),
+                            ),
+                        ),
+                    ),
+                    if_then_else(
+                        is_nonzero_u8(record_proj(
+                            field_set.clone(),
+                            "y_is_same_or_positive_y_short_vector",
+                        )),
+                        // this wants to be i16
+                        Format::Compute(Expr::U16(0)),
+                        s16be(base),
+                    ),
+                )
+            };
+
             let simple_glyf_table = |n_contours: Expr| {
                 record([
                     (
@@ -1173,7 +1337,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         "instructions",
                         repeat_count(var("instruction_length"), base.u8()),
                     ),
-                    // STUB - flags, x- and y-coordinate fields are too hard to implement as-is
+                    (
+                        "number_of_coordinates",
+                        Format::Compute(add(Expr::U16(1), last_elem("end_points_of_contour"))),
+                    ),
+                    ("flags", glyf_flags_simple(var("number_of_coordinates"))),
+                    (
+                        "x_coordinates",
+                        for_each(var("flags"), "flag_vals", x_coords(var("flag_vals"))),
+                    ),
+                    (
+                        "y_coordinates",
+                        for_each(var("flags"), "flag_vals", y_coords(var("flag_vals"))),
+                    ),
                 ])
             };
 
@@ -1188,7 +1364,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     [
                         (Pattern::U16(0), "HeaderOnly", Format::EMPTY),
                         (
-                            Pattern::Int(Bounds::new(1, (i16::MAX as usize))),
+                            Pattern::Int(Bounds::new(1, i16::MAX as usize)),
                             "Simple",
                             simple_glyf_table(n_contours.clone()),
                         ),
@@ -1217,6 +1393,39 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ValueType::Base(BaseType::U16),
                 )],
                 repeat_count(var("num_glyphs"), glyf_table_entry),
+            )
+        };
+        let loca_table = {
+            module.define_format_args(
+                "opentype.loca_table",
+                vec![
+                    (
+                        Label::Borrowed("num_glyphs"),
+                        ValueType::Base(BaseType::U16),
+                    ),
+                    (
+                        Label::Borrowed("index_to_loc_format"),
+                        ValueType::Base(BaseType::U16),
+                    ),
+                ],
+                record([(
+                    "offsets",
+                    match_variant(
+                        var("index_to_loc_format"),
+                        [
+                            (
+                                Pattern::U16(SHORT_OFFSET16),
+                                "Offsets16",
+                                repeat_count(add(var("num_glyphs"), Expr::U16(1)), base.u16be()),
+                            ),
+                            (
+                                Pattern::U16(LONG_OFFSET32),
+                                "Offsets32",
+                                repeat_count(add(var("num_glyphs"), Expr::U16(1)), base.u32be()),
+                            ),
+                        ],
+                    ),
+                )]),
             )
         };
 
@@ -1288,6 +1497,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         glyf_table.call_args(vec![record_proj(var("maxp"), "num_glyphs")]),
                     ),
                 ),
+                (
+                    "loca",
+                    optional_table(
+                        "start",
+                        "tables",
+                        magic(b"loca"),
+                        loca_table.call_args(vec![
+                            record_proj(var("maxp"), "num_glyphs"),
+                            record_proj(var("head"), "index_to_loc_format"),
+                        ]),
+                    ),
+                ),
                 // !SECTION
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
@@ -1331,7 +1552,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let ttc_header = module.define_format_args(
         "opentype.ttc_header",
         vec![START_ARG],
-        // FIXME - stub
+        // STUB - implement ttc
         Format::SkipRemainder,
     );
 

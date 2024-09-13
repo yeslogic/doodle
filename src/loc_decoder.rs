@@ -1427,7 +1427,7 @@ impl Decoder {
                 let (v, input) = d.parse_with_loc(program, scope, input)?;
                 match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::loc_fail(scope, input)),
+                    false => Err(DecodeError::loc_bad_where(scope, expr.clone(), v)),
                 }
             }
             Decoder::Compute(expr) => {
