@@ -1901,6 +1901,66 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_post {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_flags
+{
+    __reserved_msb3: u16,
+    unscaled_component_offset: u16,
+    scaled_component_offset: u16,
+    overlap_compound: u16,
+    use_my_metrics: u16,
+    we_have_instructions: u16,
+    we_have_a_two_by_two: u16,
+    we_have_an_x_and_y_scale: u16,
+    more_components: u16,
+    __reserved_bit4: u16,
+    we_have_a_scale: u16,
+    round_xy_to_grid: u16,
+    args_are_xy_values: u16,
+    arg_1_and_2_are_words: u16,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1
+{
+    Int16(u16),
+    Int8(u8),
+    Uint16(u16),
+    Uint8(u8),
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0
+{
+    F2Dot14(u16),
+}
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_XY {
+x_scale: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0,
+y_scale: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0
+}
+
+#[derive(Debug, Clone)]
+pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale
+{
+    Matrix((main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0, main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0), (main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0, main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0)), Scale(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0), XY(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_XY) }
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq {
+flags: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_flags,
+glyph_index: u16,
+argument1: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1,
+argument2: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1,
+scale: Option<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale>
+}
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite {
+glyphs: Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq>,
+instructions: Vec<u8>
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq
 {
     on_curve_point: u8,
@@ -1924,7 +1984,9 @@ y_coordinates: Vec<u16>
 
 #[derive(Debug, Clone)]
 pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description {
-    Composite,
+    Composite(
+        main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite,
+    ),
     HeaderOnly,
     Simple(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple),
 }
@@ -5978,11 +6040,19 @@ abs as u16
 },
 
 0u8 => {
-try_sub!(65535u16, try_sub!(abs as u16, 1u16))
+match abs {
+0u8 => {
+0u16
+},
+
+n => {
+try_sub!(65535u16, try_sub!(n as u16, 1u16))
+}
+}
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(16554903010408481894u64));
+return Err(ParseError::ExcludedBranch(2043508508369370554u64));
 }
 }))(inner))?
 },
@@ -6014,11 +6084,19 @@ abs as u16
 },
 
 0u8 => {
-try_sub!(65535u16, try_sub!(abs as u16, 1u16))
+match abs {
+0u8 => {
+0u16
+},
+
+n => {
+try_sub!(65535u16, try_sub!(n as u16, 1u16))
+}
+}
 },
 
 _ => {
-return Err(ParseError::ExcludedBranch(128988514772280386u64));
+return Err(ParseError::ExcludedBranch(18343740411095064101u64));
 }
 }))(inner))?
 },
@@ -6044,7 +6122,190 @@ main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description::
 },
 
 _ => {
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description::Composite
+let inner = {
+let glyphs = ((|| PResult::Ok({
+let mut accum = Vec::new();
+loop {
+let elem = {
+let flags = ((|| PResult::Ok({
+let inner = {
+let inner = {
+let field0 = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+b
+}))())?;
+let field1 = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+b
+}))())?;
+(field0, field1)
+};
+((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
+};
+((|packedbits: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_flags { __reserved_msb3: packedbits >> 13u16 & 7u16, unscaled_component_offset: packedbits >> 12u16 & 1u16, scaled_component_offset: packedbits >> 11u16 & 1u16, overlap_compound: packedbits >> 10u16 & 1u16, use_my_metrics: packedbits >> 9u16 & 1u16, we_have_instructions: packedbits >> 8u16 & 1u16, we_have_a_two_by_two: packedbits >> 7u16 & 1u16, we_have_an_x_and_y_scale: packedbits >> 6u16 & 1u16, more_components: packedbits >> 5u16 & 1u16, __reserved_bit4: packedbits >> 4u16 & 1u16, we_have_a_scale: packedbits >> 3u16 & 1u16, round_xy_to_grid: packedbits >> 2u16 & 1u16, args_are_xy_values: packedbits >> 1u16 & 1u16, arg_1_and_2_are_words: packedbits >> 0u16 & 1u16 }))(inner))?
+}))())?;
+let glyph_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let argument1 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() != 0u16 {
+true => {
+match flags.args_are_xy_values.clone() != 0u16 {
+true => {
+let inner = (Decoder24(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int16(inner)
+},
+
+false => {
+let inner = (Decoder24(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint16(inner)
+}
+}
+},
+
+false => {
+match flags.args_are_xy_values.clone() != 0u16 {
+true => {
+let inner = (Decoder35(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int8(inner)
+},
+
+false => {
+let inner = (Decoder35(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint8(inner)
+}
+}
+}
+}))())?;
+let argument2 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() != 0u16 {
+true => {
+match flags.args_are_xy_values.clone() != 0u16 {
+true => {
+let inner = (Decoder24(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int16(inner)
+},
+
+false => {
+let inner = (Decoder24(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint16(inner)
+}
+}
+},
+
+false => {
+match flags.args_are_xy_values.clone() != 0u16 {
+true => {
+let inner = (Decoder35(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int8(inner)
+},
+
+false => {
+let inner = (Decoder35(_input))?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint8(inner)
+}
+}
+}
+}))())?;
+let scale = ((|| PResult::Ok(match flags.we_have_a_scale.clone() != 0u16 {
+true => {
+let inner = {
+let inner = {
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+};
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale::Scale(inner)
+};
+((|val: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
+},
+
+false => {
+match flags.we_have_an_x_and_y_scale.clone() != 0u16 {
+true => {
+let inner = {
+let inner = {
+let x_scale = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+}))())?;
+let y_scale = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+}))())?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_XY { x_scale, y_scale }
+};
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale::XY(inner)
+};
+((|val: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
+},
+
+false => {
+match flags.we_have_a_two_by_two.clone() != 0u16 {
+true => {
+let inner = {
+let field0 = ((|| PResult::Ok({
+let field0 = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+}))())?;
+let field1 = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+}))())?;
+(field0, field1)
+}))())?;
+let field1 = ((|| PResult::Ok({
+let field0 = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+}))())?;
+let field1 = ((|| PResult::Ok({
+let inner = (Decoder24(_input))?;
+((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+}))())?;
+(field0, field1)
+}))())?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale::Matrix(field0, field1)
+};
+((|val: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
+},
+
+false => {
+None
+}
+}
+}
+}
+}
+}))())?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq { flags, glyph_index, argument1, argument2, scale }
+};
+if ((|elem: &main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq| PResult::Ok(elem.flags.more_components.clone() == 0u16))(&elem))? {
+accum.push(elem);
+break
+} else {
+accum.push(elem);
+}
+}
+accum
+}))())?;
+let instructions = ((|| PResult::Ok(match (try_fold_left_curried(glyphs.iter().cloned(), false, |tuple_var: (bool, main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq)| PResult::Ok(match tuple_var {
+(any, x) => {
+any || (x.flags.we_have_instructions.clone() != 0u16)
+}
+})))? {
+true => {
+let instructions_length = (Decoder24(_input))?;
+let mut accum = Vec::new();
+for _ in 0..instructions_length {
+accum.push((Decoder35(_input))?);
+}
+accum
+},
+
+false => {
+[].to_vec()
+}
+}))())?;
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite { glyphs, instructions }
+};
+main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description::Composite(inner)
 }
 }))())?;
 main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq { number_of_contours, x_min, y_min, x_max, y_max, description }
