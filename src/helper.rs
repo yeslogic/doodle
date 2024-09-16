@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::byte_set::ByteSet;
-use crate::{Arith, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
+use crate::{Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
 
 /// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
 /// are `u8`-valued sub-masks of the original byte.
@@ -787,4 +787,16 @@ pub fn concat(xs: Expr) -> Expr {
 /// Helper for the lambda-abstracted form of [`concat`].
 pub fn f_concat() -> Expr {
     lambda("xs", concat(var("xs")))
+}
+
+pub fn seq_any<F>(f: F, seq: Expr) -> Expr
+where
+    F: FnOnce(Expr) -> Expr,
+{
+    left_fold(
+        lambda_tuple(["any", "x"], or(var("any"), f(var("x")))),
+        Expr::Bool(false),
+        ValueType::Base(BaseType::Bool),
+        seq,
+    )
 }

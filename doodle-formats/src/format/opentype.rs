@@ -14,6 +14,9 @@ fn last_elem(seq_var: &'static str) -> Expr {
     index_unchecked(var(seq_var), last_ix)
 }
 
+/// Converts a `u8` value to an `i16` value within the `Expr` model
+/// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
+// FIXME - this currently uses the two's-complement u16 value that maps to the proper i16 value
 fn u8_to_i16(x: Expr, pos_bit: Expr) -> Expr {
     expr_match(
         pos_bit,
@@ -22,9 +25,18 @@ fn u8_to_i16(x: Expr, pos_bit: Expr) -> Expr {
             // FIXME - this will be off if `x == 0`
             (
                 Pattern::U8(0),
-                sub(
-                    Expr::U16(u16::MAX),
-                    sub(Expr::AsU16(Box::new(x)), Expr::U16(1)),
+                expr_match(
+                    x,
+                    [
+                        (Pattern::U8(0), Expr::U16(0)),
+                        (
+                            bind("n"),
+                            sub(
+                                Expr::U16(u16::MAX),
+                                sub(Expr::AsU16(Box::new(var("n"))), Expr::U16(1)),
+                            ),
+                        ),
+                    ],
                 ),
             ),
         ],
@@ -42,13 +54,12 @@ fn pos32() -> Format {
 
 /// Parses a u32 serving as the de-facto representation of a signed, 16.16 bit fixed-point number
 fn fixed32be(base: &BaseModule) -> Format {
-    map(
-        base.u32be(),
-        lambda(
-            "x",
-            Expr::Variant(Label::Borrowed("Fixed32"), Box::new(var("x"))),
-        ),
-    )
+    map(base.u32be(), lambda("x", variant("Fixed32", var("x"))))
+}
+
+// Custom type for fixed-point values that are interpreted as (2sigbits, 14sigbits) within a u16be raw-parse
+fn f2dot14(base: &BaseModule) -> Format {
+    map(base.u16be(), lambda("x", variant("F2Dot14", var("x"))))
 }
 
 /// FIXME - scaffolding to signal intent to use i8 format before it is implemented
@@ -1353,9 +1364,115 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ])
             };
 
-            let composite_glyf_table = |n_contours: Expr| {
-                // STUB - review the docs at [https://learn.microsoft.com/en-us/typography/opentype/spec/glyf] and implement as appropriate
-                Format::EMPTY
+            let glyf_arg = |are_words: Expr, are_xy_values: Expr| -> Format {
+                if_then_else(
+                    are_words,
+                    if_then_else(
+                        are_xy_values.clone(),
+                        fmt_variant("Int16", s16be(base)),
+                        fmt_variant("Uint16", base.u16be()),
+                    ),
+                    if_then_else(
+                        are_xy_values,
+                        fmt_variant("Int8", s8(base)),
+                        fmt_variant("Uint8", base.u8()),
+                    ),
+                )
+            };
+
+            let composite_glyf_table = {
+                let glyf_flags_composite = packed_bits_u16(
+                    [3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [
+                        "__reserved_msb3",           // bits 15, 14, and 13 - reserved, should be 0
+                        "unscaled_component_offset", // bit 12 - set if component offset is not to be scaled
+                        "scaled_component_offset", // bit 11 - set if component offset is to be scaled
+                        "overlap_compound", // bit 10 - hint for whether the component overlap
+                        "use_my_metrics", // bit 9 - when set, composite glyph inherits aw, lsb, rsb of current component glyph
+                        "we_have_instructions", // bit 8 - instructions present after final component
+                        "we_have_a_two_by_two", // bit 7 - we have a two by two transformation that will be used to scale the glyph
+                        "we_have_an_x_and_y_scale", // bit 6 - when set, x has a different scale from y
+                        "more_components", // bit 5 - continuation bit (1 when more follow, 0 if final)
+                        "__reserved_bit4", // bit 4 - reserved, should be 0
+                        "we_have_a_scale", // bit 3 - when 1, component has simple scale; otherwise scale is 1.0
+                        "round_xy_to_grid", // bit 2 - when set (and when `args_are_xy_values` is set), xy values are rounded to nearest grid line
+                        "args_are_xy_values", // bit 1 - when set, args are signed xy values; otherwise, they are unsigned point numbers
+                        "arg_1_and_2_are_words", // bit 0 - set for args of type u16 or i16; clear for args of type u8 or i8
+                    ],
+                );
+
+                let glyf_scale = |flags: Expr| -> Format {
+                    if_then_else(
+                        is_nonzero_u16(record_proj(flags.clone(), "we_have_a_scale")),
+                        format_some(fmt_variant("Scale", f2dot14(base))),
+                        if_then_else(
+                            is_nonzero_u16(record_proj(flags.clone(), "we_have_an_x_and_y_scale")),
+                            format_some(fmt_variant(
+                                "XY",
+                                record_repeat(["x_scale", "y_scale"], f2dot14(base)),
+                            )),
+                            if_then_else(
+                                is_nonzero_u16(record_proj(flags, "we_have_a_two_by_two")),
+                                format_some(fmt_variant(
+                                    "Matrix",
+                                    tuple_repeat(2, tuple_repeat(2, f2dot14(base))),
+                                )),
+                                format_none(),
+                            ),
+                        ),
+                    )
+                };
+
+                let glyf_component = record([
+                    ("flags", glyf_flags_composite),
+                    ("glyph_index", base.u16be()),
+                    (
+                        "argument1",
+                        glyf_arg(
+                            is_nonzero_u16(record_proj(var("flags"), "arg_1_and_2_are_words")),
+                            is_nonzero_u16(record_proj(var("flags"), "args_are_xy_values")),
+                        ),
+                    ),
+                    (
+                        "argument2",
+                        glyf_arg(
+                            is_nonzero_u16(record_proj(var("flags"), "arg_1_and_2_are_words")),
+                            is_nonzero_u16(record_proj(var("flags"), "args_are_xy_values")),
+                        ),
+                    ),
+                    ("scale", glyf_scale(var("flags"))),
+                ]);
+
+                let is_last = lambda(
+                    "elem",
+                    expr_eq(
+                        record_projs(var("elem"), &["flags", "more_components"]),
+                        Expr::U16(0),
+                    ),
+                );
+                fn any_instructions(glyphs: Expr) -> Expr {
+                    seq_any(
+                        |elt| is_nonzero_u16(record_projs(elt, &["flags", "we_have_instructions"])),
+                        glyphs,
+                    )
+                }
+
+                // FIXME - this can be optimized with a format that folds as it repeats
+                record([
+                    ("glyphs", repeat_until_last(is_last, glyf_component)),
+                    (
+                        "instructions",
+                        if_then_else(
+                            any_instructions(var("glyphs")),
+                            chain(
+                                base.u16be(),
+                                "instructions_length",
+                                repeat_count(var("instructions_length"), base.u8()),
+                            ),
+                            Format::Compute(seq_empty()),
+                        ),
+                    ),
+                ])
             };
 
             let glyf_description = |n_contours: Expr| {
@@ -1368,11 +1485,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "Simple",
                             simple_glyf_table(n_contours.clone()),
                         ),
-                        (
-                            Pattern::Wildcard,
-                            "Composite",
-                            composite_glyf_table(n_contours),
-                        ),
+                        (Pattern::Wildcard, "Composite", composite_glyf_table),
                     ],
                 )
             };

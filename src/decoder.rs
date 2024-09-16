@@ -346,12 +346,14 @@ impl Expr {
                 })
             }
             Expr::Arith(Arith::BoolAnd, x, y) => {
+                // REVIEW - do we want left-biased short-circuiting?
                 Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 && b1),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
             Expr::Arith(Arith::BoolOr, x, y) => {
+                // REVIEW - do we want left-biased short-circuiting?
                 Cow::Owned(match (x.eval_value(scope), y.eval_value(scope)) {
                     (Value::Bool(b0), Value::Bool(b1)) => Value::Bool(b0 || b1),
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
