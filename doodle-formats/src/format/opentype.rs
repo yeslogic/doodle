@@ -14,6 +14,46 @@ fn last_elem(seq_var: &'static str) -> Expr {
     index_unchecked(var(seq_var), last_ix)
 }
 
+fn loca_offset_pairs(loca: Expr) -> Expr {
+    let f = |loca_table: Expr| {
+        flat_map_accum(
+            lambda_tuple(
+                ["last_value", "value"],
+                pair(
+                    expr_some(var("value")),
+                    expr_option_map_or(
+                        seq_empty(),
+                        |last| singleton(pair(last, var("value"))),
+                        var("last_value"),
+                    ),
+                ),
+            ),
+            expr_none(),
+            ValueType::Option(Box::new(ValueType::Base(BaseType::U32))),
+            expr_match(
+                record_proj(loca_table, "offsets"),
+                [
+                    (
+                        Pattern::Variant(Label::Borrowed("Offsets16"), Box::new(bind("half16s"))),
+                        flat_map(
+                            lambda(
+                                "half16",
+                                singleton(mul(Expr::AsU32(Box::new(var("half16"))), Expr::U32(2))),
+                            ),
+                            var("half16s"),
+                        ),
+                    ),
+                    (
+                        Pattern::Variant(Label::Borrowed("Offsets32"), Box::new(bind("off32s"))),
+                        var("off32s"),
+                    ),
+                ],
+            ),
+        )
+    };
+    expr_option_map_or(seq_empty(), f, loca)
+}
+
 /// Converts a `u8` value to an `i16` value within the `Expr` model
 /// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
 // FIXME - this currently uses the two's-complement u16 value that maps to the proper i16 value
@@ -249,13 +289,16 @@ fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
         ("offset", base.u32be()),
         (
             "link",
-            if_then_else(
+            cond_maybe(
                 is_nonzero_u32(var("offset")),
-                link(add(base_offset, var("offset")), format_some(format)),
-                format_none(),
+                linked_offset32(base_offset, var("offset"), format),
             ),
         ),
     ])
+}
+
+fn linked_offset32(base_offset: Expr, rel_offset: Expr, format: Format) -> Format {
+    link(add(base_offset, rel_offset), format)
 }
 
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
@@ -1182,6 +1225,40 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
         let cvt_table = repeat(s16be(base));
         let fpgm_table = repeat(base.u8());
+
+        let loca_table = {
+            module.define_format_args(
+                "opentype.loca_table",
+                vec![
+                    (
+                        Label::Borrowed("num_glyphs"),
+                        ValueType::Base(BaseType::U16),
+                    ),
+                    (
+                        Label::Borrowed("index_to_loc_format"),
+                        ValueType::Base(BaseType::U16),
+                    ),
+                ],
+                record([(
+                    "offsets",
+                    match_variant(
+                        var("index_to_loc_format"),
+                        [
+                            (
+                                Pattern::U16(SHORT_OFFSET16),
+                                "Offsets16",
+                                repeat_count(add(var("num_glyphs"), Expr::U16(1)), base.u16be()),
+                            ),
+                            (
+                                Pattern::U16(LONG_OFFSET32),
+                                "Offsets32",
+                                repeat_count(add(var("num_glyphs"), Expr::U16(1)), base.u32be()),
+                            ),
+                        ],
+                    ),
+                )]),
+            )
+        };
         let glyf_table = {
             // NOTE - variable-length expanded version of the packed flags being parsed
             let glyf_flags_simple = |num_coordinates: Expr| -> Format {
@@ -1490,55 +1567,50 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )
             };
 
-            let glyf_table_entry = record([
-                ("number_of_contours", s16be(base)),
-                ("x_min", s16be(base)),
-                ("y_min", s16be(base)),
-                ("x_max", s16be(base)),
-                ("y_max", s16be(base)),
-                ("description", glyf_description(var("number_of_contours"))),
-            ]);
+            let glyf_table_entry = |start_offset: Expr, offset_pair: Expr| {
+                if_then_else(
+                    // NOTE - checks that the glyph is non-vacuous
+                    expr_gt(
+                        tuple_proj(offset_pair.clone(), 1),
+                        tuple_proj(offset_pair.clone(), 0),
+                    ),
+                    linked_offset32(
+                        start_offset,
+                        tuple_proj(offset_pair, 0),
+                        fmt_variant(
+                            "Glyph",
+                            record([
+                                ("number_of_contours", s16be(base)),
+                                ("x_min", s16be(base)),
+                                ("y_min", s16be(base)),
+                                ("x_max", s16be(base)),
+                                ("y_max", s16be(base)),
+                                ("description", glyf_description(var("number_of_contours"))),
+                            ]),
+                        ),
+                    ),
+                    fmt_variant("EmptyGlyph", Format::EMPTY),
+                )
+            };
 
             module.define_format_args(
                 "opentype.glyf_table",
                 vec![(
-                    Label::Borrowed("num_glyphs"),
-                    ValueType::Base(BaseType::U16),
+                    Label::Borrowed("offset_pairs"),
+                    ValueType::Seq(Box::new(ValueType::Tuple(vec![
+                        ValueType::Base(BaseType::U32),
+                        ValueType::Base(BaseType::U32),
+                    ]))),
                 )],
-                repeat_count(var("num_glyphs"), glyf_table_entry),
-            )
-        };
-        let loca_table = {
-            module.define_format_args(
-                "opentype.loca_table",
-                vec![
-                    (
-                        Label::Borrowed("num_glyphs"),
-                        ValueType::Base(BaseType::U16),
+                chain(
+                    pos32(),
+                    "start_offset",
+                    for_each(
+                        var("offset_pairs"),
+                        "offset_pair",
+                        glyf_table_entry(var("start_offset"), var("offset_pair")),
                     ),
-                    (
-                        Label::Borrowed("index_to_loc_format"),
-                        ValueType::Base(BaseType::U16),
-                    ),
-                ],
-                record([(
-                    "offsets",
-                    match_variant(
-                        var("index_to_loc_format"),
-                        [
-                            (
-                                Pattern::U16(SHORT_OFFSET16),
-                                "Offsets16",
-                                repeat_count(add(var("num_glyphs"), Expr::U16(1)), base.u16be()),
-                            ),
-                            (
-                                Pattern::U16(LONG_OFFSET32),
-                                "Offsets32",
-                                repeat_count(add(var("num_glyphs"), Expr::U16(1)), base.u32be()),
-                            ),
-                        ],
-                    ),
-                )]),
+                ),
             )
         };
 
@@ -1602,15 +1674,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     optional_table("start", "tables", magic(b"fpgm"), fpgm_table),
                 ),
                 (
-                    "glyf",
-                    optional_table(
-                        "start",
-                        "tables",
-                        magic(b"glyf"),
-                        glyf_table.call_args(vec![record_proj(var("maxp"), "num_glyphs")]),
-                    ),
-                ),
-                (
                     "loca",
                     optional_table(
                         "start",
@@ -1620,6 +1683,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             record_proj(var("maxp"), "num_glyphs"),
                             record_proj(var("head"), "index_to_loc_format"),
                         ]),
+                    ),
+                ),
+                (
+                    "glyf",
+                    optional_table(
+                        "start",
+                        "tables",
+                        magic(b"glyf"),
+                        glyf_table.call_args(vec![loca_offset_pairs(var("loca"))]),
                     ),
                 ),
                 // !SECTION
@@ -1662,12 +1734,72 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
-    let ttc_header = module.define_format_args(
-        "opentype.ttc_header",
-        vec![START_ARG],
-        // STUB - implement ttc
-        Format::SkipRemainder,
-    );
+    let ttc_header = {
+        // Version 1.0
+        let ttc_header1 = |start: Expr| {
+            record([
+                ("num_fonts", base.u32be()),
+                (
+                    "table_directories",
+                    repeat_count(
+                        var("num_fonts"),
+                        offset32(start, table_directory.call_args(vec![var("start")]), base),
+                    ),
+                ),
+            ])
+        };
+
+        // Version 2.0
+        let ttc_header2 = |start: Expr| {
+            record([
+                ("num_fonts", base.u32be()),
+                (
+                    "table_directories",
+                    repeat_count(
+                        var("num_fonts"),
+                        offset32(start, table_directory.call_args(vec![var("start")]), base),
+                    ),
+                ),
+                ("dsig_tag", base.u32be()), // either b"DSIG" or 0 if none
+                ("dsig_length", base.u32be()), // byte-length or 0 if none
+                ("dsig_offset", base.u32be()), // byte-offset or 0 if none
+            ])
+        };
+
+        module.define_format_args(
+            "opentype.ttc_header",
+            vec![START_ARG],
+            // STUB - implement ttc
+            record([
+                (
+                    "ttc_tag",
+                    where_lambda(
+                        base.u32be(),
+                        "tag",
+                        expr_eq(var("tag"), Expr::U32(magic(b"ttcf"))),
+                    ),
+                ),
+                ("major_version", base.u16be()),
+                ("minor_version", base.u16be()),
+                (
+                    "header",
+                    match_variant(
+                        var("major_version"),
+                        [
+                            (Pattern::U16(1), "Version1", ttc_header1(var("start"))),
+                            (Pattern::U16(2), "Version2", ttc_header2(var("start"))),
+                            (
+                                bind("unknown"),
+                                "UnknownVersion",
+                                Format::Compute(var("unknown")),
+                            ),
+                        ],
+                    ),
+                ),
+                ("__skip", Format::SkipRemainder),
+            ]),
+        )
+    };
 
     // NOTE - we have to fail to let text have its chance to parse
     let unknown_table = Format::Fail;

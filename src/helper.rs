@@ -800,3 +800,12 @@ where
         seq,
     )
 }
+
+/// Analogue of [`std::option::Option::map_or`] expressed within the Expr model.
+///
+/// Given a default value `dft` of type `Expr@T`, and a callable `f` mapping `Expr@T -> Expr@U`,
+/// as well as a value `x` of type `Expr@Option(T)`, computes the value of type `Expr@U`
+/// corresponding to `f` applied to the `Some(_)` case, or dft if `x` is `None`.
+pub fn expr_option_map_or(dft: Expr, f: impl FnOnce(Expr) -> Expr, x: Expr) -> Expr {
+    expr_match(x, [(pat_some(bind("x")), f(var("x"))), (pat_none(), dft)])
+}

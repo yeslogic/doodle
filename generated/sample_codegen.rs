@@ -1450,7 +1450,8 @@ pub struct main_mpeg4 {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_records_inSeq {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq
+{
     table_id: u32,
     checksum: u32,
     offset: u32,
@@ -1458,7 +1459,7 @@ pub struct main_opentype_font_directory_TableDirectory_table_records_inSeq {
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0
 {
     format: u16,
     length: u16,
@@ -1467,7 +1468,7 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10
 {
     format: u16,
     __reserved: u16,
@@ -1479,7 +1480,7 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq
 {
     start_char_code: u32,
     end_char_code: u32,
@@ -1487,70 +1488,70 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12 {
 format: u16,
 __reserved: u16,
 length: u32,
 language: u32,
 num_groups: u32,
-groups: Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq>
+groups: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq>
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link_ranges_inSeq
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link_ranges_inSeq
 {
     start_unicode_value: u32,
     additional_count: u8,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link {
 num_unicode_value_ranges: u32,
-ranges: Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link_ranges_inSeq>
+ranges: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link_ranges_inSeq>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset {
 offset: u32,
-link: Option<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link>
+link: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link>
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link_uvs_mappings_inSeq
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link_uvs_mappings_inSeq
 {
     unicode_value: u32,
     glyph_id: u16,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link {
 num_uvs_mappings: u32,
-uvs_mappings: Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link_uvs_mappings_inSeq>
+uvs_mappings: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link_uvs_mappings_inSeq>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset {
 offset: u32,
-link: Option<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link>
+link: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq {
 var_selector: u32,
-default_uvs_offset: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset,
-non_default_uvs_offset: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset
+default_uvs_offset: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset,
+non_default_uvs_offset: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14 {
 format: u16,
 length: u32,
 num_var_selector_records: u32,
-var_selector: Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq>
+var_selector: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq>
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2_sub_headers_inSeq
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2_sub_headers_inSeq
 {
     first_code: u16,
     entry_count: u16,
@@ -1559,17 +1560,17 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2 {
 format: u16,
 length: u16,
 language: u16,
 sub_header_keys: Vec<u16>,
-sub_headers: Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2_sub_headers_inSeq>,
+sub_headers: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2_sub_headers_inSeq>,
 glyph_array: Vec<u16>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4
 {
     format: u16,
     length: u16,
@@ -1587,7 +1588,7 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6
 {
     format: u16,
     length: u16,
@@ -1598,57 +1599,58 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8 {
 format: u16,
 __reserved: u16,
 length: u32,
 language: u32,
 is32: Vec<u8>,
 num_groups: u32,
-groups: Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq>
+groups: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq>
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data
 {
-    Format0(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0), Format10(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10), Format12(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12), Format13(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12), Format14(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14), Format2(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2), Format4(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4), Format6(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6), Format8(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8) }
+    Format0(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0), Format10(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10), Format12(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12), Format13(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12), Format14(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14), Format2(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2), Format4(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4), Format6(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6), Format8(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8) }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link {
 table_start: u32,
 format: u16,
-data: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data
+data: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset {
 offset: u32,
-link: Option<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link>
+link: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq {
 platform: u16,
 encoding: u16,
-subtable_offset: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset
+subtable_offset: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_cmap {
-    table_start: u32,
-    version: u16,
-    num_tables: u16,
-    encoding_records:
-        Vec<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq>,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap {
+table_start: u32,
+version: u16,
+num_tables: u16,
+encoding_records: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq>
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_head_font_revision {
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_font_revision
+{
     Fixed32(u32),
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_head_glyph_extents {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_glyph_extents
+{
     x_min: u16,
     y_min: u16,
     x_max: u16,
@@ -1656,7 +1658,8 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_head_glyph_ex
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_head_mac_style {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_mac_style
+{
     __reserved: u16,
     extended: u16,
     condensed: u16,
@@ -1668,50 +1671,52 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_head_mac_styl
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_head {
-    major_version: u16,
-    minor_version: u16,
-    font_revision: main_opentype_font_directory_TableDirectory_table_links_head_font_revision,
-    checksum_adjustment: u32,
-    magic_number: (u8, u8, u8, u8),
-    flags: u16,
-    units_per_em: u16,
-    created: u64,
-    modified: u64,
-    glyph_extents: main_opentype_font_directory_TableDirectory_table_links_head_glyph_extents,
-    mac_style: main_opentype_font_directory_TableDirectory_table_links_head_mac_style,
-    lowest_rec_ppem: u16,
-    font_direction_hint: u16,
-    index_to_loc_format: u16,
-    glyph_data_format: u16,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head {
+major_version: u16,
+minor_version: u16,
+font_revision: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_font_revision,
+checksum_adjustment: u32,
+magic_number: (u8, u8, u8, u8),
+flags: u16,
+units_per_em: u16,
+created: u64,
+modified: u64,
+glyph_extents: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_glyph_extents,
+mac_style: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_mac_style,
+lowest_rec_ppem: u16,
+font_direction_hint: u16,
+index_to_loc_format: u16,
+glyph_data_format: u16
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_hhea_caret_slope {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea_caret_slope
+{
     rise: u16,
     run: u16,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_hhea {
-    major_version: u16,
-    minor_version: u16,
-    ascent: u16,
-    descent: u16,
-    line_gap: u16,
-    advance_width_max: u16,
-    min_left_side_bearing: u16,
-    min_right_side_bearing: u16,
-    x_max_extent: u16,
-    caret_slope: main_opentype_font_directory_TableDirectory_table_links_hhea_caret_slope,
-    caret_offset: u16,
-    __reservedX4: (u16, u16, u16, u16),
-    metric_data_format: u16,
-    number_of_long_horizontal_metrics: u16,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea {
+major_version: u16,
+minor_version: u16,
+ascent: u16,
+descent: u16,
+line_gap: u16,
+advance_width_max: u16,
+min_left_side_bearing: u16,
+min_right_side_bearing: u16,
+x_max_extent: u16,
+caret_slope: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea_caret_slope,
+caret_offset: u16,
+__reservedX4: (u16, u16, u16, u16),
+metric_data_format: u16,
+number_of_long_horizontal_metrics: u16
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_maxp_data_MaxpV1 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data_MaxpV1
+{
     max_points: u16,
     max_contours: u16,
     max_composite_points: u16,
@@ -1728,180 +1733,185 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_maxp_data_Max
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_maxp_data {
-    MaxpPostScript,
-    MaxpUnknown(u32),
-    MaxpV1(main_opentype_font_directory_TableDirectory_table_links_maxp_data_MaxpV1),
-}
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data
+{
+    MaxpPostScript, MaxpUnknown(u32), MaxpV1(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data_MaxpV1) }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_maxp {
-    version: u32,
-    num_glyphs: u16,
-    data: main_opentype_font_directory_TableDirectory_table_links_maxp_data,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp {
+version: u32,
+num_glyphs: u16,
+data: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_hmtx_h_metrics_inSeq {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx_h_metrics_inSeq
+{
     advance_width: u16,
     left_side_bearing: u16,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_hmtx {
-    h_metrics: Vec<main_opentype_font_directory_TableDirectory_table_links_hmtx_h_metrics_inSeq>,
-    left_side_bearings: Vec<u16>,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx {
+h_metrics: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx_h_metrics_inSeq>,
+left_side_bearings: Vec<u16>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq_offset {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq_offset
+{
     offset: u16,
     link: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq {
-    platform: u16,
-    encoding: u16,
-    language: u16,
-    name_id: u16,
-    length: u16,
-    offset: main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq_offset,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq {
+platform: u16,
+encoding: u16,
+language: u16,
+name_id: u16,
+length: u16,
+offset: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq_offset
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1_lang_tag_records_inSeq
-{
-    length: u16,
-    offset: main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq_offset,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1_lang_tag_records_inSeq {
+length: u16,
+offset: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq_offset
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1 {
 lang_tag_count: u16,
-lang_tag_records: Vec<main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1_lang_tag_records_inSeq>
+lang_tag_records: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1_lang_tag_records_inSeq>
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_name_data {
-    NameVersion0,
-    NameVersion1(main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1),
-    NameVersionUnknown(u16),
-}
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data
+{
+    NameVersion0, NameVersion1(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1), NameVersionUnknown(u16) }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_name {
-    table_start: u32,
-    version: u16,
-    name_count: u16,
-    storage_offset: u16,
-    name_records:
-        Vec<main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq>,
-    data: main_opentype_font_directory_TableDirectory_table_links_name_data,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name {
+table_start: u32,
+version: u16,
+name_count: u16,
+storage_offset: u16,
+name_records: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq>,
+data: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1_extra_fields_v2_extra_fields_v5
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1_extra_fields_v2_extra_fields_v5
 {
     us_lower_optical_point_size: u16,
     us_upper_optical_point_size: u16,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1_extra_fields_v2 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1_extra_fields_v2 {
 sx_height: u16,
 s_cap_height: u16,
 us_default_char: u16,
 us_break_char: u16,
 us_max_context: u16,
-extra_fields_v5: Option<main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1_extra_fields_v2_extra_fields_v5>
+extra_fields_v5: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1_extra_fields_v2_extra_fields_v5>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1 {
 ul_code_page_range_1: u32,
 ul_code_page_range_2: u32,
-extra_fields_v2: Option<main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1_extra_fields_v2>
+extra_fields_v2: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1_extra_fields_v2>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_os2_data {
-    s_typo_ascender: u16,
-    s_typo_descender: u16,
-    s_typo_line_gap: u16,
-    us_win_ascent: u16,
-    us_win_descent: u16,
-    extra_fields_v1:
-        Option<main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1>,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data {
+s_typo_ascender: u16,
+s_typo_descender: u16,
+s_typo_line_gap: u16,
+us_win_ascent: u16,
+us_win_descent: u16,
+extra_fields_v1: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_os2 {
-    version: u16,
-    x_avg_char_width: u16,
-    us_weight_class: u16,
-    us_width_class: u16,
-    fs_type: u16,
-    y_subscript_x_size: u16,
-    y_subscript_y_size: u16,
-    y_subscript_x_offset: u16,
-    y_subscript_y_offset: u16,
-    y_superscript_x_size: u16,
-    y_superscript_y_size: u16,
-    y_superscript_x_offset: u16,
-    y_superscript_y_offset: u16,
-    y_strikeout_size: u16,
-    y_strikeout_position: u16,
-    s_family_class: u16,
-    panose: Vec<u8>,
-    ul_unicode_range1: u32,
-    ul_unicode_range2: u32,
-    ul_unicode_range3: u32,
-    ul_unicode_range4: u32,
-    ach_vend_id: u32,
-    fs_selection: u16,
-    us_first_char_index: u16,
-    us_last_char_index: u16,
-    data: Option<main_opentype_font_directory_TableDirectory_table_links_os2_data>,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2 {
+version: u16,
+x_avg_char_width: u16,
+us_weight_class: u16,
+us_width_class: u16,
+fs_type: u16,
+y_subscript_x_size: u16,
+y_subscript_y_size: u16,
+y_subscript_x_offset: u16,
+y_subscript_y_offset: u16,
+y_superscript_x_size: u16,
+y_superscript_y_size: u16,
+y_superscript_x_offset: u16,
+y_superscript_y_offset: u16,
+y_strikeout_size: u16,
+y_strikeout_position: u16,
+s_family_class: u16,
+panose: Vec<u8>,
+ul_unicode_range1: u32,
+ul_unicode_range2: u32,
+ul_unicode_range3: u32,
+ul_unicode_range4: u32,
+ach_vend_id: u32,
+fs_selection: u16,
+us_first_char_index: u16,
+us_last_char_index: u16,
+data: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_post_names_Version2 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names_Version2
+{
     num_glyphs: u16,
     glyph_name_index: Vec<u16>,
     string_data: u32,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_post_names_Version2Dot5 {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names_Version2Dot5
+{
     num_glyphs: u16,
     offset: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_post_names {
-    Version1,
-    Version2(main_opentype_font_directory_TableDirectory_table_links_post_names_Version2),
-    Version2Dot5(main_opentype_font_directory_TableDirectory_table_links_post_names_Version2Dot5),
-    Version3,
-    VersionUnknown(u32),
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names
+{
+    Version1, Version2(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names_Version2), Version2Dot5(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names_Version2Dot5), Version3, VersionUnknown(u32) }
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post {
+version: u32,
+italic_angle: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_font_revision,
+underline_position: u16,
+is_fixed_pitch: u32,
+min_mem_type42: u32,
+max_mem_type42: u32,
+min_mem_type1: u32,
+max_mem_type1: u32,
+names: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_post {
-    version: u32,
-    italic_angle: main_opentype_font_directory_TableDirectory_table_links_head_font_revision,
-    underline_position: u16,
-    is_fixed_pitch: u32,
-    min_mem_type42: u32,
-    max_mem_type42: u32,
-    min_mem_type1: u32,
-    max_mem_type1: u32,
-    names: main_opentype_font_directory_TableDirectory_table_links_post_names,
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca_offsets
+{
+    Offsets16(Vec<u16>),
+    Offsets32(Vec<u32>),
+}
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca {
+offsets: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca_offsets
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_flags
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_flags
 {
     __reserved_msb3: u16,
     unscaled_component_offset: u16,
@@ -1920,7 +1930,7 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_de
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1
 {
     Int16(u16),
     Int8(u8),
@@ -1929,39 +1939,39 @@ pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_desc
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0
 {
     F2Dot14(u16),
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_XY {
-x_scale: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0,
-y_scale: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_XY {
+x_scale: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0,
+y_scale: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale
 {
-    Matrix((main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0, main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0), (main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0, main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0)), Scale(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0), XY(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_XY) }
+    Matrix((main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0, main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0), (main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0, main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0)), Scale(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0), XY(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_XY) }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq {
-flags: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_flags,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq {
+flags: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_flags,
 glyph_index: u16,
-argument1: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1,
-argument2: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1,
-scale: Option<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale>
+argument1: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1,
+argument2: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1,
+scale: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale>
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite {
-glyphs: Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq>,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite {
+glyphs: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq>,
 instructions: Vec<u8>
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq
 {
     on_curve_point: u8,
     x_short_vector: u8,
@@ -1972,78 +1982,110 @@ pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_de
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple {
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple {
 end_points_of_contour: Vec<u16>,
 instruction_length: u16,
 instructions: Vec<u8>,
 number_of_coordinates: u16,
-flags: Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq>,
+flags: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq>,
 x_coordinates: Vec<u16>,
 y_coordinates: Vec<u16>
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description {
-    Composite(
-        main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite,
-    ),
-    HeaderOnly,
-    Simple(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple),
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description
+{
+    Composite(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite), HeaderOnly, Simple(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple) }
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph {
+number_of_contours: u16,
+x_min: u16,
+y_min: u16,
+x_max: u16,
+y_max: u16,
+description: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq {
-    number_of_contours: u16,
-    x_min: u16,
-    y_min: u16,
-    x_max: u16,
-    y_max: u16,
-    description: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description,
+pub enum main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq
+{
+    EmptyGlyph, Glyph(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph) }
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links {
+cmap: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap,
+head: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head,
+hhea: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea,
+maxp: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp,
+hmtx: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx,
+name: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name,
+os2: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2,
+post: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post,
+cvt: Option<Vec<u16>>,
+fpgm: Option<Vec<u8>>,
+loca: Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca>,
+glyf: Option<Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq>>,
+__skip: ()
 }
 
 #[derive(Debug, Clone)]
-pub enum main_opentype_font_directory_TableDirectory_table_links_loca_offsets {
-    Offsets16(Vec<u16>),
-    Offsets32(Vec<u32>),
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link {
+sfnt_version: u32,
+num_tables: u16,
+search_range: u16,
+entry_selector: u16,
+range_shift: u16,
+table_records: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq>,
+table_links: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links_loca {
-    offsets: main_opentype_font_directory_TableDirectory_table_links_loca_offsets,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq {
+    offset: u32,
+    link:
+        Option<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link>,
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory_table_links {
-    cmap: main_opentype_font_directory_TableDirectory_table_links_cmap,
-    head: main_opentype_font_directory_TableDirectory_table_links_head,
-    hhea: main_opentype_font_directory_TableDirectory_table_links_hhea,
-    maxp: main_opentype_font_directory_TableDirectory_table_links_maxp,
-    hmtx: main_opentype_font_directory_TableDirectory_table_links_hmtx,
-    name: main_opentype_font_directory_TableDirectory_table_links_name,
-    os2: main_opentype_font_directory_TableDirectory_table_links_os2,
-    post: main_opentype_font_directory_TableDirectory_table_links_post,
-    cvt: Option<Vec<u16>>,
-    fpgm: Option<Vec<u8>>,
-    glyf: Option<Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq>>,
-    loca: Option<main_opentype_font_directory_TableDirectory_table_links_loca>,
+pub struct main_opentype_font_directory_TTCHeader_header_Version1 {
+    num_fonts: u32,
+    table_directories:
+        Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq>,
+}
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TTCHeader_header_Version2 {
+    num_fonts: u32,
+    table_directories:
+        Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq>,
+    dsig_tag: u32,
+    dsig_length: u32,
+    dsig_offset: u32,
+}
+
+#[derive(Debug, Clone)]
+pub enum main_opentype_font_directory_TTCHeader_header {
+    UnknownVersion(u16),
+    Version1(main_opentype_font_directory_TTCHeader_header_Version1),
+    Version2(main_opentype_font_directory_TTCHeader_header_Version2),
+}
+
+#[derive(Debug, Clone)]
+pub struct main_opentype_font_directory_TTCHeader {
+    ttc_tag: u32,
+    major_version: u16,
+    minor_version: u16,
+    header: main_opentype_font_directory_TTCHeader_header,
     __skip: (),
 }
 
 #[derive(Debug, Clone)]
-pub struct main_opentype_font_directory_TableDirectory {
-    sfnt_version: u32,
-    num_tables: u16,
-    search_range: u16,
-    entry_selector: u16,
-    range_shift: u16,
-    table_records: Vec<main_opentype_font_directory_TableDirectory_table_records_inSeq>,
-    table_links: main_opentype_font_directory_TableDirectory_table_links,
-}
-
-#[derive(Debug, Clone)]
 pub enum main_opentype_font_directory {
-    TTCHeader,
-    TableDirectory(main_opentype_font_directory_TableDirectory),
+    TTCHeader(main_opentype_font_directory_TTCHeader),
+    TableDirectory(
+        main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link,
+    ),
     UnknownTable,
 }
 
@@ -2483,7 +2525,7 @@ pub struct base_u32be__dupX2 {
 #[derive(Debug, Clone)]
 pub struct base_u8_ix1 {
 repeats: u8,
-field_set: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq
+field_set: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -3489,7 +3531,7 @@ main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd_fields_inSeq { tag,
                                         }
                                     };
                                     if matching_ix == 0 {
-                                        let next_elem = (Decoder35(_input))?;
+                                        let next_elem = (Decoder25(_input))?;
                                         accum.push(next_elem);
                                     } else {
                                         break;
@@ -3538,7 +3580,7 @@ main_jpeg_frame_initial_segment_app1_data_data_exif_exif_ifd_fields_inSeq { tag,
                                         }
                                     };
                                     if matching_ix == 0 {
-                                        let next_elem = (Decoder35(_input))?;
+                                        let next_elem = (Decoder25(_input))?;
                                         accum.push(next_elem);
                                     } else {
                                         break;
@@ -4368,8 +4410,8 @@ fn Decoder20<'input>(
             }
 
             1953784678u32 => {
-                let _ = (Decoder23(_input, start.clone()))?;
-                main_opentype_font_directory::TTCHeader
+                let inner = (Decoder23(_input, start.clone()))?;
+                main_opentype_font_directory::TTCHeader(inner)
             }
 
             _ => {
@@ -4382,10 +4424,10 @@ fn Decoder20<'input>(
 
 fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+        let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
         (field0, field1, field2, field3)
     };
     PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok(u32be(x)))(inner))?)
@@ -4394,7 +4436,10 @@ fn Decoder21<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
 fn Decoder22<'input>(
     _input: &mut Parser<'input>,
     start: u32,
-) -> Result<main_opentype_font_directory_TableDirectory, ParseError> {
+) -> Result<
+    main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link,
+    ParseError,
+> {
     let sfnt_version = ((|| {
         PResult::Ok({
             let inner = (Decoder21(_input))?;
@@ -4413,151 +4458,203 @@ fn Decoder22<'input>(
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..num_tables {
-                accum.push((Decoder25(_input, start.clone()))?);
+                accum.push((Decoder26(_input, start.clone()))?);
             }
             accum
         })
     })())?;
     let table_links =
-        ((|| PResult::Ok((Decoder26(_input, start.clone(), table_records.clone()))?))())?;
-    PResult::Ok(main_opentype_font_directory_TableDirectory {
-        sfnt_version,
-        num_tables,
-        search_range,
-        entry_selector,
-        range_shift,
-        table_records,
-        table_links,
-    })
+        ((|| PResult::Ok((Decoder27(_input, start.clone(), table_records.clone()))?))())?;
+    PResult::Ok(
+        main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link {
+            sfnt_version,
+            num_tables,
+            search_range,
+            entry_selector,
+            range_shift,
+            table_records,
+            table_links,
+        },
+    )
 }
 
-fn Decoder23<'input>(_input: &mut Parser<'input>, start: u32) -> Result<(), ParseError> {
-    PResult::Ok(_input.skip_remainder())
+fn Decoder23<'input>(
+    _input: &mut Parser<'input>,
+    start: u32,
+) -> Result<main_opentype_font_directory_TTCHeader, ParseError> {
+    let ttc_tag = ((|| {
+        PResult::Ok({
+            let inner = (Decoder21(_input))?;
+            if ((|tag: u32| PResult::Ok(tag == 1953784678u32))(inner.clone()))? {
+                inner
+            } else {
+                return Err(ParseError::FalsifiedWhere);
+            }
+        })
+    })())?;
+    let major_version = ((|| PResult::Ok((Decoder24(_input))?))())?;
+    let minor_version = ((|| PResult::Ok((Decoder24(_input))?))())?;
+    let header = ((|| {
+        PResult::Ok(match major_version {
+            1u16 => {
+                let inner = {
+                    let num_fonts = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    let table_directories = ((|| {
+                        PResult::Ok({
+                            let mut accum = Vec::new();
+                            for _ in 0..num_fonts {
+                                accum.push({
+let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
+let link = ((|| PResult::Ok(if offset != 0u32 {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(start + offset, __here))?;
+let ret = ((|| PResult::Ok((Decoder22(_input, start.clone()))?))())?;
+_input.close_peek_context()?;
+Some(ret)
+} else {
+None
+}))())?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq { offset, link }
+});
+                            }
+                            accum
+                        })
+                    })())?;
+                    main_opentype_font_directory_TTCHeader_header_Version1 {
+                        num_fonts,
+                        table_directories,
+                    }
+                };
+                main_opentype_font_directory_TTCHeader_header::Version1(inner)
+            }
+
+            2u16 => {
+                let inner = {
+                    let num_fonts = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    let table_directories = ((|| {
+                        PResult::Ok({
+                            let mut accum = Vec::new();
+                            for _ in 0..num_fonts {
+                                accum.push({
+let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
+let link = ((|| PResult::Ok(if offset != 0u32 {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(start + offset, __here))?;
+let ret = ((|| PResult::Ok((Decoder22(_input, start.clone()))?))())?;
+_input.close_peek_context()?;
+Some(ret)
+} else {
+None
+}))())?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq { offset, link }
+});
+                            }
+                            accum
+                        })
+                    })())?;
+                    let dsig_tag = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    let dsig_length = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    let dsig_offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                    main_opentype_font_directory_TTCHeader_header_Version2 {
+                        num_fonts,
+                        table_directories,
+                        dsig_tag,
+                        dsig_length,
+                        dsig_offset,
+                    }
+                };
+                main_opentype_font_directory_TTCHeader_header::Version2(inner)
+            }
+
+            unknown => {
+                let inner = unknown.clone();
+                main_opentype_font_directory_TTCHeader_header::UnknownVersion(inner)
+            }
+        })
+    })())?;
+    let __skip = ((|| PResult::Ok(_input.skip_remainder()))())?;
+    PResult::Ok(main_opentype_font_directory_TTCHeader {
+        ttc_tag,
+        major_version,
+        minor_version,
+        header,
+        __skip,
+    })
 }
 
 fn Decoder24<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+        let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
         (field0, field1)
     };
     PResult::Ok(((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?)
 }
 
-fn Decoder25<'input>(
-    _input: &mut Parser<'input>,
-    start: u32,
-) -> Result<main_opentype_font_directory_TableDirectory_table_records_inSeq, ParseError> {
+fn Decoder25<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+    let b = _input.read_byte()?;
+    PResult::Ok(b)
+}
+
+fn Decoder26<'input>(_input: &mut Parser<'input>, start: u32) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq, ParseError>{
     let table_id = ((|| PResult::Ok((Decoder38(_input))?))())?;
     let checksum = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_records_inSeq {
-            table_id,
-            checksum,
-            offset,
-            length,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq { table_id, checksum, offset, length })
 }
 
-fn Decoder26<'input>(
+fn Decoder27<'input>(
     _input: &mut Parser<'input>,
     start: u32,
-    tables: Vec<main_opentype_font_directory_TableDirectory_table_records_inSeq>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links, ParseError> {
+    tables: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq>,
+) -> Result<
+    main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links,
+    ParseError,
+> {
     let cmap = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1668112752u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1668112752u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1668112752u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1668112752u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(2381717495940604803u64));
-                }
-            };
-            let offset = {
-                let inner = _input.get_offset_u64();
-                ((|x: u64| PResult::Ok(x as u32))(inner))?
-            };
-            _input.open_peek_context();
-            _input.advance_by(try_sub!(start + matching_table.offset.clone(), offset))?;
-            let ret = ((|| {
-                PResult::Ok({
-                    let sz = (matching_table.length.clone()) as usize;
-                    _input.start_slice(sz)?;
-                    let ret = ((|| PResult::Ok((Decoder27(_input))?))())?;
-                    _input.end_slice()?;
-                    ret
-                })
-            })())?;
-            _input.close_peek_context()?;
-            ret
-        })
-    })())?;
-    let head = ((|| {
-        PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1751474532u32 {
-                            true => [table.clone()].to_vec(),
-
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1751474532u32 {
-                                true => [table.clone()].to_vec(),
-
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
-
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
-
-                _ => {
-                    return Err(ParseError::ExcludedBranch(13414249021383648927u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(2381717495940604803u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4577,42 +4674,41 @@ fn Decoder26<'input>(
             ret
         })
     })())?;
-    let hhea = ((|| {
+    let head = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1751672161u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1751474532u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1751672161u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1751474532u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(2388446886758135460u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(13414249021383648927u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4632,42 +4728,41 @@ fn Decoder26<'input>(
             ret
         })
     })())?;
-    let maxp = ((|| {
+    let hhea = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1835104368u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1751672161u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1835104368u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1751672161u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(3272934374665651290u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(2388446886758135460u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4687,42 +4782,95 @@ fn Decoder26<'input>(
             ret
         })
     })())?;
+    let maxp = ((|| {
+        PResult::Ok({
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1835104368u32 {
+true => {
+[table.clone()].to_vec()
+},
+
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1835104368u32 {
+true => {
+[table.clone()].to_vec()
+},
+
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
+
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(3272934374665651290u64));
+}
+};
+            let offset = {
+                let inner = _input.get_offset_u64();
+                ((|x: u64| PResult::Ok(x as u32))(inner))?
+            };
+            _input.open_peek_context();
+            _input.advance_by(try_sub!(start + matching_table.offset.clone(), offset))?;
+            let ret = ((|| {
+                PResult::Ok({
+                    let sz = (matching_table.length.clone()) as usize;
+                    _input.start_slice(sz)?;
+                    let ret = ((|| PResult::Ok((Decoder31(_input))?))())?;
+                    _input.end_slice()?;
+                    ret
+                })
+            })())?;
+            _input.close_peek_context()?;
+            ret
+        })
+    })())?;
     let hmtx = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1752003704u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1752003704u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1752003704u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1752003704u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(10983496763888046882u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(10983496763888046882u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4735,7 +4883,7 @@ fn Decoder26<'input>(
                     _input.start_slice(sz)?;
                     let ret = ((|| {
                         PResult::Ok(
-                            (Decoder31(
+                            (Decoder32(
                                 _input,
                                 hhea.number_of_long_horizontal_metrics.clone(),
                                 maxp.num_glyphs.clone(),
@@ -4752,40 +4900,39 @@ fn Decoder26<'input>(
     })())?;
     let name = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1851878757u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1851878757u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1851878757u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1851878757u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(11387878137723461222u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(11387878137723461222u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4796,7 +4943,7 @@ fn Decoder26<'input>(
                 PResult::Ok({
                     let sz = (matching_table.length.clone()) as usize;
                     _input.start_slice(sz)?;
-                    let ret = ((|| PResult::Ok((Decoder32(_input))?))())?;
+                    let ret = ((|| PResult::Ok((Decoder33(_input))?))())?;
                     _input.end_slice()?;
                     ret
                 })
@@ -4807,40 +4954,39 @@ fn Decoder26<'input>(
     })())?;
     let os2 = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1330851634u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1330851634u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1330851634u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1330851634u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(16053312509972943637u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(16053312509972943637u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4852,7 +4998,7 @@ fn Decoder26<'input>(
                     let sz = (matching_table.length.clone()) as usize;
                     _input.start_slice(sz)?;
                     let ret =
-                        ((|| PResult::Ok((Decoder33(_input, matching_table.length.clone()))?))())?;
+                        ((|| PResult::Ok((Decoder34(_input, matching_table.length.clone()))?))())?;
                     _input.end_slice()?;
                     ret
                 })
@@ -4863,40 +5009,39 @@ fn Decoder26<'input>(
     })())?;
     let post = ((|| {
         PResult::Ok({
-            let matching_table = match match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1886352244u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1886352244u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1886352244u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1886352244u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            } {
-                Some(ref x) => x.clone(),
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.clone()
+},
 
-                _ => {
-                    return Err(ParseError::ExcludedBranch(6462592155365958452u64));
-                }
-            };
+_ => {
+return Err(ParseError::ExcludedBranch(6462592155365958452u64));
+}
+};
             let offset = {
                 let inner = _input.get_offset_u64();
                 ((|x: u64| PResult::Ok(x as u32))(inner))?
@@ -4907,7 +5052,7 @@ fn Decoder26<'input>(
                 PResult::Ok({
                     let sz = (matching_table.length.clone()) as usize;
                     _input.start_slice(sz)?;
-                    let ret = ((|| PResult::Ok((Decoder34(_input))?))())?;
+                    let ret = ((|| PResult::Ok((Decoder35(_input))?))())?;
                     _input.end_slice()?;
                     ret
                 })
@@ -4918,34 +5063,31 @@ fn Decoder26<'input>(
     })())?;
     let cvt = ((|| {
         PResult::Ok({
-            let matching_table = match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1668707360u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1668707360u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1668707360u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1668707360u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            };
+false => {
+None
+}
+};
             match matching_table {
                 Some(ref table) => {
                     let inner = {
@@ -4998,34 +5140,31 @@ fn Decoder26<'input>(
     })())?;
     let fpgm = ((|| {
         PResult::Ok({
-            let matching_table = match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1718642541u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1718642541u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1718642541u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1718642541u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            };
+false => {
+None
+}
+};
             match matching_table {
                 Some(ref table) => {
                     let inner = {
@@ -5053,7 +5192,7 @@ fn Decoder26<'input>(
                                                 }
                                             };
                                             if matching_ix == 0 {
-                                                let next_elem = (Decoder35(_input))?;
+                                                let next_elem = (Decoder25(_input))?;
                                                 accum.push(next_elem);
                                             } else {
                                                 break;
@@ -5076,98 +5215,33 @@ fn Decoder26<'input>(
             }
         })
     })())?;
-    let glyf = ((|| {
-        PResult::Ok({
-            let matching_table = match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1735162214u32 {
-                            true => [table.clone()].to_vec(),
-
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1735162214u32 {
-                                true => [table.clone()].to_vec(),
-
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
-
-                false => None,
-            };
-            match matching_table {
-                Some(ref table) => {
-                    let inner = {
-                        let offset = {
-                            let inner = _input.get_offset_u64();
-                            ((|x: u64| PResult::Ok(x as u32))(inner))?
-                        };
-                        _input.open_peek_context();
-                        _input.advance_by(try_sub!(start + table.offset.clone(), offset))?;
-                        let ret = ((|| {
-                            PResult::Ok({
-                                let sz = (table.length.clone()) as usize;
-                                _input.start_slice(sz)?;
-                                let ret = ((|| {
-                                    PResult::Ok((Decoder36(_input, maxp.num_glyphs.clone()))?)
-                                })())?;
-                                _input.end_slice()?;
-                                ret
-                            })
-                        })())?;
-                        _input.close_peek_context()?;
-                        ret
-                    };
-                    ((|val: Vec<
-                        main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq,
-                    >| PResult::Ok(Some(val)))(inner))?
-                }
-
-                None => None,
-            }
-        })
-    })())?;
     let loca = ((|| {
         PResult::Ok({
-            let matching_table = match 0u32
-                < (((try_flat_map_vec(
-                    tables.iter().cloned(),
-                    |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                        PResult::Ok(match table.table_id.clone() == 1819239265u32 {
-                            true => [table.clone()].to_vec(),
+            let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1819239265u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                            false => [].to_vec(),
-                        })
-                    },
-                ))?
-                .len()) as u32)
-            {
-                true => Some(
-                    (try_flat_map_vec(
-                        tables.iter().cloned(),
-                        |table: main_opentype_font_directory_TableDirectory_table_records_inSeq| {
-                            PResult::Ok(match table.table_id.clone() == 1819239265u32 {
-                                true => [table.clone()].to_vec(),
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1819239265u32 {
+true => {
+[table.clone()].to_vec()
+},
 
-                                false => [].to_vec(),
-                            })
-                        },
-                    ))?[0u32 as usize],
-                ),
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
 
-                false => None,
-            };
+false => {
+None
+}
+};
             match matching_table {
                 Some(ref table) => {
                     let inner = {
@@ -5183,7 +5257,7 @@ fn Decoder26<'input>(
                                 _input.start_slice(sz)?;
                                 let ret = ((|| {
                                     PResult::Ok(
-                                        (Decoder37(
+                                        (Decoder36(
                                             _input,
                                             maxp.num_glyphs.clone(),
                                             head.index_to_loc_format.clone(),
@@ -5197,9 +5271,92 @@ fn Decoder26<'input>(
                         _input.close_peek_context()?;
                         ret
                     };
-                    ((|val: main_opentype_font_directory_TableDirectory_table_links_loca| {
-                        PResult::Ok(Some(val))
-                    })(inner))?
+                    ((|val: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca| PResult::Ok(Some(val)))(inner))?
+                }
+
+                None => None,
+            }
+        })
+    })())?;
+    let glyf = ((|| {
+        PResult::Ok({
+            let matching_table = match 0u32 < (((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1735162214u32 {
+true => {
+[table.clone()].to_vec()
+},
+
+false => {
+[].to_vec()
+}
+})))?.len()) as u32) {
+true => {
+Some((try_flat_map_vec(tables.iter().cloned(), |table: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_records_inSeq| PResult::Ok(match table.table_id.clone() == 1735162214u32 {
+true => {
+[table.clone()].to_vec()
+},
+
+false => {
+[].to_vec()
+}
+})))?[0u32 as usize])
+},
+
+false => {
+None
+}
+};
+            match matching_table {
+                Some(ref table) => {
+                    let inner = {
+                        let offset = {
+                            let inner = _input.get_offset_u64();
+                            ((|x: u64| PResult::Ok(x as u32))(inner))?
+                        };
+                        _input.open_peek_context();
+                        _input.advance_by(try_sub!(start + table.offset.clone(), offset))?;
+                        let ret = ((|| {
+                            PResult::Ok({
+                                let sz = (table.length.clone()) as usize;
+                                _input.start_slice(sz)?;
+                                let ret = ((|| {
+                                    PResult::Ok((Decoder37(_input, match loca {
+Some(ref x) => {
+(try_fold_map_curried(match x.offsets.clone() {
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca_offsets::Offsets16(half16s) => {
+(try_flat_map_vec(half16s.iter().cloned(), |half16: u16| PResult::Ok([(half16 as u32) * 2u32].to_vec())))?
+},
+
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca_offsets::Offsets32(off32s) => {
+off32s
+}
+}.iter().cloned(), None, |tuple_var: (Option<u32>, u32)| PResult::Ok(match tuple_var {
+(last_value, value) => {
+(Some(value.clone()), match last_value {
+Some(x) => {
+[(x.clone(), value.clone())].to_vec()
+},
+
+None => {
+[].to_vec()
+}
+})
+}
+})))?
+},
+
+None => {
+[].to_vec()
+}
+}))?)
+                                })())?;
+                                _input.end_slice()?;
+                                ret
+                            })
+                        })())?;
+                        _input.close_peek_context()?;
+                        ret
+                    };
+                    ((|val: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq>| PResult::Ok(Some(val)))(inner))?
                 }
 
                 None => None,
@@ -5207,26 +5364,10 @@ fn Decoder26<'input>(
         })
     })())?;
     let __skip = ((|| PResult::Ok(_input.skip_remainder()))())?;
-    PResult::Ok(main_opentype_font_directory_TableDirectory_table_links {
-        cmap,
-        head,
-        hhea,
-        maxp,
-        hmtx,
-        name,
-        os2,
-        post,
-        cvt,
-        fpgm,
-        glyf,
-        loca,
-        __skip,
-    })
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links { cmap, head, hhea, maxp, hmtx, name, os2, post, cvt, fpgm, loca, glyf, __skip })
 }
 
-fn Decoder27<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap, ParseError> {
+fn Decoder28<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap, ParseError>{
     let table_start = ((|| {
         PResult::Ok({
             let inner = _input.get_offset_u64();
@@ -5244,19 +5385,10 @@ fn Decoder27<'input>(
             accum
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_cmap {
-            table_start,
-            version,
-            num_tables,
-            encoding_records,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap { table_start, version, num_tables, encoding_records })
 }
 
-fn Decoder28<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_head, ParseError> {
+fn Decoder29<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head, ParseError>{
     let major_version = ((|| {
         PResult::Ok({
             let inner = (Decoder24(_input))?;
@@ -5281,7 +5413,7 @@ fn Decoder28<'input>(
         PResult::Ok({
             let inner = (Decoder21(_input))?;
             ((|x: u32| {
-                PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_head_font_revision::Fixed32(x))
+                PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_font_revision::Fixed32(x))
             })(inner))?
         })
     })())?;
@@ -5350,12 +5482,7 @@ fn Decoder28<'input>(
             let y_min = ((|| PResult::Ok((Decoder24(_input))?))())?;
             let x_max = ((|| PResult::Ok((Decoder24(_input))?))())?;
             let y_max = ((|| PResult::Ok((Decoder24(_input))?))())?;
-            main_opentype_font_directory_TableDirectory_table_links_head_glyph_extents {
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-            }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_glyph_extents { x_min, y_min, x_max, y_max }
         })
     })())?;
     let mac_style = ((|| {
@@ -5380,28 +5507,14 @@ fn Decoder28<'input>(
                     ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
                 };
                 ((|packedbits: u16| {
-                    PResult::Ok(
-                        main_opentype_font_directory_TableDirectory_table_links_head_mac_style {
-                            __reserved: packedbits >> 7u16 & 511u16,
-                            extended: packedbits >> 6u16 & 1u16,
-                            condensed: packedbits >> 5u16 & 1u16,
-                            shadow: packedbits >> 4u16 & 1u16,
-                            outline: packedbits >> 3u16 & 1u16,
-                            underline: packedbits >> 2u16 & 1u16,
-                            italic: packedbits >> 1u16 & 1u16,
-                            bold: packedbits >> 0u16 & 1u16,
-                        },
-                    )
+                    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_mac_style { __reserved: packedbits >> 7u16 & 511u16, extended: packedbits >> 6u16 & 1u16, condensed: packedbits >> 5u16 & 1u16, shadow: packedbits >> 4u16 & 1u16, outline: packedbits >> 3u16 & 1u16, underline: packedbits >> 2u16 & 1u16, italic: packedbits >> 1u16 & 1u16, bold: packedbits >> 0u16 & 1u16 })
                 })(inner))?
             };
-            if ((|x: main_opentype_font_directory_TableDirectory_table_links_head_mac_style| {
-                PResult::Ok(x.__reserved.clone() == 0u16)
-            })(inner.clone()))?
-            {
-                inner
-            } else {
-                return Err(ParseError::FalsifiedWhere);
-            }
+            if ((|x: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_mac_style| PResult::Ok(x.__reserved.clone() == 0u16))(inner.clone()))? {
+inner
+} else {
+return Err(ParseError::FalsifiedWhere);
+}
         })
     })())?;
     let lowest_rec_ppem = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -5426,30 +5539,10 @@ fn Decoder28<'input>(
             }
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_head {
-            major_version,
-            minor_version,
-            font_revision,
-            checksum_adjustment,
-            magic_number,
-            flags,
-            units_per_em,
-            created,
-            modified,
-            glyph_extents,
-            mac_style,
-            lowest_rec_ppem,
-            font_direction_hint,
-            index_to_loc_format,
-            glyph_data_format,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head { major_version, minor_version, font_revision, checksum_adjustment, magic_number, flags, units_per_em, created, modified, glyph_extents, mac_style, lowest_rec_ppem, font_direction_hint, index_to_loc_format, glyph_data_format })
 }
 
-fn Decoder29<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_hhea, ParseError> {
+fn Decoder30<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea, ParseError>{
     let major_version = ((|| {
         PResult::Ok({
             let inner = (Decoder24(_input))?;
@@ -5481,7 +5574,7 @@ fn Decoder29<'input>(
         PResult::Ok({
             let rise = ((|| PResult::Ok((Decoder24(_input))?))())?;
             let run = ((|| PResult::Ok((Decoder24(_input))?))())?;
-            main_opentype_font_directory_TableDirectory_table_links_hhea_caret_slope { rise, run }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea_caret_slope { rise, run }
         })
     })())?;
     let caret_offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -5541,75 +5634,42 @@ fn Decoder29<'input>(
         })
     })())?;
     let number_of_long_horizontal_metrics = ((|| PResult::Ok((Decoder24(_input))?))())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_hhea {
-            major_version,
-            minor_version,
-            ascent,
-            descent,
-            line_gap,
-            advance_width_max,
-            min_left_side_bearing,
-            min_right_side_bearing,
-            x_max_extent,
-            caret_slope,
-            caret_offset,
-            __reservedX4,
-            metric_data_format,
-            number_of_long_horizontal_metrics,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hhea { major_version, minor_version, ascent, descent, line_gap, advance_width_max, min_left_side_bearing, min_right_side_bearing, x_max_extent, caret_slope, caret_offset, __reservedX4, metric_data_format, number_of_long_horizontal_metrics })
 }
 
-fn Decoder30<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_maxp, ParseError> {
+fn Decoder31<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp, ParseError>{
     let version = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let num_glyphs = ((|| PResult::Ok((Decoder24(_input))?))())?;
-    let data =
-        ((|| {
-            PResult::Ok(match version {
+    let data = ((|| {
+        PResult::Ok(match version {
 65536u32 => {
 let inner = (Decoder40(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_maxp_data::MaxpV1(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data::MaxpV1(inner)
 },
 
 20480u32 => {
-main_opentype_font_directory_TableDirectory_table_links_maxp_data::MaxpPostScript
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data::MaxpPostScript
 },
 
 unknown => {
 let inner = unknown.clone();
-main_opentype_font_directory_TableDirectory_table_links_maxp_data::MaxpUnknown(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data::MaxpUnknown(inner)
 }
 })
-        })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_maxp {
-            version,
-            num_glyphs,
-            data,
-        },
-    )
+    })())?;
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp { version, num_glyphs, data })
 }
 
-fn Decoder31<'input>(
-    _input: &mut Parser<'input>,
-    num_h_metrics: u16,
-    num_glyphs: u16,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_hmtx, ParseError> {
+fn Decoder32<'input>(_input: &mut Parser<'input>, num_h_metrics: u16, num_glyphs: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx, ParseError>{
     let h_metrics = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..num_h_metrics {
                 accum.push({
-                    let advance_width = ((|| PResult::Ok((Decoder24(_input))?))())?;
-                    let left_side_bearing = ((|| PResult::Ok((Decoder24(_input))?))())?;
-                    main_opentype_font_directory_TableDirectory_table_links_hmtx_h_metrics_inSeq {
-                        advance_width,
-                        left_side_bearing,
-                    }
-                });
+let advance_width = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let left_side_bearing = ((|| PResult::Ok((Decoder24(_input))?))())?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx_h_metrics_inSeq { advance_width, left_side_bearing }
+});
             }
             accum
         })
@@ -5623,17 +5683,10 @@ fn Decoder31<'input>(
             accum
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_hmtx {
-            h_metrics,
-            left_side_bearings,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_hmtx { h_metrics, left_side_bearings })
 }
 
-fn Decoder32<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_name, ParseError> {
+fn Decoder33<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name, ParseError>{
     let table_start = ((|| {
         PResult::Ok({
             let inner = _input.get_offset_u64();
@@ -5667,7 +5720,7 @@ let ret = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..length {
-accum.push((Decoder35(_input))?);
+accum.push((Decoder25(_input))?);
 }
 accum
 };
@@ -5681,9 +5734,9 @@ false => {
 None
 }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq_offset { offset, link }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq_offset { offset, link }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq { platform, encoding, language, name_id, length, offset }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq { platform, encoding, language, name_id, length, offset }
 });
             }
             accum
@@ -5691,37 +5744,25 @@ main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq 
     })())?;
     let data = ((|| {
         PResult::Ok(match version {
-            0u16 => main_opentype_font_directory_TableDirectory_table_links_name_data::NameVersion0,
+0u16 => {
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data::NameVersion0
+},
 
-            1u16 => {
-                let inner = (Decoder39(_input, table_start + (storage_offset as u32)))?;
-                main_opentype_font_directory_TableDirectory_table_links_name_data::NameVersion1(
-                    inner,
-                )
-            }
+1u16 => {
+let inner = (Decoder39(_input, table_start + (storage_offset as u32)))?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data::NameVersion1(inner)
+},
 
-            unknown => {
-                let inner = unknown.clone();
-                main_opentype_font_directory_TableDirectory_table_links_name_data::NameVersionUnknown(inner)
-            }
-        })
+unknown => {
+let inner = unknown.clone();
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data::NameVersionUnknown(inner)
+}
+})
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_name {
-            table_start,
-            version,
-            name_count,
-            storage_offset,
-            name_records,
-            data,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name { table_start, version, name_count, storage_offset, name_records, data })
 }
 
-fn Decoder33<'input>(
-    _input: &mut Parser<'input>,
-    table_length: u32,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_os2, ParseError> {
+fn Decoder34<'input>(_input: &mut Parser<'input>, table_length: u32) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2, ParseError>{
     let version = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let x_avg_char_width = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let us_weight_class = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -5742,7 +5783,7 @@ fn Decoder33<'input>(
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..10u8 {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -5779,76 +5820,36 @@ fn Decoder33<'input>(
                                         ((|| PResult::Ok((Decoder24(_input))?))())?;
                                     let us_upper_optical_point_size =
                                         ((|| PResult::Ok((Decoder24(_input))?))())?;
-                                    Some(main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 { us_lower_optical_point_size, us_upper_optical_point_size })
+                                    Some(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1_extra_fields_v2_extra_fields_v5 { us_lower_optical_point_size, us_upper_optical_point_size })
                                 } else {
                                     None
                                 })
                             })())?;
-                            Some(main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1_extra_fields_v2 { sx_height, s_cap_height, us_default_char, us_break_char, us_max_context, extra_fields_v5 })
+                            Some(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1_extra_fields_v2 { sx_height, s_cap_height, us_default_char, us_break_char, us_max_context, extra_fields_v5 })
                         } else {
                             None
                         })
                     })())?;
-                    Some(main_opentype_font_directory_TableDirectory_table_links_os2_data_extra_fields_v1 { ul_code_page_range_1, ul_code_page_range_2, extra_fields_v2 })
+                    Some(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data_extra_fields_v1 { ul_code_page_range_1, ul_code_page_range_2, extra_fields_v2 })
                 } else {
                     None
                 })
             })())?;
-            Some(
-                main_opentype_font_directory_TableDirectory_table_links_os2_data {
-                    s_typo_ascender,
-                    s_typo_descender,
-                    s_typo_line_gap,
-                    us_win_ascent,
-                    us_win_descent,
-                    extra_fields_v1,
-                },
-            )
+            Some(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2_data { s_typo_ascender, s_typo_descender, s_typo_line_gap, us_win_ascent, us_win_descent, extra_fields_v1 })
         } else {
             None
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_os2 {
-            version,
-            x_avg_char_width,
-            us_weight_class,
-            us_width_class,
-            fs_type,
-            y_subscript_x_size,
-            y_subscript_y_size,
-            y_subscript_x_offset,
-            y_subscript_y_offset,
-            y_superscript_x_size,
-            y_superscript_y_size,
-            y_superscript_x_offset,
-            y_superscript_y_offset,
-            y_strikeout_size,
-            y_strikeout_position,
-            s_family_class,
-            panose,
-            ul_unicode_range1,
-            ul_unicode_range2,
-            ul_unicode_range3,
-            ul_unicode_range4,
-            ach_vend_id,
-            fs_selection,
-            us_first_char_index,
-            us_last_char_index,
-            data,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_os2 { version, x_avg_char_width, us_weight_class, us_width_class, fs_type, y_subscript_x_size, y_subscript_y_size, y_subscript_x_offset, y_subscript_y_offset, y_superscript_x_size, y_superscript_y_size, y_superscript_x_offset, y_superscript_y_offset, y_strikeout_size, y_strikeout_position, s_family_class, panose, ul_unicode_range1, ul_unicode_range2, ul_unicode_range3, ul_unicode_range4, ach_vend_id, fs_selection, us_first_char_index, us_last_char_index, data })
 }
 
-fn Decoder34<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_post, ParseError> {
+fn Decoder35<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post, ParseError>{
     let version = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let italic_angle = ((|| {
         PResult::Ok({
             let inner = (Decoder21(_input))?;
             ((|x: u32| {
-                PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_head_font_revision::Fixed32(x))
+                PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head_font_revision::Fixed32(x))
             })(inner))?
         })
     })())?;
@@ -5860,95 +5861,109 @@ fn Decoder34<'input>(
     let max_mem_type1 = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let names = ((|| {
         PResult::Ok(match version {
-            65536u32 => {
-                main_opentype_font_directory_TableDirectory_table_links_post_names::Version1
-            }
+65536u32 => {
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names::Version1
+},
 
-            131072u32 => {
+131072u32 => {
+let inner = {
+let num_glyphs = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let glyph_name_index = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..num_glyphs {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+let string_data = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names_Version2 { num_glyphs, glyph_name_index, string_data }
+};
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names::Version2(inner)
+},
+
+151552u32 => {
+let inner = {
+let num_glyphs = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let offset = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..num_glyphs {
+accum.push((Decoder25(_input))?);
+}
+accum
+}))())?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names_Version2Dot5 { num_glyphs, offset }
+};
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names::Version2Dot5(inner)
+},
+
+196608u32 => {
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names::Version3
+},
+
+unknown => {
+let inner = unknown.clone();
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post_names::VersionUnknown(inner)
+}
+})
+    })())?;
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_post { version, italic_angle, underline_position, is_fixed_pitch, min_mem_type42, max_mem_type42, min_mem_type1, max_mem_type1, names })
+}
+
+fn Decoder36<'input>(_input: &mut Parser<'input>, num_glyphs: u16, index_to_loc_format: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca, ParseError>{
+    let offsets = ((|| {
+        PResult::Ok(match index_to_loc_format {
+            0u16 => {
                 let inner = {
-                    let num_glyphs = ((|| PResult::Ok((Decoder24(_input))?))())?;
-                    let glyph_name_index = ((|| {
-                        PResult::Ok({
-                            let mut accum = Vec::new();
-                            for _ in 0..num_glyphs {
-                                accum.push((Decoder24(_input))?);
-                            }
-                            accum
-                        })
-                    })())?;
-                    let string_data = ((|| {
-                        PResult::Ok({
-                            let inner = _input.get_offset_u64();
-                            ((|x: u64| PResult::Ok(x as u32))(inner))?
-                        })
-                    })())?;
-                    main_opentype_font_directory_TableDirectory_table_links_post_names_Version2 {
-                        num_glyphs,
-                        glyph_name_index,
-                        string_data,
+                    let mut accum = Vec::new();
+                    for _ in 0..num_glyphs + 1u16 {
+                        accum.push((Decoder24(_input))?);
                     }
+                    accum
                 };
-                main_opentype_font_directory_TableDirectory_table_links_post_names::Version2(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca_offsets::Offsets16(inner)
             }
 
-            151552u32 => {
+            1u16 => {
                 let inner = {
-                    let num_glyphs = ((|| PResult::Ok((Decoder24(_input))?))())?;
-                    let offset = ((|| {
-                        PResult::Ok({
-                            let mut accum = Vec::new();
-                            for _ in 0..num_glyphs {
-                                accum.push((Decoder35(_input))?);
-                            }
-                            accum
-                        })
-                    })())?;
-                    main_opentype_font_directory_TableDirectory_table_links_post_names_Version2Dot5 { num_glyphs, offset }
+                    let mut accum = Vec::new();
+                    for _ in 0..num_glyphs + 1u16 {
+                        accum.push((Decoder21(_input))?);
+                    }
+                    accum
                 };
-                main_opentype_font_directory_TableDirectory_table_links_post_names::Version2Dot5(
-                    inner,
-                )
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca_offsets::Offsets32(inner)
             }
 
-            196608u32 => {
-                main_opentype_font_directory_TableDirectory_table_links_post_names::Version3
-            }
-
-            unknown => {
-                let inner = unknown.clone();
-                main_opentype_font_directory_TableDirectory_table_links_post_names::VersionUnknown(
-                    inner,
-                )
+            _other => {
+                unreachable!(
+                    r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
+                );
             }
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_post {
-            version,
-            italic_angle,
-            underline_position,
-            is_fixed_pitch,
-            min_mem_type42,
-            max_mem_type42,
-            min_mem_type1,
-            max_mem_type1,
-            names,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_loca { offsets })
 }
 
-fn Decoder35<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
-    let b = _input.read_byte()?;
-    PResult::Ok(b)
-}
-
-fn Decoder36<'input>(
-    _input: &mut Parser<'input>,
-    num_glyphs: u16,
-) -> Result<Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq>, ParseError> {
+fn Decoder37<'input>(_input: &mut Parser<'input>, offset_pairs: Vec<(u32, u32)>) -> Result<Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq>, ParseError>{
+    let start_offset = {
+        let inner = _input.get_offset_u64();
+        ((|x: u64| PResult::Ok(x as u32))(inner))?
+    };
     let mut accum = Vec::new();
-    for _ in 0..num_glyphs {
-        accum.push({
+    for offset_pair in offset_pairs.clone() {
+        accum.push(match offset_pair.1.clone() > offset_pair.0.clone() {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(start_offset + offset_pair.0.clone(), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
 let number_of_contours = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let x_min = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let y_min = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -5956,7 +5971,7 @@ let x_max = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let y_max = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let description = ((|| PResult::Ok(match number_of_contours {
 0u16 => {
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description::HeaderOnly
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description::HeaderOnly
 },
 
 1u16..=32767u16 => {
@@ -5972,7 +5987,7 @@ let instruction_length = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let instructions = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..instruction_length {
-accum.push((Decoder35(_input))?);
+accum.push((Decoder25(_input))?);
 }
 accum
 }))())?;
@@ -5992,14 +6007,14 @@ b
 };
 let repeats = ((|| PResult::Ok(match flags.repeat_flag.clone() != 0u8 {
 true => {
-(Decoder35(_input))?
+(Decoder25(_input))?
 },
 
 false => {
 0u8
 }
 }))())?;
-let field_set = ((|| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq { on_curve_point: flags.on_curve_point.clone(), x_short_vector: flags.x_short_vector.clone(), y_short_vector: flags.y_short_vector.clone(), x_is_same_or_positive_x_short_vector: flags.x_is_same_or_positive_x_short_vector.clone(), y_is_same_or_positive_y_short_vector: flags.y_is_same_or_positive_y_short_vector.clone(), overlap_simple: flags.overlap_simple.clone() }))())?;
+let field_set = ((|| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq { on_curve_point: flags.on_curve_point.clone(), x_short_vector: flags.x_short_vector.clone(), y_short_vector: flags.y_short_vector.clone(), x_is_same_or_positive_x_short_vector: flags.x_is_same_or_positive_x_short_vector.clone(), y_is_same_or_positive_y_short_vector: flags.y_is_same_or_positive_y_short_vector.clone(), overlap_simple: flags.overlap_simple.clone() }))())?;
 base_u8_ix1 { repeats, field_set }
 };
 accum.push(elem);
@@ -6026,14 +6041,14 @@ accum
 }
 accum
 };
-((|xs: Vec<Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq>>| PResult::Ok((try_flat_map_vec(xs.iter().cloned(), |x: Vec<main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple_flags_inSeq>| PResult::Ok(x.clone())))?))(inner))?
+((|xs: Vec<Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq>>| PResult::Ok((try_flat_map_vec(xs.iter().cloned(), |x: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq>| PResult::Ok(x.clone())))?))(inner))?
 }))())?;
 let x_coordinates = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for flag_vals in flags.clone() {
 accum.push(match flag_vals.x_short_vector.clone() != 0u8 {
 true => {
-let inner = (Decoder35(_input))?;
+let inner = (Decoder25(_input))?;
 ((|abs: u8| PResult::Ok(match flag_vals.x_is_same_or_positive_x_short_vector.clone() {
 1u8 => {
 abs as u16
@@ -6077,7 +6092,7 @@ let mut accum = Vec::new();
 for flag_vals in flags.clone() {
 accum.push(match flag_vals.y_short_vector.clone() != 0u8 {
 true => {
-let inner = (Decoder35(_input))?;
+let inner = (Decoder25(_input))?;
 ((|abs: u8| PResult::Ok(match flag_vals.y_is_same_or_positive_y_short_vector.clone() {
 1u8 => {
 abs as u16
@@ -6116,9 +6131,9 @@ false => {
 }
 accum
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Simple { end_points_of_contour, instruction_length, instructions, number_of_coordinates, flags, x_coordinates, y_coordinates }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple { end_points_of_contour, instruction_length, instructions, number_of_coordinates, flags, x_coordinates, y_coordinates }
 };
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description::Simple(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description::Simple(inner)
 },
 
 _ => {
@@ -6142,7 +6157,7 @@ b
 };
 ((|x: (u8, u8)| PResult::Ok(u16be(x)))(inner))?
 };
-((|packedbits: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_flags { __reserved_msb3: packedbits >> 13u16 & 7u16, unscaled_component_offset: packedbits >> 12u16 & 1u16, scaled_component_offset: packedbits >> 11u16 & 1u16, overlap_compound: packedbits >> 10u16 & 1u16, use_my_metrics: packedbits >> 9u16 & 1u16, we_have_instructions: packedbits >> 8u16 & 1u16, we_have_a_two_by_two: packedbits >> 7u16 & 1u16, we_have_an_x_and_y_scale: packedbits >> 6u16 & 1u16, more_components: packedbits >> 5u16 & 1u16, __reserved_bit4: packedbits >> 4u16 & 1u16, we_have_a_scale: packedbits >> 3u16 & 1u16, round_xy_to_grid: packedbits >> 2u16 & 1u16, args_are_xy_values: packedbits >> 1u16 & 1u16, arg_1_and_2_are_words: packedbits >> 0u16 & 1u16 }))(inner))?
+((|packedbits: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_flags { __reserved_msb3: packedbits >> 13u16 & 7u16, unscaled_component_offset: packedbits >> 12u16 & 1u16, scaled_component_offset: packedbits >> 11u16 & 1u16, overlap_compound: packedbits >> 10u16 & 1u16, use_my_metrics: packedbits >> 9u16 & 1u16, we_have_instructions: packedbits >> 8u16 & 1u16, we_have_a_two_by_two: packedbits >> 7u16 & 1u16, we_have_an_x_and_y_scale: packedbits >> 6u16 & 1u16, more_components: packedbits >> 5u16 & 1u16, __reserved_bit4: packedbits >> 4u16 & 1u16, we_have_a_scale: packedbits >> 3u16 & 1u16, round_xy_to_grid: packedbits >> 2u16 & 1u16, args_are_xy_values: packedbits >> 1u16 & 1u16, arg_1_and_2_are_words: packedbits >> 0u16 & 1u16 }))(inner))?
 }))())?;
 let glyph_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let argument1 = ((|| PResult::Ok(match flags.arg_1_and_2_are_words.clone() != 0u16 {
@@ -6150,12 +6165,12 @@ true => {
 match flags.args_are_xy_values.clone() != 0u16 {
 true => {
 let inner = (Decoder24(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int16(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Int16(inner)
 },
 
 false => {
 let inner = (Decoder24(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint16(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Uint16(inner)
 }
 }
 },
@@ -6163,13 +6178,13 @@ main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_C
 false => {
 match flags.args_are_xy_values.clone() != 0u16 {
 true => {
-let inner = (Decoder35(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int8(inner)
+let inner = (Decoder25(_input))?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Int8(inner)
 },
 
 false => {
-let inner = (Decoder35(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint8(inner)
+let inner = (Decoder25(_input))?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Uint8(inner)
 }
 }
 }
@@ -6179,12 +6194,12 @@ true => {
 match flags.args_are_xy_values.clone() != 0u16 {
 true => {
 let inner = (Decoder24(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int16(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Int16(inner)
 },
 
 false => {
 let inner = (Decoder24(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint16(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Uint16(inner)
 }
 }
 },
@@ -6192,13 +6207,13 @@ main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_C
 false => {
 match flags.args_are_xy_values.clone() != 0u16 {
 true => {
-let inner = (Decoder35(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Int8(inner)
+let inner = (Decoder25(_input))?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Int8(inner)
 },
 
 false => {
-let inner = (Decoder35(_input))?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_argument1::Uint8(inner)
+let inner = (Decoder25(_input))?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_argument1::Uint8(inner)
 }
 }
 }
@@ -6208,11 +6223,11 @@ true => {
 let inner = {
 let inner = {
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 };
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale::Scale(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale::Scale(inner)
 };
-((|val: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
+((|val: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
 },
 
 false => {
@@ -6222,17 +6237,17 @@ let inner = {
 let inner = {
 let x_scale = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 }))())?;
 let y_scale = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_XY { x_scale, y_scale }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_XY { x_scale, y_scale }
 };
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale::XY(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale::XY(inner)
 };
-((|val: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
+((|val: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
 },
 
 false => {
@@ -6242,28 +6257,28 @@ let inner = {
 let field0 = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 }))())?;
 let field1 = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 }))())?;
 (field0, field1)
 }))())?;
 let field1 = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 }))())?;
 let field1 = ((|| PResult::Ok({
 let inner = (Decoder24(_input))?;
-((|x: u16| PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
+((|x: u16| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale_Matrix_ix0_ix0::F2Dot14(x)))(inner))?
 }))())?;
 (field0, field1)
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale::Matrix(field0, field1)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale::Matrix(field0, field1)
 };
-((|val: main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
+((|val: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq_scale| PResult::Ok(Some(val)))(inner))?
 },
 
 false => {
@@ -6274,9 +6289,9 @@ None
 }
 }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq { flags, glyph_index, argument1, argument2, scale }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq { flags, glyph_index, argument1, argument2, scale }
 };
-if ((|elem: &main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq| PResult::Ok(elem.flags.more_components.clone() == 0u16))(&elem))? {
+if ((|elem: &main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq| PResult::Ok(elem.flags.more_components.clone() == 0u16))(&elem))? {
 accum.push(elem);
 break
 } else {
@@ -6285,7 +6300,7 @@ accum.push(elem);
 }
 accum
 }))())?;
-let instructions = ((|| PResult::Ok(match (try_fold_left_curried(glyphs.iter().cloned(), false, |tuple_var: (bool, main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite_glyphs_inSeq)| PResult::Ok(match tuple_var {
+let instructions = ((|| PResult::Ok(match (try_fold_left_curried(glyphs.iter().cloned(), false, |tuple_var: (bool, main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq)| PResult::Ok(match tuple_var {
 (any, x) => {
 any || (x.flags.we_have_instructions.clone() != 0u16)
 }
@@ -6294,7 +6309,7 @@ true => {
 let instructions_length = (Decoder24(_input))?;
 let mut accum = Vec::new();
 for _ in 0..instructions_length {
-accum.push((Decoder35(_input))?);
+accum.push((Decoder25(_input))?);
 }
 accum
 },
@@ -6303,71 +6318,32 @@ false => {
 [].to_vec()
 }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description_Composite { glyphs, instructions }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite { glyphs, instructions }
 };
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq_description::Composite(inner)
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description::Composite(inner)
 }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_glyf_inSeq { number_of_contours, x_min, y_min, x_max, y_max, description }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph { number_of_contours, x_min, y_min, x_max, y_max, description }
+};
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq::Glyph(inner)
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq::EmptyGlyph
+}
 });
     }
     PResult::Ok(accum)
-}
-
-fn Decoder37<'input>(
-    _input: &mut Parser<'input>,
-    num_glyphs: u16,
-    index_to_loc_format: u16,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_loca, ParseError> {
-    let offsets = ((|| {
-        PResult::Ok(match index_to_loc_format {
-            0u16 => {
-                let inner = {
-                    let mut accum = Vec::new();
-                    for _ in 0..num_glyphs + 1u16 {
-                        accum.push((Decoder24(_input))?);
-                    }
-                    accum
-                };
-                main_opentype_font_directory_TableDirectory_table_links_loca_offsets::Offsets16(
-                    inner,
-                )
-            }
-
-            1u16 => {
-                let inner = {
-                    let mut accum = Vec::new();
-                    for _ in 0..num_glyphs + 1u16 {
-                        accum.push((Decoder21(_input))?);
-                    }
-                    accum
-                };
-                main_opentype_font_directory_TableDirectory_table_links_loca_offsets::Offsets32(
-                    inner,
-                )
-            }
-
-            _other => {
-                unreachable!(
-                    r#"ExprMatch refuted: match refuted with unexpected value {_other:?}"#
-                );
-            }
-        })
-    })())?;
-    PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_loca { offsets })
 }
 
 fn Decoder38<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
     PResult::Ok((Decoder21(_input))?)
 }
 
-fn Decoder39<'input>(
-    _input: &mut Parser<'input>,
-    storage_start: u32,
-) -> Result<
-    main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1,
-    ParseError,
-> {
+fn Decoder39<'input>(_input: &mut Parser<'input>, storage_start: u32) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1, ParseError>{
     let lang_tag_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let lang_tag_records = ((|| {
         PResult::Ok({
@@ -6389,7 +6365,7 @@ let ret = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..length {
-accum.push((Decoder35(_input))?);
+accum.push((Decoder25(_input))?);
 }
 accum
 };
@@ -6403,25 +6379,18 @@ false => {
 None
 }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_name_name_records_inSeq_offset { offset, link }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_name_records_inSeq_offset { offset, link }
 }))())?;
-main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1_lang_tag_records_inSeq { length, offset }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1_lang_tag_records_inSeq { length, offset }
 });
             }
             accum
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_name_data_NameVersion1 {
-            lang_tag_count,
-            lang_tag_records,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_name_data_NameVersion1 { lang_tag_count, lang_tag_records })
 }
 
-fn Decoder40<'input>(
-    _input: &mut Parser<'input>,
-) -> Result<main_opentype_font_directory_TableDirectory_table_links_maxp_data_MaxpV1, ParseError> {
+fn Decoder40<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data_MaxpV1, ParseError>{
     let max_points = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let max_contours = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let max_composite_points = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -6453,23 +6422,7 @@ fn Decoder40<'input>(
             }
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_maxp_data_MaxpV1 {
-            max_points,
-            max_contours,
-            max_composite_points,
-            max_composite_contours,
-            max_zones,
-            max_twilight_points,
-            max_storage,
-            max_function_defs,
-            max_instruction_defs,
-            max_stack_elements,
-            max_size_of_instructions,
-            max_component_elements,
-            max_component_depth,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_maxp_data_MaxpV1 { max_points, max_contours, max_composite_points, max_composite_contours, max_zones, max_twilight_points, max_storage, max_function_defs, max_instruction_defs, max_stack_elements, max_size_of_instructions, max_component_elements, max_component_depth })
 }
 
 fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
@@ -6478,14 +6431,14 @@ fn Decoder41<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
 
 fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field4 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field5 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field6 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field7 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+        let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field4 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field5 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field6 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field7 = ((|| PResult::Ok((Decoder25(_input))?))())?;
         (
             field0, field1, field2, field3, field4, field5, field6, field7,
         )
@@ -6493,53 +6446,34 @@ fn Decoder42<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
     PResult::Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(u64be(x)))(inner))?)
 }
 
-fn Decoder43<'input>(
-    _input: &mut Parser<'input>,
-    start: u32,
-) -> Result<
-    main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq,
-    ParseError,
-> {
+fn Decoder43<'input>(_input: &mut Parser<'input>, start: u32) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq, ParseError>{
     let platform = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let encoding = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let subtable_offset = ((|| {
         PResult::Ok({
             let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
             let link = ((|| {
-                PResult::Ok(match offset != 0u32 {
-                    true => {
-                        let __here = {
-                            let inner = _input.get_offset_u64();
-                            ((|x: u64| PResult::Ok(x as u32))(inner))?
-                        };
-                        _input.open_peek_context();
-                        _input.advance_by(try_sub!(start + offset, __here))?;
-                        let ret = ((|| {
-                            PResult::Ok({
-                                let inner = (Decoder44(_input, platform.clone()))?;
-                                ((|val: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link| PResult::Ok(Some(val)))(inner))?
-                            })
-                        })())?;
-                        _input.close_peek_context()?;
-                        ret
-                    }
-
-                    false => None,
+                PResult::Ok(if offset != 0u32 {
+                    let __here = {
+                        let inner = _input.get_offset_u64();
+                        ((|x: u64| PResult::Ok(x as u32))(inner))?
+                    };
+                    _input.open_peek_context();
+                    _input.advance_by(try_sub!(start + offset, __here))?;
+                    let ret = ((|| PResult::Ok((Decoder44(_input, platform.clone()))?))())?;
+                    _input.close_peek_context()?;
+                    Some(ret)
+                } else {
+                    None
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset { offset, link }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset { offset, link }
         })
     })())?;
-    PResult::Ok(
-        main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq {
-            platform,
-            encoding,
-            subtable_offset,
-        },
-    )
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq { platform, encoding, subtable_offset })
 }
 
-fn Decoder44<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link, ParseError>{
+fn Decoder44<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link, ParseError>{
     let table_start = ((|| {
         PResult::Ok({
             let inner = _input.get_offset_u64();
@@ -6558,47 +6492,47 @@ fn Decoder44<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
         PResult::Ok(match format {
             0u16 => {
                 let inner = (Decoder45(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format0(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format0(inner)
             }
 
             2u16 => {
                 let inner = (Decoder46(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format2(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format2(inner)
             }
 
             4u16 => {
                 let inner = (Decoder47(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format4(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format4(inner)
             }
 
             6u16 => {
                 let inner = (Decoder48(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format6(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format6(inner)
             }
 
             8u16 => {
                 let inner = (Decoder49(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format8(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format8(inner)
             }
 
             10u16 => {
                 let inner = (Decoder50(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format10(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format10(inner)
             }
 
             12u16 => {
                 let inner = (Decoder51(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format12(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format12(inner)
             }
 
             13u16 => {
                 let inner = (Decoder52(_input, platform.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format13(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format13(inner)
             }
 
             14u16 => {
                 let inner = (Decoder53(_input, table_start.clone()))?;
-                main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format14(inner)
+                main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data::Format14(inner)
             }
 
             _other => {
@@ -6608,10 +6542,10 @@ fn Decoder44<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
             }
         })
     })())?;
-    PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link { table_start, format, data })
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link { table_start, format, data })
 }
 
-fn Decoder45<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0, ParseError>{
+fn Decoder45<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -6635,19 +6569,19 @@ fn Decoder45<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                 PResult::Ok({
                     let mut accum = Vec::new();
                     for _ in 0..256u16 {
-                        accum.push((Decoder35(_input))?);
+                        accum.push((Decoder25(_input))?);
                     }
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0 { format, length, language, glyph_id_array }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format0 { format, length, language, glyph_id_array }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder46<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2, ParseError>{
+fn Decoder46<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -6748,7 +6682,7 @@ let first_code = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let entry_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let id_delta = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let id_range_offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
-main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2_sub_headers_inSeq { first_code, entry_count, id_delta, id_range_offset }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2_sub_headers_inSeq { first_code, entry_count, id_delta, id_range_offset }
 });
                     }
                     accum
@@ -6777,14 +6711,14 @@ main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_in
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2 { format, length, language, sub_header_keys, sub_headers, glyph_array }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format2 { format, length, language, sub_header_keys, sub_headers, glyph_array }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder47<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4, ParseError>{
+fn Decoder47<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -6900,14 +6834,14 @@ fn Decoder47<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4 { format, length, language, seg_count, search_range, entry_selector, range_shift, end_code, __reserved_pad, start_code, id_delta, id_range_offset, glyph_array }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format4 { format, length, language, seg_count, search_range, entry_selector, range_shift, end_code, __reserved_pad, start_code, id_delta, id_range_offset, glyph_array }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder48<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6, ParseError>{
+fn Decoder48<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -6956,14 +6890,14 @@ fn Decoder48<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6 { format, length, language, first_code, entry_count, glyph_id_array }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format6 { format, length, language, first_code, entry_count, glyph_id_array }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder49<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8, ParseError>{
+fn Decoder49<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -7029,7 +6963,7 @@ fn Decoder49<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                 PResult::Ok({
                     let mut accum = Vec::new();
                     for _ in 0..8192u16 {
-                        accum.push((Decoder35(_input))?);
+                        accum.push((Decoder25(_input))?);
                     }
                     accum
                 })
@@ -7044,14 +6978,14 @@ fn Decoder49<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8 { format, __reserved, length, language, is32, num_groups, groups }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format8 { format, __reserved, length, language, is32, num_groups, groups }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder50<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10, ParseError>{
+fn Decoder50<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -7124,14 +7058,14 @@ fn Decoder50<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10 { format, __reserved, length, language, start_char_code, num_chars, glyph_id_array }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format10 { format, __reserved, length, language, start_char_code, num_chars, glyph_id_array }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder51<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12, ParseError>{
+fn Decoder51<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -7203,14 +7137,14 @@ fn Decoder51<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12 { format, __reserved, length, language, num_groups, groups }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12 { format, __reserved, length, language, num_groups, groups }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder52<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12, ParseError>{
+fn Decoder52<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -7282,14 +7216,14 @@ fn Decoder52<'input>(_input: &mut Parser<'input>, platform: u16) -> Result<main_
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12 { format, __reserved, length, language, num_groups, groups }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12 { format, __reserved, length, language, num_groups, groups }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder53<'input>(_input: &mut Parser<'input>, table_start: u32) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14, ParseError>{
+fn Decoder53<'input>(_input: &mut Parser<'input>, table_start: u32) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14, ParseError>{
     let x = {
         _input.open_peek_context();
         let ret = ((|| {
@@ -7336,21 +7270,21 @@ fn Decoder53<'input>(_input: &mut Parser<'input>, table_start: u32) -> Result<ma
                     accum
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14 { format, length, num_var_selector_records, var_selector }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14 { format, length, num_var_selector_records, var_selector }
         })
     })())?;
     _input.end_slice()?;
     PResult::Ok(ret)
 }
 
-fn Decoder54<'input>(_input: &mut Parser<'input>, table_start: u32) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq, ParseError>{
+fn Decoder54<'input>(_input: &mut Parser<'input>, table_start: u32) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq, ParseError>{
     let var_selector = ((|| {
         PResult::Ok({
             let inner = {
                 let field0 = ((|| PResult::Ok(0u8))())?;
-                let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 (field0, field1, field2, field3)
             };
             ((|x: (u8, u8, u8, u8)| PResult::Ok(u32be(x)))(inner))?
@@ -7360,118 +7294,107 @@ fn Decoder54<'input>(_input: &mut Parser<'input>, table_start: u32) -> Result<ma
         PResult::Ok({
             let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
             let link = ((|| {
-                PResult::Ok(match offset != 0u32 {
-                    true => {
-                        let __here = {
-                            let inner = _input.get_offset_u64();
-                            ((|x: u64| PResult::Ok(x as u32))(inner))?
-                        };
-                        _input.open_peek_context();
-                        _input.advance_by(try_sub!(table_start + offset, __here))?;
-                        let ret = ((|| {
-                            PResult::Ok({
-                                let inner = {
-                                    let num_unicode_value_ranges =
-                                        ((|| PResult::Ok((Decoder21(_input))?))())?;
-                                    let ranges = ((|| {
-                                        PResult::Ok({
-                                            let mut accum = Vec::new();
-                                            for _ in 0..num_unicode_value_ranges {
-                                                accum.push({
+                PResult::Ok(if offset != 0u32 {
+                    let __here = {
+                        let inner = _input.get_offset_u64();
+                        ((|x: u64| PResult::Ok(x as u32))(inner))?
+                    };
+                    _input.open_peek_context();
+                    _input.advance_by(try_sub!(table_start + offset, __here))?;
+                    let ret = ((|| {
+                        PResult::Ok({
+                            let num_unicode_value_ranges =
+                                ((|| PResult::Ok((Decoder21(_input))?))())?;
+                            let ranges = ((|| {
+                                PResult::Ok({
+                                    let mut accum = Vec::new();
+                                    for _ in 0..num_unicode_value_ranges {
+                                        accum.push({
 let start_unicode_value = ((|| PResult::Ok({
 let inner = {
 let field0 = ((|| PResult::Ok(0u8))())?;
-let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|x: (u8, u8, u8, u8)| PResult::Ok(u32be(x)))(inner))?
 }))())?;
-let additional_count = ((|| PResult::Ok((Decoder35(_input))?))())?;
-main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link_ranges_inSeq { start_unicode_value, additional_count }
+let additional_count = ((|| PResult::Ok((Decoder25(_input))?))())?;
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link_ranges_inSeq { start_unicode_value, additional_count }
 });
-                                            }
-                                            accum
-                                        })
-                                    })())?;
-                                    main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link { num_unicode_value_ranges, ranges }
-                                };
-                                ((|val: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link| PResult::Ok(Some(val)))(inner))?
-                            })
-                        })())?;
-                        _input.close_peek_context()?;
-                        ret
-                    }
-
-                    false => None,
+                                    }
+                                    accum
+                                })
+                            })())?;
+                            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset_link { num_unicode_value_ranges, ranges }
+                        })
+                    })())?;
+                    _input.close_peek_context()?;
+                    Some(ret)
+                } else {
+                    None
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset { offset, link }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_default_uvs_offset { offset, link }
         })
     })())?;
     let non_default_uvs_offset = ((|| {
         PResult::Ok({
             let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
             let link = ((|| {
-                PResult::Ok(match offset != 0u32 {
-                    true => {
-                        let __here = {
-                            let inner = _input.get_offset_u64();
-                            ((|x: u64| PResult::Ok(x as u32))(inner))?
-                        };
-                        _input.open_peek_context();
-                        _input.advance_by(try_sub!(table_start + offset, __here))?;
-                        let ret = ((|| {
-                            PResult::Ok({
-                                let inner = {
-                                    let num_uvs_mappings =
-                                        ((|| PResult::Ok((Decoder21(_input))?))())?;
-                                    let uvs_mappings = ((|| {
-                                        PResult::Ok({
-                                            let mut accum = Vec::new();
-                                            for _ in 0..num_uvs_mappings {
-                                                accum.push({
+                PResult::Ok(if offset != 0u32 {
+                    let __here = {
+                        let inner = _input.get_offset_u64();
+                        ((|x: u64| PResult::Ok(x as u32))(inner))?
+                    };
+                    _input.open_peek_context();
+                    _input.advance_by(try_sub!(table_start + offset, __here))?;
+                    let ret = ((|| {
+                        PResult::Ok({
+                            let num_uvs_mappings = ((|| PResult::Ok((Decoder21(_input))?))())?;
+                            let uvs_mappings = ((|| {
+                                PResult::Ok({
+                                    let mut accum = Vec::new();
+                                    for _ in 0..num_uvs_mappings {
+                                        accum.push({
 let unicode_value = ((|| PResult::Ok({
 let inner = {
 let field0 = ((|| PResult::Ok(0u8))())?;
-let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|x: (u8, u8, u8, u8)| PResult::Ok(u32be(x)))(inner))?
 }))())?;
 let glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
-main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link_uvs_mappings_inSeq { unicode_value, glyph_id }
+main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link_uvs_mappings_inSeq { unicode_value, glyph_id }
 });
-                                            }
-                                            accum
-                                        })
-                                    })())?;
-                                    main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link { num_uvs_mappings, uvs_mappings }
-                                };
-                                ((|val: main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link| PResult::Ok(Some(val)))(inner))?
-                            })
-                        })())?;
-                        _input.close_peek_context()?;
-                        ret
-                    }
-
-                    false => None,
+                                    }
+                                    accum
+                                })
+                            })())?;
+                            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset_link { num_uvs_mappings, uvs_mappings }
+                        })
+                    })())?;
+                    _input.close_peek_context()?;
+                    Some(ret)
+                } else {
+                    None
                 })
             })())?;
-            main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset { offset, link }
+            main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq_non_default_uvs_offset { offset, link }
         })
     })())?;
-    PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq { var_selector, default_uvs_offset, non_default_uvs_offset })
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format14_var_selector_inSeq { var_selector, default_uvs_offset, non_default_uvs_offset })
 }
 
-fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq, ParseError>{
+fn Decoder55<'input>(_input: &mut Parser<'input>) -> Result<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq, ParseError>{
     let start_char_code = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let end_char_code = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let start_glyph_id = ((|| PResult::Ok((Decoder21(_input))?))())?;
-    PResult::Ok(main_opentype_font_directory_TableDirectory_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq { start_char_code, end_char_code, start_glyph_id })
+    PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap_encoding_records_inSeq_subtable_offset_link_data_Format12_groups_inSeq { start_char_code, end_char_code, start_glyph_id })
 }
 
 fn Decoder56<'input>(_input: &mut Parser<'input>) -> Result<main_elf_header, ParseError> {
@@ -7553,7 +7476,7 @@ fn Decoder59<'input>(
         _ => {
             let mut accum = Vec::new();
             for _ in 0..size {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         }
@@ -7710,14 +7633,14 @@ fn Decoder68<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, Pa
 
 fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field4 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field5 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field6 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field7 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+        let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field4 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field5 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field6 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field7 = ((|| PResult::Ok((Decoder25(_input))?))())?;
         (
             field0, field1, field2, field3, field4, field5, field6, field7,
         )
@@ -7727,10 +7650,10 @@ fn Decoder69<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
 
 fn Decoder70<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field3 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+        let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
         (field0, field1, field2, field3)
     };
     PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok(u32le(x)))(inner))?)
@@ -7952,15 +7875,15 @@ fn Decoder81<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, Pa
 
 fn Decoder82<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
     let inner = {
-        let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-        let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+        let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+        let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
         (field0, field1)
     };
     PResult::Ok(((|x: (u8, u8)| PResult::Ok(u16le(x)))(inner))?)
 }
 
 fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
-    let inner = (Decoder35(_input))?;
+    let inner = (Decoder25(_input))?;
     PResult::Ok(if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
         inner
     } else {
@@ -7969,7 +7892,7 @@ fn Decoder83<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 }
 
 fn Decoder84<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
-    let inner = (Decoder35(_input))?;
+    let inner = (Decoder25(_input))?;
     PResult::Ok(if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
         inner
     } else {
@@ -7978,7 +7901,7 @@ fn Decoder84<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 }
 
 fn Decoder85<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
-    let inner = (Decoder35(_input))?;
+    let inner = (Decoder25(_input))?;
     PResult::Ok(if ((|x: u8| PResult::Ok(x <= 1u8))(inner.clone()))? {
         inner
     } else {
@@ -7987,11 +7910,11 @@ fn Decoder85<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 }
 
 fn Decoder86<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
-    PResult::Ok((Decoder35(_input))?)
+    PResult::Ok((Decoder25(_input))?)
 }
 
 fn Decoder87<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
-    PResult::Ok((Decoder35(_input))?)
+    PResult::Ok((Decoder25(_input))?)
 }
 
 fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<main_tar_contents_inSeq, ParseError> {
@@ -8000,7 +7923,7 @@ fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<main_tar_contents_in
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..header.size.clone() {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -9252,7 +9175,7 @@ fn Decoder98<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -9540,7 +9463,7 @@ fn Decoder101<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -13139,7 +13062,7 @@ fn Decoder116<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError
             }
         };
         if matching_ix == 0 {
-            let next_elem = (Decoder35(_input))?;
+            let next_elem = (Decoder25(_input))?;
             accum.push(next_elem);
         } else {
             break;
@@ -13181,9 +13104,9 @@ fn Decoder118<'input>(
             }
         } else {
             let next_elem = {
-                let r = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let g = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let b = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let r = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let g = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let b = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_gif_logical_screen_global_color_table_inSeq { r, g, b }
             };
             accum.push(next_elem);
@@ -13230,7 +13153,7 @@ fn Decoder119<'input>(
                     };
                     if matching_ix == 0 {
                         let next_elem = {
-                            let palette_index = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let palette_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             main_png_chunks_inSeq_data_bKGD_color_type_3 { palette_index }
                         };
                         accum.push(next_elem);
@@ -13307,7 +13230,7 @@ fn Decoder122<'input>(
     })())?;
     let compression_method = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x == 0u8))(inner.clone()))? {
                 inner
             } else {
@@ -13330,7 +13253,7 @@ fn Decoder123<'input>(
     PResult::Ok(match ihdr.data.color_type.clone() {
         0u8 => {
             let inner = {
-                let sig_greyscale_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let sig_greyscale_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_png_chunks_inSeq_data_sBIT_color_type_0 { sig_greyscale_bits }
             };
             main_png_chunks_inSeq_data_sBIT::color_type_0(inner)
@@ -13338,9 +13261,9 @@ fn Decoder123<'input>(
 
         2u8 => {
             let inner = {
-                let sig_red_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_green_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_blue_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let sig_red_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_green_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_blue_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_png_chunks_inSeq_data_sBIT_color_type_2 {
                     sig_red_bits,
                     sig_green_bits,
@@ -13352,9 +13275,9 @@ fn Decoder123<'input>(
 
         3u8 => {
             let inner = {
-                let sig_red_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_green_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_blue_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let sig_red_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_green_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_blue_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_png_chunks_inSeq_data_sBIT_color_type_2 {
                     sig_red_bits,
                     sig_green_bits,
@@ -13366,8 +13289,8 @@ fn Decoder123<'input>(
 
         4u8 => {
             let inner = {
-                let sig_greyscale_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_alpha_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let sig_greyscale_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_alpha_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_png_chunks_inSeq_data_sBIT_color_type_4 {
                     sig_greyscale_bits,
                     sig_alpha_bits,
@@ -13378,10 +13301,10 @@ fn Decoder123<'input>(
 
         6u8 => {
             let inner = {
-                let sig_red_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_green_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_blue_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                let sig_alpha_bits = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let sig_red_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_green_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_blue_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                let sig_alpha_bits = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_png_chunks_inSeq_data_sBIT_color_type_6 {
                     sig_red_bits,
                     sig_green_bits,
@@ -13403,7 +13326,7 @@ fn Decoder124<'input>(
 ) -> Result<main_png_chunks_inSeq_data_sRGB, ParseError> {
     let rendering_intent = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x <= 3u8))(inner.clone()))? {
                 inner
             } else {
@@ -13530,7 +13453,7 @@ fn Decoder125<'input>(
                                             }
                                         };
                                         if matching_ix == 0 {
-                                            let next_elem = (Decoder35(_input))?;
+                                            let next_elem = (Decoder25(_input))?;
                                             accum.push(next_elem);
                                         } else {
                                             break;
@@ -13717,7 +13640,7 @@ fn Decoder128<'input>(
 
         3u8 => {
             let inner = {
-                let palette_index = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                let palette_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
                 main_png_chunks_inSeq_data_bKGD_color_type_3 { palette_index }
             };
             main_png_chunks_inSeq_data_bKGD::color_type_3(inner)
@@ -13763,7 +13686,7 @@ fn Decoder130<'input>(
 ) -> Result<main_png_chunks_inSeq_data_pHYs, ParseError> {
     let pixels_per_unit_x = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let pixels_per_unit_y = ((|| PResult::Ok((Decoder21(_input))?))())?;
-    let unit_specifier = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let unit_specifier = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_png_chunks_inSeq_data_pHYs {
         pixels_per_unit_x,
         pixels_per_unit_y,
@@ -13799,7 +13722,7 @@ fn Decoder131<'input>(
     })())?;
     let sample_depth = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok((x == 8u8) || (x == 16u8)))(inner.clone()))? {
                 inner
             } else {
@@ -13824,10 +13747,10 @@ fn Decoder131<'input>(
                         };
                         if matching_ix == 0 {
                             let next_elem = {
-                                let red = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                let green = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                let blue = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                let alpha = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                let red = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                let green = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                let blue = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                let alpha = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                 let frequency = ((|| PResult::Ok((Decoder24(_input))?))())?;
                                 main_png_chunks_inSeq_data_sPLT_pallette_sample_depth_u8_inSeq {
                                     red,
@@ -13903,11 +13826,11 @@ fn Decoder132<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_png_chunks_inSeq_data_tIME, ParseError> {
     let year = ((|| PResult::Ok((Decoder24(_input))?))())?;
-    let month = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let day = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let hour = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let minute = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let second = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let month = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let day = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let hour = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let minute = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let second = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_png_chunks_inSeq_data_tIME {
         year,
         month,
@@ -19897,11 +19820,11 @@ fn Decoder146<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), P
 fn Decoder147<'input>(_input: &mut Parser<'input>) -> Result<main_png_ihdr_data, ParseError> {
     let width = ((|| PResult::Ok((Decoder21(_input))?))())?;
     let height = ((|| PResult::Ok((Decoder21(_input))?))())?;
-    let bit_depth = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let color_type = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let compression_method = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let filter_method = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let interlace_method = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let bit_depth = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let color_type = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let compression_method = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let filter_method = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let interlace_method = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_png_ihdr_data {
         width,
         height,
@@ -20041,7 +19964,7 @@ fn Decoder148<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_in
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -20123,12 +20046,12 @@ fn Decoder150<'input>(
 
                     (104u8, 100u8, 108u8, 114u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -20157,12 +20080,12 @@ fn Decoder150<'input>(
 
                     (112u8, 105u8, 116u8, 109u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -20190,12 +20113,12 @@ fn Decoder150<'input>(
 
                     (105u8, 105u8, 110u8, 102u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -20230,12 +20153,12 @@ fn Decoder150<'input>(
 
                     (105u8, 114u8, 101u8, 102u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -20465,19 +20388,19 @@ accum.push((Decoder21(_input))?);
 
                     (105u8, 108u8, 111u8, 99u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
                             let offset_size_length_size =
-                                ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let base_offset_size_index_size =
-                                ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let offset_size = ((|| PResult::Ok(offset_size_length_size >> 4u8))())?;
                             let length_size = ((|| PResult::Ok(offset_size_length_size & 7u8))())?;
                             let base_offset_size =
@@ -20663,7 +20586,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq { item_ID, cons
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -20688,7 +20611,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iloc_items_inSeq { item_ID, cons
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -20737,12 +20660,12 @@ fn Decoder151<'input>(
                 PResult::Ok(match r#type {
                     (109u8, 118u8, 104u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -20894,7 +20817,7 @@ fn Decoder151<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -20943,12 +20866,12 @@ fn Decoder152<'input>(
                 PResult::Ok(match r#type {
                     (116u8, 107u8, 104u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21098,7 +21021,7 @@ fn Decoder152<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -21189,7 +21112,7 @@ fn Decoder153<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -21238,12 +21161,12 @@ fn Decoder154<'input>(
                 PResult::Ok(match r#type {
                     (101u8, 108u8, 115u8, 116u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21281,7 +21204,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_edts_inSeq_data_elst
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -21332,12 +21255,12 @@ fn Decoder155<'input>(
                 PResult::Ok(match r#type {
                     (104u8, 100u8, 108u8, 114u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21355,12 +21278,12 @@ fn Decoder155<'input>(
 
                     (109u8, 100u8, 104u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21449,7 +21372,7 @@ fn Decoder155<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -21555,12 +21478,12 @@ fn Decoder157<'input>(
                 PResult::Ok(match r#type {
                     (118u8, 109u8, 104u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21581,12 +21504,12 @@ fn Decoder157<'input>(
 
                     (115u8, 109u8, 104u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21661,7 +21584,7 @@ fn Decoder157<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -21712,12 +21635,12 @@ fn Decoder158<'input>(
                 PResult::Ok(match r#type {
                     (100u8, 114u8, 101u8, 102u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21779,7 +21702,7 @@ fn Decoder158<'input>(
                                                                     };
                                                                     if matching_ix == 0 {
                                                                         let next_elem =
-                                                                            (Decoder35(_input))?;
+                                                                            (Decoder25(_input))?;
                                                                         accum.push(next_elem);
                                                                     } else {
                                                                         break;
@@ -21828,7 +21751,7 @@ fn Decoder158<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -21877,12 +21800,12 @@ fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<main_mpeg4_atoms_in
                 PResult::Ok(match r#type {
                     (115u8, 116u8, 115u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21924,7 +21847,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder35(_input))?;
+let next_elem = (Decoder25(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -21948,12 +21871,12 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_dinf_inSeq_data_dref_data_inSeq 
 
                     (115u8, 116u8, 116u8, 115u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -21978,12 +21901,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (99u8, 116u8, 116u8, 115u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22008,12 +21931,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (115u8, 116u8, 115u8, 115u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22034,12 +21957,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (115u8, 116u8, 115u8, 99u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22065,12 +21988,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (115u8, 116u8, 115u8, 122u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22094,12 +22017,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (115u8, 116u8, 99u8, 111u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22120,12 +22043,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (99u8, 111u8, 54u8, 52u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22146,12 +22069,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (115u8, 103u8, 112u8, 100u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22175,7 +22098,7 @@ default_length.clone()
 let sample_group_entry = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..description_length {
-accum.push((Decoder35(_input))?);
+accum.push((Decoder25(_input))?);
 }
 accum
 }))())?;
@@ -22192,12 +22115,12 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
 
                     (115u8, 98u8, 103u8, 112u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22242,7 +22165,7 @@ main_mpeg4_atoms_inSeq_data_moov_inSeq_data_trak_inSeq_data_mdia_inSeq_data_minf
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -22287,12 +22210,12 @@ fn Decoder160<'input>(
                 PResult::Ok(match r#type {
                     (105u8, 110u8, 102u8, 101u8) => {
                         let inner = {
-                            let version = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                            let version = ((|| PResult::Ok((Decoder25(_input))?))())?;
                             let flags = ((|| {
                                 PResult::Ok({
-                                    let field0 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field1 = ((|| PResult::Ok((Decoder35(_input))?))())?;
-                                    let field2 = ((|| PResult::Ok((Decoder35(_input))?))())?;
+                                    let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
+                                    let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
                                     (field0, field1, field2)
                                 })
                             })())?;
@@ -22383,7 +22306,7 @@ main_mpeg4_atoms_inSeq_data_meta_ix1_inSeq_data_iinf_item_info_entry_inSeq_data_
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -22471,7 +22394,7 @@ fn Decoder161<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -22567,7 +22490,7 @@ fn Decoder162<'input>(
                                     }
                                 };
                                 if matching_ix == 0 {
-                                    let next_elem = (Decoder35(_input))?;
+                                    let next_elem = (Decoder25(_input))?;
                                     accum.push(next_elem);
                                 } else {
                                     break;
@@ -24353,7 +24276,7 @@ fn Decoder189<'input>(
 ) -> Result<main_jpeg_frame_scan_sos_data, ParseError> {
     let num_image_components = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok((x >= 1u8) && (x <= 4u8)))(inner.clone()))? {
                 inner
             } else {
@@ -24372,7 +24295,7 @@ fn Decoder189<'input>(
     })())?;
     let start_spectral_selection = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x <= 63u8))(inner.clone()))? {
                 inner
             } else {
@@ -24382,7 +24305,7 @@ fn Decoder189<'input>(
     })())?;
     let end_spectral_selection = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x <= 63u8))(inner.clone()))? {
                 inner
             } else {
@@ -24416,7 +24339,7 @@ fn Decoder189<'input>(
 fn Decoder190<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_jpeg_frame_scan_sos_data_image_components_inSeq, ParseError> {
-    let component_selector = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let component_selector = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let entropy_coding_table_ids = ((|| {
         PResult::Ok({
             let inner = {
@@ -25287,7 +25210,7 @@ fn Decoder206<'input>(
 ) -> Result<main_jpeg_frame_header_sof0_data, ParseError> {
     let sample_precision = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok((x >= 2u8) && (x <= 16u8)))(inner.clone()))? {
                 inner
             } else {
@@ -25308,7 +25231,7 @@ fn Decoder206<'input>(
     })())?;
     let num_image_components = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x != 0u8))(inner.clone()))? {
                 inner
             } else {
@@ -25337,7 +25260,7 @@ fn Decoder206<'input>(
 fn Decoder207<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_jpeg_frame_header_sof0_data_image_components_inSeq, ParseError> {
-    let id = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let id = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let sampling_factor = ((|| {
         PResult::Ok({
             let inner = {
@@ -25356,7 +25279,7 @@ fn Decoder207<'input>(
     })())?;
     let quantization_table_id = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x <= 3u8))(inner.clone()))? {
                 inner
             } else {
@@ -25624,7 +25547,7 @@ fn Decoder212<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -25691,7 +25614,7 @@ fn Decoder213<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -25758,7 +25681,7 @@ fn Decoder214<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -25825,7 +25748,7 @@ fn Decoder215<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -25892,7 +25815,7 @@ fn Decoder216<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -25959,7 +25882,7 @@ fn Decoder217<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26026,7 +25949,7 @@ fn Decoder218<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26093,7 +26016,7 @@ fn Decoder219<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26160,7 +26083,7 @@ fn Decoder220<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26227,7 +26150,7 @@ fn Decoder221<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26294,7 +26217,7 @@ fn Decoder222<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26361,7 +26284,7 @@ fn Decoder223<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26428,7 +26351,7 @@ fn Decoder224<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26495,7 +26418,7 @@ fn Decoder225<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26562,7 +26485,7 @@ fn Decoder226<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26618,7 +26541,7 @@ fn Decoder228<'input>(
             }
         })
     })())?;
-    let value = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let value = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_jpeg_frame_segments_inSeq_dac_data {
         class_table_id,
         value,
@@ -26658,7 +26581,7 @@ fn Decoder229<'input>(
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..16u8 {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -26670,7 +26593,7 @@ fn Decoder229<'input>(
                 accum.push({
                     let mut accum = Vec::new();
                     for _ in 0..n {
-                        accum.push((Decoder35(_input))?);
+                        accum.push((Decoder25(_input))?);
                     }
                     accum
                 });
@@ -26717,7 +26640,7 @@ return Err(ParseError::FalsifiedWhere);
                 let inner = {
                     let mut accum = Vec::new();
                     for _ in 0..64u32 {
-                        accum.push((Decoder35(_input))?);
+                        accum.push((Decoder25(_input))?);
                     }
                     accum
                 };
@@ -26779,7 +26702,7 @@ fn Decoder231<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26880,7 +26803,7 @@ fn Decoder234<'input>(
                     }
                 };
                 if matching_ix == 0 {
-                    let next_elem = (Decoder35(_input))?;
+                    let next_elem = (Decoder25(_input))?;
                     accum.push(next_elem);
                 } else {
                     break;
@@ -26917,7 +26840,7 @@ fn Decoder235<'input>(
                             }
                         };
                         if matching_ix == 0 {
-                            let next_elem = (Decoder35(_input))?;
+                            let next_elem = (Decoder25(_input))?;
                             accum.push(next_elem);
                         } else {
                             break;
@@ -26987,11 +26910,11 @@ fn Decoder236<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_fna
 fn Decoder237<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_jpeg_frame_initial_segment_app0_data_data_jfif, ParseError> {
-    let version_major = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let version_minor = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let version_major = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let version_minor = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let density_units = ((|| {
         PResult::Ok({
-            let inner = (Decoder35(_input))?;
+            let inner = (Decoder25(_input))?;
             if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
                 inner
             } else {
@@ -27019,8 +26942,8 @@ fn Decoder237<'input>(
             }
         })
     })())?;
-    let thumbnail_width = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let thumbnail_height = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let thumbnail_width = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let thumbnail_height = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let thumbnail_pixels = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -27051,9 +26974,9 @@ fn Decoder237<'input>(
 fn Decoder238<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_logical_screen_global_color_table_inSeq, ParseError> {
-    let r = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let g = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let b = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let r = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let g = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let b = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_gif_logical_screen_global_color_table_inSeq { r, g, b })
 }
 
@@ -27083,7 +27006,7 @@ fn Decoder239<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_hea
             (field0, field1)
         })
     })())?;
-    let method = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let method = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let file_flags = ((|| {
         PResult::Ok({
             let inner = {
@@ -27113,8 +27036,8 @@ fn Decoder239<'input>(_input: &mut Parser<'input>) -> Result<main_gzip_inSeq_hea
         })
     })())?;
     let timestamp = ((|| PResult::Ok((Decoder70(_input))?))())?;
-    let compression_flags = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let os_id = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let compression_flags = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let os_id = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_gzip_inSeq_header {
         magic,
         method,
@@ -27295,7 +27218,7 @@ fn Decoder247<'input>(
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..len {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -27761,7 +27684,7 @@ fn Decoder259<'input>(
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..8u8 {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -27770,7 +27693,7 @@ fn Decoder259<'input>(
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..3u8 {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -27900,7 +27823,7 @@ fn Decoder261<'input>(_input: &mut Parser<'input>) -> Result<main_gif_blocks_inS
         PResult::Ok({
             let mut accum = Vec::new();
             for _ in 0..len_bytes {
-                accum.push((Decoder35(_input))?);
+                accum.push((Decoder25(_input))?);
             }
             accum
         })
@@ -27969,7 +27892,7 @@ fn Decoder263<'input>(
         })
     })())?;
     let delay_time = ((|| PResult::Ok((Decoder82(_input))?))())?;
-    let transparent_color_index = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let transparent_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let terminator = ((|| PResult::Ok((Decoder262(_input))?))())?;
     PResult::Ok(
         main_gif_blocks_inSeq_graphic_block_graphic_control_extension_some {
@@ -28087,10 +28010,10 @@ fn Decoder266<'input>(
     let text_grid_top_position = ((|| PResult::Ok((Decoder82(_input))?))())?;
     let text_grid_width = ((|| PResult::Ok((Decoder82(_input))?))())?;
     let text_grid_height = ((|| PResult::Ok((Decoder82(_input))?))())?;
-    let character_cell_width = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let character_cell_height = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let text_foreground_color_index = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let text_background_color_index = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let character_cell_width = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let character_cell_height = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let text_foreground_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let text_background_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let plain_text_data = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -28188,9 +28111,9 @@ fn Decoder267<'input>(
 fn Decoder268<'input>(
     _input: &mut Parser<'input>,
 ) -> Result<main_gif_logical_screen_global_color_table_inSeq, ParseError> {
-    let r = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let g = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let b = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let r = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let g = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let b = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_gif_logical_screen_global_color_table_inSeq { r, g, b })
 }
 
@@ -28200,7 +28123,7 @@ fn Decoder269<'input>(
     main_gif_blocks_inSeq_graphic_block_graphic_rendering_block_table_based_image_data,
     ParseError,
 > {
-    let lzw_min_code_size = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let lzw_min_code_size = ((|| PResult::Ok((Decoder25(_input))?))())?;
     let image_data = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
@@ -28263,8 +28186,8 @@ fn Decoder270<'input>(
             })(inner))?
         })
     })())?;
-    let bg_color_index = ((|| PResult::Ok((Decoder35(_input))?))())?;
-    let pixel_aspect_ratio = ((|| PResult::Ok((Decoder35(_input))?))())?;
+    let bg_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
+    let pixel_aspect_ratio = ((|| PResult::Ok((Decoder25(_input))?))())?;
     PResult::Ok(main_gif_logical_screen_descriptor {
         screen_width,
         screen_height,
