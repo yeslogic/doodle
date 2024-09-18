@@ -51,7 +51,7 @@ pub fn main(module: &mut FormatModule) -> FormatRef {
                     var("gzip-raw"),
                     "item",
                     Format::DecodeBytes(
-                        record_projs(var("item"), &["data", "inflate"]),
+                        Box::new(record_projs(var("item"), &["data", "inflate"])),
                         Box::new(tar.call()),
                     ),
                 ),
@@ -108,7 +108,10 @@ mod test {
             ("len", base.u32be()),
             (
                 "mask",
-                Format::WithRelativeOffset(var("len"), Box::new(Format::Byte(mask_bytes))),
+                Format::WithRelativeOffset(
+                    Box::new(var("len")),
+                    Box::new(Format::Byte(mask_bytes)),
+                ),
             ),
             (
                 "data",
@@ -116,7 +119,7 @@ mod test {
                     var("len"),
                     Format::Map(
                         Box::new(base.u8()),
-                        lambda("byte", bit_and(var("mask"), var("byte"))),
+                        Box::new(lambda("byte", bit_and(var("mask"), var("byte")))),
                     ),
                 ),
             ),

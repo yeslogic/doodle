@@ -65,7 +65,10 @@ pub fn main(module: &mut FormatModule, deflate: FormatRef, base: &BaseModule) ->
             ("xlen", base.u16le()),
             (
                 "subfields",
-                Format::Slice(var("xlen"), Box::new(repeat(fextra_subfield.call()))),
+                Format::Slice(
+                    Box::new(var("xlen")),
+                    Box::new(repeat(fextra_subfield.call())),
+                ),
             ),
         ]),
     );

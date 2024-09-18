@@ -6,7 +6,7 @@ use super::rust_ast::{PrimType, RustType, RustTypeDef};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::{Arith, IntRel, Label, ValueType};
+use crate::{Arith, IntRel, Label, TypeHint};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {
@@ -147,7 +147,7 @@ pub enum TypedFormat<TypeRep> {
     ),
     ForEach(
         TypeRep,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
         Label,
         Box<TypedFormat<TypeRep>>,
     ),
@@ -162,33 +162,33 @@ pub enum TypedFormat<TypeRep> {
     Record(TypeRep, Vec<(Label, TypedFormat<TypeRep>)>),
     Repeat(TypeRep, Box<TypedFormat<TypeRep>>),
     Repeat1(TypeRep, Box<TypedFormat<TypeRep>>),
-    RepeatCount(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    RepeatCount(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     RepeatBetween(
         TypeRep,
-        TypedExpr<TypeRep>,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
         Box<TypedFormat<TypeRep>>,
     ),
-    RepeatUntilLast(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
-    RepeatUntilSeq(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
-    Maybe(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    RepeatUntilLast(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
+    RepeatUntilSeq(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
+    Maybe(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     Peek(TypeRep, Box<TypedFormat<TypeRep>>),
     PeekNot(TypeRep, Box<TypedFormat<TypeRep>>),
-    Slice(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    Slice(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     Bits(TypeRep, Box<TypedFormat<TypeRep>>),
-    WithRelativeOffset(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
-    Map(TypeRep, Box<TypedFormat<TypeRep>>, TypedExpr<TypeRep>),
-    Where(TypeRep, Box<TypedFormat<TypeRep>>, TypedExpr<TypeRep>),
-    Compute(TypeRep, TypedExpr<TypeRep>),
+    WithRelativeOffset(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
+    Map(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    Where(TypeRep, Box<TypedFormat<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    Compute(TypeRep, Box<TypedExpr<TypeRep>>),
     Let(
         TypeRep,
         Label,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
         Box<TypedFormat<TypeRep>>,
     ),
     Match(
         TypeRep,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
         Vec<(TypedPattern<TypeRep>, TypedFormat<TypeRep>)>,
     ),
     Dynamic(
@@ -200,7 +200,7 @@ pub enum TypedFormat<TypeRep> {
     Apply(TypeRep, Label, Rc<TypedDynFormat<TypeRep>>),
     Pos,
     SkipRemainder,
-    DecodeBytes(TypeRep, TypedExpr<TypeRep>, Box<TypedFormat<TypeRep>>),
+    DecodeBytes(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedFormat<TypeRep>>),
     LetFormat(
         TypeRep,
         Box<TypedFormat<TypeRep>>,
@@ -416,7 +416,7 @@ impl TypedFormat<GenType> {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypedDynFormat<TypeRep> {
-    Huffman(TypedExpr<TypeRep>, Option<TypedExpr<TypeRep>>),
+    Huffman(Box<TypedExpr<TypeRep>>, Option<Box<TypedExpr<TypeRep>>>),
 }
 
 impl<TypeRep> std::hash::Hash for TypedDynFormat<TypeRep> {
@@ -497,20 +497,20 @@ pub enum TypedExpr<TypeRep> {
         TypeRep,
         Box<TypedExpr<TypeRep>>,
         Box<TypedExpr<TypeRep>>,
-        ValueType,
+        TypeHint,
         Box<TypedExpr<TypeRep>>,
     ),
     LeftFold(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
         Box<TypedExpr<TypeRep>>,
-        ValueType,
+        TypeHint,
         Box<TypedExpr<TypeRep>>,
     ),
     FlatMapList(
         TypeRep,
         Box<TypedExpr<TypeRep>>,
-        ValueType,
+        TypeHint,
         Box<TypedExpr<TypeRep>>,
     ),
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
@@ -829,7 +829,7 @@ mod __impls {
                     Format::ItemVar(level, args)
                 }
                 TypedFormat::DecodeBytes(_, expr, inner) => {
-                    Format::DecodeBytes(Expr::from(expr), rebox(inner))
+                    Format::DecodeBytes(rebox(expr), rebox(inner))
                 }
                 TypedFormat::SkipRemainder => Format::SkipRemainder,
                 TypedFormat::Pos => Format::Pos,
@@ -852,44 +852,42 @@ mod __impls {
                 TypedFormat::Repeat(_, inner) => Format::Repeat(rebox(inner)),
                 TypedFormat::Repeat1(_, inner) => Format::Repeat1(rebox(inner)),
                 TypedFormat::RepeatCount(_, count, inner) => {
-                    Format::RepeatCount(Expr::from(count), rebox(inner))
+                    Format::RepeatCount(rebox(count), rebox(inner))
                 }
                 TypedFormat::RepeatBetween(_, min, max, inner) => {
-                    Format::RepeatBetween(Expr::from(min), Expr::from(max), rebox(inner))
+                    Format::RepeatBetween(rebox(min), rebox(max), rebox(inner))
                 }
                 TypedFormat::RepeatUntilLast(_, lambda, inner) => {
-                    Format::RepeatUntilLast(Expr::from(lambda), rebox(inner))
+                    Format::RepeatUntilLast(rebox(lambda), rebox(inner))
                 }
                 TypedFormat::RepeatUntilSeq(_, lambda, inner) => {
-                    Format::RepeatUntilSeq(Expr::from(lambda), rebox(inner))
+                    Format::RepeatUntilSeq(rebox(lambda), rebox(inner))
                 }
                 TypedFormat::Maybe(_, is_present, inner) => {
-                    Format::Maybe(Expr::from(is_present), rebox(inner))
+                    Format::Maybe(rebox(is_present), rebox(inner))
                 }
                 TypedFormat::ForEach(_, expr, lbl, inner) => {
-                    Format::ForEach(Expr::from(expr), lbl, rebox(inner))
+                    Format::ForEach(rebox(expr), lbl, rebox(inner))
                 }
                 TypedFormat::Peek(_, inner) => Format::Peek(rebox(inner)),
                 TypedFormat::PeekNot(_, inner) => Format::PeekNot(rebox(inner)),
-                TypedFormat::Slice(_, sz, inner) => Format::Slice(Expr::from(sz), rebox(inner)),
+                TypedFormat::Slice(_, sz, inner) => Format::Slice(rebox(sz), rebox(inner)),
                 TypedFormat::Bits(_, inner) => Format::Bits(rebox(inner)),
                 TypedFormat::WithRelativeOffset(_, ofs, inner) => {
-                    Format::WithRelativeOffset(ofs.into(), rebox(inner))
+                    Format::WithRelativeOffset(rebox(ofs), rebox(inner))
                 }
-                TypedFormat::Map(_, inner, lambda) => Format::Map(rebox(inner), Expr::from(lambda)),
-                TypedFormat::Where(_, inner, lambda) => {
-                    Format::Where(rebox(inner), Expr::from(lambda))
-                }
-                TypedFormat::Compute(_, expr) => Format::Compute(Expr::from(expr)),
+                TypedFormat::Map(_, inner, lambda) => Format::Map(rebox(inner), rebox(lambda)),
+                TypedFormat::Where(_, inner, lambda) => Format::Where(rebox(inner), rebox(lambda)),
+                TypedFormat::Compute(_, expr) => Format::Compute(rebox(expr)),
                 TypedFormat::Let(_, name, val, inner) => {
-                    Format::Let(name, Expr::from(val), rebox(inner))
+                    Format::Let(name, rebox(val), rebox(inner))
                 }
                 TypedFormat::Match(_, head, t_branches) => {
                     let branches = t_branches
                         .into_iter()
                         .map(|(p, f)| (Pattern::from(p), Format::from(f)))
                         .collect();
-                    Format::Match(Expr::from(head), branches)
+                    Format::Match(rebox(head), branches)
                 }
                 TypedFormat::Dynamic(_, name, dynf, inner) => {
                     Format::Dynamic(name, DynFormat::from(dynf), rebox(inner))
@@ -903,7 +901,7 @@ mod __impls {
         fn from(value: TypedDynFormat<TypeRep>) -> Self {
             match value {
                 TypedDynFormat::Huffman(code_values, opt_code_lengths) => {
-                    DynFormat::Huffman(Expr::from(code_values), opt_code_lengths.map(Expr::from))
+                    DynFormat::Huffman(rebox(code_values), opt_code_lengths.map(rebox))
                 }
             }
         }

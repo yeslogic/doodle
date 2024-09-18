@@ -120,7 +120,7 @@ fn s64be(base: &BaseModule) -> Format {
 fn u24be(base: &BaseModule) -> Format {
     map(
         Format::Tuple(vec![
-            Format::Compute(Expr::U8(0)),
+            Format::Compute(Box::new(Expr::U8(0))),
             base.u8(),
             base.u8(),
             base.u8(),
@@ -169,7 +169,10 @@ where
     chain(
         Format::Peek(Box::new(record(prefix))),
         "x",
-        Format::Slice(record_proj(var("x"), length_field), Box::new(record(full))),
+        Format::Slice(
+            Box::new(record_proj(var("x"), length_field)),
+            Box::new(record(full)),
+        ),
     )
 }
 
@@ -242,7 +245,7 @@ fn link_offset(sof_offset: Expr, table_offset: Expr, format: Format) -> Format {
         pos32(),
         "offset",
         Format::WithRelativeOffset(
-            rel_offset(sof_offset, var("offset"), table_offset),
+            Box::new(rel_offset(sof_offset, var("offset"), table_offset)),
             Box::new(format),
         ),
     )
@@ -260,7 +263,7 @@ fn link(abs_offset: Expr, format: Format) -> Format {
         pos32(),
         "__here",
         Format::WithRelativeOffset(
-            relativize_offset(abs_offset, var("__here")),
+            Box::new(relativize_offset(abs_offset, var("__here"))),
             Box::new(format),
         ),
     )
@@ -330,12 +333,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
-                expr_unwrap(find_table(var(table_records_var), id)),
+                Box::new(expr_unwrap(find_table(var(table_records_var), id))),
                 Box::new(link_offset(
                     var(sof_offset32_vname),
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
-                        record_proj(var("matching_table"), "length"),
+                        Box::new(record_proj(var("matching_table"), "length")),
                         Box::new(table_format),
                     ),
                 )),
@@ -350,12 +353,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
-                expr_unwrap(find_table(var(table_records_var), id)),
+                Box::new(expr_unwrap(find_table(var(table_records_var), id))),
                 Box::new(link_offset(
                     var(sof_offset_var),
                     record_proj(var("matching_table"), "offset"),
                     Format::Slice(
-                        record_proj(var("matching_table"), "length"),
+                        Box::new(record_proj(var("matching_table"), "length")),
                         Box::new(
                             table_format_ref
                                 .call_args(vec![record_proj(var("matching_table"), "length")]),
@@ -373,9 +376,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ) -> Format {
             Format::Let(
                 Label::Borrowed("matching_table"),
-                find_table(var(table_records_var), id),
+                Box::new(find_table(var(table_records_var), id)),
                 Box::new(Format::Match(
-                    var("matching_table"),
+                    Box::new(var("matching_table")),
                     vec![
                         (
                             pat_some(bind("table")),
@@ -383,7 +386,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 var(sof_offset_var),
                                 record_proj(var("table"), "offset"),
                                 Format::Slice(
-                                    record_proj(var("table"), "length"),
+                                    Box::new(record_proj(var("table"), "length")),
                                     Box::new(table_format),
                                 ),
                             )),
@@ -923,7 +926,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     bind("unknown"),
                                     "MaxpUnknown",
-                                    Format::Compute(var("unknown")),
+                                    Format::Compute(Box::new(var("unknown"))),
                                 ), // FIXME - do we need this at all?
                             ],
                         ),
@@ -1073,7 +1076,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::binding("unknown"),
                                     "NameVersionUnknown",
-                                    Format::Compute(var("unknown")),
+                                    Format::Compute(Box::new(var("unknown"))),
                                 ),
                             ],
                         ),
@@ -1214,7 +1217,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     bind("unknown"),
                                     "VersionUnknown",
-                                    Format::Compute(var("unknown")),
+                                    Format::Compute(Box::new(var("unknown"))),
                                 ),
                             ],
                         ),
@@ -1287,12 +1290,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             if_then_else(
                                 is_nonzero_u8(record_proj(var("flags"), "repeat_flag")),
                                 base.u8(),
-                                Format::Compute(Expr::U8(0)),
+                                Format::Compute(Box::new(Expr::U8(0))),
                             ),
                         ),
                         (
                             "field_set",
-                            Format::Compute(subset_fields(
+                            Format::Compute(Box::new(subset_fields(
                                 var("flags"),
                                 [
                                     "on_curve_point",
@@ -1302,7 +1305,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     "y_is_same_or_positive_y_short_vector",
                                     "overlap_simple",
                                 ],
-                            )),
+                            ))),
                         ),
                     ]),
                 );
@@ -1379,7 +1382,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "x_is_same_or_positive_x_short_vector",
                         )),
                         // this wants to be i16
-                        Format::Compute(Expr::U16(0)),
+                        Format::Compute(Box::new(Expr::U16(0))),
                         s16be(base),
                     ),
                 )
@@ -1408,7 +1411,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "y_is_same_or_positive_y_short_vector",
                         )),
                         // this wants to be i16
-                        Format::Compute(Expr::U16(0)),
+                        Format::Compute(Box::new(Expr::U16(0))),
                         s16be(base),
                     ),
                 )
@@ -1427,7 +1430,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "number_of_coordinates",
-                        Format::Compute(add(Expr::U16(1), last_elem("end_points_of_contour"))),
+                        Format::Compute(Box::new(add(
+                            Expr::U16(1),
+                            last_elem("end_points_of_contour"),
+                        ))),
                     ),
                     ("flags", glyf_flags_simple(var("number_of_coordinates"))),
                     (
@@ -1546,7 +1552,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 "instructions_length",
                                 repeat_count(var("instructions_length"), base.u8()),
                             ),
-                            Format::Compute(seq_empty()),
+                            Format::Compute(Box::new(seq_empty())),
                         ),
                     ),
                 ])
@@ -1791,7 +1797,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             (
                                 bind("unknown"),
                                 "UnknownVersion",
-                                Format::Compute(var("unknown")),
+                                Format::Compute(Box::new(var("unknown"))),
                             ),
                         ],
                     ),

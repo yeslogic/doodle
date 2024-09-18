@@ -30,7 +30,6 @@ pub mod prelude;
 pub mod read;
 
 mod typecheck;
-use typecheck::UnificationError;
 pub use typecheck::{typecheck, TCError, TCResult};
 
 pub type Label = std::borrow::Cow<'static, str>;
@@ -47,47 +46,8 @@ pub enum ValueKind {
     Format(ValueType),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Hash, PartialOrd, Ord)]
-pub enum BaseType {
-    Bool,
-    U8,
-    U16,
-    U32,
-    U64,
-    Char,
-}
-
-impl BaseType {
-    fn is_numeric(&self) -> bool {
-        matches!(self, Self::U8 | Self::U16 | Self::U32 | Self::U64)
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
-pub enum ValueType {
-    Any,
-    Empty,
-    Base(BaseType),
-    Tuple(Vec<ValueType>),
-    Record(Vec<(Label, ValueType)>),
-    Union(BTreeMap<Label, ValueType>),
-    Seq(Box<ValueType>),
-    Option(Box<ValueType>),
-}
-
-impl From<BaseType> for ValueType {
-    fn from(b: BaseType) -> Self {
-        ValueType::Base(b)
-    }
-}
-
-impl ValueType {
-    pub const BOOL: Self = ValueType::Base(BaseType::Bool);
-
-    // NOTE - should be updated if we ever add new integer types
-    /// Alias for the widest (unsigned) integer type we support as a ValueType
-    pub const UMAX: Self = ValueType::Base(BaseType::U64);
-}
+pub(crate) mod valuetype;
+pub use valuetype::{BaseType, TypeHint, ValueType};
 
 fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
     match vt {
@@ -123,115 +83,6 @@ fn mk_value_expr(vt: &ValueType) -> Option<Expr> {
             Label::from("Some"),
             Box::new(mk_value_expr(t)?),
         )),
-    }
-}
-
-impl ValueType {
-    pub const UNIT: ValueType = ValueType::Tuple(Vec::new());
-
-    fn record_proj(&self, label: &str) -> ValueType {
-        match self {
-            ValueType::Record(fields) => match fields.iter().find(|(l, _)| label == l) {
-                Some((_, t)) => t.clone(),
-                None => panic!("{label} not found in record type"),
-            },
-            _ => panic!("expected record type"),
-        }
-    }
-
-    fn unwrap_tuple_type(self) -> AResult<Vec<ValueType>> {
-        match self {
-            ValueType::Tuple(ts) => Ok(ts),
-            t => Err(anyhow!("type is not a tuple: {t:?}")),
-        }
-    }
-
-    fn as_tuple_type(&self) -> &[ValueType] {
-        match self {
-            ValueType::Tuple(ts) => ts.as_slice(),
-            other => panic!("type is not a tuple: {other:?}"),
-        }
-    }
-
-    pub fn is_equivalent(&self, other: &ValueType) -> Result<(), UnificationError<ValueType>> {
-        self.unify(other)?;
-        Ok(())
-    }
-
-    fn unify(&self, other: &ValueType) -> Result<ValueType, UnificationError<ValueType>> {
-        match (self, other) {
-            (ValueType::Empty, ValueType::Empty) => Ok(ValueType::Empty),
-
-            // NOTE - we have to specify these patterns before the similar cases for Empty because we want (Empty, Any) in either order to yield Empty
-            (ValueType::Any, rhs) => Ok(rhs.clone()),
-            (lhs, ValueType::Any) => Ok(lhs.clone()),
-
-            (ValueType::Empty, rhs) => Ok(rhs.clone()),
-            (lhs, ValueType::Empty) => Ok(lhs.clone()),
-
-            (ValueType::Base(b1), ValueType::Base(b2)) => {
-                if b1 == b2 {
-                    Ok(ValueType::Base(*b1))
-                } else {
-                    Err(UnificationError::Unsatisfiable(self.clone(), other.clone()))
-                }
-            }
-            (ValueType::Tuple(ts1), ValueType::Tuple(ts2)) => {
-                if ts1.len() != ts2.len() {
-                    // tuple arity mismatch
-                    return Err(UnificationError::Unsatisfiable(self.clone(), other.clone()));
-                }
-                let mut ts = Vec::new();
-                for (t1, t2) in Iterator::zip(ts1.iter(), ts2.iter()) {
-                    ts.push(t1.unify(t2)?);
-                }
-                Ok(ValueType::Tuple(ts))
-            }
-            (ValueType::Record(fs1), ValueType::Record(fs2)) => {
-                if fs1.len() != fs2.len() {
-                    // field count mismatch
-                    return Err(UnificationError::Unsatisfiable(self.clone(), other.clone()));
-                }
-                // NOTE - because fields are parsed in declared order, two records with conflicting field orders are not operationally equivalent
-                let mut fs = Vec::new();
-                for ((l1, t1), (l2, t2)) in Iterator::zip(fs1.iter(), fs2.iter()) {
-                    if l1 != l2 {
-                        // field label mismatch
-                        return Err(UnificationError::Unsatisfiable(self.clone(), other.clone()));
-                    }
-                    fs.push((l1.clone(), t1.unify(t2)?));
-                }
-                Ok(ValueType::Record(fs))
-            }
-            (ValueType::Union(bs1), ValueType::Union(bs2)) => {
-                let mut bs: BTreeMap<Label, ValueType> = BTreeMap::new();
-
-                let keys1 = bs1.keys().collect::<HashSet<_>>();
-                let keys2 = bs2.keys().collect::<HashSet<_>>();
-
-                let keys_common = HashSet::union(&keys1, &keys2).cloned();
-
-                for key in keys_common.into_iter() {
-                    match (bs1.get(key), bs2.get(key)) {
-                        (Some(t1), Some(t2)) => {
-                            let t = t1.unify(t2)?;
-                            bs.insert(key.clone(), t);
-                        }
-                        (Some(t), None) | (None, Some(t)) => {
-                            bs.insert(key.clone(), t.clone());
-                        }
-                        (None, None) => unreachable!("key must appear in at least one operand"),
-                    }
-                }
-
-                Ok(ValueType::Union(bs))
-            }
-            (ValueType::Seq(t1), ValueType::Seq(t2)) => Ok(ValueType::Seq(Box::new(t1.unify(t2)?))),
-            (ValueType::Option(t1), ValueType::Option(t2)) => {
-                Ok(ValueType::Option(Box::new(t1.unify(t2)?)))
-            }
-            (t1, t2) => Err(UnificationError::Unsatisfiable(t1.clone(), t2.clone())),
-        }
     }
 }
 
@@ -304,24 +155,18 @@ pub enum Expr {
     /// FlatMap :: (T -> [U]) -> [T] -> [U]
     FlatMap(Box<Expr>, Box<Expr>),
     /// FlatMapAccum :: ((V, T) -> (V, [U])) -> V -> TypeRep V -> [T] -> [U]
-    FlatMapAccum(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
+    FlatMapAccum(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
     /// FlatMapList :: (([U], T) -> [U]) -> TypeRep U -> [T] -> [U]
-    FlatMapList(Box<Expr>, ValueType, Box<Expr>),
+    FlatMapList(Box<Expr>, TypeHint, Box<Expr>),
 
     /// LeftFold :: ((U, T) -> U) -> U -> [T} -> U
-    LeftFold(Box<Expr>, Box<Expr>, ValueType, Box<Expr>),
+    LeftFold(Box<Expr>, Box<Expr>, TypeHint, Box<Expr>),
 
     /// Dup :: U32 -> T -> [T]
     Dup(Box<Expr>, Box<Expr>),
 
     LiftOption(Option<Box<Expr>>),
 }
-
-// #[derive(Clone, Debug, PartialEq)]
-// pub enum HigherOrderType {
-//     Point(ValueType),
-//     Arrow(ValueType, ValueType),
-// }
 
 impl Expr {
     pub const UNIT: Self = Expr::Tuple(Vec::new());
@@ -566,7 +411,7 @@ impl Expr {
             Expr::FlatMapAccum(expr, accum, accum_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
-                        let accum_type = accum.infer_type(scope)?.unify(accum_type)?;
+                        let accum_type = accum.infer_type(scope)?.unify(accum_type.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         child_scope
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
@@ -589,7 +434,7 @@ impl Expr {
             Expr::LeftFold(expr, accum, accum_type, seq) => match expr.as_ref() {
                 Expr::Lambda(name, expr) => match seq.infer_type(scope)? {
                     ValueType::Seq(t) => {
-                        let accum_type = accum.infer_type(scope)?.unify(accum_type)?;
+                        let accum_type = accum.infer_type(scope)?.unify(accum_type.as_ref())?;
                         let mut child_scope = TypeScope::child(scope);
                         child_scope
                             .push(name.clone(), ValueType::Tuple(vec![accum_type.clone(), *t]));
@@ -605,7 +450,10 @@ impl Expr {
                         let mut child_scope = TypeScope::child(scope);
                         child_scope.push(
                             name.clone(),
-                            ValueType::Tuple(vec![ValueType::Seq(Box::new(ret_type.clone())), *t]),
+                            ValueType::Tuple(vec![
+                                ValueType::Seq(Box::new(ret_type.as_ref().clone())),
+                                *t,
+                            ]),
                         );
                         match expr.infer_type(&child_scope)? {
                             ValueType::Seq(t2) => Ok(ValueType::Seq(t2)),
@@ -719,7 +567,7 @@ impl Expr {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 pub enum DynFormat {
-    Huffman(Expr, Option<Expr>),
+    Huffman(Box<Expr>, Option<Box<Expr>>),
 }
 
 /// Binary format descriptions
@@ -791,37 +639,37 @@ pub enum Format {
     /// Repeat a format one-or-more times
     Repeat1(Box<Format>),
     /// Repeat a format an exact number of times
-    RepeatCount(Expr, Box<Format>),
+    RepeatCount(Box<Expr>, Box<Format>),
     /// Repeat a format at least N and at most M times
-    RepeatBetween(Expr, Expr, Box<Format>),
+    RepeatBetween(Box<Expr>, Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by its last item
-    RepeatUntilLast(Expr, Box<Format>),
+    RepeatUntilLast(Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
-    RepeatUntilSeq(Expr, Box<Format>),
+    RepeatUntilSeq(Box<Expr>, Box<Format>),
     /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
-    ForEach(Expr, Label, Box<Format>),
+    ForEach(Box<Expr>, Label, Box<Format>),
     /// Parse a format if and only if the given expression evaluates to true, otherwise skip
-    Maybe(Expr, Box<Format>),
+    Maybe(Box<Expr>, Box<Format>),
     /// Parse a format without advancing the stream position afterwards
     Peek(Box<Format>),
     /// Attempt to parse a format and fail if it succeeds
     PeekNot(Box<Format>),
     /// Restrict a format to a sub-stream of a given number of bytes (skips any leftover bytes in the sub-stream)
-    Slice(Expr, Box<Format>),
+    Slice(Box<Expr>, Box<Format>),
     /// Parse bitstream
     Bits(Box<Format>),
     /// Matches a format at a byte offset relative to the current stream position
-    WithRelativeOffset(Expr, Box<Format>),
+    WithRelativeOffset(Box<Expr>, Box<Format>),
     /// Map a value with a lambda expression
-    Map(Box<Format>, Expr),
+    Map(Box<Format>, Box<Expr>),
     /// Assert that a boolean condition holds on a value
-    Where(Box<Format>, Expr),
+    Where(Box<Format>, Box<Expr>),
     /// Compute a value
-    Compute(Expr),
+    Compute(Box<Expr>),
     /// Let binding
-    Let(Label, Expr, Box<Format>),
+    Let(Label, Box<Expr>, Box<Format>),
     /// Pattern match on an expression
-    Match(Expr, Vec<(Pattern, Format)>),
+    Match(Box<Expr>, Vec<(Pattern, Format)>),
     /// Format generated dynamically
     Dynamic(Label, DynFormat, Box<Format>),
     /// Apply a dynamic format from a named variable in the scope
@@ -831,7 +679,7 @@ pub enum Format {
     /// Skip the remainder of the stream, up until the end of input or the last available byte within a Slice
     SkipRemainder,
     /// Given an expression corresponding to a byte-sequence, decode it again using the provided Format. This can be used to reparse the initial decode of formats that output Vec<u8> or similar
-    DecodeBytes(Expr, Box<Format>),
+    DecodeBytes(Box<Expr>, Box<Format>),
     /// Process one format, bind the result to a label, and process a second format, discarding the result of the first
     LetFormat(Box<Format>, Label, Box<Format>),
 }
@@ -1253,7 +1101,7 @@ impl FormatModule {
                 }
             }
             Format::RepeatUntilLast(lambda_elem, a) => {
-                match lambda_elem {
+                match lambda_elem.as_ref() {
                     Expr::Lambda(head, expr) => {
                         let t = self.infer_format_type(scope, a)?;
                         let mut child_scope = TypeScope::child(scope);
@@ -1268,7 +1116,7 @@ impl FormatModule {
                 }
             }
             Format::RepeatUntilSeq(lambda_seq, a) => {
-                match lambda_seq {
+                match lambda_seq.as_ref() {
                     Expr::Lambda(head, expr) => {
                         let t = self.infer_format_type(scope, a)?;
                         let mut child_scope = TypeScope::child(scope);
@@ -1298,7 +1146,7 @@ impl FormatModule {
             Format::WithRelativeOffset(_expr, a) => self.infer_format_type(scope, a),
             Format::Map(a, expr) => {
                 let arg_type = self.infer_format_type(scope, a)?;
-                match expr {
+                match expr.as_ref() {
                     Expr::Lambda(name, body) => {
                         let mut child_scope = TypeScope::child(scope);
                         child_scope.push(name.clone(), arg_type);
@@ -1309,7 +1157,7 @@ impl FormatModule {
             }
             Format::Where(a, expr) => {
                 let arg_type = self.infer_format_type(scope, a)?;
-                match expr {
+                match expr.as_ref() {
                     Expr::Lambda(name, body) => {
                         let mut child_scope = TypeScope::child(scope);
                         child_scope.push(name.clone(), arg_type.clone());
@@ -2461,15 +2309,15 @@ mod test {
     fn format_let_eval_precedence() {
         let fmt = Format::Let(
             Label::Borrowed("y"),
-            Expr::U8(10),
+            Box::new(Expr::U8(10)),
             Box::new(Format::Let(
                 Label::Borrowed("x"),
-                Expr::Var(Label::Borrowed("y")),
+                Box::new(Expr::Var(Label::Borrowed("y"))),
                 Box::new(Format::Record(vec![
-                    (Label::Borrowed("y"), Format::Compute(Expr::U8(5))),
+                    (Label::Borrowed("y"), Format::Compute(Box::new(Expr::U8(5)))),
                     (
                         Label::Borrowed("z"),
-                        Format::Compute(Expr::Var(Label::Borrowed("x"))),
+                        Format::Compute(Box::new(Expr::Var(Label::Borrowed("x")))),
                     ),
                 ])),
             )),

@@ -651,26 +651,26 @@ pub enum Decoder {
     Record(Vec<(Label, Decoder)>),
     While(MatchTree, Box<Decoder>),
     Until(MatchTree, Box<Decoder>),
-    RepeatCount(Expr, Box<Decoder>),
-    RepeatUntilLast(Expr, Box<Decoder>),
-    RepeatUntilSeq(Expr, Box<Decoder>),
-    Maybe(Expr, Box<Decoder>),
+    RepeatCount(Box<Expr>, Box<Decoder>),
+    RepeatUntilLast(Box<Expr>, Box<Decoder>),
+    RepeatUntilSeq(Box<Expr>, Box<Decoder>),
+    Maybe(Box<Expr>, Box<Decoder>),
     Peek(Box<Decoder>),
     PeekNot(Box<Decoder>),
-    Slice(Expr, Box<Decoder>),
+    Slice(Box<Expr>, Box<Decoder>),
     Bits(Box<Decoder>),
-    WithRelativeOffset(Expr, Box<Decoder>),
-    Map(Box<Decoder>, Expr),
-    Where(Box<Decoder>, Expr),
-    Compute(Expr),
-    Let(Label, Expr, Box<Decoder>),
-    Match(Expr, Vec<(Pattern, Decoder)>),
+    WithRelativeOffset(Box<Expr>, Box<Decoder>),
+    Map(Box<Decoder>, Box<Expr>),
+    Where(Box<Decoder>, Box<Expr>),
+    Compute(Box<Expr>),
+    Let(Label, Box<Expr>, Box<Decoder>),
+    Match(Box<Expr>, Vec<(Pattern, Decoder)>),
     Dynamic(Label, DynFormat, Box<Decoder>),
     Apply(Label),
-    RepeatBetween(MatchTree, Expr, Expr, Box<Decoder>),
-    ForEach(Expr, Label, Box<Decoder>),
+    RepeatBetween(MatchTree, Box<Expr>, Box<Expr>, Box<Decoder>),
+    ForEach(Box<Expr>, Label, Box<Decoder>),
     SkipRemainder,
-    DecodeBytes(Expr, Box<Decoder>),
+    DecodeBytes(Box<Expr>, Box<Decoder>),
     LetFormat(Box<Decoder>, Label, Box<Decoder>),
 }
 
@@ -882,7 +882,8 @@ impl<'a> Compiler<'a> {
                     let mut branches: Vec<Format> = Vec::new();
                     // FIXME: this is inefficient but probably works
                     for count in 0..=max {
-                        let f_count = Format::RepeatCount(Expr::U32(count as u32), a.clone());
+                        let f_count =
+                            Format::RepeatCount(Box::new(Expr::U32(count as u32)), a.clone());
                         branches.push(f_count);
                     }
                     let Some(tree) = MatchTree::build(self.module, &branches[..], next) else {
@@ -1426,7 +1427,7 @@ impl Decoder {
                 let (v, input) = d.parse(program, scope, input)?;
                 match expr.eval_lambda(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::bad_where(scope, expr.clone(), v)),
+                    false => Err(DecodeError::bad_where(scope, *expr.clone(), v)),
                 }
             }
             Decoder::Compute(expr) => {
@@ -1515,7 +1516,10 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         if len != 0 {
             codes.push(Format::Map(
                 Box::new(bit_range(len, next_code[len])),
-                Expr::Lambda("_".into(), Box::new(Expr::U16(n.try_into().unwrap()))),
+                Box::new(Expr::Lambda(
+                    "_".into(),
+                    Box::new(Expr::U16(n.try_into().unwrap())),
+                )),
             ));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;
@@ -1648,8 +1652,8 @@ mod tests {
 
     #[test]
     fn compile_alt_slice_byte() {
-        let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
-        let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0xFF)));
+        let slice_a = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0x00)));
+        let slice_b = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0xFF)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
         let d = Compiler::compile_one(&f).unwrap();
         accepts(
@@ -1670,8 +1674,8 @@ mod tests {
 
     #[test]
     fn compile_alt_slice_ambiguous1() {
-        let slice_a = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
-        let slice_b = Format::Slice(Expr::U8(1), Box::new(is_byte(0x00)));
+        let slice_a = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0x00)));
+        let slice_b = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0x00)));
         let f = alts([("a", slice_a), ("b", slice_b)]);
         assert!(Compiler::compile_one(&f).is_err());
     }
@@ -1680,8 +1684,8 @@ mod tests {
     fn compile_alt_slice_ambiguous2() {
         let tuple_a = Format::Tuple(vec![is_byte(0x00), is_byte(0x00)]);
         let tuple_b = Format::Tuple(vec![is_byte(0x00), is_byte(0xFF)]);
-        let slice_a = Format::Slice(Expr::U8(1), Box::new(tuple_a));
-        let slice_b = Format::Slice(Expr::U8(1), Box::new(tuple_b));
+        let slice_a = Format::Slice(Box::new(Expr::U8(1)), Box::new(tuple_a));
+        let slice_b = Format::Slice(Box::new(Expr::U8(1)), Box::new(tuple_b));
         let f = alts([("a", slice_a), ("b", slice_b)]);
         assert!(Compiler::compile_one(&f).is_err());
     }
@@ -2287,8 +2291,11 @@ mod tests {
 
     #[test]
     fn compile_repeat_between() {
-        let repeat_between =
-            Format::RepeatBetween(Expr::U16(0u16), Expr::U16(2u16), Box::new(is_byte(0)));
+        let repeat_between = Format::RepeatBetween(
+            Box::new(Expr::U16(0u16)),
+            Box::new(Expr::U16(2u16)),
+            Box::new(is_byte(0)),
+        );
         let trailer = is_byte(1);
         let f = Format::Tuple(vec![repeat_between, trailer]);
         assert!(Compiler::compile_one(&f).is_ok());
@@ -2304,11 +2311,11 @@ mod tests {
         );
         let a = Format::Where(
             Box::new(u16be.clone()),
-            lambda("x", expr_eq(var("x"), Expr::U16(0x00FF))),
+            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0x00FF)))),
         );
         let b = Format::Where(
             Box::new(u16be),
-            lambda("x", expr_eq(var("x"), Expr::U16(0xFF00))),
+            Box::new(lambda("x", expr_eq(var("x"), Expr::U16(0xFF00)))),
         );
         let f = Format::Union(vec![a, b]);
         let d = Compiler::compile_one(&f).unwrap();

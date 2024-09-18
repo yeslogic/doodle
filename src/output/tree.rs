@@ -1669,7 +1669,7 @@ impl<'module> MonoidalPrinter<'module> {
             }
             Format::RepeatBetween(min, max, format) => {
                 let expr_frag = self.compile_expr(
-                    &Expr::Tuple(vec![min.clone(), max.clone()]),
+                    &Expr::Tuple(vec![*min.clone(), *max.clone()]),
                     Precedence::ATOM,
                 );
                 cond_paren(

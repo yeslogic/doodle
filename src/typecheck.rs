@@ -1937,7 +1937,7 @@ impl TypeChecker {
                 let ys_var = self.get_new_uvar();
 
                 let (acc_x_var, acc_ys_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
-                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt, scope)?;
+                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt.as_ref(), scope)?;
                 let xs_var = self.infer_var_expr(seq_expr, scope)?;
                 let x_var = self.get_new_uvar();
                 let y_var = self.get_new_uvar();
@@ -1962,7 +1962,7 @@ impl TypeChecker {
                 let newvar = self.get_new_uvar();
 
                 let (acc_x_var, ret_var) = self.infer_vars_expr_lambda(f_expr, scope)?;
-                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt, scope)?;
+                let acc_var = self.infer_var_expr_acc(acc_expr, acc_vt.as_ref(), scope)?;
                 let xs_var = self.infer_var_expr(seq_expr, scope)?;
                 let x_var = self.get_new_uvar();
 
@@ -1988,7 +1988,7 @@ impl TypeChecker {
 
                 self.unify_var_proj_elem(ys_var, y_var)?;
                 self.unify_var_proj_elem(xs_var, x_var)?;
-                self.unify_var_valuetype(y_var, ret_type)?;
+                self.unify_var_valuetype(y_var, ret_type.as_ref())?;
                 self.unify_var_pair(ys_var, tail_var)?;
 
                 // constrain the shape to be exactly the tuple we expect
@@ -3057,7 +3057,7 @@ mod __impls {
 #[cfg(test)]
 mod tests {
     use crate::byte_set::ByteSet;
-    use crate::Arith;
+    use crate::{Arith, TypeHint};
 
     use super::*;
 
@@ -3100,7 +3100,7 @@ mod tests {
             ("number".into(), Format::Byte(ByteSet::full())),
             (
                 "isEven".into(),
-                Format::Compute(Expr::Match(
+                Format::Compute(Box::new(Expr::Match(
                     Box::new(Expr::Arith(
                         Arith::Rem,
                         Box::new(Expr::Var("number".into())),
@@ -3110,7 +3110,7 @@ mod tests {
                         (Pattern::U8(0), Expr::Bool(true)),
                         (Pattern::Wildcard, Expr::Bool(false)),
                     ],
-                )),
+                ))),
             ),
         ]);
         let mut module = FormatModule::new();
@@ -3137,7 +3137,7 @@ mod tests {
             ("number".into(), Format::Byte(ByteSet::full())),
             (
                 "parity".into(),
-                Format::Compute(Expr::Match(
+                Format::Compute(Box::new(Expr::Match(
                     Box::new(Expr::Arith(
                         Arith::Rem,
                         Box::new(Expr::Var("number".into())),
@@ -3153,7 +3153,7 @@ mod tests {
                             Expr::Variant("Odd".into(), Box::new(Expr::UNIT)),
                         ),
                     ],
-                )),
+                ))),
             ),
         ]);
         let mut module = FormatModule::new();
@@ -3182,10 +3182,10 @@ mod tests {
     fn mk_format_u32() -> Format {
         Format::Map(
             Box::new(Format::Tuple(vec![Format::Byte(ByteSet::full()); 4])),
-            Expr::Lambda(
+            Box::new(Expr::Lambda(
                 "x".into(),
                 Box::new(Expr::U32Be(Box::new(Expr::Var("x".into())))),
-            ),
+            )),
         )
     }
 
@@ -3194,7 +3194,7 @@ mod tests {
         let mut tc = TypeChecker::new();
         let format = Format::Map(
             Box::new(Format::Repeat(Box::new(mk_format_u32()))),
-            Expr::Lambda(
+            Box::new(Expr::Lambda(
                 "xs".into(),
                 Box::new(Expr::FlatMapAccum(
                     Box::new(Expr::Lambda(
@@ -3223,10 +3223,10 @@ mod tests {
                         ])),
                     )),
                     Box::new(Expr::U32(1)),
-                    ValueType::Base(BaseType::U32),
+                    TypeHint::from(ValueType::Base(BaseType::U32)),
                     Box::new(Expr::Var("xs".into())),
                 )),
-            ),
+            )),
         );
         let module = FormatModule::new();
         // module.define_format("prod32", format.clone());

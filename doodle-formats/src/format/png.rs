@@ -28,7 +28,10 @@ pub fn main(
                 ),
             ), // NOTE: < 2^31
             ("tag", tag),
-            ("data", Format::Slice(var("length"), Box::new(data))),
+            (
+                "data",
+                Format::Slice(Box::new(var("length")), Box::new(data)),
+            ),
             ("crc", base.u32be()), // FIXME check this
         ])
     };
@@ -145,7 +148,7 @@ pub fn main(
         zlib.call(),
         "zlib",
         Format::DecodeBytes(
-            record_projs(var("zlib"), &["data", "inflate"]),
+            Box::new(record_projs(var("zlib"), &["data", "inflate"])),
             Box::new(utf8text_nz.call()),
         ),
     );
@@ -258,7 +261,7 @@ pub fn main(
         zlib.call(),
         "zlib",
         Format::DecodeBytes(
-            record_projs(var("zlib"), &["data", "inflate"]),
+            Box::new(record_projs(var("zlib"), &["data", "inflate"])),
             // FIXME - we need to define a new format for latin1 without a null terminal (viz. why asciiz_string won't work)
             Box::new(utf8text.call()),
         ),
@@ -421,7 +424,7 @@ pub fn main(
             (
                 "data",
                 Format::Slice(
-                    var("length"),
+                    Box::new(var("length")),
                     Box::new(match_variant(
                         var("tag"),
                         [
@@ -480,7 +483,7 @@ pub fn main(
                         ),
                     ),
                     "idat",
-                    Format::DecodeBytes(var("idat"), Box::new(zlib.call())),
+                    Format::DecodeBytes(Box::new(var("idat")), Box::new(zlib.call())),
                 ),
             ),
             (

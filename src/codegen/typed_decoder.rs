@@ -61,33 +61,61 @@ pub(crate) enum TypedDecoder<TypeRep> {
     Record(TypeRep, Vec<(Label, TypedDecoderExt<TypeRep>)>),
     Repeat0While(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
     Repeat1Until(TypeRep, MatchTree, Box<TypedDecoderExt<TypeRep>>),
-    RepeatCount(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    RepeatCount(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     RepeatBetween(
         TypeRep,
         MatchTree,
-        TypedExpr<TypeRep>,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
-    RepeatUntilLast(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
-    RepeatUntilSeq(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    RepeatUntilLast(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
+    RepeatUntilSeq(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     Peek(TypeRep, Box<TypedDecoderExt<TypeRep>>),
     PeekNot(TypeRep, Box<TypedDecoderExt<TypeRep>>),
-    Slice(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    Slice(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     Bits(TypeRep, Box<TypedDecoderExt<TypeRep>>),
-    WithRelativeOffset(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
-    Map(TypeRep, Box<TypedDecoderExt<TypeRep>>, TypedExpr<TypeRep>),
-    Where(TypeRep, Box<TypedDecoderExt<TypeRep>>, TypedExpr<TypeRep>),
-    Compute(TypeRep, TypedExpr<TypeRep>),
+    WithRelativeOffset(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
+    Map(
+        TypeRep,
+        Box<TypedDecoderExt<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
+    Where(
+        TypeRep,
+        Box<TypedDecoderExt<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
+    Compute(TypeRep, Box<TypedExpr<TypeRep>>),
     Let(
         TypeRep,
         Label,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
         Box<TypedDecoderExt<TypeRep>>,
     ),
     Match(
         TypeRep,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
         Vec<(TypedPattern<TypeRep>, TypedDecoderExt<TypeRep>)>,
     ),
     Dynamic(
@@ -97,16 +125,24 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Box<TypedDecoderExt<TypeRep>>,
     ),
     Apply(TypeRep, Label),
-    Maybe(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    Maybe(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     Pos,
     ForEach(
         TypeRep,
-        TypedExpr<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
         Label,
         Box<TypedDecoderExt<TypeRep>>,
     ),
     SkipRemainder,
-    DecodeBytes(TypeRep, TypedExpr<TypeRep>, Box<TypedDecoderExt<TypeRep>>),
+    DecodeBytes(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
     LetFormat(
         TypeRep,
         Box<TypedDecoderExt<TypeRep>>,
@@ -370,7 +406,7 @@ impl<'a> GTCompiler<'a> {
                     for count in 0..=max {
                         let f_count = TypedFormat::RepeatCount(
                             gt.clone(),
-                            TypedExpr::U32(count as u32),
+                            Box::new(TypedExpr::U32(count as u32)),
                             a.clone(),
                         );
                         branches.push(f_count.into());

@@ -12,7 +12,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             ("tag", tag),
             ("length", base.u32le()),
-            ("data", Format::Slice(var("length"), Box::new(data))),
+            (
+                "data",
+                Format::Slice(Box::new(var("length")), Box::new(data)),
+            ),
             ("pad", cond_maybe(is_odd(var("length")), is_byte(0x00))),
         ])
     };

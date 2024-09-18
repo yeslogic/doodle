@@ -166,7 +166,7 @@ pub fn match_variant<Name: IntoLabel>(
     branches: impl IntoIterator<Item = (Pattern, Name, Format)>,
 ) -> Format {
     Format::Match(
-        head,
+        Box::new(head),
         (branches.into_iter())
             .map(|(pattern, label, format)| {
                 (pattern, Format::Variant(label.into(), Box::new(format)))
@@ -243,7 +243,7 @@ pub fn repeat1(format: Format) -> Format {
 
 /// Helper-function for [`Format::RepeatCount`].
 pub fn repeat_count(len: Expr, format: Format) -> Format {
-    Format::RepeatCount(len, Box::new(format))
+    Format::RepeatCount(Box::new(len), Box::new(format))
 }
 
 /// Helper-function for [`Format::RepeatBetween`].
@@ -260,7 +260,7 @@ pub fn repeat_count(len: Expr, format: Format) -> Format {
 /// requirement of the primitive, but rather an imposed limitation of the implementation designed
 /// to keep the logic simple.
 pub fn repeat_between(min: Expr, max: Expr, format: Format) -> Format {
-    Format::RepeatBetween(min, max, Box::new(format))
+    Format::RepeatBetween(Box::new(min), Box::new(max), Box::new(format))
 }
 
 /// Helper-function for [`Format::RepeatUntilLast`].
@@ -272,7 +272,7 @@ pub fn repeat_between(min: Expr, max: Expr, format: Format) -> Format {
 ///
 /// By virtue of its definition, the repetition will always contain at least one element.
 pub fn repeat_until_last(predicate: Expr, format: Format) -> Format {
-    Format::RepeatUntilLast(predicate, Box::new(format))
+    Format::RepeatUntilLast(Box::new(predicate), Box::new(format))
 }
 
 /// Helper-function for [`Format::RepeatUntilSeq`].
@@ -288,7 +288,7 @@ pub fn repeat_until_last(predicate: Expr, format: Format) -> Format {
 ///
 /// If the condition being evaluated only ever returns true based on a predicate over the final element of the sequence, use [`repeat_until_last`] instead.
 pub fn repeat_until_seq(predicate: Expr, format: Format) -> Format {
-    Format::RepeatUntilSeq(predicate, Box::new(format))
+    Format::RepeatUntilSeq(Box::new(predicate), Box::new(format))
 }
 
 /// Helper-function for alternating between two formats based on a boolean predicate.
@@ -302,7 +302,7 @@ pub fn repeat_until_seq(predicate: Expr, format: Format) -> Format {
 /// If the two formats have different value-types, or if knowledge of the chosen branch is needed, use [`if_then_else_variant`] instead.
 pub fn if_then_else(cond: Expr, format_true: Format, format_false: Format) -> Format {
     Format::Match(
-        cond,
+        Box::new(cond),
         vec![
             (Pattern::Bool(true), format_true),
             (Pattern::Bool(false), format_false),
@@ -328,12 +328,12 @@ pub fn if_then_else_variant(cond: Expr, format_yes: Format, format_no: Format) -
 /// Helper function for accepting a given format if and only if the given expression evaluates to `true`, and otherwise
 /// returning a None-value without parsing any bytes.
 pub fn cond_maybe(cond: Expr, format: Format) -> Format {
-    Format::Maybe(cond, Box::new(format))
+    Format::Maybe(Box::new(cond), Box::new(format))
 }
 
 /// Helper function for [`Format::Map`].
 pub fn map(f: Format, expr: Expr) -> Format {
-    Format::Map(Box::new(f), expr)
+    Format::Map(Box::new(f), Box::new(expr))
 }
 
 /// Returns a `Format` that matches the byte `b` and fails on any other byte.
@@ -355,7 +355,7 @@ where
 
 /// Returns a format consisting of `count` consecutive bytes all matching `b`.
 pub fn repeat_byte(count: u32, b: u8) -> Format {
-    Format::RepeatCount(Expr::U32(count), Box::new(is_byte(b)))
+    Format::RepeatCount(Box::new(Expr::U32(count)), Box::new(is_byte(b)))
 }
 
 /// Returns a format that matches any byte *other than* `b`.
@@ -523,7 +523,12 @@ pub fn flat_map(f: Expr, seq: Expr) -> Expr {
 /// The final value of `accum` is discarded, but the immediate return value
 /// after any non-final iteration is used as the input value for the next.
 pub fn flat_map_accum(f: Expr, accum: Expr, accum_type: ValueType, seq: Expr) -> Expr {
-    Expr::FlatMapAccum(Box::new(f), Box::new(accum), accum_type, Box::new(seq))
+    Expr::FlatMapAccum(
+        Box::new(f),
+        Box::new(accum),
+        accum_type.into(),
+        Box::new(seq),
+    )
 }
 
 /// Helper-function for [`Expr::FlatMapList`]
@@ -536,7 +541,7 @@ pub fn flat_map_accum(f: Expr, accum: Expr, accum_type: ValueType, seq: Expr) ->
 ///
 /// The parameter `ret_type` corresponds to the element-type of the list being returned, not the overall type of the return-value.
 pub fn flat_map_list(f: Expr, ret_type: ValueType, seq: Expr) -> Expr {
-    Expr::FlatMapList(Box::new(f), ret_type, Box::new(seq))
+    Expr::FlatMapList(Box::new(f), ret_type.into(), Box::new(seq))
 }
 
 /// Helper-function for [`Expr::Dup`].
@@ -546,7 +551,7 @@ pub fn dup(count: Expr, expr: Expr) -> Expr {
 
 /// Composed `Format::Where` and `Expr::Lambda` taking a raw format, an arbitrary name for the lambda expression head, and the lambda body as an Expr.
 pub fn where_lambda(raw: Format, name: impl IntoLabel, body: Expr) -> Format {
-    Format::Where(Box::new(raw), lambda(name, body))
+    Format::Where(Box::new(raw), Box::new(lambda(name, body)))
 }
 
 /// Numeric validation helper that constrains a given format to yield a value that falls in the inclusive range `lower..=upper`
@@ -622,8 +627,8 @@ pub fn format_some(f: Format) -> Format {
 }
 
 /// Helper for constructing `Option::None` within the Format model-language.
-pub const fn format_none() -> Format {
-    Format::Compute(expr_none())
+pub fn format_none() -> Format {
+    Format::Compute(Box::new(expr_none()))
 }
 
 /// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u8`]
@@ -638,7 +643,7 @@ pub fn where_nonzero_u16(format: Format) -> Format {
 
 /// Helper for constructing `Format::ForEach`
 pub fn for_each(seq: Expr, name: impl IntoLabel, inner: Format) -> Format {
-    Format::ForEach(seq, name.into(), Box::new(inner))
+    Format::ForEach(Box::new(seq), name.into(), Box::new(inner))
 }
 
 /// Helper for specifying a byte-aligned Format with a given byte-multiple `align`
@@ -734,7 +739,7 @@ pub fn lambda_tuple<const N: usize>(names: [&'static str; N], body: Expr) -> Exp
 
 /// Shorthand for Expr::LeftFold
 pub fn left_fold(f: Expr, init: Expr, init_vt: ValueType, seq: Expr) -> Expr {
-    Expr::LeftFold(Box::new(f), Box::new(init), init_vt, Box::new(seq))
+    Expr::LeftFold(Box::new(f), Box::new(init), init_vt.into(), Box::new(seq))
 }
 
 /// Helper for constructing an `Expr::Seq` of length == 0

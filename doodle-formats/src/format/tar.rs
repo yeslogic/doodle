@@ -41,7 +41,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     // Octal-encoded numeric value (as of UStar) fitting in N bytes, terminated by the space character or NUL
     let o_numeric = |len: u16| {
         Format::Slice(
-            Expr::U16(len),
+            Box::new(Expr::U16(len)),
             Box::new(record([
                 ("string", repeat(base.ascii_octal_digit())),
                 ("__nul_or_wsp", nul_or_wsp.call()),
@@ -50,8 +50,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         )
     };
 
-    let cstr_arr =
-        |len: u16| -> Format { Format::Slice(Expr::U16(len), Box::new(tar_asciiz.call())) };
+    let cstr_arr = |len: u16| -> Format {
+        Format::Slice(Box::new(Expr::U16(len)), Box::new(tar_asciiz.call()))
+    };
     let magic = is_bytes(MAGIC);
     let size_field = {
         let octal_digit = map(
@@ -75,7 +76,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("__nil", nul_or_wsp.call()),
                 (
                     "value",
-                    Format::Compute(bit_or(
+                    Format::Compute(Box::new(bit_or(
                         shl(
                             o4u32(Expr::U8(0), var("oA"), var("o9"), var("o8")),
                             Expr::U32(24),
@@ -87,7 +88,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ),
                             o4u32(var("o3"), var("o2"), var("o1"), var("o0")),
                         ),
-                    )),
+                    ))),
                 ),
             ]),
             lambda("rec", Expr::record_proj(var("rec"), "value")),
@@ -115,18 +116,18 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
-    let filename = Format::Slice(Expr::U16(100), Box::new(tar_str_optz_ne.call()));
+    let filename = Format::Slice(Box::new(Expr::U16(100)), Box::new(tar_str_optz_ne.call()));
 
-    let linkname = Format::Slice(Expr::U16(100), Box::new(tar_str_optz.call()));
+    let linkname = Format::Slice(Box::new(Expr::U16(100)), Box::new(tar_str_optz.call()));
 
-    let prefix = Format::Slice(Expr::U16(155), Box::new(tar_str_optz.call()));
+    let prefix = Format::Slice(Box::new(Expr::U16(155)), Box::new(tar_str_optz.call()));
 
     // This specification is only guaranteed to work for UStar archives. Anything else might work
     // by happenstance but may fail just as easily.
     let header = module.define_format(
         "tar.header",
         Format::Slice(
-            Expr::U32(BLOCK_SIZE),
+            Box::new(Expr::U32(BLOCK_SIZE)),
             Box::new(record([
                 ("name", filename),              // bytes 0 - 99
                 ("mode", o_numeric(8)),          // bytes 100 - 107
