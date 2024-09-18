@@ -149,6 +149,13 @@ pub(crate) enum TypedDecoder<TypeRep> {
         Label,
         Box<TypedDecoderExt<TypeRep>>,
     ),
+    AccumUntil(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedDecoderExt<TypeRep>>,
+    ),
 }
 
 #[derive(Clone, Debug)]
@@ -435,6 +442,17 @@ impl<'a> GTCompiler<'a> {
                 // FIXME probably not right
                 let da = Box::new(self.compile_gt_format(a, None, next)?);
                 Ok(TypedDecoder::RepeatUntilSeq(gt.clone(), expr.clone(), da))
+            }
+            GTFormat::AccumUntil(gt, cond, update, init, _vt, a) => {
+                // FIXME probably not right
+                let da = Box::new(self.compile_gt_format(a, None, next)?);
+                Ok(TypedDecoder::AccumUntil(
+                    gt.clone(),
+                    cond.clone(),
+                    update.clone(),
+                    init.clone(),
+                    da,
+                ))
             }
             GTFormat::Maybe(gt, cond, a) => {
                 let da = Box::new(self.compile_gt_format(a, None, next)?);

@@ -297,7 +297,6 @@ dependencies = [
  "clap",
  "criterion",
  "doodle",
- "lazy_static",
  "serde",
  "serde_json",
 ]

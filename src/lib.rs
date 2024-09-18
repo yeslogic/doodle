@@ -646,6 +646,9 @@ pub enum Format {
     RepeatUntilLast(Box<Expr>, Box<Format>),
     /// Repeat a format until a condition is satisfied by the sequence
     RepeatUntilSeq(Box<Expr>, Box<Format>),
+    /// Repeat a format until a condition is satisfied by a tuple constructed from a left-fold accumulator and the sequence, returning both
+    /// AccumUntil :: ((A, [T]) -> bool) -> ((A, T) -> A) -> A -> Vt(A) -> T -> (acc, [T])
+    AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Format>),
     /// Apply a parametric format for each element of a sequence-typed Expr using a fused lambda binding
     ForEach(Box<Expr>, Label, Box<Format>),
     /// Parse a format if and only if the given expression evaluates to true, otherwise skip
@@ -740,7 +743,7 @@ impl Format {
                 f.match_bounds(module) * (Bounds::union(xmin.bounds(), xmax.bounds()))
             }
             Format::RepeatUntilLast(_, f) => f.match_bounds(module) * Bounds::at_least(1),
-            Format::RepeatUntilSeq(_, _f) => Bounds::any(),
+            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
             Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.match_bounds(module)),
             Format::Peek(_) => Bounds::exact(0),
             Format::PeekNot(_) => Bounds::exact(0),
@@ -805,7 +808,7 @@ impl Format {
                 f.lookahead_bounds(module) * Bounds::union(xmin.bounds(), xmax.bounds())
             }
             Format::RepeatUntilLast(_, f) => f.lookahead_bounds(module) * Bounds::at_least(1),
-            Format::RepeatUntilSeq(_, _f) => Bounds::any(),
+            Format::RepeatUntilSeq(_, _f) | Format::AccumUntil(.., _f) => Bounds::any(),
             Format::Maybe(_, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds(module)),
             Format::Peek(f) => f.lookahead_bounds(module),
             Format::PeekNot(f) => f.lookahead_bounds(module),
@@ -858,6 +861,7 @@ impl Format {
             Format::RepeatCount(..) => false,
             Format::RepeatUntilLast(..) => false,
             Format::RepeatUntilSeq(..) => false,
+            Format::AccumUntil(..) => false,
             Format::Maybe(..) => true,
             Format::Peek(..) => false,
             Format::PeekNot(..) => false,
@@ -1128,6 +1132,38 @@ impl FormatModule {
                         }
                     }
                     other => Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
+                }
+            }
+            Format::AccumUntil(lambda_acc_seq, lambda_acc_val, init, vt, a) => {
+                match lambda_acc_seq.as_ref() {
+                    Expr::Lambda(head, expr) => {
+                        let t = self.infer_format_type(scope, a)?;
+                        // Check that the initial accumulator value's type unifies with the type-claim
+                        let _acc_type = init.infer_type(&scope)?.unify(vt.as_ref())?;
+                        let mut child_scope = TypeScope::child(scope);
+                        let t_seq = ValueType::Seq(Box::new(t.clone()));
+                        let vt_acc_seq = ValueType::Tuple(vec![vt.as_ref().clone(), t_seq.clone()]);
+                        child_scope.push(head.clone(), vt_acc_seq.clone());
+                        let ret_type = expr.infer_type(&child_scope)?;
+                        match ret_type {
+                            ValueType::Base(BaseType::Bool) => {
+                                match lambda_acc_val.as_ref() {
+                                    Expr::Lambda(head, expr) => {
+                                        let mut child_scope = TypeScope::child(&child_scope);
+                                        let vt_acc_elem = ValueType::Tuple(vec![vt.as_ref().clone(), t.clone()]);
+                                        child_scope.push(head.clone(), vt_acc_elem);
+                                        // we just need to check that these types unify, the value is unimportant
+                                        let _ret_type = expr.infer_type(&child_scope)?.unify(vt.as_ref())?;
+                                        Ok(vt_acc_seq)
+                                    }
+                                    other => return Err(anyhow!("AccumUntil second argument type should be lambda, found {other:?} instead")),
+                                }
+                            }
+                            other => Err(anyhow!("AccumUntil first argument (lambda) return type should be Bool, found {other:?} instead")),
+                        }
+
+                    }
+                    other => Err(anyhow!("AccumUntil first argument type should be lambda, found {other:?} instead")),
                 }
             }
             Format::Maybe(x, a) => match x.infer_type(scope)? {
@@ -1824,6 +1860,9 @@ impl<'a> MatchTreeStep<'a> {
             TypedFormat::RepeatUntilSeq(_, _expr, _a) => {
                 Self::accept() // FIXME
             }
+            TypedFormat::AccumUntil(.., _a) => {
+                Self::accept() // FIXME
+            }
             TypedFormat::Maybe(_, _cond, a) => {
                 let tree_some = Self::from_gt_format(module, a, next.clone());
                 let tree_none = Self::from_next(module, next);
@@ -1992,6 +2031,9 @@ impl<'a> MatchTreeStep<'a> {
                 Self::accept() // FIXME
             }
             Format::RepeatUntilSeq(_expr, _a) => {
+                Self::accept() // FIXME
+            }
+            Format::AccumUntil(.., _a) => {
                 Self::accept() // FIXME
             }
             Format::Maybe(_expr, a) => {

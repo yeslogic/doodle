@@ -348,6 +348,36 @@ impl<'module> MonoidalPrinter<'module> {
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
+            Format::AccumUntil(.., format) => match value {
+                ParsedValue::Tuple(values) => match values.get_inner().as_slice() {
+                    [accum, vs] => {
+                        let accum = self.compile_parsed_value(accum);
+                        let vs = match vs {
+                            ParsedValue::Seq(values) => {
+                                if self.flags.tables_for_record_sequences
+                                    && self.try_as_record_with_atomic_fields(format).is_some()
+                                {
+                                    self.compile_parsed_seq_records(values, format)
+                                } else if self.flags.pretty_ascii_strings
+                                    && format.is_ascii_char_format(self.module)
+                                {
+                                    self.compile_parsed_ascii_seq(values)
+                                } else {
+                                    self.compile_parsed_seq(values, Some(format))
+                                }
+                            }
+                            _ => panic!("expected sequence, found {vs:?}"),
+                        };
+                        // FIXME - this will probably break often, so adjust as necessary
+                        frag.encat(accum);
+                        frag.encat(Fragment::string(", "));
+                        frag.encat(vs);
+                        frag.delimit(Fragment::Char('('), Fragment::Char(')'))
+                    }
+                    _ => panic!("expected 2-tuple, found {values:#?}"),
+                },
+                _ => panic!("expected sequence, found {value:?}"),
+            },
             Format::Maybe(_, format) => match value {
                 ParsedValue::Option(opt_val) => match opt_val {
                     Some(val) => Fragment::string("some")
@@ -480,6 +510,36 @@ impl<'module> MonoidalPrinter<'module> {
                     }
                 }
                 _ => panic!("expected sequence, found {value:?}"),
+            },
+            Format::AccumUntil(.., format) => match value {
+                Value::Tuple(values) => match &values[..] {
+                    [accum, seq] => {
+                        let accum = self.compile_value(accum);
+                        let seq = match seq {
+                            Value::Seq(values) => {
+                                if self.flags.tables_for_record_sequences
+                                    && self.try_as_record_with_atomic_fields(format).is_some()
+                                {
+                                    self.compile_seq_records(values, format)
+                                } else if self.flags.pretty_ascii_strings
+                                    && format.is_ascii_char_format(self.module)
+                                {
+                                    self.compile_ascii_seq(values)
+                                } else {
+                                    self.compile_seq(values, Some(format))
+                                }
+                            }
+                            _ => panic!("expected sequence, found {seq:?}"),
+                        };
+                        // FIXME - this may be easily-broken formatting and need some tweaking
+                        frag.encat(accum);
+                        frag.encat(Fragment::string(", "));
+                        frag.encat(seq);
+                        frag.delimit(Fragment::Char('('), Fragment::Char(')'))
+                    }
+                    _ => panic!("expected 2-tuple, found {values:#?}"),
+                },
+                _ => panic!("expected tuple, found {value:?}"),
             },
             Format::Maybe(_, inner) => {
                 match value {
@@ -1695,6 +1755,21 @@ impl<'module> MonoidalPrinter<'module> {
                     self.compile_nested_format(
                         "repeat-until-seq",
                         Some(&[expr_frag]),
+                        format,
+                        prec,
+                    ),
+                    prec,
+                    Precedence::FORMAT_COMPOUND,
+                )
+            }
+            Format::AccumUntil(f_done, f_update, init, _vt, format) => {
+                let done_frag = self.compile_expr(f_done, Precedence::ATOM);
+                let update_frag = self.compile_expr(f_update, Precedence::ATOM);
+                let init_frag = self.compile_expr(init, Precedence::ATOM);
+                cond_paren(
+                    self.compile_nested_format(
+                        "accum-until",
+                        Some(&[done_frag, update_frag, init_frag]),
                         format,
                         prec,
                     ),

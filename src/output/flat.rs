@@ -161,7 +161,8 @@ fn check_covered(
         | Format::RepeatBetween(_, _, format)
         | Format::ForEach(_, _, format)
         | Format::RepeatUntilLast(_, format)
-        | Format::RepeatUntilSeq(_, format) => {
+        | Format::RepeatUntilSeq(_, format)
+        | Format::AccumUntil(.., format) => {
             check_covered(module, path, format)?;
         }
         Format::Maybe(_expr, format) => {
@@ -277,18 +278,28 @@ impl<'module, W: io::Write> Context<'module, W> {
                 }
                 _ => panic!("expected sequence, found {value:?}"),
             },
-            Format::Maybe(_expr, format) => match value {
-                // REVIEW - consider having a first-class Value::Option?
-                Value::Variant(lbl, inner) => match lbl.as_ref() {
-                    "Some" => self.write_flat(inner, format),
-                    "None" => self.write_flat(inner, &Format::EMPTY),
-                    other => {
-                        unreachable!("found unexpected variant `{other:?}` (expected Some or None)")
-                    }
+            Format::AccumUntil(.., format) => match value {
+                // REVIEW - is this the correct approach?
+                Value::Tuple(vs) => match vs.as_slice() {
+                    [_, v] => match &v {
+                        Value::Seq(values) => {
+                            for v in values {
+                                self.write_flat(v, format)?;
+                            }
+                            Ok(())
+                        }
+                        _ => panic!("expected sequence, found {v:?}"),
+                    },
+                    _ => panic!("expected 2-tuple, found {vs:#?}"),
                 },
-                other => {
-                    unreachable!("Maybe should only produce Some(X)|None(()), found {other:?}")
-                }
+                _ => panic!("expected tuple, found {value:?}"),
+            },
+            Format::Maybe(_expr, format) => match value {
+                Value::Option(inner) => match inner.as_ref() {
+                    Some(val) => self.write_flat(val, format),
+                    None => Ok(()),
+                },
+                other => unreachable!("expected Option, found {other:?}"),
             },
             Format::DecodeBytes(_bytes, format) => self.write_flat(value, format),
             Format::Peek(format) => self.write_flat(value, format),

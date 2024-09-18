@@ -1929,6 +1929,7 @@ impl From<bool> for ReturnKind {
 #[derive(Clone, Debug)]
 pub(crate) enum RustStmt {
     Let(Mut, Label, Option<RustType>, RustExpr),
+    Reassign(Label, RustExpr),
     Expr(RustExpr),
     Return(ReturnKind, RustExpr), // bool: true for explicit return, false for implicit return
     Control(RustControl),
@@ -2201,6 +2202,11 @@ impl ToFragment for RustStmt {
             .cat(Fragment::string(" = "))
             .cat(value.to_fragment_precedence(Precedence::TOP))
             .cat(Fragment::Char(';')),
+            RustStmt::Reassign(binding, value) => binding
+                .to_fragment()
+                .cat(Fragment::string(" = "))
+                .cat(value.to_fragment_precedence(Precedence::TOP))
+                .cat(Fragment::Char(';')),
             RustStmt::Expr(expr) => expr
                 .to_fragment_precedence(Precedence::TOP)
                 .cat(Fragment::Char(';')),
