@@ -17,7 +17,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ("length", base.u16be()),
             (
                 "data",
-                Format::Slice(sub(var("length"), Expr::U16(2)), Box::new(data)),
+                Format::Slice(Box::new(sub(var("length"), Expr::U16(2))), Box::new(data)),
             ),
         ])
     };
@@ -479,7 +479,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ),
             (
                 "scan-data-stream",
-                Format::Compute(flat_map(
+                Format::Compute(Box::new(flat_map(
                     lambda(
                         "x",
                         expr_match(
@@ -525,7 +525,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                         ),
                     ),
                     var("scan-data"),
-                )),
+                ))),
             ),
         ]),
     );

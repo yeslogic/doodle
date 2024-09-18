@@ -83,7 +83,7 @@ fn dist8(base: &BaseModule) -> Format {
 /// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
 fn bits8(n: usize, base: &BaseModule) -> Format {
     if n == 0 {
-        return Format::Compute(Expr::U8(0));
+        return Format::Compute(Box::new(Expr::U8(0)));
     }
 
     map(
@@ -96,7 +96,7 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
 /// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
 fn bits16(n: usize, base: &BaseModule) -> Format {
     if n == 0 {
-        return Format::Compute(Expr::U16(0));
+        return Format::Compute(Box::new(Expr::U16(0)));
     }
 
     map(
@@ -115,10 +115,10 @@ fn length_record(
         ("length-extra-bits", bits8(extra_bits, base)),
         (
             "length",
-            Format::Compute(add(
+            Format::Compute(Box::new(add(
                 Expr::U16(start as u16),
                 as_u16(var("length-extra-bits")),
-            )),
+            ))),
         ),
         (
             "distance-code",
@@ -141,10 +141,10 @@ fn length_record_fixed(
         ("length-extra-bits", bits8(extra_bits, base)),
         (
             "length",
-            Format::Compute(add(
+            Format::Compute(Box::new(add(
                 Expr::U16(start as u16),
                 as_u16(var("length-extra-bits")),
-            )),
+            ))),
         ),
         ("distance-code", dist8(base)),
         (
@@ -210,7 +210,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "distance-extra-bits",
                 Format::Match(
-                    var("extra-bits"),
+                    Box::new(var("extra-bits")),
                     vec![
                         (Pattern::U8(0), bits16(0, base)),
                         (Pattern::U8(1), bits16(1, base)),
@@ -231,7 +231,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "distance",
-                Format::Compute(add(var("start"), var("distance-extra-bits"))),
+                Format::Compute(Box::new(add(var("start"), var("distance-extra-bits")))),
             ),
         ]),
     );
@@ -240,7 +240,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         "deflate.distance-record",
         vec![("distance-code".into(), ValueType::Base(BaseType::U16))],
         Format::Match(
-            as_u8(var("distance-code")),
+            Box::new(as_u8(var("distance-code"))),
             vec![
                 (
                     Pattern::U8(0),
@@ -376,10 +376,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("bytes", repeat_count(var("len"), bits8(8, base))),
             (
                 "codes-values",
-                Format::Compute(flat_map(
+                Format::Compute(Box::new(flat_map(
                     lambda("x", Expr::Seq(vec![variant("literal", var("x"))])),
                     var("bytes"),
-                )),
+                ))),
             ),
         ]),
     );
@@ -391,7 +391,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "codes",
                 Format::Dynamic(
                     "format".into(),
-                    DynFormat::Huffman(fixed_code_lengths(), None),
+                    DynFormat::Huffman(Box::new(fixed_code_lengths()), None),
                     Box::new(repeat_until_last(
                         lambda(
                             "x",
@@ -402,7 +402,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             (
                                 "extra",
                                 Format::Match(
-                                    var("code"),
+                                    Box::new(var("code")),
                                     vec![
                                         (
                                             Pattern::U16(257),
@@ -677,7 +677,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "codes-values",
-                Format::Compute(flat_map(
+                Format::Compute(Box::new(flat_map(
                     lambda(
                         "x",
                         expr_match(
@@ -697,7 +697,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     ),
                     var("codes"),
-                )),
+                ))),
             ),
         ]),
     );
@@ -717,8 +717,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 Format::Dynamic(
                     "code-length-alphabet-format".into(),
                     DynFormat::Huffman(
-                        var("code-length-alphabet-code-lengths"),
-                        Some(Expr::Seq(vec![
+                        Box::new(var("code-length-alphabet-code-lengths")),
+                        Some(Box::new(Expr::Seq(vec![
                             Expr::U8(16),
                             Expr::U8(17),
                             Expr::U8(18),
@@ -738,7 +738,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             Expr::U8(14),
                             Expr::U8(1),
                             Expr::U8(15),
-                        ])),
+                        ]))),
                     ),
                     Box::new(repeat_until_seq(
                         lambda(
@@ -820,12 +820,12 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             (
                                 "extra",
                                 Format::Match(
-                                    as_u8(var("code")),
+                                    Box::new(as_u8(var("code"))),
                                     vec![
                                         (Pattern::U8(16), bits2.clone()),
                                         (Pattern::U8(17), bits3.clone()),
                                         (Pattern::U8(18), bits7.clone()),
-                                        (Pattern::Wildcard, Format::Compute(Expr::U8(0))),
+                                        (Pattern::Wildcard, Format::Compute(Box::new(Expr::U8(0)))),
                                     ],
                                 ),
                             ),
@@ -835,7 +835,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "literal-length-distance-alphabet-code-lengths-value",
-                Format::Compute(flat_map_accum(
+                Format::Compute(Box::new(flat_map_accum(
                     lambda_tuple(
                         ["last-symbol", "cl-code-extra"],
                         expr_match(
@@ -893,32 +893,35 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     expr_none(),
                     ValueType::Option(Box::new(ValueType::Base(BaseType::U8))),
                     var("literal-length-distance-alphabet-code-lengths"),
-                )),
+                ))),
             ),
             (
                 "literal-length-alphabet-code-lengths-value",
-                Format::Compute(sub_seq(
+                Format::Compute(Box::new(sub_seq(
                     var("literal-length-distance-alphabet-code-lengths-value"),
                     Expr::U32(0),
                     add(as_u32(var("hlit")), Expr::U32(257)),
-                )),
+                ))),
             ),
             (
                 "distance-alphabet-code-lengths-value",
-                Format::Compute(sub_seq(
+                Format::Compute(Box::new(sub_seq(
                     var("literal-length-distance-alphabet-code-lengths-value"),
                     add(as_u32(var("hlit")), Expr::U32(257)),
                     add(as_u32(var("hdist")), Expr::U32(1)),
-                )),
+                ))),
             ),
             (
                 "codes",
                 Format::Dynamic(
                     "distance-alphabet-format".into(),
-                    DynFormat::Huffman(var("distance-alphabet-code-lengths-value"), None),
+                    DynFormat::Huffman(Box::new(var("distance-alphabet-code-lengths-value")), None),
                     Box::new(Format::Dynamic(
                         "literal-length-alphabet-format".into(),
-                        DynFormat::Huffman(var("literal-length-alphabet-code-lengths-value"), None),
+                        DynFormat::Huffman(
+                            Box::new(var("literal-length-alphabet-code-lengths-value")),
+                            None,
+                        ),
                         Box::new(repeat_until_last(
                             lambda(
                                 "x",
@@ -932,7 +935,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     "extra",
                                     Format::Match(
-                                        var("code"),
+                                        Box::new(var("code")),
                                         vec![
                                             (
                                                 Pattern::U16(257),
@@ -1208,7 +1211,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "codes-values",
-                Format::Compute(flat_map(
+                Format::Compute(Box::new(flat_map(
                     lambda(
                         "x",
                         expr_match(
@@ -1229,7 +1232,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     ),
                     var("codes"),
-                )),
+                ))),
             ),
         ]),
     );
@@ -1241,7 +1244,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ("type", bits2.clone()),
             ("data", {
                 Format::Match(
-                    var("type"),
+                    Box::new(var("type")),
                     vec![
                         (
                             Pattern::U8(0),
@@ -1274,7 +1277,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "codes",
-                Format::Compute(flat_map(
+                Format::Compute(Box::new(flat_map(
                     lambda(
                         "x",
                         expr_match(
@@ -1296,11 +1299,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     ),
                     var("blocks"),
-                )),
+                ))),
             ),
             (
                 "inflate",
-                Format::Compute(flat_map_list(
+                Format::Compute(Box::new(flat_map_list(
                     lambda_tuple(
                         ["buffer", "symbol"],
                         expr_match(
@@ -1326,7 +1329,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     ValueType::Base(BaseType::U8),
                     var("codes"),
-                )),
+                ))),
             ),
         ]),
     )

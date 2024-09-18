@@ -549,7 +549,7 @@ impl CodeGen {
                 let cl_inner = self.translate(inner.get_dec());
                 CaseLogic::Derived(
                     DerivedLogic::Dynamic(
-                        DynamicLogic::Huffman(name.clone(), lengths.clone(), opt_values.clone()),
+                        DynamicLogic::Huffman(name.clone(), lengths.as_ref().clone(), opt_values.as_deref().cloned()),
                         Box::new(cl_inner)
                     )
                 )
@@ -2781,13 +2781,13 @@ impl<'a> Elaborator<'a> {
                 // for the element-type of code_lengths
                 self.increment_index();
 
-                let t_values_expr = opt_values_expr.as_ref().map(|values_expr| {
+                let boxed_t_values_expr = opt_values_expr.as_ref().map(|values_expr| {
                     let t_values = self.elaborate_expr(values_expr);
                     // for the element-type of opt_values_expr
                     self.increment_index();
-                    t_values
+                    Box::new(t_values)
                 });
-                GTDynFormat::Huffman(t_codes, t_values_expr)
+                GTDynFormat::Huffman(Box::new(t_codes), boxed_t_values_expr)
             }
         }
     }
@@ -2922,14 +2922,14 @@ impl<'a> Elaborator<'a> {
                 self.increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::ForEach(gt, t_expr, lbl.clone(), Box::new(t_inner))
+                TypedFormat::ForEach(gt, Box::new(t_expr), lbl.clone(), Box::new(t_inner))
             }
             Format::DecodeBytes(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::DecodeBytes(gt, t_expr, Box::new(t_inner))
+                TypedFormat::DecodeBytes(gt, Box::new(t_expr), Box::new(t_inner))
             }
             Format::Fail => {
                 self.increment_index();
@@ -3029,7 +3029,7 @@ impl<'a> Elaborator<'a> {
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::RepeatCount(gt, t_expr, Box::new(t_inner))
+                TypedFormat::RepeatCount(gt, Box::new(t_expr), Box::new(t_inner))
             }
             Format::RepeatBetween(min_expr, max_expr, inner) => {
                 let index = self.get_and_increment_index();
@@ -3037,28 +3037,33 @@ impl<'a> Elaborator<'a> {
                 let t_max_expr = self.elaborate_expr(max_expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::RepeatBetween(gt, t_min_expr, t_max_expr, Box::new(t_inner))
+                TypedFormat::RepeatBetween(
+                    gt,
+                    Box::new(t_min_expr),
+                    Box::new(t_max_expr),
+                    Box::new(t_inner),
+                )
             }
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::RepeatUntilLast(gt, t_lambda, Box::new(t_inner))
+                TypedFormat::RepeatUntilLast(gt, Box::new(t_lambda), Box::new(t_inner))
             }
             Format::RepeatUntilSeq(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::RepeatUntilSeq(gt, t_lambda, Box::new(t_inner))
+                TypedFormat::RepeatUntilSeq(gt, Box::new(t_lambda), Box::new(t_inner))
             }
             Format::Maybe(cond, inner) => {
                 let index = self.get_and_increment_index();
                 let t_cond = self.elaborate_expr(cond);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Maybe(gt, t_cond, Box::new(t_inner))
+                TypedFormat::Maybe(gt, Box::new(t_cond), Box::new(t_inner))
             }
             Format::Peek(inner) => {
                 let index = self.get_and_increment_index();
@@ -3077,7 +3082,7 @@ impl<'a> Elaborator<'a> {
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Slice(gt, t_expr, Box::new(t_inner))
+                TypedFormat::Slice(gt, Box::new(t_expr), Box::new(t_inner))
             }
             Format::Bits(inner) => {
                 let index = self.get_and_increment_index();
@@ -3090,34 +3095,34 @@ impl<'a> Elaborator<'a> {
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::WithRelativeOffset(gt, t_expr, Box::new(t_inner))
+                TypedFormat::WithRelativeOffset(gt, Box::new(t_expr), Box::new(t_inner))
             }
             Format::Map(inner, lambda) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Map(gt, Box::new(t_inner), t_lambda)
+                TypedFormat::Map(gt, Box::new(t_inner), Box::new(t_lambda))
             }
             Format::Where(inner, lambda) => {
                 let index = self.get_and_increment_index();
                 let t_inner = self.elaborate_format(inner, dyns);
                 let t_lambda = self.elaborate_expr_lambda(lambda);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Where(gt, Box::new(t_inner), t_lambda)
+                TypedFormat::Where(gt, Box::new(t_inner), Box::new(t_lambda))
             }
             Format::Compute(expr) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Compute(gt, t_expr)
+                TypedFormat::Compute(gt, Box::new(t_expr))
             }
             Format::Let(lbl, expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Let(gt, lbl.clone(), t_expr, Box::new(t_inner))
+                TypedFormat::Let(gt, lbl.clone(), Box::new(t_expr), Box::new(t_inner))
             }
             Format::Match(x, branches) => {
                 let index = self.get_and_increment_index();
@@ -3129,7 +3134,7 @@ impl<'a> Elaborator<'a> {
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
-                TypedFormat::Match(gt, t_x, t_branches)
+                TypedFormat::Match(gt, Box::new(t_x), t_branches)
             }
             Format::Dynamic(lbl, dynf, inner) => {
                 let index = self.get_and_increment_index();
@@ -3495,7 +3500,7 @@ impl<'a> TypedDynScope<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::typecheck::Ctxt;
+    use crate::{typecheck::Ctxt, TypeHint};
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
         let mut tc = TypeChecker::new();
@@ -3583,12 +3588,12 @@ mod tests {
     #[test]
     fn test_popcheck_compute_simple() {
         let x = Format::Byte(ByteSet::full());
-        let fx = Format::Compute(Expr::Var("x".into()));
-        let gx = Format::Compute(Expr::Arith(
+        let fx = Format::Compute(Box::new(Expr::Var("x".into())));
+        let gx = Format::Compute(Box::new(Expr::Arith(
             Arith::Add,
             Box::new(Expr::Var("x".into())),
             Box::new(Expr::Var("x".into())),
-        ));
+        )));
 
         let f = Format::Record(vec![("x".into(), x), ("fx".into(), fx), ("gx".into(), gx)]);
         run_popcheck(&[("test.compute_simple", f)]);
@@ -3619,13 +3624,14 @@ mod tests {
             ])),
         );
 
-        let xs = Format::RepeatUntilLast(is_null, Box::new(Format::Byte(ByteSet::full())));
-        let fxs = Format::Compute(Expr::FlatMapAccum(
+        let xs =
+            Format::RepeatUntilLast(Box::new(is_null), Box::new(Format::Byte(ByteSet::full())));
+        let fxs = Format::Compute(Box::new(Expr::FlatMapAccum(
             Box::new(ixdup),
             Box::new(Expr::U32(1)),
-            ValueType::Base(BaseType::U32),
+            TypeHint::from(ValueType::Base(BaseType::U32)),
             Box::new(Expr::Var("xs".into())),
-        ));
+        )));
 
         let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
         run_popcheck(&[("test.compute_complex", f)]);

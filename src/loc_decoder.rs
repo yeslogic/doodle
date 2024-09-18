@@ -1427,7 +1427,7 @@ impl Decoder {
                 let (v, input) = d.parse_with_loc(program, scope, input)?;
                 match expr.eval_lambda_with_loc(scope, &v).unwrap_bool() {
                     true => Ok((v, input)),
-                    false => Err(DecodeError::loc_bad_where(scope, expr.clone(), v)),
+                    false => Err(DecodeError::loc_bad_where(scope, *expr.clone(), v)),
                 }
             }
             Decoder::Compute(expr) => {
@@ -1516,7 +1516,10 @@ fn make_huffman_codes(lengths: &[usize]) -> Format {
         if len != 0 {
             codes.push(Format::Map(
                 Box::new(bit_range(len, next_code[len])),
-                Expr::Lambda("_".into(), Box::new(Expr::U16(n.try_into().unwrap()))),
+                Box::new(Expr::Lambda(
+                    "_".into(),
+                    Box::new(Expr::U16(n.try_into().unwrap())),
+                )),
             ));
             //println!("{:?}", codes[codes.len()-1]);
             next_code[len] += 1;

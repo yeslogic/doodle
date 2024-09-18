@@ -49,7 +49,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "magic",
                 Format::Match(
-                    var("byte-order"),
+                    Box::new(var("byte-order")),
                     vec![
                         (Pattern::variant("le", Pattern::Wildcard), base.u16le()), // 42
                         (Pattern::variant("be", Pattern::Wildcard), base.u16be()), // 42
@@ -59,7 +59,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             (
                 "offset",
                 Format::Match(
-                    var("byte-order"),
+                    Box::new(var("byte-order")),
                     vec![
                         (Pattern::variant("le", Pattern::Wildcard), base.u32le()),
                         (Pattern::variant("be", Pattern::Wildcard), base.u32be()),
@@ -70,9 +70,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "ifd",
                 Format::WithRelativeOffset(
                     // TODO: Offset from start of the TIFF header
-                    sub(var("offset"), Expr::U32(8)),
+                    Box::new(sub(var("offset"), Expr::U32(8))),
                     Box::new(Format::Match(
-                        var("byte-order"),
+                        Box::new(var("byte-order")),
                         vec![
                             (Pattern::variant("le", Pattern::Wildcard), ifd(false)),
                             (Pattern::variant("be", Pattern::Wildcard), ifd(true)),

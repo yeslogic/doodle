@@ -296,7 +296,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         record([
             (
                 "ident",
-                Format::Slice(Expr::U32(EI_NIDENT), Box::new(elf_ident.call())),
+                Format::Slice(Box::new(Expr::U32(EI_NIDENT)), Box::new(elf_ident.call())),
             ), // machine-independent ELF identification array (byte-oriented)
             ("type", e_type.call_args(vec![var_is_be.clone()])), // file-type identifier
             ("machine", e_machine.call_args(vec![var_is_be.clone()])), // identifier for the architecture required by the ELF image
@@ -583,7 +583,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ],
         // FIXME - we can refine this a lot more based on the type passed in
         Format::Match(
-            var("type"),
+            Box::new(var("type")),
             vec![
                 (Pattern::Wildcard, repeat_count(var("size"), base.u8())), // abstract (unrefined) section
             ],
@@ -638,7 +638,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (Pattern::Wildcard, Expr::Bool(true)),
                 ],
             ),
-            Format::WithRelativeOffset(sub(off_as_64(offset_file), var("__eoh")), Box::new(f)),
+            Format::WithRelativeOffset(
+                Box::new(sub(off_as_64(offset_file), var("__eoh"))),
+                Box::new(f),
+            ),
         )
     };
 
@@ -671,7 +674,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 "sections",
                 // FIXME: this suggests the definition of a Format-level Option::map helper
                 Format::Match(
-                    var("section_headers"),
+                    Box::new(var("section_headers")),
                     vec![
                         (
                             pat_some(Pattern::binding("shdrs")),
@@ -690,10 +693,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         ),
                                     ),
                                     Format::WithRelativeOffset(
-                                        sub(
+                                        Box::new(sub(
                                             off_as_64(record_proj(var("shdr"), "offset")),
                                             var("__eoh"),
-                                        ),
+                                        )),
                                         Box::new(elf_section.call_args(vec![
                                             record_proj(var("shdr"), "type"),
                                             full_as_64(record_proj(var("shdr"), "size")),
