@@ -5994,7 +5994,6 @@ accum
 let number_of_coordinates = ((|| PResult::Ok(1u16 + end_points_of_contour[(try_sub!((end_points_of_contour.len()) as u32, 1u32)) as usize].clone()))())?;
 let flags = ((|| PResult::Ok({
 let inner = {
-let packed_flags = {
 let mut accum = Vec::new();
 loop {
 let elem = {
@@ -6028,20 +6027,7 @@ break
 }
 accum
 };
-let mut accum = Vec::new();
-for packed in packed_flags.clone() {
-accum.push({
-let count = ((packed.repeats.clone()) as u32) + 1u32;
-let mut accum = Vec::new();
-for _ in 0..count {
-accum.push(packed.field_set.clone());
-}
-accum
-});
-}
-accum
-};
-((|xs: Vec<Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq>>| PResult::Ok((try_flat_map_vec(xs.iter().cloned(), |x: Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq>| PResult::Ok(x.clone())))?))(inner))?
+((|arr_flags: Vec<base_u8_ix1>| PResult::Ok((try_flat_map_vec(arr_flags.iter().cloned(), |packed: base_u8_ix1| PResult::Ok(dup32(((packed.repeats.clone()) as u32) + 1u32, packed.field_set.clone()))))?))(inner))?
 }))())?;
 let x_coordinates = ((|| PResult::Ok({
 let mut accum = Vec::new();

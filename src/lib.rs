@@ -631,8 +631,8 @@ impl Expr {
     }
 
     /// Returns `true` if the evaluation of `self` contains any references to an external variable with a given identifier
-    /// of `name`. This occurs when the expression contains `Expr::Var(name)` that it does not itself provide a local binding for)
-    /// (as in a pattern-match or lambda head).
+    /// of `name`. This occurs when the expression contains `Expr::Var(name)` that it does not itself provide a local binding for
+    /// (e.g. in a pattern-match or lambda head).
     pub fn is_shadowed_by(&self, name: &str) -> bool {
         match self {
             Expr::Var(vname) => vname == name,
