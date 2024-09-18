@@ -1358,6 +1358,43 @@ impl Decoder {
                 let totlen = input.offset - start_offset;
                 Ok((ParsedValue::new_seq(v, start_offset, totlen), input))
             }
+            Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                let mut accum = init.eval_value_with_loc(scope);
+                loop {
+                    let done_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
+                        accum.clone(),
+                        ParsedValue::new_seq(v.clone(), start_offset, input.offset - start_offset)
+                            .clone_into_value(),
+                    ]));
+                    let is_done = f_done.eval_lambda_with_loc(&scope, &done_arg).unwrap_bool();
+                    if is_done {
+                        break;
+                    }
+                    let (next_elem, next_input) = a.parse_with_loc(program, scope, input)?;
+                    v.push(next_elem.clone());
+                    let update_arg = ParsedValue::from_evaluated(Value::Tuple(vec![
+                        accum.clone(),
+                        next_elem.clone_into_value(),
+                    ]));
+                    let next_accum = f_update.eval_lambda_with_loc(scope, &update_arg);
+                    accum = next_accum;
+                    input = next_input;
+                }
+                let totlen = input.offset - start_offset;
+                Ok((
+                    ParsedValue::new_tuple(
+                        vec![
+                            ParsedValue::from_evaluated(accum),
+                            ParsedValue::new_seq(v, start_offset, totlen),
+                        ],
+                        start_offset,
+                        totlen,
+                    ),
+                    input,
+                ))
+            }
             Decoder::Maybe(expr, a) => {
                 let is_present = expr.eval_value_with_loc(scope).unwrap_bool();
                 if is_present {

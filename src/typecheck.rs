@@ -2550,6 +2550,42 @@ impl TypeChecker {
                 self.unify_var_utype(newvar, Rc::new(UType::Seq(inner_t)))?;
                 Ok(newvar)
             }
+            Format::AccumUntil(lambda_acc_seq, lambda_acc_elt, init_acc, vt_acc, inner) => {
+                // NOTE - ((acc, [x]) -> bool) -> ((acc. x) -> acc) -> acc -> Vt(acc) -> x -> (acc, [x])
+                let newvar = self.get_new_uvar();
+                let (acc_seq_var, done_var) =
+                    self.infer_vars_expr_lambda(lambda_acc_seq, ctxt.scope)?;
+                let (acc_elt_var, update_var) =
+                    self.infer_vars_expr_lambda(lambda_acc_elt, ctxt.scope)?;
+                let acc_var = self.infer_var_expr(init_acc, ctxt.scope)?;
+                let inner_t = self.infer_utype_format(inner, ctxt)?;
+
+                // establish known equivalences
+
+                // Initial accumulator value has the declared type
+                self.unify_var_valuetype(acc_var, vt_acc.as_ref())?;
+
+                // terminal predicate is (acc, [x]) -> bool
+                self.unify_var_utype(
+                    acc_seq_var,
+                    Rc::new(UType::tuple([
+                        UType::Var(acc_var),
+                        UType::Seq(inner_t.clone()),
+                    ])),
+                )?;
+                self.unify_var_utype(done_var, Rc::new(UType::Base(BaseType::Bool)))?;
+
+                // update function is (acc, x) -> acc
+                self.unify_var_utype(
+                    acc_elt_var,
+                    Rc::new(UType::tuple([UType::Var(acc_var), (&*inner_t).clone()])),
+                )?;
+                self.unify_var_pair(update_var, acc_var)?;
+
+                // assign correct type to newvar
+                self.unify_var_pair(newvar, acc_seq_var)?;
+                Ok(newvar)
+            }
             Format::Maybe(cond, inner) => {
                 let newvar = self.get_new_uvar();
                 let cond_var = self.infer_var_expr(cond, ctxt.scope)?;

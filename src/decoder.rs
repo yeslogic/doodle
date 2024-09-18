@@ -5,7 +5,7 @@ use crate::{
     pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
     TypeScope, ValueType,
 };
-use crate::{IntoLabel, Label, MaybeTyped};
+use crate::{IntoLabel, Label, MaybeTyped, TypeHint};
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -672,6 +672,7 @@ pub enum Decoder {
     SkipRemainder,
     DecodeBytes(Box<Expr>, Box<Decoder>),
     LetFormat(Box<Decoder>, Label, Box<Decoder>),
+    AccumUntil(Box<Expr>, Box<Expr>, Box<Expr>, TypeHint, Box<Decoder>),
 }
 
 #[derive(Clone, Debug)]
@@ -899,19 +900,30 @@ impl<'a> Compiler<'a> {
                 ))
             }
             Format::RepeatUntilLast(expr, a) => {
-                // FIXME - the next value we pass in is probably not right
+                // FIXME - the `Next` value we pass in is probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilLast(expr.clone(), da))
             }
             Format::ForEach(expr, lbl, a) => {
-                // FIXME - the next value we pass in is probably not right
+                // FIXME - the `Next` value we pass in is probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::ForEach(expr.clone(), lbl.clone(), da))
             }
             Format::RepeatUntilSeq(expr, a) => {
-                // FIXME - the next value we pass in is probably not right
+                // FIXME - the `Next` value we pass in is probably not right
                 let da = Box::new(self.compile_format(a, next)?);
                 Ok(Decoder::RepeatUntilSeq(expr.clone(), da))
+            }
+            Format::AccumUntil(f_done, f_update, init, vt, a) => {
+                // FIXME - the `Next` value we pass in is probably not right
+                let da = Box::new(self.compile_format(a, next)?);
+                Ok(Decoder::AccumUntil(
+                    f_done.clone(),
+                    f_update.clone(),
+                    init.clone(),
+                    vt.clone(),
+                    da,
+                ))
             }
             Format::Maybe(x, a) => {
                 let da = Box::new(self.compile_format(a, Rc::new(Next::Empty))?);
@@ -1372,6 +1384,25 @@ impl Decoder {
                     }
                 }
                 Ok((Value::Seq(v), input))
+            }
+            Decoder::AccumUntil(f_done, f_update, init, _vt, a) => {
+                let mut input = input;
+                let mut v = Vec::new();
+                let mut accum = init.eval_value(scope);
+                loop {
+                    let done_arg = Value::Tuple(vec![accum.clone(), Value::Seq(v.clone())]);
+                    let is_done = f_done.eval_lambda(&scope, &done_arg).unwrap_bool();
+                    if is_done {
+                        break;
+                    }
+                    let (next_elem, next_input) = a.parse(program, scope, input)?;
+                    v.push(next_elem.clone());
+                    let update_arg = Value::Tuple(vec![accum.clone(), next_elem]);
+                    let next_accum = f_update.eval_lambda(scope, &update_arg);
+                    accum = next_accum;
+                    input = next_input;
+                }
+                Ok((Value::Tuple(vec![accum, Value::Seq(v)]), input))
             }
             Decoder::Peek(a) => {
                 let (v, _next_input) = a.parse(program, scope, input)?;

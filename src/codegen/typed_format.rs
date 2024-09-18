@@ -91,6 +91,12 @@ impl<TypeRep> std::hash::Hash for TypedFormat<TypeRep> {
                 f.hash(state);
                 inner.hash(state);
             }
+            TypedFormat::AccumUntil(_, f, g, init, _, inner) => {
+                f.hash(state);
+                g.hash(state);
+                init.hash(state);
+                inner.hash(state);
+            }
             TypedFormat::Maybe(_, cond, inner) => {
                 cond.hash(state);
                 inner.hash(state);
@@ -207,6 +213,14 @@ pub enum TypedFormat<TypeRep> {
         Label,
         Box<TypedFormat<TypeRep>>,
     ),
+    AccumUntil(
+        TypeRep,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+        TypeHint,
+        Box<TypedFormat<TypeRep>>,
+    ),
 }
 
 impl TypedFormat<GenType> {
@@ -255,7 +269,9 @@ impl TypedFormat<GenType> {
                 f.lookahead_bounds() * Bounds::at_least(1)
             }
 
-            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
+            TypedFormat::Repeat(_, _f)
+            | TypedFormat::RepeatUntilSeq(_, _, _f)
+            | TypedFormat::AccumUntil(.., _f) => Bounds::any(),
             // REVIEW - can we do any better than this?
             TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
             TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.lookahead_bounds()),
@@ -327,7 +343,9 @@ impl TypedFormat<GenType> {
                 f.match_bounds() * Bounds::at_least(1)
             }
 
-            TypedFormat::Repeat(_, _f) | TypedFormat::RepeatUntilSeq(_, _, _f) => Bounds::any(),
+            TypedFormat::Repeat(_, _f)
+            | TypedFormat::RepeatUntilSeq(_, _, _f)
+            | TypedFormat::AccumUntil(.., _f) => Bounds::any(),
             // REVIEW - can we do any better than this?
             TypedFormat::ForEach(_, _expr, _lbl, _f) => Bounds::any(),
             TypedFormat::Maybe(_, _, f) => Bounds::union(Bounds::exact(0), f.match_bounds()),
@@ -397,6 +415,7 @@ impl TypedFormat<GenType> {
             | TypedFormat::RepeatBetween(gt, ..)
             | TypedFormat::RepeatUntilLast(gt, ..)
             | TypedFormat::RepeatUntilSeq(gt, ..)
+            | TypedFormat::AccumUntil(gt, ..)
             | TypedFormat::Maybe(gt, ..)
             | TypedFormat::Peek(gt, ..)
             | TypedFormat::PeekNot(gt, ..)
@@ -863,6 +882,13 @@ mod __impls {
                 TypedFormat::RepeatUntilSeq(_, lambda, inner) => {
                     Format::RepeatUntilSeq(rebox(lambda), rebox(inner))
                 }
+                TypedFormat::AccumUntil(_, cond, update, init, vt, inner) => Format::AccumUntil(
+                    rebox(cond),
+                    rebox(update),
+                    rebox(init),
+                    vt,
+                    rebox(inner),
+                ),
                 TypedFormat::Maybe(_, is_present, inner) => {
                     Format::Maybe(rebox(is_present), rebox(inner))
                 }

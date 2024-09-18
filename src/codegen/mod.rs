@@ -470,6 +470,16 @@ impl CodeGen {
                     )
                 )
             }
+            TypedDecoder::AccumUntil(_gt, f, g, init, single) => {
+                CaseLogic::Repeat(
+                    RepeatLogic::AccumUntil(
+                        embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true), // check correctness of this choice of needs_ok
+                        embed_lambda_dft(g, ClosureKind::Transform, false), // check correctness of this choice of needs_ok
+                        embed_expr_dft(init),
+                        Box::new(self.translate(single.get_dec()))
+                    )
+                )
+            }
             TypedDecoder::Maybe(_gt, cond, inner) => {
                 CaseLogic::Derived(
                     DerivedLogic::Maybe(
@@ -1001,6 +1011,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
     }
 }
 
+/// Uses the default value of `ExprInfo` for [`embed_expr`]
 fn embed_expr_dft(expr: &TypedExpr<GenType>) -> RustExpr {
     embed_expr(expr, ExprInfo::default())
 }
@@ -1188,13 +1199,29 @@ fn contains_irrefutable_pattern<A>(head_cases: &[(TypedPattern<GenType>, A)]) ->
     false
 }
 
+/// Marker-type for different syntactic categories of closure, with respect to what type of
+/// capture they perform (i.e. move or borrow)
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ClosureKind {
+    /// Category for closures that take a single borrowed argument
     Predicate,
+    /// Category for closures that take a single owned argument
     Transform,
+    /// Hybrid category for closures taking an pair-argument, the first element of which is borrowed and the second of which is owned
     PairBorrowOwned,
 }
 
+/// Transcribes a lambda-kinded `GTExpr` into a RustExpr value.
+///
+/// When `kind` is `ClosureKind::Predicate`, the resulting RustExpr will be a closure that operates on a reference to its associated argument-type
+/// When `kind` is `ClosureKind::Transform`, the resulting RustExpr will be a closure that operates on an owned value of its associated argument-type
+///
+/// The `needs_ok` argument controls whether the overall body of the closure expression will be wrapped in `Ok` or not, which depends on whether
+/// there are any short-circuiting code-paths within the embedded lambda body. If `true`, an `Ok(...)` will be produced. Otherwise, the body will be
+/// transcribed as-is.
+///
+/// Additionally takes an argument `info` that dictates how the body is to be transcribed, according to the
+/// implied semantics used in `embed_expr`
 fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo) -> RustExpr {
     match expr {
         TypedExpr::Lambda((head_t, _), head, body) => match kind {
@@ -1836,6 +1863,8 @@ enum RepeatLogic<ExprT> {
     ConditionComplete(RustExpr, Box<CaseLogic<ExprT>>),
     /// Lifts an Expr to a sequence of parameters to apply to a format, once per element
     ForEach(RustExpr, Label, Box<CaseLogic<ExprT>>),
+    /// Fused logic for a left-fold that is updated on each repeat, and contributes to the condition for termination
+    AccumUntil(RustExpr, RustExpr, RustExpr, Box<CaseLogic<ExprT>>),
 }
 
 pub(crate) trait ToAst {
@@ -2087,10 +2116,8 @@ where
                 let mut stmts = Vec::new();
                 let elt_expr = elt.to_ast(ctxt).into();
 
-                stmts.push(RustStmt::Let(
-                    Mut::Mutable,
-                    Label::from("accum"),
-                    None,
+                stmts.push(RustStmt::assign_mut(
+                    "accum",
                     RustExpr::scoped(["Vec"], "new").call(),
                 ));
                 let ctrl = {
@@ -2113,6 +2140,53 @@ where
                 };
                 stmts.push(ctrl);
                 (stmts, Some(RustExpr::local("accum")))
+            }
+            RepeatLogic::AccumUntil(cond, update, init, elt) => {
+                let mut stmts = Vec::new();
+                let elt_expr = elt.to_ast(ctxt).into();
+
+                stmts.push(RustStmt::assign_mut(
+                    "seq",
+                    RustExpr::scoped(["Vec"], "new").call(),
+                ));
+                stmts.push(RustStmt::assign_mut("acc", init.clone()));
+                let ctrl = {
+                    let done_call = cond
+                        .clone()
+                        .call_with([RustExpr::Tuple(vec![
+                            RustExpr::borrow_of(RustExpr::local("acc")),
+                            RustExpr::borrow_of(RustExpr::local("seq")),
+                        ])])
+                        .wrap_try();
+                    let break_if_done = RustStmt::Control(RustControl::If(
+                        done_call,
+                        vec![RustStmt::Control(RustControl::Break)],
+                        None,
+                    ));
+                    let elt_bind = RustStmt::assign("elem", elt_expr);
+                    let push_elt = RustStmt::Expr(RustExpr::local("seq").call_method_with(
+                        "push",
+                        [RustExpr::CloneOf(Box::new(RustExpr::local("elem")))],
+                    ));
+                    let new_acc = update
+                        .clone()
+                        .call_with([RustExpr::local("acc"), RustExpr::local("elem")]);
+                    let update_acc = RustStmt::Reassign(Label::Borrowed("acc"), new_acc);
+                    RustStmt::Control(RustControl::Loop(vec![
+                        break_if_done,
+                        elt_bind,
+                        push_elt,
+                        update_acc,
+                    ]))
+                };
+                stmts.push(ctrl);
+                (
+                    stmts,
+                    Some(RustExpr::Tuple(vec![
+                        RustExpr::local("acc"),
+                        RustExpr::local("seq"),
+                    ])),
+                )
             }
         }
     }
@@ -3054,6 +3128,22 @@ impl<'a> Elaborator<'a> {
                 let t_inner = self.elaborate_format(inner, dyns);
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatUntilSeq(gt, Box::new(t_lambda), Box::new(t_inner))
+            }
+            Format::AccumUntil(cond, update, init, _vt, inner) => {
+                let index = self.get_and_increment_index();
+                let t_cond = self.elaborate_expr_lambda(cond);
+                let t_update = self.elaborate_expr_lambda(update);
+                let t_init = self.elaborate_expr(init);
+                let t_inner = self.elaborate_format(inner, dyns);
+                let gt = self.get_gt_from_index(index);
+                TypedFormat::AccumUntil(
+                    gt,
+                    Box::new(t_cond),
+                    Box::new(t_update),
+                    Box::new(t_init),
+                    _vt.clone(),
+                    Box::new(t_inner),
+                )
             }
             Format::Maybe(cond, inner) => {
                 let index = self.get_and_increment_index();
