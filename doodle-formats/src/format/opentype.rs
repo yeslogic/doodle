@@ -1328,31 +1328,31 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         num_coordinates,
                     ),
                 );
-                // FIXME - this currently mandates quadratic performance of a linear computation
                 // Format that parses the flags as a packed (unexpanded repeats) array
+                // FIXME - this currently mandates quadratic performance of a linear computation
                 let raw_flags = repeat_until_seq(is_finished, flag_list_entry);
-                // helper for turning a list of packed flags into its nominal expanded sequence-form as x -> Seq(Seq(x.field_set))
-                let unpack = |packed: Expr| -> Format {
-                    Format::Let(
-                        Label::Borrowed("count"),
-                        add(
-                            Expr::AsU32(Box::new(record_proj(packed.clone(), "repeats"))),
-                            Expr::U32(1),
-                        ),
-                        Box::new(repeat_count(
-                            var("count"),
-                            Format::Compute(record_proj(packed, "field_set")),
-                        )),
-                    )
-                };
-                // Perform the appropriate map-and-concat over the raw flags we parse as a first-pass
+                // flattens the flag-array after parsing it, into the final format with expanded repetitions
                 map(
-                    chain(
-                        raw_flags,
-                        "packed_flags",
-                        for_each(var("packed_flags"), "packed", unpack(var("packed"))),
+                    raw_flags,
+                    lambda(
+                        "arr_flags",
+                        flat_map(
+                            lambda(
+                                "packed",
+                                dup(
+                                    add(
+                                        Expr::AsU32(Box::new(record_proj(
+                                            var("packed"),
+                                            "repeats",
+                                        ))),
+                                        Expr::U32(1),
+                                    ),
+                                    record_proj(var("packed"), "field_set"),
+                                ),
+                            ),
+                            var("arr_flags"),
+                        ),
                     ),
-                    f_concat(),
                 )
             };
 
