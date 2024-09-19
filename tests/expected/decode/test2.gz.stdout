@@ -22,7 +22,7 @@ some "test2"
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 1
+│           │   │       ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 1
 │           │   │       └── data <- match type { ... } :=
 │           │   │           └── fixed_huffman <- deflate.fixed_huffman :=
 │           │   │               ├── codes <- dynamic format huffman (repeat-until-last (x -> as-u16 (x.code) == 256) { ... }) :=

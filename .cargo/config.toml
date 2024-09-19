@@ -4,3 +4,6 @@ cg = "run --bin doodle -- format --output rust --dest generated/sample_codegen.r
 [profile.profiling]
 inherits = "release"
 debug = true
+
+[env]
+RUST_MIN_STACK = "4194304"

@@ -9730,7 +9730,7 @@ fn Decoder108<'input>(
                 let field1 = ((|| PResult::Ok((Decoder109(_input))?))())?;
                 (field0, field1)
             };
-            ((|bits: (u8, u8)| PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone()))(inner))?
+            ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
         })
     })())?;
     let data = ((|| {
@@ -9816,22 +9816,22 @@ fn Decoder110<'input>(
                 u8,
             )| {
                 PResult::Ok(
-                    ((bits.15.clone()) as u16) << 15u16
-                        | ((bits.14.clone()) as u16) << 14u16
-                        | ((bits.13.clone()) as u16) << 13u16
-                        | ((bits.12.clone()) as u16) << 12u16
-                        | ((bits.11.clone()) as u16) << 11u16
-                        | ((bits.10.clone()) as u16) << 10u16
-                        | ((bits.9.clone()) as u16) << 9u16
-                        | ((bits.8.clone()) as u16) << 8u16
-                        | ((bits.7.clone()) as u16) << 7u16
-                        | ((bits.6.clone()) as u16) << 6u16
-                        | ((bits.5.clone()) as u16) << 5u16
-                        | ((bits.4.clone()) as u16) << 4u16
-                        | ((bits.3.clone()) as u16) << 3u16
-                        | ((bits.2.clone()) as u16) << 2u16
+                    ((bits.0.clone()) as u16) << 0u16
                         | ((bits.1.clone()) as u16) << 1u16
-                        | ((bits.0.clone()) as u16),
+                        | ((bits.2.clone()) as u16) << 2u16
+                        | ((bits.3.clone()) as u16) << 3u16
+                        | ((bits.4.clone()) as u16) << 4u16
+                        | ((bits.5.clone()) as u16) << 5u16
+                        | ((bits.6.clone()) as u16) << 6u16
+                        | ((bits.7.clone()) as u16) << 7u16
+                        | ((bits.8.clone()) as u16) << 8u16
+                        | ((bits.9.clone()) as u16) << 9u16
+                        | ((bits.10.clone()) as u16) << 10u16
+                        | ((bits.11.clone()) as u16) << 11u16
+                        | ((bits.12.clone()) as u16) << 12u16
+                        | ((bits.13.clone()) as u16) << 13u16
+                        | ((bits.14.clone()) as u16) << 14u16
+                        | ((bits.15.clone()) as u16) << 15u16,
                 )
             })(inner))?
         })
@@ -9879,22 +9879,22 @@ fn Decoder110<'input>(
                 u8,
             )| {
                 PResult::Ok(
-                    ((bits.15.clone()) as u16) << 15u16
-                        | ((bits.14.clone()) as u16) << 14u16
-                        | ((bits.13.clone()) as u16) << 13u16
-                        | ((bits.12.clone()) as u16) << 12u16
-                        | ((bits.11.clone()) as u16) << 11u16
-                        | ((bits.10.clone()) as u16) << 10u16
-                        | ((bits.9.clone()) as u16) << 9u16
-                        | ((bits.8.clone()) as u16) << 8u16
-                        | ((bits.7.clone()) as u16) << 7u16
-                        | ((bits.6.clone()) as u16) << 6u16
-                        | ((bits.5.clone()) as u16) << 5u16
-                        | ((bits.4.clone()) as u16) << 4u16
-                        | ((bits.3.clone()) as u16) << 3u16
-                        | ((bits.2.clone()) as u16) << 2u16
+                    ((bits.0.clone()) as u16) << 0u16
                         | ((bits.1.clone()) as u16) << 1u16
-                        | ((bits.0.clone()) as u16),
+                        | ((bits.2.clone()) as u16) << 2u16
+                        | ((bits.3.clone()) as u16) << 3u16
+                        | ((bits.4.clone()) as u16) << 4u16
+                        | ((bits.5.clone()) as u16) << 5u16
+                        | ((bits.6.clone()) as u16) << 6u16
+                        | ((bits.7.clone()) as u16) << 7u16
+                        | ((bits.8.clone()) as u16) << 8u16
+                        | ((bits.9.clone()) as u16) << 9u16
+                        | ((bits.10.clone()) as u16) << 10u16
+                        | ((bits.11.clone()) as u16) << 11u16
+                        | ((bits.12.clone()) as u16) << 12u16
+                        | ((bits.13.clone()) as u16) << 13u16
+                        | ((bits.14.clone()) as u16) << 14u16
+                        | ((bits.15.clone()) as u16) << 15u16,
                 )
             })(inner))?
         })
@@ -9919,14 +9919,14 @@ fn Decoder110<'input>(
                     };
                     ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
                         PResult::Ok(
-                            bits.7.clone() << 7u8
-                                | bits.6.clone() << 6u8
-                                | bits.5.clone() << 5u8
-                                | bits.4.clone() << 4u8
-                                | bits.3.clone() << 3u8
-                                | bits.2.clone() << 2u8
+                            bits.0.clone() << 0u8
                                 | bits.1.clone() << 1u8
-                                | bits.0.clone(),
+                                | bits.2.clone() << 2u8
+                                | bits.3.clone() << 3u8
+                                | bits.4.clone() << 4u8
+                                | bits.5.clone() << 5u8
+                                | bits.6.clone() << 6u8
+                                | bits.7.clone() << 7u8,
                         )
                     })(inner))?
                 });
@@ -10445,7 +10445,9 @@ fn Decoder111<'input>(
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -10493,7 +10495,9 @@ fn Decoder111<'input>(
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -10541,7 +10545,9 @@ fn Decoder111<'input>(
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -10589,7 +10595,9 @@ fn Decoder111<'input>(
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -10640,9 +10648,9 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -10694,9 +10702,9 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -10748,9 +10756,9 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -10802,9 +10810,9 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -10858,10 +10866,10 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -10915,10 +10923,10 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -10972,10 +10980,10 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -11029,10 +11037,10 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -11088,11 +11096,11 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -11148,11 +11156,11 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -11208,11 +11216,11 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -11268,11 +11276,11 @@ fn Decoder111<'input>(
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -11418,11 +11426,11 @@ fn Decoder112<'input>(
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
                 PResult::Ok(
-                    bits.4.clone() << 4u8
-                        | bits.3.clone() << 3u8
-                        | bits.2.clone() << 2u8
+                    bits.0.clone() << 0u8
                         | bits.1.clone() << 1u8
-                        | bits.0.clone(),
+                        | bits.2.clone() << 2u8
+                        | bits.3.clone() << 3u8
+                        | bits.4.clone() << 4u8,
                 )
             })(inner))?
         })
@@ -11439,11 +11447,11 @@ fn Decoder112<'input>(
             };
             ((|bits: (u8, u8, u8, u8, u8)| {
                 PResult::Ok(
-                    bits.4.clone() << 4u8
-                        | bits.3.clone() << 3u8
-                        | bits.2.clone() << 2u8
+                    bits.0.clone() << 0u8
                         | bits.1.clone() << 1u8
-                        | bits.0.clone(),
+                        | bits.2.clone() << 2u8
+                        | bits.3.clone() << 3u8
+                        | bits.4.clone() << 4u8,
                 )
             })(inner))?
         })
@@ -11459,10 +11467,10 @@ fn Decoder112<'input>(
             };
             ((|bits: (u8, u8, u8, u8)| {
                 PResult::Ok(
-                    bits.3.clone() << 3u8
-                        | bits.2.clone() << 2u8
+                    bits.0.clone() << 0u8
                         | bits.1.clone() << 1u8
-                        | bits.0.clone(),
+                        | bits.2.clone() << 2u8
+                        | bits.3.clone() << 3u8,
                 )
             })(inner))?
         })
@@ -11479,7 +11487,9 @@ fn Decoder112<'input>(
                         (field0, field1, field2)
                     };
                     ((|bits: (u8, u8, u8)| {
-                        PResult::Ok(bits.2.clone() << 2u8 | bits.1.clone() << 1u8 | bits.0.clone())
+                        PResult::Ok(
+                            bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8,
+                        )
                     })(inner))?
                 });
             }
@@ -11511,7 +11521,7 @@ fn Decoder112<'input>(
                                     (field0, field1)
                                 };
                                 ((|bits: (u8, u8)| {
-                                    PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                    PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8)
                                 })(inner))?
                             }
 
@@ -11524,9 +11534,9 @@ fn Decoder112<'input>(
                                 };
                                 ((|bits: (u8, u8, u8)| {
                                     PResult::Ok(
-                                        bits.2.clone() << 2u8
+                                        bits.0.clone() << 0u8
                                             | bits.1.clone() << 1u8
-                                            | bits.0.clone(),
+                                            | bits.2.clone() << 2u8,
                                     )
                                 })(inner))?
                             }
@@ -11544,13 +11554,13 @@ fn Decoder112<'input>(
                                 };
                                 ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
                                     PResult::Ok(
-                                        bits.6.clone() << 6u8
-                                            | bits.5.clone() << 5u8
-                                            | bits.4.clone() << 4u8
-                                            | bits.3.clone() << 3u8
-                                            | bits.2.clone() << 2u8
+                                        bits.0.clone() << 0u8
                                             | bits.1.clone() << 1u8
-                                            | bits.0.clone(),
+                                            | bits.2.clone() << 2u8
+                                            | bits.3.clone() << 3u8
+                                            | bits.4.clone() << 4u8
+                                            | bits.5.clone() << 5u8
+                                            | bits.6.clone() << 6u8,
                                     )
                                 })(inner))?
                             }
@@ -11901,7 +11911,9 @@ v => {
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -11931,7 +11943,9 @@ v => {
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -11961,7 +11975,9 @@ v => {
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -11991,7 +12007,9 @@ v => {
                                                 (field0, field1)
                                             };
                                             ((|bits: (u8, u8)| {
-                                                PResult::Ok(bits.1.clone() << 1u8 | bits.0.clone())
+                                                PResult::Ok(
+                                                    bits.0.clone() << 0u8 | bits.1.clone() << 1u8,
+                                                )
                                             })(inner))?
                                         })
                                     })(
@@ -12024,9 +12042,9 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12060,9 +12078,9 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12096,9 +12114,9 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12132,9 +12150,9 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12170,10 +12188,10 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12209,10 +12227,10 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12248,10 +12266,10 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12287,10 +12305,10 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12328,11 +12346,11 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12370,11 +12388,11 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12412,11 +12430,11 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12454,11 +12472,11 @@ v => {
                                             };
                                             ((|bits: (u8, u8, u8, u8, u8)| {
                                                 PResult::Ok(
-                                                    bits.4.clone() << 4u8
-                                                        | bits.3.clone() << 3u8
-                                                        | bits.2.clone() << 2u8
+                                                    bits.0.clone() << 0u8
                                                         | bits.1.clone() << 1u8
-                                                        | bits.0.clone(),
+                                                        | bits.2.clone() << 2u8
+                                                        | bits.3.clone() << 3u8
+                                                        | bits.4.clone() << 4u8,
                                                 )
                                             })(inner))?
                                         })
@@ -12669,7 +12687,9 @@ fn Decoder114<'input>(
                     (field0, field1)
                 };
                 ((|bits: (u8, u8)| {
-                    PResult::Ok(((bits.1.clone()) as u16) << 1u16 | ((bits.0.clone()) as u16))
+                    PResult::Ok(
+                        ((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16,
+                    )
                 })(inner))?
             }
 
@@ -12682,9 +12702,9 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16,
                     )
                 })(inner))?
             }
@@ -12699,10 +12719,10 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16,
                     )
                 })(inner))?
             }
@@ -12718,11 +12738,11 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16,
                     )
                 })(inner))?
             }
@@ -12739,12 +12759,12 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16,
                     )
                 })(inner))?
             }
@@ -12762,13 +12782,13 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16,
                     )
                 })(inner))?
             }
@@ -12789,14 +12809,14 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.7.clone()) as u16) << 7u16
-                            | ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16
+                            | ((bits.7.clone()) as u16) << 7u16,
                     )
                 })(inner))?
             }
@@ -12818,15 +12838,15 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.8.clone()) as u16) << 8u16
-                            | ((bits.7.clone()) as u16) << 7u16
-                            | ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16
+                            | ((bits.7.clone()) as u16) << 7u16
+                            | ((bits.8.clone()) as u16) << 8u16,
                     )
                 })(inner))?
             }
@@ -12850,16 +12870,16 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.9.clone()) as u16) << 9u16
-                            | ((bits.8.clone()) as u16) << 8u16
-                            | ((bits.7.clone()) as u16) << 7u16
-                            | ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16
+                            | ((bits.7.clone()) as u16) << 7u16
+                            | ((bits.8.clone()) as u16) << 8u16
+                            | ((bits.9.clone()) as u16) << 9u16,
                     )
                 })(inner))?
             }
@@ -12884,17 +12904,17 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.10.clone()) as u16) << 10u16
-                            | ((bits.9.clone()) as u16) << 9u16
-                            | ((bits.8.clone()) as u16) << 8u16
-                            | ((bits.7.clone()) as u16) << 7u16
-                            | ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16
+                            | ((bits.7.clone()) as u16) << 7u16
+                            | ((bits.8.clone()) as u16) << 8u16
+                            | ((bits.9.clone()) as u16) << 9u16
+                            | ((bits.10.clone()) as u16) << 10u16,
                     )
                 })(inner))?
             }
@@ -12920,18 +12940,18 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.11.clone()) as u16) << 11u16
-                            | ((bits.10.clone()) as u16) << 10u16
-                            | ((bits.9.clone()) as u16) << 9u16
-                            | ((bits.8.clone()) as u16) << 8u16
-                            | ((bits.7.clone()) as u16) << 7u16
-                            | ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16
+                            | ((bits.7.clone()) as u16) << 7u16
+                            | ((bits.8.clone()) as u16) << 8u16
+                            | ((bits.9.clone()) as u16) << 9u16
+                            | ((bits.10.clone()) as u16) << 10u16
+                            | ((bits.11.clone()) as u16) << 11u16,
                     )
                 })(inner))?
             }
@@ -12958,19 +12978,19 @@ fn Decoder114<'input>(
                 };
                 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| {
                     PResult::Ok(
-                        ((bits.12.clone()) as u16) << 12u16
-                            | ((bits.11.clone()) as u16) << 11u16
-                            | ((bits.10.clone()) as u16) << 10u16
-                            | ((bits.9.clone()) as u16) << 9u16
-                            | ((bits.8.clone()) as u16) << 8u16
-                            | ((bits.7.clone()) as u16) << 7u16
-                            | ((bits.6.clone()) as u16) << 6u16
-                            | ((bits.5.clone()) as u16) << 5u16
-                            | ((bits.4.clone()) as u16) << 4u16
-                            | ((bits.3.clone()) as u16) << 3u16
-                            | ((bits.2.clone()) as u16) << 2u16
+                        ((bits.0.clone()) as u16) << 0u16
                             | ((bits.1.clone()) as u16) << 1u16
-                            | ((bits.0.clone()) as u16),
+                            | ((bits.2.clone()) as u16) << 2u16
+                            | ((bits.3.clone()) as u16) << 3u16
+                            | ((bits.4.clone()) as u16) << 4u16
+                            | ((bits.5.clone()) as u16) << 5u16
+                            | ((bits.6.clone()) as u16) << 6u16
+                            | ((bits.7.clone()) as u16) << 7u16
+                            | ((bits.8.clone()) as u16) << 8u16
+                            | ((bits.9.clone()) as u16) << 9u16
+                            | ((bits.10.clone()) as u16) << 10u16
+                            | ((bits.11.clone()) as u16) << 11u16
+                            | ((bits.12.clone()) as u16) << 12u16,
                     )
                 })(inner))?
             }

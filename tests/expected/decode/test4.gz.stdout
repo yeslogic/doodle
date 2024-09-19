@@ -22,13 +22,13 @@ some "test4"
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   ├── 0 <- deflate.block :=
 │           │   │   │   ├── final <- base.bit := 0
-│           │   │   │   ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 2
+│           │   │   │   ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 2
 │           │   │   │   └── data <- match type { ... } :=
 │           │   │   │       └── dynamic_huffman <- deflate.dynamic_huffman :=
-│           │   │   │           ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
-│           │   │   │           ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 28
-│           │   │   │           ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 11
-│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │   │           ├── hlit <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 29
+│           │   │   │           ├── hdist <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 28
+│           │   │   │           ├── hclen <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 11
+│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2) (...)) :=
 │           │   │   │           │   ├── 0 := 3
 │           │   │   │           │   ├── 1 := 0
 │           │   │   │           │   ├── 2 := 0
@@ -165,13 +165,13 @@ some "test4"
 │           │   │   │               └── 8191 := { literal := 15 }
 │           │   │   ├── 1 <- deflate.block :=
 │           │   │   │   ├── final <- base.bit := 0
-│           │   │   │   ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 2
+│           │   │   │   ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 2
 │           │   │   │   └── data <- match type { ... } :=
 │           │   │   │       └── dynamic_huffman <- deflate.dynamic_huffman :=
-│           │   │   │           ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 28
-│           │   │   │           ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
-│           │   │   │           ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 15
-│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │   │           ├── hlit <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 28
+│           │   │   │           ├── hdist <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 29
+│           │   │   │           ├── hclen <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 15
+│           │   │   │           ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2) (...)) :=
 │           │   │   │           │   ├── 0 := 3
 │           │   │   │           │   ├── 1 := 6
 │           │   │   │           │   ├── 2 := 0
@@ -308,13 +308,13 @@ some "test4"
 │           │   │   │               └── 32766 := { literal := 58 }
 │           │   │   └── 2 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 2
+│           │   │       ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 2
 │           │   │       └── data <- match type { ... } :=
 │           │   │           └── dynamic_huffman <- deflate.dynamic_huffman :=
-│           │   │               ├── hlit <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 26
-│           │   │               ├── hdist <- map (bits -> bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 29
-│           │   │               ├── hclen <- map (bits -> bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...) := 13
-│           │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │               ├── hlit <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 26
+│           │   │               ├── hdist <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4) (...) := 29
+│           │   │               ├── hclen <- map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3) (...) := 13
+│           │   │               ├── code-length-alphabet-code-lengths <- repeat-count (hclen + 4) (map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2) (...)) :=
 │           │   │               │   ├── 0 := 3
 │           │   │               │   ├── 1 := 7
 │           │   │               │   ├── 2 := 0
