@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::BTreeSet;
 
 use crate::byte_set::ByteSet;
@@ -825,4 +826,40 @@ pub fn compute(expr: Expr) -> Format {
 #[inline]
 pub fn slice(len: Expr, inner: Format) -> Format {
     Format::Slice(Box::new(len), Box::new(inner))
+}
+
+/// Constructs a balanced (i.e. minimiazed max depth) tree of `bitor`-joined
+/// nodes of type Expr (U8 or U16).
+///
+/// Does not work if there are more than 16 elements in `nodes`
+pub fn balanced_bitor_max16(mut nodes: Vec<Expr>) -> Expr {
+    let n = nodes.len();
+
+    let (l, r) = match () {
+        _ if n > 8 => (
+            balanced_bitor_max16(nodes.drain(0..8).collect::<Vec<_>>()),
+            balanced_bitor_max16(nodes.drain(..).collect::<Vec<_>>()),
+        ),
+        _ if n > 4 => (
+            balanced_bitor_max16(nodes.drain(0..4).collect::<Vec<_>>()),
+            balanced_bitor_max16(nodes.drain(..).collect::<Vec<_>>()),
+        ),
+        _ if n > 2 => (
+            balanced_bitor_max16(nodes.drain(0..2).collect::<Vec<_>>()),
+            balanced_bitor_max16(nodes.drain(..).collect::<Vec<_>>()),
+        ),
+        _ if n == 2 => {
+            let mut two_shot = nodes.drain(..);
+            let l = two_shot.next().unwrap();
+            let r = two_shot.next().unwrap();
+            (l, r)
+        }
+        _ if n == 1 => {
+            return nodes.drain(..).next().unwrap();
+        }
+        _ => {
+            panic!("balanced_bitor_max16 called with n == 0")
+        }
+    };
+    bit_or(l, r)
 }

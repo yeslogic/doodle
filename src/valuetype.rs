@@ -165,9 +165,7 @@ type Container<T> = std::rc::Rc<T>; // Box<T>;
 
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TypeHint(
-    Container<ValueType>
-);
+pub struct TypeHint(Container<ValueType>);
 
 impl TypeHint {
     pub fn into_inner(&self) -> &Container<ValueType> {

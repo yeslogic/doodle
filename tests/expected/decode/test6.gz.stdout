@@ -22,13 +22,13 @@ some "test6"
 │           │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │           │   │   └── 0 <- deflate.block :=
 │           │   │       ├── final <- base.bit := 1
-│           │   │       ├── type <- map (bits -> bits.1 << 1 | bits.0) (...) := 0
+│           │   │       ├── type <- map (bits -> bits.0 << 0 | bits.1 << 1) (...) := 0
 │           │   │       └── data <- match type { ... } :=
 │           │   │           └── uncompressed <- deflate.uncompressed :=
 │           │   │               ├── align <- align 8 := ()
-│           │   │               ├── len <- map (bits -> as-u16 (bits.15) << 15 | as-u16 (bits.14) << 14 | as-u16 (bits.13) << 13 | as-u16 (bits.12) << 12 | as-u16 (bits.11) << 11 | as-u16 (bits.10) << 10 | as-u16 (bits.9) << 9 | as-u16 (bits.8) << 8 | as-u16 (bits.7) << 7 | as-u16 (bits.6) << 6 | as-u16 (bits.5) << 5 | as-u16 (bits.4) << 4 | as-u16 (bits.3) << 3 | as-u16 (bits.2) << 2 | as-u16 (bits.1) << 1 | as-u16 (bits.0)) (...) := 2048
-│           │   │               ├── nlen <- map (bits -> as-u16 (bits.15) << 15 | as-u16 (bits.14) << 14 | as-u16 (bits.13) << 13 | as-u16 (bits.12) << 12 | as-u16 (bits.11) << 11 | as-u16 (bits.10) << 10 | as-u16 (bits.9) << 9 | as-u16 (bits.8) << 8 | as-u16 (bits.7) << 7 | as-u16 (bits.6) << 6 | as-u16 (bits.5) << 5 | as-u16 (bits.4) << 4 | as-u16 (bits.3) << 3 | as-u16 (bits.2) << 2 | as-u16 (bits.1) << 1 | as-u16 (bits.0)) (...) := 63487
-│           │   │               ├── bytes <- repeat-count len (map (bits -> bits.7 << 7 | bits.6 << 6 | bits.5 << 5 | bits.4 << 4 | bits.3 << 3 | bits.2 << 2 | bits.1 << 1 | bits.0) (...)) :=
+│           │   │               ├── len <- map (bits -> as-u16 (bits.0) << 0 | as-u16 (bits.1) << 1 | as-u16 (bits.2) << 2 | as-u16 (bits.3) << 3 | as-u16 (bits.4) << 4 | as-u16 (bits.5) << 5 | as-u16 (bits.6) << 6 | as-u16 (bits.7) << 7 | as-u16 (bits.8) << 8 | as-u16 (bits.9) << 9 | as-u16 (bits.10) << 10 | as-u16 (bits.11) << 11 | as-u16 (bits.12) << 12 | as-u16 (bits.13) << 13 | as-u16 (bits.14) << 14 | as-u16 (bits.15) << 15) (...) := 2048
+│           │   │               ├── nlen <- map (bits -> as-u16 (bits.0) << 0 | as-u16 (bits.1) << 1 | as-u16 (bits.2) << 2 | as-u16 (bits.3) << 3 | as-u16 (bits.4) << 4 | as-u16 (bits.5) << 5 | as-u16 (bits.6) << 6 | as-u16 (bits.7) << 7 | as-u16 (bits.8) << 8 | as-u16 (bits.9) << 9 | as-u16 (bits.10) << 10 | as-u16 (bits.11) << 11 | as-u16 (bits.12) << 12 | as-u16 (bits.13) << 13 | as-u16 (bits.14) << 14 | as-u16 (bits.15) << 15) (...) := 63487
+│           │   │               ├── bytes <- repeat-count len (map (bits -> bits.0 << 0 | bits.1 << 1 | bits.2 << 2 | bits.3 << 3 | bits.4 << 4 | bits.5 << 5 | bits.6 << 6 | bits.7 << 7) (...)) :=
 │           │   │               │   ├── 0 := 13
 │           │   │               │   ├── 1 := 60
 │           │   │               │   ├── 2 := 105

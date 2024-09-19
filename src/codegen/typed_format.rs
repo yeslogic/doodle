@@ -882,13 +882,9 @@ mod __impls {
                 TypedFormat::RepeatUntilSeq(_, lambda, inner) => {
                     Format::RepeatUntilSeq(rebox(lambda), rebox(inner))
                 }
-                TypedFormat::AccumUntil(_, cond, update, init, vt, inner) => Format::AccumUntil(
-                    rebox(cond),
-                    rebox(update),
-                    rebox(init),
-                    vt,
-                    rebox(inner),
-                ),
+                TypedFormat::AccumUntil(_, cond, update, init, vt, inner) => {
+                    Format::AccumUntil(rebox(cond), rebox(update), rebox(init), vt, rebox(inner))
+                }
                 TypedFormat::Maybe(_, is_present, inner) => {
                     Format::Maybe(rebox(is_present), rebox(inner))
                 }

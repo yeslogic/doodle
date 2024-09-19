@@ -18,7 +18,7 @@ thread_local! {
 
 fn run_decoder(f: &str) -> Value {
     let input = std::fs::read(f).unwrap();
-    let value = PROGRAM.with(|p|  match p.run(ReadCtxt::new(&input)) {
+    let value = PROGRAM.with(|p| match p.run(ReadCtxt::new(&input)) {
         Ok((value, _)) => value,
         Err(_) => unreachable!(),
     });

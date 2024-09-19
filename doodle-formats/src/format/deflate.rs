@@ -24,17 +24,20 @@ where
 /// position is the MSB.
 ///
 /// This is suitable for 'number'-kinded values injected into a deflate bitstream.
-///
-/// Auto-recursive for n > 1, using a successively smaller prefix of the tuple expression.
 fn bits_value_u8(name: &'static str, n: usize) -> Expr {
-    if n > 1 {
-        bit_or(
-            shl_u8(tuple_proj(var(name), n - 1), cast(n - 1)),
-            bits_value_u8(name, n - 1),
-        )
-    } else {
-        tuple_proj(var(name), 0)
+    if n == 0 {
+        return Expr::U8(0);
+    } else if n == 1 {
+        return tuple_proj(var(name), 0);
     }
+
+    // initialize a flat array of AST nodes (simple expressions)
+    let mut nodes = Vec::with_capacity(n);
+    for i in 0..n {
+        nodes.push(shl_u8(tuple_proj(var(name), i), cast(i)));
+    }
+    // construct a balanced binary tree of bitor operations
+    balanced_bitor_max16(nodes)
 }
 
 /// Maps an `Expr::Tuple` consisting of 5 bit-values into the `u8`-typed Expr
@@ -58,18 +61,21 @@ fn dist_value_u8(x: &'static str) -> Expr {
 /// position is the MSB.
 ///
 /// This is suitable for 'number'-kinded values injected into a deflate bitstream.
-///
-/// Auto-recursive for n > 1, using a successively smaller prefix of the tuple expression.
 fn bits_value_u16(name: &'static str, n: usize) -> Expr {
-    // FIXME - try to balance the tree with explicit conditional flow over value of n
-    if n > 1 {
-        bit_or(
-            shl_u16(tuple_proj(var(name), n - 1), cast(n - 1)),
-            bits_value_u16(name, n - 1),
-        )
-    } else {
-        as_u16(tuple_proj(var(name), 0))
+    if n == 0 {
+        return Expr::U16(0);
+    } else if n == 1 {
+        return as_u16(tuple_proj(var(name), 0));
     }
+
+    // initialize a flat array of AST nodes (simple expressions)
+    let mut nodes = Vec::with_capacity(n);
+    for i in 0..n {
+        nodes.push(shl_u16(tuple_proj(var(name), i), cast(i)));
+    }
+
+    // construct a balanced binary tree of bitor operations
+    balanced_bitor_max16(nodes)
 }
 
 /// Parse a 5-bit Fixed Huffman distance-code and map it into its corresponding distance-symbol
