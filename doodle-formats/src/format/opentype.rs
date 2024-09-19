@@ -1282,7 +1282,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                         (
                             "field_set",
-                            Format::Compute(Box::new(subset_fields(
+                            compute(subset_fields(
                                 var("flags"),
                                 [
                                     "on_curve_point",
@@ -1292,7 +1292,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     "y_is_same_or_positive_y_short_vector",
                                     "overlap_simple",
                                 ],
-                            ))),
+                            )),
                         ),
                     ]),
                 );
@@ -1417,10 +1417,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                     (
                         "number_of_coordinates",
-                        Format::Compute(Box::new(add(
-                            Expr::U16(1),
-                            last_elem("end_points_of_contour"),
-                        ))),
+                        compute(add(Expr::U16(1), last_elem("end_points_of_contour"))),
                     ),
                     ("flags", glyf_flags_simple(var("number_of_coordinates"))),
                     (

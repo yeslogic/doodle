@@ -5,11 +5,10 @@ use doodle::{
     FormatModule,
 };
 use doodle_formats::format;
-use lazy_static::lazy_static;
 
 // amortize the cost of constructing the program to avoid overhead in the inflate profile
-lazy_static! {
-    static ref PROGRAM: Program = {
+thread_local! {
+    static PROGRAM: Program = {
         let mut module = FormatModule::new();
         let format = format::main(&mut module).call();
         let program = Compiler::compile_program(&module, &format).unwrap();
@@ -19,10 +18,10 @@ lazy_static! {
 
 fn run_decoder(f: &str) -> Value {
     let input = std::fs::read(f).unwrap();
-    let value = match PROGRAM.run(ReadCtxt::new(&input)) {
+    let value = PROGRAM.with(|p|  match p.run(ReadCtxt::new(&input)) {
         Ok((value, _)) => value,
         Err(_) => unreachable!(),
-    };
+    });
     value
 }
 

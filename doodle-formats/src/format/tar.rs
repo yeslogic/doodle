@@ -74,7 +74,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ("__nil", nul_or_wsp.call()),
                 (
                     "value",
-                    Format::Compute(Box::new(bit_or(
+                    compute(bit_or(
                         shl(
                             o4u32(Expr::U8(0), var("oA"), var("o9"), var("o8")),
                             Expr::U32(24),
@@ -86,7 +86,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             ),
                             o4u32(var("o3"), var("o2"), var("o1"), var("o0")),
                         ),
-                    ))),
+                    )),
                 ),
             ]),
             lambda("rec", Expr::record_proj(var("rec"), "value")),

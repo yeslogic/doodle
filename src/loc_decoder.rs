@@ -87,9 +87,9 @@ impl ParseLoc {
     /// that are seen along the way.
     pub fn join(self, other: Self) -> Self {
         match other {
-            ParseLoc::Synthesized => return self,
+            ParseLoc::Synthesized => self,
             ParseLoc::InBuffer { offset, length } => match self {
-                ParseLoc::Synthesized => return other,
+                ParseLoc::Synthesized => other,
                 ParseLoc::InBuffer {
                     offset: offset0,
                     length: length0,
@@ -261,7 +261,7 @@ impl From<ParsedValue> for Value {
 }
 
 impl ParsedValue {
-    pub fn into_cow_value<'a>(&'a self) -> Cow<'a, Value> {
+    pub fn into_cow_value(&self) -> Cow<'_, Value> {
         match self {
             ParsedValue::Flat(Parsed { inner, .. }) => Cow::Borrowed(inner),
             _ => Cow::Owned(self.clone().into()),
@@ -1189,20 +1189,17 @@ impl Decoder {
                 let bytes = {
                     let raw = bytes.eval_value_with_loc(scope);
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals
-                        .into_iter()
-                        .map(|v| v.get_as_u8())
-                        .collect::<Vec<u8>>()
+                    seq_vals.iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
                 let (va, rem_input) = a.parse_with_loc(program, scope, new_input)?;
                 match rem_input.read_byte() {
                     Some((b, _)) => {
                         // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        return Err(DecodeError::Trailing {
+                        Err(DecodeError::Trailing {
                             byte: b,
                             offset: rem_input.offset,
-                        });
+                        })
                     }
                     None => Ok((va, input)),
                 }
@@ -1376,7 +1373,7 @@ impl Decoder {
             }
             Decoder::LetFormat(da, name, db) => {
                 let (va, input) = da.parse_with_loc(program, scope, input)?;
-                let new_scope = LocScope::Single(LocSingleScope::new(scope, &name, &va));
+                let new_scope = LocScope::Single(LocSingleScope::new(scope, name, &va));
                 db.parse_with_loc(program, &new_scope, input)
             }
             Decoder::PeekNot(a) => {

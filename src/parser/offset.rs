@@ -57,9 +57,9 @@ impl ByteOffset {
     }
 
     pub(crate) fn increment_by(&self, delta: usize) -> Self {
-        match self {
-            &ByteOffset::Bytes(n_bytes) => Self::Bytes(n_bytes + delta),
-            &ByteOffset::Bits {
+        match *self {
+            ByteOffset::Bytes(n_bytes) => Self::Bytes(n_bytes + delta),
+            ByteOffset::Bits {
                 starting_byte,
                 bits_advanced,
             } => Self::Bits {
@@ -117,9 +117,9 @@ impl ByteOffset {
     }
 
     pub(crate) fn abs_bit_offset(&self) -> usize {
-        match self {
-            &ByteOffset::Bytes(n) => n * 8,
-            &ByteOffset::Bits {
+        match *self {
+            ByteOffset::Bytes(n) => n * 8,
+            ByteOffset::Bits {
                 starting_byte,
                 bits_advanced,
             } => starting_byte * 8 + bits_advanced,
@@ -134,9 +134,9 @@ impl ByteOffset {
     }
 
     pub(crate) fn as_bytes(&self) -> (usize, Option<usize>) {
-        match self {
-            &ByteOffset::Bytes(n) => (n, None),
-            &ByteOffset::Bits {
+        match *self {
+            ByteOffset::Bytes(n) => (n, None),
+            ByteOffset::Bits {
                 starting_byte,
                 bits_advanced,
             } => {

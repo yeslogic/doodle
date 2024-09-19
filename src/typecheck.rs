@@ -115,7 +115,7 @@ impl UType {
             }
             ValueType::Union(..) => None,
             ValueType::Option(inner) => {
-                let inner_t = Self::from_valuetype(&**inner)?;
+                let inner_t = Self::from_valuetype(inner)?;
                 Some(UType::Option(Rc::new(inner_t)))
             }
             ValueType::Seq(inner) => Some(Self::Seq(Rc::new(Self::from_valuetype(inner)?))),
@@ -535,21 +535,20 @@ pub enum IntWidth {
 }
 
 impl IntWidth {
-    pub const MASK8: usize = !(u8::MAX as usize);
-    pub const MASK16: usize = !(u16::MAX as usize);
-    pub const MASK32: usize = !(u32::MAX as usize);
-    pub const MASK64: usize = !(u64::MAX as usize);
+    pub const MAX8: usize = u8::MAX as usize;
+    pub const MAX16: usize = u16::MAX as usize;
+    pub const MAX32: usize = u32::MAX as usize;
+    pub const MAX64: usize = u64::MAX as usize;
 }
 
 impl crate::Bounds {
     pub fn min_required_width(&self) -> IntWidth {
         let max = self.max.unwrap_or(self.min);
         match () {
-            _ if max & IntWidth::MASK8 == 0 => IntWidth::Bits8,
-            _ if max & IntWidth::MASK16 == 0 => IntWidth::Bits16,
-            _ if max & IntWidth::MASK32 == 0 => IntWidth::Bits32,
-            _ if max & IntWidth::MASK64 == 0 => IntWidth::Bits64,
-            _ => unreachable!("no valid narrowing into 64 or fewer bits for bounds {self:?}"),
+            _ if max <= IntWidth::MAX8 => IntWidth::Bits8,
+            _ if max <= IntWidth::MAX16 => IntWidth::Bits16,
+            _ if max <= IntWidth::MAX32 => IntWidth::Bits32,
+            _ => IntWidth::Bits64,
         }
     }
 }
@@ -881,7 +880,7 @@ impl TypeChecker {
 
     fn infer_var_format_level(&mut self, level: usize, ctxt: Ctxt<'_>) -> TCResult<UVar> {
         if let Some(ret) = self.level_vars.get(&level) {
-            Ok(ret.clone())
+            Ok(*ret)
         } else {
             let ret = self.infer_var_format(ctxt.module.get_format(level), ctxt)?;
             self.level_vars.insert(level, ret);
@@ -3057,6 +3056,7 @@ mod __impls {
 #[cfg(test)]
 mod tests {
     use crate::byte_set::ByteSet;
+    use crate::helper::compute;
     use crate::{Arith, TypeHint};
 
     use super::*;
@@ -3090,7 +3090,7 @@ mod tests {
             ("B".into(), ValueType::Tuple(vec![])),
         ]));
         assert_eq!(oput, expected);
-        return Ok(());
+        Ok(())
     }
 
     #[test]
@@ -3100,7 +3100,7 @@ mod tests {
             ("number".into(), Format::Byte(ByteSet::full())),
             (
                 "isEven".into(),
-                Format::Compute(Box::new(Expr::Match(
+                compute(Expr::Match(
                     Box::new(Expr::Arith(
                         Arith::Rem,
                         Box::new(Expr::Var("number".into())),
@@ -3110,7 +3110,7 @@ mod tests {
                         (Pattern::U8(0), Expr::Bool(true)),
                         (Pattern::Wildcard, Expr::Bool(false)),
                     ],
-                ))),
+                )),
             ),
         ]);
         let mut module = FormatModule::new();
@@ -3127,7 +3127,7 @@ mod tests {
             ("isEven".into(), ValueType::Base(BaseType::Bool)),
         ]);
         assert_eq!(oput, expected);
-        return Ok(());
+        Ok(())
     }
 
     #[test]
@@ -3137,7 +3137,7 @@ mod tests {
             ("number".into(), Format::Byte(ByteSet::full())),
             (
                 "parity".into(),
-                Format::Compute(Box::new(Expr::Match(
+                compute(Expr::Match(
                     Box::new(Expr::Arith(
                         Arith::Rem,
                         Box::new(Expr::Var("number".into())),
@@ -3153,7 +3153,7 @@ mod tests {
                             Expr::Variant("Odd".into(), Box::new(Expr::UNIT)),
                         ),
                     ],
-                ))),
+                )),
             ),
         ]);
         let mut module = FormatModule::new();
@@ -3176,7 +3176,7 @@ mod tests {
             ),
         ]);
         assert_eq!(oput, expected);
-        return Ok(());
+        Ok(())
     }
 
     fn mk_format_u32() -> Format {
@@ -3238,6 +3238,6 @@ mod tests {
             .unwrap_or_else(|| panic!("reify returned None"));
         let expected = ValueType::Seq(Box::new(ValueType::Base(BaseType::U32)));
         assert_eq!(oput, expected);
-        return Ok(());
+        Ok(())
     }
 }

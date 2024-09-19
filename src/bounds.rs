@@ -100,7 +100,7 @@ impl Bounds {
     /// `self` over the range `min..=max`.
     pub(crate) fn significant_bits(&self) -> Bounds {
         Self {
-            min: sigbits(self.min) as usize,
+            min: sigbits(self.min),
             max: self.max.map(sigbits),
         }
     }
@@ -236,10 +236,7 @@ impl Sub for Bounds {
                 Some(m2) => self.min.saturating_sub(m2),
                 None => 0,
             },
-            max: match self.max {
-                Some(m1) => Some(m1.saturating_sub(rhs.min)),
-                None => None,
-            },
+            max: self.max.map(|m1| m1.saturating_sub(rhs.min)),
         }
     }
 }
@@ -267,10 +264,7 @@ impl Div<Bounds> for Bounds {
                 Some(m2) => self.min.checked_div(m2).unwrap(),
                 None => 0,
             },
-            max: match self.max {
-                Some(m1) => Some(m1 / usize::max(rhs.min, 1)),
-                _ => None,
-            },
+            max: self.max.map(|m1| m1 / usize::max(rhs.min, 1)),
         }
     }
 }
@@ -301,10 +295,9 @@ impl Shr<Bounds> for Bounds {
                 Some(m2) => self.min.checked_shr(u32::try_from(m2).unwrap()).unwrap(),
                 None => 0,
             },
-            max: match self.max {
-                Some(m1) => Some(m1.checked_shr(u32::try_from(rhs.min).unwrap()).unwrap()),
-                _ => None,
-            },
+            max: self
+                .max
+                .map(|m1| m1.checked_shr(u32::try_from(rhs.min).unwrap()).unwrap()),
         }
     }
 }

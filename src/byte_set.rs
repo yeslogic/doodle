@@ -414,7 +414,7 @@ mod tests {
                 let bs_range_exc = if end < 255 {
                     ByteSet::from(start..end+1)
                 } else {
-                    bs_range_inc.clone()
+                    bs_range_inc
                 };
                 let bs_iter = (start..=end).collect::<ByteSet>();
                 let bs_manual = {

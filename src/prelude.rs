@@ -163,10 +163,12 @@ pub fn parse_huffman(
     join_fallible(make_huffman_decoder(&lengths))
 }
 
+type ParseFn<'f, T> = Box<dyn 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<T>>;
+
 /// Monad-joins `PResult<impl Fn(&mut Parser) -> PResult<u16>>` into either the exact closure passed in,
 /// or a closure that always returns the error passed in.
 // NOTE - this is monomorphized to u16, but could be polymorphic if necessary
-fn join_fallible<'f, F>(rf: PResult<F>) -> Box<dyn 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>>
+fn join_fallible<'f, F>(rf: PResult<F>) -> ParseFn<'f, u16>
 where
     F: 'f + for<'a> Fn(&mut Parser<'a>) -> PResult<u16>,
 {
@@ -252,7 +254,7 @@ pub(crate) mod huffman {
                 }
                 (this @ &mut HuffmanNode::Empty, &[b @ (0 | 1), ..]) => {
                     let mut children = [Box::new(HuffmanNode::Empty), Box::new(HuffmanNode::Empty)];
-                    match (&mut children[b as usize]).insert(&suffix[1..], value) {
+                    match children[b as usize].insert(&suffix[1..], value) {
                         Ok(()) => {}
                         Err(_e) => {
                             eprintln!("{:?}", this);
@@ -263,7 +265,7 @@ pub(crate) mod huffman {
                     Ok(())
                 }
                 (HuffmanNode::Branch { children }, &[b @ (0 | 1), ..]) => {
-                    (&mut children[b as usize]).insert(&suffix[1..], value)
+                    children[b as usize].insert(&suffix[1..], value)
                 }
                 (_, &[other, ..]) => {
                     unreachable!("suffix of huffman code begins with {other} != 0, 1")
@@ -357,7 +359,7 @@ pub fn extend_from_within_ext(vs: &mut Vec<u8>, range: std::ops::Range<usize>) {
     }
 }
 
-pub fn slice_ext<T: Copy>(vs: &Vec<T>, range: std::ops::Range<usize>) -> Cow<'_, [T]> {
+pub fn slice_ext<T: Copy>(vs: &[T], range: std::ops::Range<usize>) -> Cow<'_, [T]> {
     match range.end_bound() {
         Bound::Excluded(&rangemax) if rangemax <= vs.len() => Cow::Borrowed(&vs[range]),
         Bound::Included(&lastix) if lastix < vs.len() => Cow::Borrowed(&vs[range]),

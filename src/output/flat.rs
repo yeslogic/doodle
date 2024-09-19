@@ -304,7 +304,7 @@ impl<'module, W: io::Write> Context<'module, W> {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
                     self.write_flat(value, format)?;
-                    return Ok(());
+                    Ok(())
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },

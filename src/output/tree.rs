@@ -197,11 +197,9 @@ impl<'module> MonoidalPrinter<'module> {
 
     fn compile_location(&self, loc: ParseLoc) -> Fragment {
         match loc {
-            ParseLoc::InBuffer { offset, length } => match length {
-                // 0 => Fragment::string(format!("BUF<{offset}>")),
-                // 1 => Fragment::string(format!("BUF@{offset}")),
-                _ => Fragment::string(format!("BUF({offset}:+{length})")),
-            },
+            ParseLoc::InBuffer { offset, length } => {
+                Fragment::string(format!("BUF({offset}:+{length})"))
+            }
             ParseLoc::Synthesized => Fragment::string("<SYNTH>"),
         }
     }
@@ -389,7 +387,7 @@ impl<'module> MonoidalPrinter<'module> {
                 ParsedValue::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
                     frag.encat(self.compile_parsed_decoded_value(value, format));
-                    return frag;
+                    frag
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
@@ -516,7 +514,7 @@ impl<'module> MonoidalPrinter<'module> {
                 Value::Branch(index, value) => {
                     let (_pattern, format) = &branches[*index];
                     frag.encat(self.compile_decoded_value(value, format));
-                    return frag;
+                    frag
                 }
                 _ => panic!("expected branch, found {value:?}"),
             },
@@ -705,16 +703,16 @@ impl<'module> MonoidalPrinter<'module> {
             }) => (*loc, *b),
             _ => panic!("expected U8 value, found {v:?}"),
         };
-        let symbol = match b {
+
+        // NOTE - ignoring location because ascii strings are printed inline and we can't clutter them
+        match b {
             0x00 => Fragment::String("\\0".into()),
             0x09 => Fragment::String("\\t".into()),
             0x0A => Fragment::String("\\n".into()),
             0x0D => Fragment::String("\\r".into()),
             32..=127 => Fragment::Char(b as char),
             _ => Fragment::String(format!("\\x{b:02X}").into()),
-        };
-        // NOTE - ignoring location because ascii strings are printed inline and we can't clutter them
-        symbol
+        }
     }
 
     fn compile_ascii_char(&self, v: &Value) -> Fragment {
@@ -919,7 +917,7 @@ impl<'module> MonoidalPrinter<'module> {
         frag.engroup().encat_break();
         let mut frag = frags.renew();
         self.gutter.push(Column::Space);
-        for (tr, loc) in Iterator::zip(rows.into_iter(), locs.into_iter()) {
+        for (tr, loc) in Iterator::zip(rows.iter(), locs.iter()) {
             frag.encat(self.compile_gutter());
             for (i, td) in tr.iter().enumerate() {
                 frag.encat(Fragment::String(

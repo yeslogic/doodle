@@ -1264,10 +1264,7 @@ impl Decoder {
                 let bytes = {
                     let raw = bytes.eval_value(scope);
                     let seq_vals = raw.get_sequence().expect("bad type for DecodeBytes input");
-                    seq_vals
-                        .into_iter()
-                        .map(|v| v.get_as_u8())
-                        .collect::<Vec<u8>>()
+                    seq_vals.iter().map(|v| v.get_as_u8()).collect::<Vec<u8>>()
                 };
                 let new_input = ReadCtxt::new(&bytes);
                 let (va, rem_input) = a.parse(program, scope, new_input)?;
@@ -1275,17 +1272,17 @@ impl Decoder {
                 match rem_input.read_byte() {
                     Some((b, _)) => {
                         // FIXME - this error-value doesn't properly distinguish between offsets within the main input or the sub-buffer
-                        return Err(DecodeError::Trailing {
+                        Err(DecodeError::Trailing {
                             byte: b,
                             offset: rem_input.offset,
-                        });
+                        })
                     }
                     None => Ok((va, input)),
                 }
             }
             Decoder::LetFormat(da, name, db) => {
                 let (va, input) = da.parse(program, scope, input)?;
-                let new_scope = Scope::Single(SingleScope::new(scope, &name, &va));
+                let new_scope = Scope::Single(SingleScope::new(scope, name, &va));
                 db.parse(program, &new_scope, input)
             }
             Decoder::ForEach(expr, lbl, a) => {

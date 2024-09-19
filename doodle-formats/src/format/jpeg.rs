@@ -476,7 +476,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
             ),
             (
                 "scan-data-stream",
-                Format::Compute(Box::new(flat_map(
+                compute(flat_map(
                     lambda(
                         "x",
                         expr_match(
@@ -522,7 +522,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
                         ),
                     ),
                     var("scan-data"),
-                ))),
+                )),
             ),
         ]),
     );
