@@ -119,12 +119,7 @@ fn s64be(base: &BaseModule) -> Format {
 
 fn u24be(base: &BaseModule) -> Format {
     map(
-        Format::Tuple(vec![
-            Format::Compute(Box::new(Expr::U8(0))),
-            base.u8(),
-            base.u8(),
-            base.u8(),
-        ]),
+        Format::Tuple(vec![compute(Expr::U8(0)), base.u8(), base.u8(), base.u8()]),
         lambda("x", Expr::U32Be(Box::new(var("x")))),
     )
 }
@@ -923,11 +918,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             [
                                 (Pattern::U32(0x0001_0000), "MaxpV1", maxp_version_1.call()),
                                 (Pattern::U32(0x0000_5000), "MaxpPostScript", Format::EMPTY),
-                                (
-                                    bind("unknown"),
-                                    "MaxpUnknown",
-                                    Format::Compute(Box::new(var("unknown"))),
-                                ), // FIXME - do we need this at all?
+                                (bind("unknown"), "MaxpUnknown", compute(var("unknown"))), // FIXME - do we need this at all?
                             ],
                         ),
                     ),
@@ -1076,7 +1067,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::binding("unknown"),
                                     "NameVersionUnknown",
-                                    Format::Compute(Box::new(var("unknown"))),
+                                    compute(var("unknown")),
                                 ),
                             ],
                         ),
@@ -1214,11 +1205,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (Pattern::U32(0x0002_0000), "Version2", postv2),
                                 (Pattern::U32(0x0002_5000), "Version2Dot5", postv2dot5),
                                 (Pattern::U32(0x0003_0000), "Version3", Format::EMPTY),
-                                (
-                                    bind("unknown"),
-                                    "VersionUnknown",
-                                    Format::Compute(Box::new(var("unknown"))),
-                                ),
+                                (bind("unknown"), "VersionUnknown", compute(var("unknown"))),
                             ],
                         ),
                     ),
@@ -1290,7 +1277,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             if_then_else(
                                 is_nonzero_u8(record_proj(var("flags"), "repeat_flag")),
                                 base.u8(),
-                                Format::Compute(Box::new(Expr::U8(0))),
+                                compute(Expr::U8(0)),
                             ),
                         ),
                         (
@@ -1382,7 +1369,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "x_is_same_or_positive_x_short_vector",
                         )),
                         // this wants to be i16
-                        Format::Compute(Box::new(Expr::U16(0))),
+                        compute(Expr::U16(0)),
                         s16be(base),
                     ),
                 )
@@ -1411,7 +1398,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                             "y_is_same_or_positive_y_short_vector",
                         )),
                         // this wants to be i16
-                        Format::Compute(Box::new(Expr::U16(0))),
+                        compute(Expr::U16(0)),
                         s16be(base),
                     ),
                 )
@@ -1552,7 +1539,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 "instructions_length",
                                 repeat_count(var("instructions_length"), base.u8()),
                             ),
-                            Format::Compute(Box::new(seq_empty())),
+                            compute(seq_empty()),
                         ),
                     ),
                 ])
@@ -1794,11 +1781,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         [
                             (Pattern::U16(1), "Version1", ttc_header1(var("start"))),
                             (Pattern::U16(2), "Version2", ttc_header2(var("start"))),
-                            (
-                                bind("unknown"),
-                                "UnknownVersion",
-                                Format::Compute(Box::new(var("unknown"))),
-                            ),
+                            (bind("unknown"), "UnknownVersion", compute(var("unknown"))),
                         ],
                     ),
                 ),

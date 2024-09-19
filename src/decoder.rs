@@ -1652,8 +1652,8 @@ mod tests {
 
     #[test]
     fn compile_alt_slice_byte() {
-        let slice_a = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0x00)));
-        let slice_b = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0xFF)));
+        let slice_a = slice(Expr::U8(1), is_byte(0x00));
+        let slice_b = slice(Expr::U8(1), is_byte(0xFF));
         let f = alts([("a", slice_a), ("b", slice_b)]);
         let d = Compiler::compile_one(&f).unwrap();
         accepts(
@@ -1674,8 +1674,8 @@ mod tests {
 
     #[test]
     fn compile_alt_slice_ambiguous1() {
-        let slice_a = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0x00)));
-        let slice_b = Format::Slice(Box::new(Expr::U8(1)), Box::new(is_byte(0x00)));
+        let slice_a = slice(Expr::U8(1), is_byte(0x00));
+        let slice_b = slice(Expr::U8(1), is_byte(0x00));
         let f = alts([("a", slice_a), ("b", slice_b)]);
         assert!(Compiler::compile_one(&f).is_err());
     }
@@ -1684,8 +1684,8 @@ mod tests {
     fn compile_alt_slice_ambiguous2() {
         let tuple_a = Format::Tuple(vec![is_byte(0x00), is_byte(0x00)]);
         let tuple_b = Format::Tuple(vec![is_byte(0x00), is_byte(0xFF)]);
-        let slice_a = Format::Slice(Box::new(Expr::U8(1)), Box::new(tuple_a));
-        let slice_b = Format::Slice(Box::new(Expr::U8(1)), Box::new(tuple_b));
+        let slice_a = slice(Expr::U8(1), tuple_a);
+        let slice_b = slice(Expr::U8(1), tuple_b);
         let f = alts([("a", slice_a), ("b", slice_b)]);
         assert!(Compiler::compile_one(&f).is_err());
     }

@@ -61,6 +61,7 @@ fn dist_value_u8(x: &'static str) -> Expr {
 ///
 /// Auto-recursive for n > 1, using a successively smaller prefix of the tuple expression.
 fn bits_value_u16(name: &'static str, n: usize) -> Expr {
+    // FIXME - try to balance the tree with explicit conditional flow over value of n
     if n > 1 {
         bit_or(
             shl_u16(tuple_proj(var(name), n - 1), cast(n - 1)),
@@ -83,7 +84,7 @@ fn dist8(base: &BaseModule) -> Format {
 /// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
 fn bits8(n: usize, base: &BaseModule) -> Format {
     if n == 0 {
-        return Format::Compute(Box::new(Expr::U8(0)));
+        return compute(Expr::U8(0));
     }
 
     map(
@@ -96,7 +97,7 @@ fn bits8(n: usize, base: &BaseModule) -> Format {
 /// standard LSB-to-MSB write order for numeric values in the DEFLATE specification.
 fn bits16(n: usize, base: &BaseModule) -> Format {
     if n == 0 {
-        return Format::Compute(Box::new(Expr::U16(0)));
+        return compute(Expr::U16(0));
     }
 
     map(
@@ -231,7 +232,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             ),
             (
                 "distance",
-                Format::Compute(Box::new(add(var("start"), var("distance-extra-bits")))),
+                compute(add(var("start"), var("distance-extra-bits"))),
             ),
         ]),
     );
@@ -825,7 +826,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                         (Pattern::U8(16), bits2.clone()),
                                         (Pattern::U8(17), bits3.clone()),
                                         (Pattern::U8(18), bits7.clone()),
-                                        (Pattern::Wildcard, Format::Compute(Box::new(Expr::U8(0)))),
+                                        (Pattern::Wildcard, compute(Expr::U8(0))),
                                     ],
                                 ),
                             ),

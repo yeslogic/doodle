@@ -15,10 +15,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, tiff: &FormatRef) -> F
         record([
             ("marker", marker(id)),
             ("length", base.u16be()),
-            (
-                "data",
-                Format::Slice(Box::new(sub(var("length"), Expr::U16(2))), Box::new(data)),
-            ),
+            ("data", slice(sub(var("length"), Expr::U16(2)), data)),
         ])
     };
 

@@ -28,10 +28,7 @@ pub fn main(
                 ),
             ), // NOTE: < 2^31
             ("tag", tag),
-            (
-                "data",
-                Format::Slice(Box::new(var("length")), Box::new(data)),
-            ),
+            ("data", slice(var("length"), data)),
             ("crc", base.u32be()), // FIXME check this
         ])
     };
