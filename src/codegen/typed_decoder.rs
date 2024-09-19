@@ -163,16 +163,18 @@ impl TypedProgram<GenType> {
     }
 }
 
+type QueueItem<'a> = (
+    &'a GTFormat,
+    Option<Vec<(Label, GenType)>>,
+    Rc<Next<'a>>,
+    usize,
+);
+
 pub struct GTCompiler<'a> {
     module: &'a FormatModule,
     program: TypedProgram<GenType>,
     decoder_map: HashMap<(usize, Rc<Next<'a>>), usize>,
-    compile_queue: Vec<(
-        &'a GTFormat,
-        Option<Vec<(Label, GenType)>>,
-        Rc<Next<'a>>,
-        usize,
-    )>,
+    compile_queue: Vec<QueueItem<'a>>,
 }
 
 pub(crate) type GTDecoder = TypedDecoder<GenType>;
@@ -231,7 +233,7 @@ impl<'a> GTCompiler<'a> {
     ) -> AResult<GTDecoderExt> {
         let dec = match format {
             GTFormat::FormatCall(gt, level, arg_exprs, deref) => {
-                let this_args = arg_exprs.iter().cloned().collect();
+                let this_args = arg_exprs.to_vec();
                 let sig_args = if arg_exprs.is_empty() {
                     None
                 } else {
@@ -321,7 +323,7 @@ impl<'a> GTCompiler<'a> {
                         MaybeTyped::Typed(fields.as_slice()),
                         next.clone(),
                     ));
-                    let df = self.compile_gt_format(&f, None, next)?;
+                    let df = self.compile_gt_format(f, None, next)?;
                     dfields.push(df);
                 }
                 Ok(TypedDecoder::Tuple(gt.clone(), dfields))

@@ -159,12 +159,18 @@ impl ValueType {
     }
 }
 
+/// Alias to reduce the number of code-sites we need to update if we pick a different Smart-Pointer type
+/// as the backer of `TypeHint`
+type Container<T> = std::rc::Rc<T>; // Box<T>;
+
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TypeHint(std::rc::Rc<ValueType>);
+pub struct TypeHint(
+    Container<ValueType>
+);
 
 impl TypeHint {
-    pub fn into_inner(&self) -> &std::rc::Rc<ValueType> {
+    pub fn into_inner(&self) -> &Container<ValueType> {
         &self.0
     }
 }
@@ -186,6 +192,6 @@ impl Serialize for TypeHint {
 
 impl From<ValueType> for TypeHint {
     fn from(t: ValueType) -> Self {
-        Self(std::rc::Rc::new(t))
+        Self(Container::new(t))
     }
 }

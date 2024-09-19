@@ -591,10 +591,7 @@ impl RustType {
 
     fn try_as_primtype(&self) -> Option<PrimType> {
         match self {
-            RustType::Atom(at) => match at {
-                AtomType::Prim(pt) => Some(*pt),
-                _ => None,
-            },
+            RustType::Atom(AtomType::Prim(pt)) => Some(*pt),
             _ => None,
         }
     }
@@ -1447,20 +1444,17 @@ impl RustOp {
                     (Operator::Eq | Operator::Neq, Some(ltype), Some(rtype)) => ltype == rtype,
                     // NOTE - we need to filter out BoolAnd and BoolOr from the next catchall branch, so we can't merely match on the literal PrimType::Bool in the case-pattern
                     (Operator::BoolAnd | Operator::BoolOr, Some(ltype), Some(rtype)) => {
-                        match (ltype, rtype) {
-                            (PrimType::Bool, PrimType::Bool) => true,
-                            _ => false,
-                        }
+                        matches!((ltype, rtype), (PrimType::Bool, PrimType::Bool))
                     }
                     (_, Some(ltype), Some(rtype)) => ltype == rtype && ltype.is_numeric(),
                     (_, None, _) | (_, _, None) => false,
                 }
             }
             RustOp::AsCast(expr, typ) => match (expr.try_get_primtype(), typ.try_as_primtype()) {
-                (Some(pt0), Some(pt1)) => match PrimType::compare_width(pt0, pt1) {
-                    None | Some(Ordering::Greater) => false,
-                    _ => true,
-                },
+                (Some(pt0), Some(pt1)) => !matches!(
+                    PrimType::compare_width(pt0, pt1),
+                    None | Some(Ordering::Greater)
+                ),
                 _ => false,
             },
         }
@@ -1711,9 +1705,7 @@ impl RustExpr {
                     }
                 }
                 RustOp::AsCast(expr, typ) => {
-                    let Some(out_typ) = typ.try_as_primtype() else {
-                        return None;
-                    };
+                    let out_typ = typ.try_as_primtype()?;
                     if expr
                         .try_get_primtype()
                         .as_ref()
@@ -1789,7 +1781,7 @@ impl RustExpr {
     }
 
     /// Embed a RustExpr into a new non-temporary value, or return it if it is already non-temporary
-    pub(crate) fn make_persistent<'a>(&'a self) -> Cow<'a, Self> {
+    pub(crate) fn make_persistent(&self) -> Cow<'_, Self> {
         match self {
             RustExpr::Entity(..) => Cow::Borrowed(self),
             // REVIEW - consider which non-entity cases are already 'peristent'

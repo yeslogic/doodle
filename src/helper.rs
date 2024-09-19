@@ -22,7 +22,7 @@ pub fn packed_bits_u8<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
 ) -> Format {
-    const BINDING_NAME: &'static str = "packedbits";
+    const BINDING_NAME: &str = "packedbits";
     let _totlen: u8 = field_bit_lengths.iter().sum();
     assert_eq!(
         _totlen, 8,
@@ -73,7 +73,7 @@ pub fn packed_bits_u16<const N: usize>(
     field_bit_lengths: [u8; N],
     field_names: [&'static str; N],
 ) -> Format {
-    const BINDING_NAME: &'static str = "packedbits";
+    const BINDING_NAME: &str = "packedbits";
     let _totlen: u8 = field_bit_lengths.iter().sum();
     assert_eq!(
         _totlen, 16,
@@ -146,7 +146,7 @@ pub fn alts<Name: IntoLabel>(branches: impl IntoIterator<Item = (Name, Format)>)
 
 /// Helper-function for [`Expr::Match`] that accepts any iterable container `branches` of `(Pattern, Expr)` pairs.
 pub fn expr_match(head: Expr, branches: impl IntoIterator<Item = (Pattern, Expr)>) -> Expr {
-    Expr::Match(Box::new(head), Vec::from_iter(branches.into_iter()))
+    Expr::Match(Box::new(head), Vec::from_iter(branches))
 }
 
 /// Helper-function for [`Format::Match`] where the body of every branch is a
@@ -183,7 +183,7 @@ pub fn match_variant<Name: IntoLabel>(
 ///
 /// If the given branches cannot be deterministically distinguished within a fixed finite lookahead, use [`union_nondet`] instead.
 pub fn union(branches: impl IntoIterator<Item = Format>) -> Format {
-    Format::Union(Vec::from_iter(branches.into_iter()))
+    Format::Union(Vec::from_iter(branches))
 }
 
 /// Helper-function for constructing a [`Format::Union`] over branches that cannot be deterministically distinguished within a fixed finite lookahead.
@@ -383,7 +383,7 @@ pub fn record_proj(head: Expr, label: impl IntoLabel) -> Expr {
 /// Otherwise, will return `(((head->label0)->label1)->...)->labelN`.
 pub fn record_projs(head: Expr, labels: &[&'static str]) -> Expr {
     if labels.is_empty() {
-        return head;
+        head
     } else {
         record_projs(record_proj(head, labels[0]), &labels[1..])
     }
@@ -659,7 +659,7 @@ pub fn chain(f0: Format, name: impl IntoLabel, f: Format) -> Format {
 
 /// Shortcut for matching an explicit pattern of bytes wrapped in a sequence.
 pub fn pattern_bytestring(bytes: &[u8]) -> Pattern {
-    Pattern::Seq(bytes.into_iter().map(|b| Pattern::U8(*b)).collect())
+    Pattern::Seq(bytes.iter().map(|b| Pattern::U8(*b)).collect())
 }
 
 /// Helper for the identity function as an Expr::Lambda

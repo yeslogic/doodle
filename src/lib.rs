@@ -508,7 +508,7 @@ impl Expr {
                         return false;
                     }
                 }
-                return false;
+                false
             }
             Expr::RecordProj(rec, _) => rec.is_shadowed_by(name),
             Expr::Variant(_, inner) => inner.is_shadowed_by(name),
@@ -1094,10 +1094,10 @@ impl FormatModule {
                                 let t = self.infer_format_type(scope, a)?;
                                 Ok(ValueType::Seq(Box::new(t)))
                             }
-                            other => return Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
+                            other => Err(anyhow!("RepeatBetween second argument type should be the same as the first, found {other:?} (!= {t0:?})")),
                         }
                     }
-                    other => return Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
+                    other => Err(anyhow!("RepeatBetween first argument type should be numeric, found {other:?} instead")),
                 }
             }
             Format::RepeatUntilLast(lambda_elem, a) => {
@@ -1112,7 +1112,7 @@ impl FormatModule {
                             other => Err(anyhow!("RepeatUntilLast first argument (lambda) return type should be Bool, found {other:?} instead")),
                         }
                     }
-                    other => return Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
+                    other => Err(anyhow!("RepeatUntilLast first argument type should be lambda, found {other:?} instead")),
                 }
             }
             Format::RepeatUntilSeq(lambda_seq, a) => {
@@ -1127,7 +1127,7 @@ impl FormatModule {
                             other => Err(anyhow!("RepeatUntilSeq first argument (lambda) return type should be Bool, found {other:?} instead")),
                         }
                     }
-                    other => return Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
+                    other => Err(anyhow!("RepeatUntilSeq first argument type should be lambda, found {other:?} instead")),
                 }
             }
             Format::Maybe(x, a) => match x.infer_type(scope)? {
@@ -1236,7 +1236,7 @@ impl FormatModule {
                 };
                 let mut child_scope = TypeScope::child(scope);
                 child_scope.push(lbl.clone(), elem_t);
-                let inner_t = self.infer_format_type(&child_scope, &format)?;
+                let inner_t = self.infer_format_type(&child_scope, format)?;
                 Ok(ValueType::Seq(Box::new(inner_t)))
             }
         }
@@ -1251,10 +1251,7 @@ pub enum MaybeTyped<'a, U: ?Sized, T: ?Sized> {
 
 impl<'a, U: ?Sized + 'a, T: ?Sized + 'a> Clone for MaybeTyped<'a, U, T> {
     fn clone(&self) -> Self {
-        match self {
-            Self::Untyped(arg0) => Self::Untyped(*arg0),
-            Self::Typed(arg0) => Self::Typed(*arg0),
-        }
+        *self
     }
 }
 
@@ -1777,7 +1774,7 @@ impl<'a> MatchTreeStep<'a> {
                             if min > 0 {
                                 Self::from_gt_format(
                                     module,
-                                    &**a,
+                                    a,
                                     Rc::new(Next::RepeatBetween(
                                         min - 1,
                                         max - 1,
@@ -1801,7 +1798,7 @@ impl<'a> MatchTreeStep<'a> {
                             if min > 0 {
                                 Self::from_gt_format(
                                     module,
-                                    &**a,
+                                    a,
                                     Rc::new(Next::RepeatCount(
                                         min - 1,
                                         MaybeTyped::Typed(&**a),
@@ -2301,6 +2298,7 @@ impl<'a> TypeScope<'a> {
 
 #[cfg(test)]
 mod test {
+    use crate::helper::compute;
     use decoder::Value;
 
     use super::*;

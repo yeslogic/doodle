@@ -248,26 +248,17 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ),
         (
             "length_size",
-            Format::Compute(Box::new(bit_and(
-                var("offset_size_length_size"),
-                Expr::U8(7),
-            ))),
+            compute(bit_and(var("offset_size_length_size"), Expr::U8(7))),
         ),
         (
             "base_offset_size",
-            Format::Compute(Box::new(shr(
-                var("base_offset_size_index_size"),
-                Expr::U8(4),
-            ))),
+            compute(shr(var("base_offset_size_index_size"), Expr::U8(4))),
         ),
         (
             "index_size",
             if_then_else(
                 expr_gt(var("version"), Expr::U8(0)),
-                Format::Compute(Box::new(bit_and(
-                    var("base_offset_size_index_size"),
-                    Expr::U8(7),
-                ))),
+                compute(bit_and(var("base_offset_size_index_size"), Expr::U8(7))),
                 compute(Expr::U8(0)),
             ),
         ),

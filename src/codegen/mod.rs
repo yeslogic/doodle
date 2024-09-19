@@ -34,8 +34,8 @@ pub(crate) use ixlabel::IxLabel;
 fn get_trace(state: &impl std::hash::Hash) -> u64 {
     let mut hasher = std::hash::DefaultHasher::new();
     state.hash(&mut hasher);
-    let ret = hasher.finish();
-    ret
+
+    hasher.finish()
 }
 
 mod path_names {
@@ -766,7 +766,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
                 _ => scrutinized,
             };
             let ck = refutability_check(
-                &*scrutinee.get_type().expect("unexpected lambda in match-scrutinee position"),
+                &scrutinee.get_type().expect("unexpected lambda in match-scrutinee position"),
                 cases
             );
 
@@ -1101,7 +1101,7 @@ fn refutability_check<A: std::fmt::Debug + Clone>(
                                 CompType::Result(_, _) =>
                                     unreachable!("unexpected result in pattern head-type"),
                                 CompType::Borrow(_, _, t) => {
-                                    refutability_check(&GenType::Inline((&**t).clone()), cases)
+                                    refutability_check(&GenType::Inline((**t).clone()), cases)
                                 }
                             }
                     }
@@ -1545,8 +1545,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
                         .wrap_try(),
                 );
                 let (stmts, opt_ret) = expand_matchtree(branch, ctxt);
-                let all_stmts =
-                    Iterator::chain(std::iter::once(ignore_byte), stmts.into_iter()).collect();
+                let all_stmts = Iterator::chain(std::iter::once(ignore_byte), stmts).collect();
                 return (all_stmts, opt_ret);
             } else {
                 let b_true: Vec<RustStmt> = implicate_return(expand_matchtree(branch, ctxt));
@@ -1631,9 +1630,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
 
     match expr {
         Some(expr) => (
-            std::iter::once(open_peek)
-                .chain(stmts.into_iter())
-                .collect(),
+            std::iter::once(open_peek).chain(stmts).collect(),
             Some(RustExpr::BlockScope(
                 vec![RustStmt::assign("ret", expr), close_peek],
                 Box::new(RustExpr::local("ret")),
@@ -1641,7 +1638,7 @@ fn embed_matchtree(tree: &MatchTree, ctxt: ProdCtxt<'_>) -> RustBlock {
         ),
         None => (
             std::iter::once(open_peek)
-                .chain(stmts.into_iter())
+                .chain(stmts)
                 .chain(std::iter::once(close_peek))
                 .collect(),
             None,
@@ -2288,7 +2285,7 @@ where
                 (
                     Iterator::chain(
                         std::iter::once(RustStmt::assign(name.clone(), preamble)),
-                        init.into_iter(),
+                        init,
                     )
                     .collect(),
                     last,
@@ -2342,7 +2339,7 @@ where
                                     .wrap_try(),
                             ),
                         };
-                        let thunk = abstracted_try_block(branch_cl.to_ast(ctxt).into());
+                        let thunk = abstracted_try_block(branch_cl.to_ast(ctxt));
                         RustStmt::Expr(RustExpr::BlockScope(
                             [RustStmt::assign_mut("f_tmp", thunk)].to_vec(),
                             Box::new(RustExpr::Control(Box::new(RustControl::Match(
@@ -2444,12 +2441,12 @@ impl ToAst for DerivedLogic<GTExpr> {
             DerivedLogic::Dynamic(dynl, inner_cl) => {
                 let (init, last) = inner_cl.to_ast(ctxt);
                 (
-                    Iterator::chain(std::iter::once(dynl.to_ast(ctxt)), init.into_iter()).collect(),
+                    Iterator::chain(std::iter::once(dynl.to_ast(ctxt)), init).collect(),
                     last,
                 )
             }
             DerivedLogic::DecodeBytes(bytes_expr, inner_cl) => {
-                const INNER_NAME: &'static str = "reparser";
+                const INNER_NAME: &str = "reparser";
                 let bytes_ctxt = ProdCtxt {
                     input_varname: &Cow::Borrowed(INNER_NAME),
                 };
@@ -2468,7 +2465,7 @@ impl ToAst for DerivedLogic<GTExpr> {
                             ),
                         ]
                         .into_iter(),
-                        init.into_iter(),
+                        init,
                     )
                     .collect(),
                     last,
@@ -2583,7 +2580,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
             .codegen
             .name_gen
             .ctxt
-            .find_name_for(&path)
+            .find_name_for(path)
             .expect("no name found");
         let traits = if tdef.can_be_copy() {
             TraitSet::DebugCopy
@@ -2772,7 +2769,7 @@ impl<'a> Elaborator<'a> {
         self.next_index
     }
 
-    fn elaborate_dynamic_format<'s>(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
+    fn elaborate_dynamic_format(&mut self, dynf: &DynFormat) -> TypedDynFormat<GenType> {
         match dynf {
             DynFormat::Huffman(code_lengths, opt_values_expr) => {
                 // for dynf itself
@@ -3174,7 +3171,7 @@ impl<'a> Elaborator<'a> {
         self.codegen.lift_type(&vt)
     }
 
-    fn elaborate_expr<'s>(&mut self, expr: &Expr) -> GTExpr {
+    fn elaborate_expr(&mut self, expr: &Expr) -> GTExpr {
         let index = self.get_and_increment_index();
         match expr {
             Expr::Var(lbl) => {
@@ -3500,6 +3497,7 @@ impl<'a> TypedDynScope<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::helper::compute;
     use crate::{typecheck::Ctxt, TypeHint};
 
     fn population_check(module: &FormatModule, f: &Format, label: Option<&'static str>) {
@@ -3589,11 +3587,11 @@ mod tests {
     fn test_popcheck_compute_simple() {
         let x = Format::Byte(ByteSet::full());
         let fx = compute(Expr::Var("x".into()));
-        let gx = Format::Compute(Box::new(Expr::Arith(
+        let gx = compute(Expr::Arith(
             Arith::Add,
             Box::new(Expr::Var("x".into())),
             Box::new(Expr::Var("x".into())),
-        )));
+        ));
 
         let f = Format::Record(vec![("x".into(), x), ("fx".into(), fx), ("gx".into(), gx)]);
         run_popcheck(&[("test.compute_simple", f)]);
@@ -3626,12 +3624,12 @@ mod tests {
 
         let xs =
             Format::RepeatUntilLast(Box::new(is_null), Box::new(Format::Byte(ByteSet::full())));
-        let fxs = Format::Compute(Box::new(Expr::FlatMapAccum(
+        let fxs = compute(Expr::FlatMapAccum(
             Box::new(ixdup),
             Box::new(Expr::U32(1)),
             TypeHint::from(ValueType::Base(BaseType::U32)),
             Box::new(Expr::Var("xs".into())),
-        )));
+        ));
 
         let f = Format::Record(vec![("xs".into(), xs), ("fxs".into(), fxs)]);
         run_popcheck(&[("test.compute_complex", f)]);

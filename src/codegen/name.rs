@@ -232,7 +232,7 @@ impl NameCtxt {
 
     /// Registers the current PathLabel on-stack into the appropriate [`PHeap`] in the association-table,
     /// returning it for later promotion using [`NameCtxt::find_name_for`]
-    pub fn produce_name<'a>(&mut self) -> PathLabel {
+    pub fn produce_name(&mut self) -> PathLabel {
         let identifier = Self::generate_name(&self.stack);
         Self::resolve(&mut self.table, identifier.clone(), &self.stack);
         self.stack.clone()
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_record_tree() {
-        let ref mut ctxt = NameCtxt::new();
+        let ctxt = &mut NameCtxt::new();
         let root = ctxt
             .push_atom(NameAtom::Explicit(Label::Borrowed("root")))
             .produce_name();
