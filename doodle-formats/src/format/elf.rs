@@ -294,11 +294,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     let elf_header = module.define_format(
         "elf.header",
         record([
-            (
-                "ident",
-                Format::Slice(Box::new(Expr::U32(EI_NIDENT)), Box::new(elf_ident.call())),
-            ), // machine-independent ELF identification array (byte-oriented)
-            ("type", e_type.call_args(vec![var_is_be.clone()])), // file-type identifier
+            ("ident", slice(Expr::U32(EI_NIDENT), elf_ident.call())), // machine-independent ELF identification array (byte-oriented)
+            ("type", e_type.call_args(vec![var_is_be.clone()])),      // file-type identifier
             ("machine", e_machine.call_args(vec![var_is_be.clone()])), // identifier for the architecture required by the ELF image
             ("version", e_version.call_args(vec![var_is_be.clone()])), // ELF version (should agree with the equivalent field in `ident`)
             (

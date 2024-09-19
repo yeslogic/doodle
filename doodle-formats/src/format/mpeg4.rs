@@ -40,19 +40,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 Format::Match(
                     Box::new(var("size-field")),
                     vec![
-                        (Pattern::U32(0), Format::Compute(Box::new(Expr::U64(0)))), // FIXME
+                        (Pattern::U32(0), compute(Expr::U64(0))), // FIXME
                         (
                             Pattern::U32(1),
                             map(base.u64be(), lambda("x", sub(var("x"), Expr::U64(16)))),
                         ),
                         (
                             Pattern::Wildcard,
-                            Format::Compute(Box::new(as_u64(sub(var("size-field"), Expr::U32(8))))),
+                            compute(as_u64(sub(var("size-field"), Expr::U32(8)))),
                         ),
                     ],
                 ),
             ),
-            ("data", Format::Slice(Box::new(var("size")), Box::new(data))),
+            ("data", slice(var("size"), data)),
         ])
     }
 
@@ -244,7 +244,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ("base_offset_size_index_size", base.u8()), // two four-bit fields
         (
             "offset_size",
-            Format::Compute(Box::new(shr(var("offset_size_length_size"), Expr::U8(4)))),
+            compute(shr(var("offset_size_length_size"), Expr::U8(4))),
         ),
         (
             "length_size",
@@ -268,7 +268,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     var("base_offset_size_index_size"),
                     Expr::U8(7),
                 ))),
-                Format::Compute(Box::new(Expr::U8(0))),
+                compute(Expr::U8(0)),
             ),
         ),
         (
@@ -302,7 +302,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         Format::Match(
                             Box::new(var("base_offset_size")),
                             vec![
-                                (Pattern::U8(0), Format::Compute(Box::new(Expr::U64(0)))),
+                                (Pattern::U8(0), compute(Expr::U64(0))),
                                 (
                                     Pattern::U8(4),
                                     map(base.u32be(), lambda("x", as_u64(var("x")))),
@@ -322,10 +322,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Format::Match(
                                         Box::new(var("index_size")),
                                         vec![
-                                            (
-                                                Pattern::U8(0),
-                                                Format::Compute(Box::new(Expr::U64(0))),
-                                            ),
+                                            (Pattern::U8(0), compute(Expr::U64(0))),
                                             (
                                                 Pattern::U8(4),
                                                 map(base.u32be(), lambda("x", as_u64(var("x")))),
@@ -339,10 +336,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Format::Match(
                                         Box::new(var("offset_size")),
                                         vec![
-                                            (
-                                                Pattern::U8(0),
-                                                Format::Compute(Box::new(Expr::U64(0))),
-                                            ),
+                                            (Pattern::U8(0), compute(Expr::U64(0))),
                                             (
                                                 Pattern::U8(4),
                                                 map(base.u32be(), lambda("x", as_u64(var("x")))),
@@ -356,10 +350,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                     Format::Match(
                                         Box::new(var("length_size")),
                                         vec![
-                                            (
-                                                Pattern::U8(0),
-                                                Format::Compute(Box::new(Expr::U64(0))),
-                                            ),
+                                            (Pattern::U8(0), compute(Expr::U64(0))),
                                             (
                                                 Pattern::U8(4),
                                                 map(base.u32be(), lambda("x", as_u64(var("x")))),
@@ -531,7 +522,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         if_then_else(
                             expr_eq(var("default_length"), Expr::U32(0)),
                             base.u32be(),
-                            Format::Compute(Box::new(var("default_length"))),
+                            compute(var("default_length")),
                         ),
                     ),
                     (

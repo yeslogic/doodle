@@ -2314,10 +2314,10 @@ mod test {
                 Label::Borrowed("x"),
                 Box::new(Expr::Var(Label::Borrowed("y"))),
                 Box::new(Format::Record(vec![
-                    (Label::Borrowed("y"), Format::Compute(Box::new(Expr::U8(5)))),
+                    (Label::Borrowed("y"), compute(Expr::U8(5))),
                     (
                         Label::Borrowed("z"),
-                        Format::Compute(Box::new(Expr::Var(Label::Borrowed("x")))),
+                        compute(Expr::Var(Label::Borrowed("x"))),
                     ),
                 ])),
             )),

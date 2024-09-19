@@ -50,9 +50,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         )
     };
 
-    let cstr_arr = |len: u16| -> Format {
-        Format::Slice(Box::new(Expr::U16(len)), Box::new(tar_asciiz.call()))
-    };
+    let cstr_arr = |len: u16| -> Format { slice(Expr::U16(len), tar_asciiz.call()) };
     let magic = is_bytes(MAGIC);
     let size_field = {
         let octal_digit = map(
@@ -116,11 +114,11 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         ]),
     );
 
-    let filename = Format::Slice(Box::new(Expr::U16(100)), Box::new(tar_str_optz_ne.call()));
+    let filename = slice(Expr::U16(100), tar_str_optz_ne.call());
 
-    let linkname = Format::Slice(Box::new(Expr::U16(100)), Box::new(tar_str_optz.call()));
+    let linkname = slice(Expr::U16(100), tar_str_optz.call());
 
-    let prefix = Format::Slice(Box::new(Expr::U16(155)), Box::new(tar_str_optz.call()));
+    let prefix = slice(Expr::U16(155), tar_str_optz.call());
 
     // This specification is only guaranteed to work for UStar archives. Anything else might work
     // by happenstance but may fail just as easily.

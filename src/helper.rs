@@ -628,7 +628,7 @@ pub fn format_some(f: Format) -> Format {
 
 /// Helper for constructing `Option::None` within the Format model-language.
 pub fn format_none() -> Format {
-    Format::Compute(Box::new(expr_none()))
+    compute(expr_none())
 }
 
 /// Shortcut for `where_lambda` applied over the simple predicate [`is_nonzero_u8`]
@@ -813,4 +813,16 @@ where
 /// corresponding to `f` applied to the `Some(_)` case, or dft if `x` is `None`.
 pub fn expr_option_map_or(dft: Expr, f: impl FnOnce(Expr) -> Expr, x: Expr) -> Expr {
     expr_match(x, [(pat_some(bind("x")), f(var("x"))), (pat_none(), dft)])
+}
+
+/// Helper function for [`Format::Compute`].
+#[inline]
+pub fn compute(expr: Expr) -> Format {
+    Format::Compute(Box::new(expr))
+}
+
+/// Helper function for [`Format::Slice`]
+#[inline]
+pub fn slice(len: Expr, inner: Format) -> Format {
+    Format::Slice(Box::new(len), Box::new(inner))
 }

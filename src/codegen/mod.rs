@@ -3588,7 +3588,7 @@ mod tests {
     #[test]
     fn test_popcheck_compute_simple() {
         let x = Format::Byte(ByteSet::full());
-        let fx = Format::Compute(Box::new(Expr::Var("x".into())));
+        let fx = compute(Expr::Var("x".into()));
         let gx = Format::Compute(Box::new(Expr::Arith(
             Arith::Add,
             Box::new(Expr::Var("x".into())),
