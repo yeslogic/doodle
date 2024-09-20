@@ -210,4 +210,172 @@ pub mod png_metrics {
     }
 }
 
+pub mod oft_metrics {
+    use super::*;
+
+    pub type OpentypeFontDirectory =
+        main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link;
+    pub type OpentypeGlyph = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq;
+    pub type GlyphDescription = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description;
+    pub type SimpleGlyph = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple;
+    pub type OpentypeCmap = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap;
+    pub type OpentypeHead = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head;
+
+    pub fn show_opentype_stats(parsed_data: &OpentypeData) {
+        // STUB - show more specific data
+        show_magic(parsed_data.font.magic);
+        match &parsed_data.font.directory {
+            main_opentype_font_directory::TTCHeader(ttc) => {
+                println!("TTC: version {}.{}", ttc.major_version, ttc.minor_version);
+                match &ttc.header {
+                    main_opentype_font_directory_TTCHeader_header::UnknownVersion(n) => {
+                        println!("<unrecognized version {}.*", n)
+                    }
+                    main_opentype_font_directory_TTCHeader_header::Version1(hv1) => {
+                        println!("TTC Version 1 ({} fonts)", hv1.num_fonts);
+                        for (i, table_dir) in hv1.table_directories.iter().enumerate() {
+                            match table_dir.link.as_ref() {
+                                Some(table_dir) => {
+                                    println!("=== Font @ Index {i} ===");
+                                    show_font_directory(table_dir);
+                                }
+                                None => {
+                                    println!("=== Skipping Index {i} ===");
+                                }
+                            }
+                        }
+                    }
+                    main_opentype_font_directory_TTCHeader_header::Version2(hv2) => {
+                        println!("TTC Version 2 ({} fonts)", hv2.num_fonts);
+                        for (i, table_dir) in hv2.table_directories.iter().enumerate() {
+                            match table_dir.link.as_ref() {
+                                Some(table_dir) => {
+                                    println!("=== Font @ Index {i} ===");
+                                    show_font_directory(table_dir);
+                                }
+                                None => {
+                                    println!("=== Skipping Index {i} ===");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            main_opentype_font_directory::TableDirectory(table_dir) => {
+                show_font_directory(table_dir)
+            }
+            main_opentype_font_directory::UnknownTable => println!("<unknown>"),
+        }
+    }
+
+    fn show_magic(magic: u32) {
+        let bytes = magic.to_be_bytes();
+        let show = |b: u8| {
+            if b.is_ascii_alphanumeric() {
+                String::from(b as char)
+            } else {
+                format!("{:02x}", b)
+            }
+        };
+        println!(
+            "Magic: {}{}{}{}",
+            show(bytes[0]),
+            show(bytes[1]),
+            show(bytes[2]),
+            show(bytes[3])
+        );
+    }
+
+    fn show_font_directory(table_dir: &OpentypeFontDirectory) {
+        let links = &table_dir.table_links;
+        // STUB - add in more tailored printing of each table according to what it contains
+        show_cmap_table(&links.cmap);
+        show_head_table(&links.head);
+        // println!("hhea: {:?}", &links.hhea);
+        // println!("hmtx: {:?}", &links.hmtx);
+        // println!("maxp: {:?}", &links.maxp);
+        // println!("name: {:?}", &links.name);
+        // println!("os2: {:?}", &links.os2);
+        // println!("post: {:?}", &links.post);
+        // println!("cvt: {:?}", &links.cvt);
+        // println!("fpgm: {:?}", &links.fpgm);
+        // println!("loca: {:?}", &links.loca);
+        show_glyph_table(&links.glyf);
+    }
+
+    fn format_version16dot16(v: u32) -> String {
+        let major = v >> 16;
+        let minor = (v & 0xf000) >> 12;
+        format!("{}.{}", major, minor)
+    }
+
+
+    fn show_cmap_table(cmap: &OpentypeCmap) {
+        println!("cmap: table version {}, {} encoding tables", cmap.version, cmap.num_tables);
+    }
+
+
+    fn show_head_table(head: &OpentypeHead) {
+        println!("head: {:?}", head);
+    }
+
+    fn show_glyph_table(
+        glyf: &Option<Vec<OpentypeGlyph>>,
+    ) {
+        let Some(glyf) = glyf.as_ref() else {
+            println!("glyf: <not present>");
+            return;
+        };
+
+        let n_glyphs = glyf.len();
+        println!("glyf: {} glyphs", n_glyphs);
+        const SHOW_CUTOFF: usize = 16;
+        const BEFORE_ELIPSIS: usize = 8;
+        const AFTER_ELIPSIS: usize = 8;
+        if n_glyphs > SHOW_CUTOFF {
+            for i in 0..BEFORE_ELIPSIS {
+                show_single_glyph(i, &glyf[i]);
+            }
+            println!(
+                "skipping glyphs {}..{}",
+                BEFORE_ELIPSIS,
+                n_glyphs - AFTER_ELIPSIS
+            );
+            for i in n_glyphs - AFTER_ELIPSIS..n_glyphs {
+                show_single_glyph(i, &glyf[i]);
+            }
+        } else {
+            for i in 0..n_glyphs {
+                show_single_glyph(i, &glyf[i]);
+            }
+        }
+    }
+
+    fn show_single_glyph(ix: usize, glyf: &OpentypeGlyph) {
+        print!("[{ix}]: ");
+        match glyf {
+            OpentypeGlyph::EmptyGlyph => println!("<empty>"),
+            OpentypeGlyph::Glyph(glyph) => match &glyph.description {
+                GlyphDescription::HeaderOnly => println!("<empty (implied)>"),
+                GlyphDescription::Simple(sglyph) => {
+                    println!("Simple Glyph [{} contours, {} coordinates, {} instructions, xy: [({}, {}) <-> ({}, {})]]",
+                        glyph.number_of_contours,
+                        sglyph.end_points_of_contour.last().unwrap() + 1,
+                        sglyph.instruction_length,
+                        glyph.x_min, glyph.y_min, glyph.x_max, glyph.y_max
+                    );
+                }
+                GlyphDescription::Composite(cglyph) => {
+                    println!("Composite Glyph [{} components, {} instructions, xy: [({}, {}) <-> ({}, {})]]",
+                        cglyph.glyphs.len(),
+                        cglyph.instructions.len(),
+                        glyph.x_min, glyph.y_min, glyph.x_max, glyph.y_max
+                    );
+                }
+            },
+        }
+    }
+}
+
+pub use oft_metrics::*;
 pub use png_metrics::*;

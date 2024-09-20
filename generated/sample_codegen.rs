@@ -2523,7 +2523,7 @@ pub struct base_u32be__dupX2 {
 }
 
 #[derive(Debug, Clone)]
-pub struct base_u8_ix1 {
+pub struct base_u8_ix1_inSeq {
 repeats: u8,
 field_set: main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq
 }
@@ -5994,8 +5994,17 @@ accum
 let number_of_coordinates = ((|| PResult::Ok(1u16 + end_points_of_contour[(try_sub!((end_points_of_contour.len()) as u32, 1u32)) as usize].clone()))())?;
 let flags = ((|| PResult::Ok({
 let inner = {
-let mut accum = Vec::new();
+let inner = {
+let mut seq = Vec::new();
+let mut acc = 0u16;
 loop {
+if ((|tuple_var: (u16, &Vec<base_u8_ix1_inSeq>)| PResult::Ok(match tuple_var {
+(totlen, seq) => {
+totlen >= number_of_coordinates
+}
+}))((acc.clone(), &seq)))? {
+break
+}
 let elem = {
 let flags = {
 let inner = {
@@ -6014,20 +6023,24 @@ false => {
 }
 }))())?;
 let field_set = ((|| PResult::Ok(main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple_flags_inSeq { on_curve_point: flags.on_curve_point.clone(), x_short_vector: flags.x_short_vector.clone(), y_short_vector: flags.y_short_vector.clone(), x_is_same_or_positive_x_short_vector: flags.x_is_same_or_positive_x_short_vector.clone(), y_is_same_or_positive_y_short_vector: flags.y_is_same_or_positive_y_short_vector.clone(), overlap_simple: flags.overlap_simple.clone() }))())?;
-base_u8_ix1 { repeats, field_set }
+base_u8_ix1_inSeq { repeats, field_set }
 };
-accum.push(elem);
-if ((|seq: &Vec<base_u8_ix1>| PResult::Ok((try_fold_left_curried(seq.iter().cloned(), 0u16, |tuple_var: (u16, base_u8_ix1)| PResult::Ok(match tuple_var {
-(acc, x) => {
-acc + ((x.repeats.clone()) as u16) + 1u16
+seq.push(elem.clone());
+acc = ((|tuple_var: (u16, base_u8_ix1_inSeq)| PResult::Ok(match tuple_var {
+(acc, flags) => {
+acc + ((flags.repeats.clone()) as u16) + 1u16
 }
-})))? >= number_of_coordinates))(&accum))? {
-break
+}))((acc, elem)))?;
 }
-}
-accum
+(acc, seq)
 };
-((|arr_flags: Vec<base_u8_ix1>| PResult::Ok((try_flat_map_vec(arr_flags.iter().cloned(), |packed: base_u8_ix1| PResult::Ok(dup32(((packed.repeats.clone()) as u32) + 1u32, packed.field_set.clone()))))?))(inner))?
+((|tuple_var: (u16, Vec<base_u8_ix1_inSeq>)| PResult::Ok(match tuple_var {
+(_len, flags) => {
+flags
+}
+}))(inner))?
+};
+((|arr_flags: Vec<base_u8_ix1_inSeq>| PResult::Ok((try_flat_map_vec(arr_flags.iter().cloned(), |packed: base_u8_ix1_inSeq| PResult::Ok(dup32(((packed.repeats.clone()) as u32) + 1u32, packed.field_set.clone()))))?))(inner))?
 }))())?;
 let x_coordinates = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -6124,9 +6137,33 @@ main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_l
 
 _ => {
 let inner = {
-let glyphs = ((|| PResult::Ok({
-let mut accum = Vec::new();
+let acc_glyphs = {
+let mut seq = Vec::new();
+let mut acc = false;
 loop {
+if ((|tuple_var: (bool, &Vec<main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq>)| PResult::Ok(match tuple_var {
+(has_instructions, seq) => {
+match match ((seq.len()) as u32) > 0u32 {
+true => {
+Some(seq[(try_sub!((seq.len()) as u32, 1u32)) as usize].clone())
+},
+
+false => {
+None
+}
+} {
+Some(ref x) => {
+x.flags.more_components.clone() == 0u16
+},
+
+None => {
+false
+}
+}
+}
+}))((acc.clone(), &seq)))? {
+break
+}
 let elem = {
 let flags = ((|| PResult::Ok({
 let inner = {
@@ -6277,20 +6314,17 @@ None
 }))())?;
 main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq { flags, glyph_index, argument1, argument2, scale }
 };
-if ((|elem: &main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq| PResult::Ok(elem.flags.more_components.clone() == 0u16))(&elem))? {
-accum.push(elem);
-break
-} else {
-accum.push(elem);
+seq.push(elem.clone());
+acc = ((|tuple_var: (bool, main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq)| PResult::Ok(match tuple_var {
+(acc, glyph) => {
+acc || (glyph.flags.we_have_instructions.clone() != 0u16)
 }
+}))((acc, elem)))?;
 }
-accum
-}))())?;
-let instructions = ((|| PResult::Ok(match (try_fold_left_curried(glyphs.iter().cloned(), false, |tuple_var: (bool, main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Composite_glyphs_inSeq)| PResult::Ok(match tuple_var {
-(any, x) => {
-any || (x.flags.we_have_instructions.clone() != 0u16)
-}
-})))? {
+(acc, seq)
+};
+let glyphs = ((|| PResult::Ok(acc_glyphs.1.clone()))())?;
+let instructions = ((|| PResult::Ok(match acc_glyphs.0.clone() {
 true => {
 let instructions_length = (Decoder24(_input))?;
 let mut accum = Vec::new();

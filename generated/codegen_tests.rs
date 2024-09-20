@@ -29,11 +29,6 @@ fn test_decoder_tgz() -> TestResult {
     Ok(())
 }
 
-fn show_opentype_stats(parsed_data: &OpentypeData) {
-    // STUB - show more specific data
-    println!("{:?}", parsed_data);
-}
-
 #[test]
 fn test_decoder_font() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath(

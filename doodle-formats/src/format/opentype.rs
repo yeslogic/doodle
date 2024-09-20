@@ -1297,30 +1297,29 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ]),
                 );
                 // Lambda that tells us whether we are done reading flags
-                let is_finished = lambda(
-                    "seq",
-                    expr_gte(
-                        left_fold(
-                            lambda_tuple(
-                                ["acc", "x"],
-                                add(
-                                    var("acc"),
-                                    add(
-                                        Expr::AsU16(Box::new(record_proj(var("x"), "repeats"))),
-                                        Expr::U16(1),
-                                    ),
-                                ),
-                            ),
-                            Expr::U16(0),
-                            ValueType::Base(BaseType::U16),
-                            var("seq"),
+                let is_finished =
+                    lambda_tuple(["totlen", "seq"], expr_gte(var("totlen"), num_coordinates));
+                let update_totlen = lambda_tuple(
+                    ["acc", "flags"],
+                    add(
+                        var("acc"),
+                        add(
+                            Expr::AsU16(Box::new(record_proj(var("flags"), "repeats"))),
+                            Expr::U16(1),
                         ),
-                        num_coordinates,
                     ),
                 );
                 // Format that parses the flags as a packed (unexpanded repeats) array
-                // FIXME - this currently mandates quadratic performance of a linear computation
-                let raw_flags = repeat_until_seq(is_finished, flag_list_entry);
+                let raw_flags = map(
+                    accum_until(
+                        is_finished,
+                        update_totlen,
+                        Expr::U16(0),
+                        ValueType::Base(BaseType::U16),
+                        flag_list_entry,
+                    ),
+                    lambda_tuple(["_len", "flags"], var("flags")),
+                );
                 // flattens the flag-array after parsing it, into the final format with expanded repetitions
                 map(
                     raw_flags,
@@ -1510,36 +1509,54 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("scale", glyf_scale(var("flags"))),
                 ]);
 
-                let is_last = lambda(
-                    "elem",
-                    expr_eq(
-                        record_projs(var("elem"), &["flags", "more_components"]),
-                        Expr::U16(0),
+                let is_last = lambda_tuple(
+                    ["has_instructions", "seq"],
+                    expr_option_map_or(
+                        Expr::Bool(false),
+                        |elt| {
+                            expr_eq(
+                                record_projs(elt, &["flags", "more_components"]),
+                                Expr::U16(0),
+                            )
+                        },
+                        seq_opt_last(var("seq")),
                     ),
                 );
-                fn any_instructions(glyphs: Expr) -> Expr {
-                    seq_any(
-                        |elt| is_nonzero_u16(record_projs(elt, &["flags", "we_have_instructions"])),
-                        glyphs,
-                    )
-                }
-
-                // FIXME - this can be optimized with a format that folds as it repeats
-                record([
-                    ("glyphs", repeat_until_last(is_last, glyf_component)),
-                    (
-                        "instructions",
-                        if_then_else(
-                            any_instructions(var("glyphs")),
-                            chain(
-                                base.u16be(),
-                                "instructions_length",
-                                repeat_count(var("instructions_length"), base.u8()),
-                            ),
-                            compute(seq_empty()),
-                        ),
+                let update_any_instructions = lambda_tuple(
+                    ["acc", "glyph"],
+                    or(
+                        var("acc"),
+                        is_nonzero_u16(record_projs(
+                            var("glyph"),
+                            &["flags", "we_have_instructions"],
+                        )),
                     ),
-                ])
+                );
+                chain(
+                    accum_until(
+                        is_last,
+                        update_any_instructions,
+                        Expr::Bool(false),
+                        ValueType::Base(BaseType::Bool),
+                        glyf_component,
+                    ),
+                    "acc_glyphs",
+                    record([
+                        ("glyphs", compute(tuple_proj(var("acc_glyphs"), 1))),
+                        (
+                            "instructions",
+                            if_then_else(
+                                tuple_proj(var("acc_glyphs"), 0),
+                                chain(
+                                    base.u16be(),
+                                    "instructions_length",
+                                    repeat_count(var("instructions_length"), base.u8()),
+                                ),
+                                compute(seq_empty()),
+                            ),
+                        ),
+                    ]),
+                )
             };
 
             let glyf_description = |n_contours: Expr| {

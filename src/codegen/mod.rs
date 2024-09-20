@@ -473,8 +473,8 @@ impl CodeGen {
             TypedDecoder::AccumUntil(_gt, f, g, init, single) => {
                 CaseLogic::Repeat(
                     RepeatLogic::AccumUntil(
-                        embed_lambda_dft(f, ClosureKind::PairBorrowOwned, true), // check correctness of this choice of needs_ok
-                        embed_lambda_dft(g, ClosureKind::Transform, false), // check correctness of this choice of needs_ok
+                        embed_lambda_dft(f, ClosureKind::PairOwnedBorrow, true), // check correctness of this choice of needs_ok
+                        embed_lambda_dft(g, ClosureKind::Transform, true), // check correctness of this choice of needs_ok
                         embed_expr_dft(init),
                         Box::new(self.translate(single.get_dec()))
                     )
@@ -1209,6 +1209,8 @@ pub(crate) enum ClosureKind {
     Transform,
     /// Hybrid category for closures taking an pair-argument, the first element of which is borrowed and the second of which is owned
     PairBorrowOwned,
+    /// Hybrid category for closures taking an pair-argument, the first element of which is owned and the second of which is borrowed
+    PairOwnedBorrow,
 }
 
 /// Transcribes a lambda-kinded `GTExpr` into a RustExpr value.
@@ -1257,6 +1259,28 @@ fn embed_lambda(expr: &GTExpr, kind: ClosureKind, needs_ok: bool, info: ExprInfo
                     [fst, snd] => RustType::AnonTuple(vec![
                         RustType::borrow_of(None, Mut::Immutable, fst.clone()),
                         snd.clone(),
+                    ]),
+                    other => unreachable!("tuple is not a pair: {other:?}"),
+                };
+                let expansion = embed_expr(body, info);
+                RustExpr::Closure(RustClosure::new_transform(
+                    head.clone(),
+                    Some(point_t),
+                    if needs_ok {
+                        RustExpr::scoped(["PResult"], "Ok").call_with([expansion])
+                    } else {
+                        expansion
+                    },
+                ))
+            }
+            ClosureKind::PairOwnedBorrow => {
+                let RustType::AnonTuple(args) = head_t.clone().to_rust_type() else {
+                    panic!("type {head_t:?} does not look like a tuple...")
+                };
+                let point_t = match &args[..] {
+                    [fst, snd] => RustType::AnonTuple(vec![
+                        fst.clone(),
+                        RustType::borrow_of(None, Mut::Immutable, snd.clone()),
                     ]),
                     other => unreachable!("tuple is not a pair: {other:?}"),
                 };
@@ -2154,7 +2178,7 @@ where
                     let done_call = cond
                         .clone()
                         .call_with([RustExpr::Tuple(vec![
-                            RustExpr::borrow_of(RustExpr::local("acc")),
+                            RustExpr::CloneOf(Box::new(RustExpr::local("acc"))),
                             RustExpr::borrow_of(RustExpr::local("seq")),
                         ])])
                         .wrap_try();
@@ -2170,7 +2194,11 @@ where
                     ));
                     let new_acc = update
                         .clone()
-                        .call_with([RustExpr::local("acc"), RustExpr::local("elem")]);
+                        .call_with([RustExpr::Tuple(vec![
+                            RustExpr::local("acc"),
+                            RustExpr::local("elem"),
+                        ])])
+                        .wrap_try();
                     let update_acc = RustStmt::Reassign(Label::Borrowed("acc"), new_acc);
                     RustStmt::Control(RustControl::Loop(vec![
                         break_if_done,

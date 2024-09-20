@@ -2,7 +2,9 @@ use core::panic;
 use std::collections::BTreeSet;
 
 use crate::byte_set::ByteSet;
-use crate::{Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, ValueType};
+use crate::{
+    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, ValueType,
+};
 
 /// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
 /// are `u8`-valued sub-masks of the original byte.
@@ -862,4 +864,29 @@ pub fn balanced_bitor_max16(mut nodes: Vec<Expr>) -> Expr {
         }
     };
     bit_or(l, r)
+}
+
+/// Helper function for `Format::AccumUntil`
+pub fn accum_until(
+    f_done: Expr,
+    f_update: Expr,
+    init: Expr,
+    vt: impl Into<TypeHint>,
+    format: Format,
+) -> Format {
+    Format::AccumUntil(
+        Box::new(f_done),
+        Box::new(f_update),
+        Box::new(init),
+        vt.into(),
+        Box::new(format),
+    )
+}
+
+/// Computes the final element of a sequence-typed Expr, evaluating to None if it is empty
+pub fn seq_opt_last(seq: Expr) -> Expr {
+    expr_opt_if(
+        expr_gt(seq_length(seq.clone()), Expr::U32(0)),
+        index_unchecked(seq.clone(), sub(seq_length(seq.clone()), Expr::U32(1))),
+    )
 }
