@@ -319,19 +319,19 @@
 │           │           │                                               │           ├── sample_size <- base.u32be := 0
 │           │           │                                               │           ├── sample_count <- base.u32be := 182
 │           │           │                                               │           └── entry_size <- maybe (sample_size == 0) (repeat-count sample_count base.u32be) :=
-some
-│           │           │                                               │               ├── 0 := 13936
-│           │           │                                               │               ├── 1 := 690
-│           │           │                                               │               ├── 2 := 163
-│           │           │                                               │               ├── 3 := 88
-│           │           │                                               │               ├── 4 := 995
-│           │           │                                               │               ├── 5 := 1673
-│           │           │                                               │               ├── 6 := 1876
-│           │           │                                               │               ├── 7 := 1506
-│           │           │                                               │               ├── 8 := 1986
-│           │           │                                               │               ├── 9 := 2413
-│           │           │                                               │               ~
-│           │           │                                               │               └── 181 := 1809
+│           │           │                                               │               └── some <- repeat-count sample_count base.u32be :=
+│           │           │                                               │                   ├── 0 := 13936
+│           │           │                                               │                   ├── 1 := 690
+│           │           │                                               │                   ├── 2 := 163
+│           │           │                                               │                   ├── 3 := 88
+│           │           │                                               │                   ├── 4 := 995
+│           │           │                                               │                   ├── 5 := 1673
+│           │           │                                               │                   ├── 6 := 1876
+│           │           │                                               │                   ├── 7 := 1506
+│           │           │                                               │                   ├── 8 := 1986
+│           │           │                                               │                   ├── 9 := 2413
+│           │           │                                               │                   ~
+│           │           │                                               │                   └── 181 := 1809
 │           │           │                                               └── 5 <- mpeg4.stbl-atom :=
 │           │           │                                                   ├── size-field <- base.u32be := 744
 │           │           │                                                   ├── type <- mpeg4.tag := "stco"
@@ -636,19 +636,19 @@ some
 │           │           │                                               │           ├── sample_size <- base.u32be := 0
 │           │           │                                               │           ├── sample_count <- base.u32be := 284
 │           │           │                                               │           └── entry_size <- maybe (sample_size == 0) (repeat-count sample_count base.u32be) :=
-some
-│           │           │                                               │               ├── 0 := 24
-│           │           │                                               │               ├── 1 := 6
-│           │           │                                               │               ├── 2 := 6
-│           │           │                                               │               ├── 3 := 6
-│           │           │                                               │               ├── 4 := 6
-│           │           │                                               │               ├── 5 := 6
-│           │           │                                               │               ├── 6 := 6
-│           │           │                                               │               ├── 7 := 6
-│           │           │                                               │               ├── 8 := 6
-│           │           │                                               │               ├── 9 := 6
-│           │           │                                               │               ~
-│           │           │                                               │               └── 283 := 278
+│           │           │                                               │               └── some <- repeat-count sample_count base.u32be :=
+│           │           │                                               │                   ├── 0 := 24
+│           │           │                                               │                   ├── 1 := 6
+│           │           │                                               │                   ├── 2 := 6
+│           │           │                                               │                   ├── 3 := 6
+│           │           │                                               │                   ├── 4 := 6
+│           │           │                                               │                   ├── 5 := 6
+│           │           │                                               │                   ├── 6 := 6
+│           │           │                                               │                   ├── 7 := 6
+│           │           │                                               │                   ├── 8 := 6
+│           │           │                                               │                   ├── 9 := 6
+│           │           │                                               │                   ~
+│           │           │                                               │                   └── 283 := 278
 │           │           │                                               ├── 4 <- mpeg4.stbl-atom :=
 │           │           │                                               │   ├── size-field <- base.u32be := 744
 │           │           │                                               │   ├── type <- mpeg4.tag := "stco"
@@ -706,7 +706,7 @@ some
 │           │           │                                                           │   ├── 1 <- base.u8 := 0
 │           │           │                                                           │   └── 2 <- base.u8 := 0
 │           │           │                                                           ├── grouping_type <- base.u32be := 1919904876
-│           │           │                                                           ├── grouping_type_parameter <- maybe (version == 1) base.u32be := none
+│           │           │                                                           ├── grouping_type_parameter <- maybe (version == 1) base.u32be := { none := () }
 │           │           │                                                           ├── entry_count <- base.u32be := 1
 │           │           │                                                           └── sample_groups <- repeat-count entry_count { ... } :=
 │           │           │                                                               └── 0 :=
