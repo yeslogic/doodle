@@ -15,40 +15,40 @@
 │       │   │   ├── bg-color-index <- base.u8 := 0
 │       │   │   └── pixel-aspect-ratio <- base.u8 := 0
 │       │   └── global-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) :=
-some
-│       │       └──    r   g   b
-│       │              0   0   0
-│       │            162 161 162
-│       │            158 157 158
-│       │            114 117 117
-│       │            124 126 126
-│       │            132 134 134
-│       │            205 206 206
-│       │            196 197 197
-│       │            173 174 174
-│       │            143 144 144
-│       │            152 150 151
-│       │            149 159 157
-│       │            212 229 225
-│       │             52  56  55
-│       │             88  92  91
-│       │            231 239 237
-│       │            156 170 166
-│       │             72  75  74
-│       │            179 182 181
-│       │            103 105 104
-│       │            191 193 192
-│       │            211 212 211
-│       │            218 218 217
-│       │            226 224 223
-│       │            231 229 229
-│       │            187 186 186
-│       │            168 167 167
-│       │            201 201 201
-│       │            138 138 138
-│       │              0   0   0
-│       │              0   0   0
-│       │              0   0   0
+│       │       └── some <- repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry :=
+│       │           └──    r   g   b
+│       │                  0   0   0
+│       │                162 161 162
+│       │                158 157 158
+│       │                114 117 117
+│       │                124 126 126
+│       │                132 134 134
+│       │                205 206 206
+│       │                196 197 197
+│       │                173 174 174
+│       │                143 144 144
+│       │                152 150 151
+│       │                149 159 157
+│       │                212 229 225
+│       │                 52  56  55
+│       │                 88  92  91
+│       │                231 239 237
+│       │                156 170 166
+│       │                 72  75  74
+│       │                179 182 181
+│       │                103 105 104
+│       │                191 193 192
+│       │                211 212 211
+│       │                218 218 217
+│       │                226 224 223
+│       │                231 229 229
+│       │                187 186 186
+│       │                168 167 167
+│       │                201 201 201
+│       │                138 138 138
+│       │                  0   0   0
+│       │                  0   0   0
+│       │                  0   0   0
 │       ├── blocks <- repeat gif.block :=
 │       │   └── 0 <- gif.block :=
 │       │       └── graphic-block <- gif.graphic-block :=
@@ -79,7 +79,7 @@ some
 │       │                   │       ├── sort-flag := 0
 │       │                   │       ├── reserved := 0
 │       │                   │       └── table-size := 0
-│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
+│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := { none := () }
 │       │                   └── data <- gif.table-based-image-data :=
 │       │                       ├── lzw-min-code-size <- base.u8 := 5
 │       │                       ├── image-data <- repeat gif.subblock :=

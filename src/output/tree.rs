@@ -380,14 +380,8 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::Maybe(_, format) => match value {
                 ParsedValue::Option(opt_val) => match opt_val {
-                    Some(val) => Fragment::string("some")
-                        .join_with_wsp(self.compile_parsed_decoded_value(val, format)),
-                    None => {
-                        Fragment::string("none").join_with_wsp(self.compile_parsed_decoded_value(
-                            &ParsedValue::from_evaluated(Value::UNIT),
-                            &Format::EMPTY,
-                        ))
-                    }
+                    Some(val) => self.compile_parsed_variant("some", val, Some(format)),
+                    None => self.compile_parsed_variant("none", &ParsedValue::from_evaluated(Value::UNIT), Some(&Format::EMPTY)),
                 },
                 _ => panic!("expected variant, found {value:?}"),
             },
@@ -543,11 +537,9 @@ impl<'module> MonoidalPrinter<'module> {
             },
             Format::Maybe(_, inner) => {
                 match value {
-                    // FIXME - consider first-class parsedValue for Option
                     Value::Option(opt_val) => match opt_val {
-                        Some(val) => Fragment::string("some")
-                            .join_with_wsp(self.compile_decoded_value(val, inner)),
-                        None => Fragment::string("none"),
+                        Some(val) => self.compile_variant("some", val, Some(inner)),
+                        None => self.compile_variant("none", &Value::UNIT, None),
                     },
                     _ => panic!("expected Option, found {value:?}"),
                 }
@@ -1147,6 +1139,7 @@ impl<'module> MonoidalPrinter<'module> {
             self.compile_parsed_field_value_last(label, value, format, true)
         }
     }
+
     fn compile_variant(&mut self, label: &str, value: &Value, format: Option<&Format>) -> Fragment {
         if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
