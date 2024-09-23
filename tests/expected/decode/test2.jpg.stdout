@@ -12,8 +12,7 @@
 │       │   │               └── exif <- jpeg.app1-exif :=
 │       │   │                   ├── padding <- [= 0]
 │       │   │                   └── exif <- tiff.main :=
-│       │   │                       ├── byte-order <- _ |...| _ :=
-│       │   │                       │   └── be <- (...)
+│       │   │                       ├── byte-order <- _ |...| _ := be
 │       │   │                       ├── magic <- match byte-order { ... } := 42
 │       │   │                       ├── offset <- match byte-order { ... } := 8
 │       │   │                       └── ifd <- with-relative-offset (offset - 8) (match byte-order { ... }) :=
@@ -317,7 +316,7 @@
 │       │   │           ├── 9 := 221
 │       │   │           ~
 │       │   │           └── 80404 := 95
-│       │   ├── dnl <- _ |...| _ := { none := () }
+│       │   ├── dnl <- _ |...| _ := none
 │       │   └── scans <- repeat jpeg.scan := []
 │       └── eoi <- jpeg.eoi
 └── end <- end-of-input

@@ -96,7 +96,7 @@
 │       │   │   ├── flevel := 3
 │       │   │   ├── fdict := 0
 │       │   │   └── fcheck := 7
-│       │   ├── dict-id <- maybe (flags.fdict != 0) base.u32be := { none := () }
+│       │   ├── dict-id <- maybe (flags.fdict != 0) base.u32be := none
 │       │   ├── data <- bits deflate.main :=
 │       │   │   ├── blocks <- repeat-until-last (x -> x.final == 1) deflate.block :=
 │       │   │   │   └── 0 <- deflate.block :=

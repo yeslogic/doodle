@@ -110,7 +110,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 1 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -128,7 +128,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 2 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -146,7 +146,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 3 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -164,7 +164,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 4 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -182,7 +182,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 5 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -200,7 +200,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "hvc1"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 6 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -218,7 +218,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "grid"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               ├── 7 <- mpeg4.iinf-atom :=
 │           │               │               │   ├── size-field <- base.u32be := 21
 │           │               │               │   ├── type <- mpeg4.tag := "infe"
@@ -236,7 +236,7 @@
 │           │               │               │                   ├── item_protection_index <- base.u16be := 0
 │           │               │               │                   ├── item_type <- mpeg4.tag := "Exif"
 │           │               │               │                   ├── item_name <- base.asciiz-string := ""
-│           │               │               │                   └── extra_fields <- match item_type { ... } := { unknown := () }
+│           │               │               │                   └── extra_fields <- match item_type { ... } := unknown
 │           │               │               └── 8 <- mpeg4.iinf-atom :=
 │           │               │                   ├── size-field <- base.u32be := 41
 │           │               │                   ├── type <- mpeg4.tag := "infe"
@@ -456,5 +456,5 @@
 │               ├── size-field <- base.u32be := 1
 │               ├── type <- mpeg4.tag := "mdat"
 │               ├── size <- match size-field { ... } := 287781
-│               └── data <- slice size (match type { ... }) := { mdat := () }
+│               └── data <- slice size (match type { ... }) := mdat
 └── end <- end-of-input
