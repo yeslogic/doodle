@@ -1,12 +1,12 @@
 use std::{borrow::Cow, fmt, io, ops::Deref, rc::Rc};
 
 use crate::precedence::{cond_paren, Precedence};
-use crate::Label;
 use crate::{
     decoder::Value,
     loc_decoder::{ParseLoc, Parsed, ParsedValue},
 };
 use crate::{Arith, DynFormat, Expr, Format, FormatModule, IntRel};
+use crate::{Label, UnaryOp};
 
 use super::{Fragment, FragmentBuilder, Symbol};
 
@@ -50,6 +50,7 @@ pub struct Flags {
     pretty_utf8_strings: bool,
     hide_double_underscore_fields: bool,
     show_redundant_formats: bool,
+    summarize_boolean_record_set_fields: bool,
 }
 
 #[inline]
@@ -256,6 +257,7 @@ impl<'module> MonoidalPrinter<'module> {
             pretty_utf8_strings: true,
             hide_double_underscore_fields: true,
             show_redundant_formats: false,
+            summarize_boolean_record_set_fields: true,
         };
         MonoidalPrinter {
             gutter: Vec::new(),
@@ -381,7 +383,11 @@ impl<'module> MonoidalPrinter<'module> {
             Format::Maybe(_, format) => match value {
                 ParsedValue::Option(opt_val) => match opt_val {
                     Some(val) => self.compile_parsed_variant("some", val, Some(format)),
-                    None => self.compile_parsed_variant("none", &ParsedValue::from_evaluated(Value::UNIT), Some(&Format::EMPTY)),
+                    None => self.compile_parsed_variant(
+                        "none",
+                        &ParsedValue::from_evaluated(Value::UNIT),
+                        Some(&Format::EMPTY),
+                    ),
                 },
                 _ => panic!("expected variant, found {value:?}"),
             },
@@ -535,15 +541,13 @@ impl<'module> MonoidalPrinter<'module> {
                 },
                 _ => panic!("expected tuple, found {value:?}"),
             },
-            Format::Maybe(_, inner) => {
-                match value {
-                    Value::Option(opt_val) => match opt_val {
-                        Some(val) => self.compile_variant("some", val, Some(inner)),
-                        None => self.compile_variant("none", &Value::UNIT, Some(&Format::EMPTY)),
-                    },
-                    _ => panic!("expected Option, found {value:?}"),
-                }
-            }
+            Format::Maybe(_, inner) => match value {
+                Value::Option(opt_val) => match opt_val {
+                    Some(val) => self.compile_variant("some", val, Some(inner)),
+                    None => self.compile_variant("none", &Value::UNIT, Some(&Format::EMPTY)),
+                },
+                _ => panic!("expected Option, found {value:?}"),
+            },
             Format::Peek(format) => self.compile_decoded_value(value, format),
             Format::PeekNot(_format) => self.compile_value(value),
             Format::Slice(_, format) => self.compile_decoded_value(value, format),
@@ -1056,8 +1060,13 @@ impl<'module> MonoidalPrinter<'module> {
         } else {
             (value_fields, format_fields)
         };
+
         if value_fields.is_empty() {
             Fragment::String("{}".into())
+        } else if value_fields.iter().all(|(_, v)| v.is_boolean())
+            && self.flags.summarize_boolean_record_set_fields
+        {
+            self.compile_parsed_boolflags(value_fields)
         } else {
             let mut frag = Fragment::new();
             let last_index = value_fields.len() - 1;
@@ -1071,6 +1080,21 @@ impl<'module> MonoidalPrinter<'module> {
             frag
         }
     }
+
+    fn compile_parsed_boolflags(&mut self, value_fields: &[FieldPValue]) -> Fragment {
+        let mut set_fields = Vec::with_capacity(value_fields.len());
+
+        for (label, value) in value_fields {
+            if value.coerce_mapped_value().into_cow_value().unwrap_bool() {
+                set_fields.push(Fragment::String(label.clone()));
+            }
+        }
+        Fragment::string("bool-flags").cat(
+            Fragment::seq(set_fields, Some(Fragment::Char('|')))
+                .delimit(Fragment::Char('['), Fragment::Char(']')),
+        )
+    }
+
     fn compile_record(
         &mut self,
         value_fields: &[FieldValue],
@@ -1104,6 +1128,10 @@ impl<'module> MonoidalPrinter<'module> {
         };
         if value_fields.is_empty() {
             Fragment::String("{}".into())
+        } else if value_fields.iter().all(|(_, v)| v.is_boolean())
+            && self.flags.summarize_boolean_record_set_fields
+        {
+            self.compile_boolflags(value_fields)
         } else {
             let mut frag = Fragment::new();
             let last_index = value_fields.len() - 1;
@@ -1118,13 +1146,29 @@ impl<'module> MonoidalPrinter<'module> {
         }
     }
 
+    fn compile_boolflags(&mut self, value_fields: &[FieldValue]) -> Fragment {
+        let mut set_fields = Vec::with_capacity(value_fields.len());
+
+        for (label, value) in value_fields {
+            if value.coerce_mapped_value().unwrap_bool() {
+                set_fields.push(Fragment::String(label.clone()));
+            }
+        }
+        Fragment::string("bool-flags").cat(
+            Fragment::seq(set_fields, Some(Fragment::Char('|')))
+                .delimit(Fragment::Char('['), Fragment::Char(']')),
+        )
+    }
+
     fn compile_parsed_variant(
         &mut self,
         label: &str,
         value: &ParsedValue,
         format: Option<&Format>,
     ) -> Fragment {
-        if self.flags.omit_implied_values && format.is_some_and(|format| self.is_implied_value_format(format)) {
+        if self.flags.omit_implied_values
+            && format.is_some_and(|format| self.is_implied_value_format(format))
+        {
             Fragment::string(label.to_string())
         } else if self.is_atomic_parsed_value(value, format) {
             let mut frag = Fragment::new();
@@ -1143,7 +1187,9 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn compile_variant(&mut self, label: &str, value: &Value, format: Option<&Format>) -> Fragment {
-        if self.flags.omit_implied_values && format.is_some_and(|format| self.is_implied_value_format(format)) {
+        if self.flags.omit_implied_values
+            && format.is_some_and(|format| self.is_implied_value_format(format))
+        {
             Fragment::string(label.to_string())
         } else if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
@@ -1518,6 +1564,11 @@ impl<'module> MonoidalPrinter<'module> {
                 self.compile_binop(" >> ", lhs, rhs, Precedence::BITSHIFT, Precedence::BITSHIFT),
                 prec,
                 Precedence::BITSHIFT,
+            ),
+            Expr::Unary(UnaryOp::BoolNot, expr) => cond_paren(
+                self.compile_prefix("!", None, expr),
+                prec,
+                Precedence::LOGNEGATE,
             ),
             Expr::AsU8(expr) => cond_paren(
                 self.compile_prefix("as-u8", None, expr),

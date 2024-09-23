@@ -2,6 +2,7 @@ use crate::byte_set::ByteSet;
 use crate::decoder::{Compiler, ScopeEntry};
 use crate::error::{DecodeError, LocDecodeError};
 use crate::read::ReadCtxt;
+use crate::UnaryOp;
 use crate::{
     decoder::{cow_map, Decoder, Program, Value},
     pattern::Pattern,
@@ -233,6 +234,13 @@ impl ParsedValue {
             ParsedValue::Mapped(_, image) => image.transpose(new_loc),
             ParsedValue::Option(Some(inner)) => inner.transpose(new_loc),
             ParsedValue::Option(None) => {}
+        }
+    }
+
+    pub(crate) fn is_boolean(&self) -> bool {
+        match self.coerce_mapped_value() {
+            ParsedValue::Flat(v) => v.inner.is_boolean(),
+            _ => false,
         }
     }
 }
@@ -687,6 +695,12 @@ impl Expr {
                         Value::U64(u64::checked_shr(x, u32::try_from(y).unwrap()).unwrap())
                     }
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
+                },
+            )),
+            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(ParsedValue::from_evaluated(
+                match x.eval_value_with_loc(scope) {
+                    Value::Bool(x) => Value::Bool(!x),
+                    x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
                 },
             )),
 

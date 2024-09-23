@@ -6,7 +6,7 @@ use super::rust_ast::{PrimType, RustType, RustTypeDef};
 use super::{AtomType, LocalType};
 use crate::bounds::Bounds;
 use crate::byte_set::ByteSet;
-use crate::{Arith, IntRel, Label, TypeHint};
+use crate::{Arith, IntRel, Label, TypeHint, UnaryOp};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum GenType {
@@ -534,6 +534,7 @@ pub enum TypedExpr<TypeRep> {
     ),
     Dup(TypeRep, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
     LiftOption(TypeRep, Option<Box<TypedExpr<TypeRep>>>),
+    Unary(TypeRep, UnaryOp, Box<TypedExpr<TypeRep>>),
 }
 
 impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
@@ -578,6 +579,10 @@ impl<TypeRep> std::hash::Hash for TypedExpr<TypeRep> {
                 ath.hash(state);
                 lhs.hash(state);
                 rhs.hash(state);
+            }
+            TypedExpr::Unary(_, op, inner) => {
+                op.hash(state);
+                inner.hash(state);
             }
             TypedExpr::AsU8(inner)
             | TypedExpr::AsU16(inner)
@@ -659,25 +664,26 @@ impl TypedExpr<GenType> {
             }
             TypedExpr::AsChar(_) => Some(Cow::Owned(GenType::from(PrimType::Char))),
             TypedExpr::Lambda(..) => None,
-            TypedExpr::Var(gt, _)
-            | TypedExpr::Tuple(gt, _)
-            | TypedExpr::TupleProj(gt, _, _)
-            | TypedExpr::Record(gt, _)
-            | TypedExpr::RecordProj(gt, _, _)
-            | TypedExpr::Variant(gt, _, _)
-            | TypedExpr::Seq(gt, _)
-            | TypedExpr::SeqIx(gt, _, _)
-            | TypedExpr::Match(gt, _, _)
-            | TypedExpr::IntRel(gt, _, _, _)
-            | TypedExpr::Arith(gt, _, _, _)
-            | TypedExpr::SubSeq(gt, _, _, _)
-            | TypedExpr::SubSeqInflate(gt, _, _, _)
-            | TypedExpr::FlatMap(gt, _, _)
-            | TypedExpr::FlatMapAccum(gt, _, _, _, _)
-            | TypedExpr::LeftFold(gt, _, _, _, _)
-            | TypedExpr::FlatMapList(gt, _, _, _)
-            | TypedExpr::LiftOption(gt, _)
-            | TypedExpr::Dup(gt, _, _) => Some(Cow::Borrowed(gt)),
+            TypedExpr::Var(gt, ..)
+            | TypedExpr::Tuple(gt, ..)
+            | TypedExpr::TupleProj(gt, ..)
+            | TypedExpr::Record(gt, ..)
+            | TypedExpr::RecordProj(gt, ..)
+            | TypedExpr::Variant(gt, ..)
+            | TypedExpr::Seq(gt, ..)
+            | TypedExpr::SeqIx(gt, ..)
+            | TypedExpr::Match(gt, ..)
+            | TypedExpr::IntRel(gt, ..)
+            | TypedExpr::Arith(gt, ..)
+            | TypedExpr::Unary(gt, ..)
+            | TypedExpr::SubSeq(gt, ..)
+            | TypedExpr::SubSeqInflate(gt, ..)
+            | TypedExpr::FlatMap(gt, ..)
+            | TypedExpr::FlatMapAccum(gt, ..)
+            | TypedExpr::LeftFold(gt, ..)
+            | TypedExpr::FlatMapList(gt, ..)
+            | TypedExpr::LiftOption(gt, ..)
+            | TypedExpr::Dup(gt, ..) => Some(Cow::Borrowed(gt)),
         }
     }
 }
@@ -801,6 +807,7 @@ mod __impls {
                 TypedExpr::Lambda(_, name, inner) => Expr::Lambda(name, rebox(inner)),
                 TypedExpr::IntRel(_, rel, x, y) => Expr::IntRel(rel, rebox(x), rebox(y)),
                 TypedExpr::Arith(_, op, x, y) => Expr::Arith(op, rebox(x), rebox(y)),
+                TypedExpr::Unary(_, op, x) => Expr::Unary(op, rebox(x)),
                 TypedExpr::AsU8(x) => Expr::AsU8(rebox(x)),
                 TypedExpr::AsU16(x) => Expr::AsU16(rebox(x)),
                 TypedExpr::AsU32(x) => Expr::AsU32(rebox(x)),

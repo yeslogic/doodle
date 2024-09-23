@@ -9,7 +9,7 @@ use doodle::{Expr, FormatModule, FormatRef};
 pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     fn has_color_table(flags: Expr) -> Expr {
         // (flags->table-flag) != 0
-        expr_ne(record_proj(flags, "table-flag"), Expr::U8(0))
+        is_nonzero_u8(record_proj(flags, "table-flag"))
     }
 
     fn color_table_len(flags: Expr) -> Expr {

@@ -208,6 +208,7 @@ impl Precedence {
     pub(crate) const ADDSUB: Self = Precedence::ArithInfix(ArithLevel::AddSub);
     pub(crate) const BITAND: Self = Precedence::BitwiseInfix(BitwiseLevel::And);
     pub(crate) const LOGAND: Self = Precedence::LogicalInfix(LogicalLevel::And);
+    pub(crate) const LOGNEGATE: Self = Precedence::Prefix;
     pub(crate) const DIVREM: Self = Precedence::ArithInfix(ArithLevel::DivRem);
     pub(crate) const MUL: Self = Precedence::ArithInfix(ArithLevel::Mul);
     pub(crate) const BITSHIFT: Self = Precedence::BitwiseInfix(BitwiseLevel::Shift);

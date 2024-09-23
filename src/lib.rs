@@ -111,6 +111,11 @@ pub enum Arith {
     BoolAnd,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize)]
+pub enum UnaryOp {
+    BoolNot,
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize)]
 #[serde(tag = "tag", content = "data")]
 pub enum Expr {
@@ -131,6 +136,7 @@ pub enum Expr {
 
     IntRel(IntRel, Box<Expr>, Box<Expr>),
     Arith(Arith, Box<Expr>, Box<Expr>),
+    Unary(UnaryOp, Box<Expr>),
 
     AsU8(Box<Expr>),
     AsU16(Box<Expr>),
@@ -273,6 +279,10 @@ impl Expr {
                 (x, y) => Err(anyhow!(
                     "mismatched operand types for {_arith:?}: {x:?}, {y:?}"
                 )),
+            },
+            Expr::Unary(_arith @ UnaryOp::BoolNot, x) => match x.infer_type(scope)? {
+                ValueType::Base(BaseType::Bool) => Ok(ValueType::Base(BaseType::Bool)),
+                x => Err(anyhow!("unexpected operand type for {_arith:?}: {x:?}")),
             },
 
             Expr::AsU8(x) => match x.infer_type(scope)? {
@@ -494,6 +504,7 @@ impl Expr {
             Expr::Arith(_, x, y) | Expr::IntRel(_, x, y) => {
                 x.is_shadowed_by(name) || y.is_shadowed_by(name)
             }
+            Expr::Unary(_, x) => x.is_shadowed_by(name),
             Expr::Dup(x, y) => x.is_shadowed_by(name) || y.is_shadowed_by(name),
             Expr::Bool(_) | Expr::U8(_) | Expr::U16(_) | Expr::U32(_) | Expr::U64(_) => false,
             Expr::Tuple(ts) => ts.iter().any(|x| x.is_shadowed_by(name)),

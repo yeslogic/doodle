@@ -1,4 +1,6 @@
-use crate::{Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, ValueType};
+use crate::{
+    Arith, BaseType, DynFormat, Expr, Format, FormatModule, Label, Pattern, UnaryOp, ValueType,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     rc::Rc,
@@ -1780,6 +1782,14 @@ impl TypeChecker {
 
                 self.unify_var_constraint(zvar, BaseSet::Single(BaseType::Bool).to_constraint())?;
                 zvar
+            }
+            Expr::Unary(UnaryOp::BoolNot, x) => {
+                let newvar = self.get_new_uvar();
+                let xvar = self.infer_var_expr(x.as_ref(), scope)?;
+
+                self.unify_var_constraint(xvar, BaseSet::Single(BaseType::Bool).to_constraint())?;
+                self.unify_var_constraint(newvar, BaseSet::Single(BaseType::Bool).to_constraint())?;
+                newvar
             }
             Expr::Arith(_, x, y) => {
                 let zvar = self.get_new_uvar();
