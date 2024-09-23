@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 
 use crate::byte_set::ByteSet;
 use crate::{
-    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, ValueType,
+    Arith, BaseType, Expr, Format, IntRel, IntoLabel, Label, Pattern, TypeHint, UnaryOp, ValueType,
 };
 
 /// Constructs a Format that expands a single parsed byte into a multi-field record whose elements
@@ -43,6 +43,32 @@ pub fn packed_bits_u8<const N: usize>(
     map(
         Format::Byte(ByteSet::full()),
         lambda(BINDING_NAME, Expr::Record(fields)),
+    )
+}
+
+/// Like [`packed_bits_u8`], except all fields are 1-bit and implied to be flags,
+/// with fields of type `Bool` rather than `U8`.
+///
+/// The `field_names` parameter specifies, in MSB-to-LSB order, the name of each flag to be
+/// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
+/// one name should be `Some`, or else the operation is perfunctory).
+pub fn flags_bits8(field_names: [Option<&'static str>; 8]) -> Format {
+    const BINDING_NAME: &str = "flagbits";
+
+    let mut flags = Vec::new();
+
+    for (ix, field_name) in field_names.into_iter().enumerate() {
+        if let Some(name) = field_name {
+            flags.push((
+                Label::Borrowed(name),
+                is_nonzero_u8(mask_bits(var(BINDING_NAME), ix as u8, 1)),
+            ));
+        }
+    }
+
+    map(
+        Format::Byte(ByteSet::full()),
+        lambda(BINDING_NAME, Expr::Record(flags)),
     )
 }
 
@@ -97,6 +123,35 @@ pub fn packed_bits_u16<const N: usize>(
             lambda("x", Expr::U16Be(Box::new(var("x")))),
         ),
         lambda(BINDING_NAME, Expr::Record(fields)),
+    )
+}
+
+/// Like [`packed_bits_u16`], except all fields are 1-bit and implied to be flags,
+/// with fields of type `Bool` rather than `U16`.
+///
+/// The `field_names` parameter specifies, in MSB-to-LSB order, the name of each flag to be
+/// extracted from the appropriate bit-position. None indicates that the bit is unused (at least
+/// one name should be `Some`, or else the operation is perfunctory).
+pub fn flags_bits16(field_names: [Option<&'static str>; 16]) -> Format {
+    const BINDING_NAME: &str = "flagbits";
+
+    let mut flags = Vec::new();
+
+    for (ix, field_name) in field_names.into_iter().enumerate() {
+        if let Some(name) = field_name {
+            flags.push((
+                Label::Borrowed(name),
+                is_nonzero_u16(mask_bits16(var(BINDING_NAME), ix as u8, 1)),
+            ));
+        }
+    }
+
+    map(
+        map(
+            tuple_repeat(2, Format::Byte(ByteSet::full())),
+            lambda("x", Expr::U16Be(Box::new(var("x")))),
+        ),
+        lambda(BINDING_NAME, Expr::Record(flags)),
     )
 }
 
@@ -468,6 +523,10 @@ pub fn or(x: Expr, y: Expr) -> Expr {
 
 pub fn and(x: Expr, y: Expr) -> Expr {
     Expr::Arith(Arith::BoolAnd, Box::new(x), Box::new(y))
+}
+
+pub fn expr_not(x: Expr) -> Expr {
+    Expr::Unary(UnaryOp::BoolNot, Box::new(x))
 }
 
 pub fn bit_or(x: Expr, y: Expr) -> Expr {

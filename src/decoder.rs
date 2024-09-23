@@ -5,7 +5,7 @@ use crate::{
     pattern::Pattern, Arith, DynFormat, Expr, Format, FormatModule, IntRel, MatchTree, Next,
     TypeScope, ValueType,
 };
-use crate::{IntoLabel, Label, MaybeTyped, TypeHint};
+use crate::{IntoLabel, Label, MaybeTyped, TypeHint, UnaryOp};
 use anyhow::{anyhow, Result as AResult};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -121,6 +121,13 @@ impl Value {
             _ => None,
         }
     }
+
+    pub(crate) fn is_boolean(&self) -> bool {
+        match self.coerce_mapped_value() {
+            Value::Bool(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Value {
@@ -170,9 +177,9 @@ impl Value {
         }
     }
 
-    pub(crate) fn unwrap_bool(self) -> bool {
+    pub(crate) fn unwrap_bool(&self) -> bool {
         match self {
-            Value::Bool(b) => b,
+            Value::Bool(b) => *b,
             _ => panic!("value is not a bool"),
         }
     }
@@ -389,6 +396,10 @@ impl Expr {
                     (x, y) => panic!("mismatched operands {x:?}, {y:?}"),
                 })
             }
+            Expr::Unary(UnaryOp::BoolNot, x) => Cow::Owned(match x.eval_value(scope) {
+                Value::Bool(x) => Value::Bool(!x),
+                x => panic!("unexpected operand: expecting boolean, found `{x:?}`"),
+            }),
 
             Expr::AsU8(x) => {
                 Cow::Owned(match x.eval_value(scope) {

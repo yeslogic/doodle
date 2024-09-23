@@ -8,7 +8,7 @@ use crate::{
     byte_set::ByteSet,
     typecheck::{TypeChecker, UScope, UVar},
     Arith, BaseType, DynFormat, Expr, Format, FormatModule, IntRel, Label, MatchTree, Pattern,
-    ValueType,
+    UnaryOp, ValueType,
 };
 
 use std::{
@@ -829,26 +829,26 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let x = embed_expr_dft(lhs);
             let y = embed_expr_dft(rhs);
             let op = match arith {
-                Arith::BitAnd => Operator::BitAnd,
-                Arith::BitOr => Operator::BitOr,
-                Arith::BoolAnd => Operator::BoolAnd,
-                Arith::BoolOr => Operator::BoolOr,
-                Arith::Add => Operator::Add,
+                Arith::BitAnd => InfixOperator::BitAnd,
+                Arith::BitOr => InfixOperator::BitOr,
+                Arith::BoolAnd => InfixOperator::BoolAnd,
+                Arith::BoolOr => InfixOperator::BoolOr,
+                Arith::Add => InfixOperator::Add,
                 Arith::Sub => {
                     alt.replace(RustExpr::local("try_sub!").call_with([x.clone(), y.clone()]));
-                    Operator::Sub
+                    InfixOperator::Sub
                 }
-                Arith::Mul => Operator::Mul,
+                Arith::Mul => InfixOperator::Mul,
                 Arith::Div => {
                     // TODO - implement try_div! to avoid panic on divide-by-zero
-                    Operator::Div
+                    InfixOperator::Div
                 }
                 Arith::Rem => {
                     // TODO - implement try_rem! to avoid panic on remainder-by-zero
-                    Operator::Rem
+                    InfixOperator::Rem
                 }
-                Arith::Shl => Operator::Shl,
-                Arith::Shr => Operator::Shr,
+                Arith::Shl => InfixOperator::Shl,
+                Arith::Shr => InfixOperator::Shr,
             };
             match alt {
                 Some(alt) => alt,
@@ -861,14 +861,22 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let x = embed_expr_dft(lhs);
             let y = embed_expr_dft(rhs);
             let op = match rel {
-                IntRel::Eq => Operator::Eq,
-                IntRel::Ne => Operator::Neq,
-                IntRel::Lt => Operator::Lt,
-                IntRel::Gt => Operator::Gt,
-                IntRel::Lte => Operator::Lte,
-                IntRel::Gte => Operator::Gte,
+                IntRel::Eq => InfixOperator::Eq,
+                IntRel::Ne => InfixOperator::Neq,
+                IntRel::Lt => InfixOperator::Lt,
+                IntRel::Gt => InfixOperator::Gt,
+                IntRel::Lte => InfixOperator::Lte,
+                IntRel::Gte => InfixOperator::Gte,
             };
             RustExpr::infix(x, op, y)
+        }
+        TypedExpr::Unary(_, op, inner) => {
+            // NOTE - because Unary only deals with Copy types, we oughtn't need any embedded clones
+            let x = embed_expr_dft(inner);
+            let op = match op {
+                UnaryOp::BoolNot => PrefixOperator::BoolNot,
+            };
+            RustExpr::Operation(RustOp::PrefixOp(op, Box::new(x)))
         }
         TypedExpr::AsU8(x) =>
             RustExpr::Operation(RustOp::AsCast(Box::new(embed_expr_dft(x)), PrimType::U8.into())),
@@ -912,7 +920,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             );
             let end_expr = RustExpr::infix(
                 RustExpr::local("ix"),
-                Operator::Add,
+                InfixOperator::Add,
                 RustExpr::Operation(
                     RustOp::AsCast(Box::new(embed_expr_dft(len)), PrimType::Usize.into())
                 )
@@ -941,7 +949,7 @@ fn embed_expr(expr: &GTExpr, info: ExprInfo) -> RustExpr {
             let bind_ix = RustStmt::assign("ix", RustExpr::Operation(RustOp::AsCast(Box::new(start_expr), PrimType::Usize.into())));
             let end_expr = RustExpr::infix(
                 RustExpr::local("ix"),
-                Operator::Add,
+                InfixOperator::Add,
                 RustExpr::Operation(
                     RustOp::AsCast(Box::new(embed_expr_dft(len)), PrimType::Usize.into())
                 )
@@ -1921,7 +1929,7 @@ where
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
-                        Operator::Eq,
+                        InfixOperator::Eq,
                         RustExpr::num_lit(0usize),
                     );
                     let b_continue = [
@@ -1937,7 +1945,7 @@ where
                     RustStmt::Control(RustControl::While(
                         RustExpr::infix(
                             RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
-                            Operator::Gt,
+                            InfixOperator::Gt,
                             RustExpr::num_lit(0usize),
                         ),
                         vec![bind_ix, RustStmt::Control(escape_clause)],
@@ -1960,7 +1968,7 @@ where
                     let bind_ix = RustStmt::assign("matching_ix", tree_index_expr);
                     let cond = RustExpr::infix(
                         RustExpr::local("matching_ix"),
-                        Operator::Eq,
+                        InfixOperator::Eq,
                         RustExpr::num_lit(0usize),
                     );
                     let b_continue = [
@@ -1983,7 +1991,7 @@ where
                     RustStmt::Control(RustControl::While(
                         RustExpr::infix(
                             RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
-                            Operator::Gt,
+                            InfixOperator::Gt,
                             RustExpr::num_lit(0usize),
                         ),
                         vec![bind_ix, RustStmt::Control(escape_clause)],
@@ -2006,12 +2014,12 @@ where
                     let cond = {
                         let tree_cond = RustExpr::infix(
                             RustExpr::local("matching_ix"),
-                            Operator::Eq,
+                            InfixOperator::Eq,
                             RustExpr::num_lit(0usize),
                         );
                         let min_cond = RustExpr::infix(
                             RustExpr::local("accum").vec_len(),
-                            Operator::Gte,
+                            InfixOperator::Gte,
                             RustExpr::Operation(RustOp::AsCast(
                                 Box::new(expr_min.clone()),
                                 RustType::from(PrimType::Usize),
@@ -2019,7 +2027,7 @@ where
                         );
                         let max_cond = RustExpr::infix(
                             RustExpr::local("accum").vec_len(),
-                            Operator::Eq,
+                            InfixOperator::Eq,
                             RustExpr::Operation(RustOp::AsCast(
                                 Box::new(expr_max.clone()),
                                 RustType::from(PrimType::Usize),
@@ -2043,7 +2051,7 @@ where
                     RustStmt::Control(RustControl::While(
                         RustExpr::infix(
                             RustExpr::local(ctxt.input_varname.clone()).call_method("remaining"),
-                            Operator::Gt,
+                            InfixOperator::Gt,
                             RustExpr::num_lit(0usize),
                         ),
                         vec![bind_ix, RustStmt::Control(escape_clause)],
@@ -3340,7 +3348,7 @@ impl<'a> Elaborator<'a> {
                         // unreachable!("found non-adhoc type for expr record elaboration: {gt:?} @ {index} ({flds:#?})");
                     }
                 }
-                GTExpr::Record(gt, t_flds)
+                TypedExpr::Record(gt, t_flds)
             }
             Expr::Seq(elts) => {
                 let mut t_elts = Vec::with_capacity(elts.len());
@@ -3350,12 +3358,12 @@ impl<'a> Elaborator<'a> {
                     t_elts.push(t_elt);
                 }
                 let gt = self.get_gt_from_index(index);
-                GTExpr::Seq(gt, t_elts)
+                TypedExpr::Seq(gt, t_elts)
             }
             Expr::RecordProj(e, fld) => {
                 let t_e = self.elaborate_expr(e);
                 let gt = self.get_gt_from_index(index);
-                GTExpr::RecordProj(gt, Box::new(t_e), fld.clone())
+                TypedExpr::RecordProj(gt, Box::new(t_e), fld.clone())
             }
             Expr::Match(head, branches) => {
                 let t_head = self.elaborate_expr(head);
@@ -3366,7 +3374,7 @@ impl<'a> Elaborator<'a> {
                     t_branches.push((t_pat, t_rhs));
                 }
                 let gt = self.get_gt_from_index(index);
-                GTExpr::Match(gt, Box::new(t_head), t_branches)
+                TypedExpr::Match(gt, Box::new(t_head), t_branches)
             }
             Expr::Lambda(..) => unreachable!(
                 "Cannot elabora
@@ -3387,69 +3395,74 @@ impl<'a> Elaborator<'a> {
                         // unreachable!("found non-adhoc type for expr variant elaboration: {gt:?} @ {index} ({lbl}({inner?}))");
                     }
                 }
-                GTExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
+                TypedExpr::Variant(gt, lbl.clone(), Box::new(t_inner))
             }
             Expr::IntRel(rel, x, y) => {
                 let t_x = self.elaborate_expr(x);
                 let t_y = self.elaborate_expr(y);
                 let gt = self.get_gt_from_index(index);
-                GTExpr::IntRel(gt, *rel, Box::new(t_x), Box::new(t_y))
+                TypedExpr::IntRel(gt, *rel, Box::new(t_x), Box::new(t_y))
             }
             Expr::Arith(op, x, y) => {
                 let t_x = self.elaborate_expr(x);
                 let t_y = self.elaborate_expr(y);
                 let gt = self.get_gt_from_index(index);
-                GTExpr::Arith(gt, *op, Box::new(t_x), Box::new(t_y))
+                TypedExpr::Arith(gt, *op, Box::new(t_x), Box::new(t_y))
+            }
+            Expr::Unary(op, inner) => {
+                let t_inner = self.elaborate_expr(inner);
+                let gt = self.get_gt_from_index(index);
+                TypedExpr::Unary(gt, *op, Box::new(t_inner))
             }
             Expr::AsU8(inner) => {
                 let t_inner = self.elaborate_expr(inner);
-                GTExpr::AsU8(Box::new(t_inner))
+                TypedExpr::AsU8(Box::new(t_inner))
             }
             Expr::AsU16(inner) => {
                 let t_inner = self.elaborate_expr(inner);
-                GTExpr::AsU16(Box::new(t_inner))
+                TypedExpr::AsU16(Box::new(t_inner))
             }
             Expr::AsU32(inner) => {
                 let t_inner = self.elaborate_expr(inner);
-                GTExpr::AsU32(Box::new(t_inner))
+                TypedExpr::AsU32(Box::new(t_inner))
             }
             Expr::AsU64(inner) => {
                 let t_inner = self.elaborate_expr(inner);
-                GTExpr::AsU64(Box::new(t_inner))
+                TypedExpr::AsU64(Box::new(t_inner))
             }
             Expr::AsChar(inner) => {
                 let t_inner = self.elaborate_expr(inner);
-                GTExpr::AsChar(Box::new(t_inner))
+                TypedExpr::AsChar(Box::new(t_inner))
             }
             Expr::U16Be(bytes) => {
                 let t_bytes = self.elaborate_expr(bytes);
-                GTExpr::U16Be(Box::new(t_bytes))
+                TypedExpr::U16Be(Box::new(t_bytes))
             }
             Expr::U16Le(bytes) => {
                 let t_bytes = self.elaborate_expr(bytes);
-                GTExpr::U16Le(Box::new(t_bytes))
+                TypedExpr::U16Le(Box::new(t_bytes))
             }
             Expr::U32Be(bytes) => {
                 let t_bytes = self.elaborate_expr(bytes);
-                GTExpr::U32Be(Box::new(t_bytes))
+                TypedExpr::U32Be(Box::new(t_bytes))
             }
             Expr::U32Le(bytes) => {
                 let t_bytes = self.elaborate_expr(bytes);
-                GTExpr::U32Le(Box::new(t_bytes))
+                TypedExpr::U32Le(Box::new(t_bytes))
             }
             Expr::U64Be(bytes) => {
                 let t_bytes = self.elaborate_expr(bytes);
-                GTExpr::U64Be(Box::new(t_bytes))
+                TypedExpr::U64Be(Box::new(t_bytes))
             }
             Expr::U64Le(bytes) => {
                 let t_bytes = self.elaborate_expr(bytes);
-                GTExpr::U64Le(Box::new(t_bytes))
+                TypedExpr::U64Le(Box::new(t_bytes))
             }
             Expr::SeqLength(seq) => {
                 let t_seq = self.elaborate_expr(seq);
                 // NOTE - for element type of sequence
                 self.increment_index();
-                GTExpr::SeqLength(Box::new(t_seq))
+                TypedExpr::SeqLength(Box::new(t_seq))
             }
             Expr::SubSeq(seq, start, length) => {
                 let t_seq = self.elaborate_expr(seq);
@@ -3458,7 +3471,7 @@ impl<'a> Elaborator<'a> {
                 // NOTE - for element type of sequence
                 self.increment_index();
                 let gt = self.get_gt_from_index(index);
-                GTExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
+                TypedExpr::SubSeq(gt, Box::new(t_seq), Box::new(t_start), Box::new(t_length))
             }
             Expr::SubSeqInflate(_seq, _start, _length) => {
                 let t_seq = self.elaborate_expr(_seq);
@@ -3476,7 +3489,7 @@ impl<'a> Elaborator<'a> {
                 self.increment_index();
 
                 let gt = self.get_gt_from_index(index);
-                GTExpr::FlatMap(gt, Box::new(t_lambda), Box::new(t_seq))
+                TypedExpr::FlatMap(gt, Box::new(t_lambda), Box::new(t_seq))
             }
             Expr::FlatMapAccum(lambda, acc, _acc_vt, seq) => {
                 let t_lambda = self.elaborate_expr_lambda(lambda);
@@ -3490,7 +3503,7 @@ impl<'a> Elaborator<'a> {
                 }
 
                 let gt = self.get_gt_from_index(index);
-                GTExpr::FlatMapAccum(
+                TypedExpr::FlatMapAccum(
                     gt,
                     Box::new(t_lambda),
                     Box::new(t_acc),
@@ -3525,13 +3538,13 @@ impl<'a> Elaborator<'a> {
 
                 let gt = self.get_gt_from_index(index);
 
-                GTExpr::FlatMapList(gt, Box::new(t_lambda), _ret_type.clone(), Box::new(t_seq))
+                TypedExpr::FlatMapList(gt, Box::new(t_lambda), _ret_type.clone(), Box::new(t_seq))
             }
             Expr::Dup(count, x) => {
                 let count_t = self.elaborate_expr(count);
                 let x_t = self.elaborate_expr(x);
                 let gt = self.get_gt_from_index(index);
-                GTExpr::Dup(gt, Box::new(count_t), Box::new(x_t))
+                TypedExpr::Dup(gt, Box::new(count_t), Box::new(x_t))
             }
             Expr::LiftOption(opt) => {
                 let t_expr = if let Some(expr) = opt {
@@ -3541,7 +3554,7 @@ impl<'a> Elaborator<'a> {
                     None
                 };
                 let gt = self.get_gt_from_index(index);
-                GTExpr::LiftOption(gt, t_expr)
+                TypedExpr::LiftOption(gt, t_expr)
             }
         }
     }
@@ -3555,7 +3568,7 @@ impl<'a> Elaborator<'a> {
                 let t_body = self.elaborate_expr(body);
                 let gt_head = self.get_gt_from_index(head_index);
                 let gt_body = self.get_gt_from_index(body_index);
-                GTExpr::Lambda((gt_head, gt_body), head.clone(), Box::new(t_body))
+                TypedExpr::Lambda((gt_head, gt_body), head.clone(), Box::new(t_body))
             }
             _ => unreachable!("elaborate_expr_lambda: unexpected non-lambda {expr:?}"),
         }

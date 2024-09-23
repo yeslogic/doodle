@@ -1311,7 +1311,7 @@ impl ToFragmentExt for RustClosure {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Operator {
+pub(crate) enum InfixOperator {
     Eq,
     Neq,
     Lt,
@@ -1331,49 +1331,72 @@ pub(crate) enum Operator {
     BoolAnd,
 }
 
-impl Operator {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PrefixOperator {
+    BoolNot,
+}
+impl PrefixOperator {
+    fn precedence(&self) -> Precedence {
+        match self {
+            PrefixOperator::BoolNot => Precedence::LOGNEGATE,
+        }
+    }
+
+    pub(crate) fn out_type(&self, inner_type: PrimType) -> Option<PrimType> {
+        match self {
+            PrefixOperator::BoolNot => match inner_type {
+                PrimType::Bool => Some(PrimType::Bool),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl InfixOperator {
     pub(crate) fn precedence(&self) -> Precedence {
         match self {
-            Operator::Eq | Operator::Neq => Precedence::EQUALITY,
-            Operator::Lt | Operator::Lte | Operator::Gt | Operator::Gte => Precedence::COMPARE,
-            Operator::Div | Operator::Rem => Precedence::DIVREM,
-            Operator::Add | Operator::Sub => Precedence::ADDSUB,
-            Operator::Mul => Precedence::MUL,
-            Operator::Shl | Operator::Shr => Precedence::BITSHIFT,
-            Operator::BitOr => Precedence::BITOR,
-            Operator::BitAnd => Precedence::BITAND,
-            Operator::BoolAnd => Precedence::LOGAND,
-            Operator::BoolOr => Precedence::LOGOR,
+            InfixOperator::Eq | InfixOperator::Neq => Precedence::EQUALITY,
+            InfixOperator::Lt | InfixOperator::Lte | InfixOperator::Gt | InfixOperator::Gte => {
+                Precedence::COMPARE
+            }
+            InfixOperator::Div | InfixOperator::Rem => Precedence::DIVREM,
+            InfixOperator::Add | InfixOperator::Sub => Precedence::ADDSUB,
+            InfixOperator::Mul => Precedence::MUL,
+            InfixOperator::Shl | InfixOperator::Shr => Precedence::BITSHIFT,
+            InfixOperator::BitOr => Precedence::BITOR,
+            InfixOperator::BitAnd => Precedence::BITAND,
+            InfixOperator::BoolAnd => Precedence::LOGAND,
+            InfixOperator::BoolOr => Precedence::LOGOR,
         }
     }
 
     pub(crate) fn out_type(&self, lhs_type: PrimType, rhs_type: PrimType) -> Option<PrimType> {
         match self {
-            Operator::Eq | Operator::Neq => {
+            InfixOperator::Eq | InfixOperator::Neq => {
                 if lhs_type == rhs_type {
                     Some(PrimType::Bool)
                 } else {
                     None
                 }
             }
-            Operator::BoolAnd | Operator::BoolOr => match (lhs_type, rhs_type) {
+            InfixOperator::BoolAnd | InfixOperator::BoolOr => match (lhs_type, rhs_type) {
                 (PrimType::Bool, PrimType::Bool) => Some(PrimType::Bool),
                 _ => None,
             },
-            Operator::Lt | Operator::Lte | Operator::Gt | Operator::Gte => {
+            InfixOperator::Lt | InfixOperator::Lte | InfixOperator::Gt | InfixOperator::Gte => {
                 if lhs_type == rhs_type && lhs_type.is_numeric() {
                     Some(PrimType::Bool)
                 } else {
                     None
                 }
             }
-            Operator::BitOr
-            | Operator::BitAnd
-            | Operator::Div
-            | Operator::Rem
-            | Operator::Add
-            | Operator::Sub
-            | Operator::Mul => {
+            InfixOperator::BitOr
+            | InfixOperator::BitAnd
+            | InfixOperator::Div
+            | InfixOperator::Rem
+            | InfixOperator::Add
+            | InfixOperator::Sub
+            | InfixOperator::Mul => {
                 if lhs_type == rhs_type && lhs_type.is_numeric() {
                     Some(lhs_type)
                 } else {
@@ -1381,7 +1404,7 @@ impl Operator {
                 }
             }
             // NOTE - the types of a SHR or SHL do not have to be the same, but both must be numeric at the very least
-            Operator::Shl | Operator::Shr => {
+            InfixOperator::Shl | InfixOperator::Shr => {
                 if lhs_type.is_numeric() && rhs_type.is_numeric() {
                     Some(lhs_type)
                 } else {
@@ -1392,34 +1415,42 @@ impl Operator {
     }
 }
 
-impl Operator {
+impl InfixOperator {
     pub(crate) fn token(&self) -> &'static str {
         match self {
-            Operator::Eq => " == ",
-            Operator::Neq => " != ",
-            Operator::Lt => " < ",
-            Operator::Lte => " <= ",
-            Operator::Gt => " > ",
-            Operator::Gte => " >= ",
-            Operator::Div => " / ",
-            Operator::Rem => " % ",
-            Operator::Add => " + ",
-            Operator::Sub => " - ",
-            Operator::Mul => " * ",
-            Operator::Shl => " << ",
-            Operator::Shr => " >> ",
-            Operator::BitOr => " | ",
-            Operator::BitAnd => " & ",
-            Operator::BoolOr => " || ",
-            Operator::BoolAnd => " && ",
+            InfixOperator::Eq => " == ",
+            InfixOperator::Neq => " != ",
+            InfixOperator::Lt => " < ",
+            InfixOperator::Lte => " <= ",
+            InfixOperator::Gt => " > ",
+            InfixOperator::Gte => " >= ",
+            InfixOperator::Div => " / ",
+            InfixOperator::Rem => " % ",
+            InfixOperator::Add => " + ",
+            InfixOperator::Sub => " - ",
+            InfixOperator::Mul => " * ",
+            InfixOperator::Shl => " << ",
+            InfixOperator::Shr => " >> ",
+            InfixOperator::BitOr => " | ",
+            InfixOperator::BitAnd => " & ",
+            InfixOperator::BoolOr => " || ",
+            InfixOperator::BoolAnd => " && ",
+        }
+    }
+}
+
+impl PrefixOperator {
+    pub(crate) fn token(&self) -> &'static str {
+        match self {
+            PrefixOperator::BoolNot => "!",
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum RustOp {
-    // scaffolding to allow for flexible infix operations from operator tokens; should contain spaces already
-    InfixOp(Operator, Box<RustExpr>, Box<RustExpr>),
+    InfixOp(InfixOperator, Box<RustExpr>, Box<RustExpr>),
+    PrefixOp(PrefixOperator, Box<RustExpr>),
     AsCast(Box<RustExpr>, RustType),
 }
 
@@ -1427,6 +1458,7 @@ impl RustOp {
     pub(crate) fn precedence(&self) -> Precedence {
         match self {
             Self::InfixOp(op, _, _) => op.precedence(),
+            Self::PrefixOp(op, _) => op.precedence(),
             Self::AsCast(_, _) => Precedence::CAST_INFIX,
         }
     }
@@ -1441,15 +1473,21 @@ impl RustOp {
         match self {
             RustOp::InfixOp(op, lhs, rhs) => {
                 match (op, lhs.try_get_primtype(), rhs.try_get_primtype()) {
-                    (Operator::Eq | Operator::Neq, Some(ltype), Some(rtype)) => ltype == rtype,
+                    (InfixOperator::Eq | InfixOperator::Neq, Some(ltype), Some(rtype)) => {
+                        ltype == rtype
+                    }
                     // NOTE - we need to filter out BoolAnd and BoolOr from the next catchall branch, so we can't merely match on the literal PrimType::Bool in the case-pattern
-                    (Operator::BoolAnd | Operator::BoolOr, Some(ltype), Some(rtype)) => {
+                    (InfixOperator::BoolAnd | InfixOperator::BoolOr, Some(ltype), Some(rtype)) => {
                         matches!((ltype, rtype), (PrimType::Bool, PrimType::Bool))
                     }
                     (_, Some(ltype), Some(rtype)) => ltype == rtype && ltype.is_numeric(),
                     (_, None, _) | (_, _, None) => false,
                 }
             }
+            RustOp::PrefixOp(op, inner) => match (op, inner.try_get_primtype()) {
+                (PrefixOperator::BoolNot, Some(PrimType::Bool)) => true,
+                (PrefixOperator::BoolNot, _) => false,
+            },
             RustOp::AsCast(expr, typ) => match (expr.try_get_primtype(), typ.try_as_primtype()) {
                 (Some(pt0), Some(pt1)) => !matches!(
                     PrimType::compare_width(pt0, pt1),
@@ -1463,11 +1501,11 @@ impl RustOp {
 
 impl RustOp {
     pub fn op_eq(lhs: RustExpr, rhs: RustExpr) -> Self {
-        Self::InfixOp(Operator::Eq, Box::new(lhs), Box::new(rhs))
+        Self::InfixOp(InfixOperator::Eq, Box::new(lhs), Box::new(rhs))
     }
 
     pub fn op_neq(lhs: RustExpr, rhs: RustExpr) -> Self {
-        Self::InfixOp(Operator::Neq, Box::new(lhs), Box::new(rhs))
+        Self::InfixOp(InfixOperator::Neq, Box::new(lhs), Box::new(rhs))
     }
 }
 
@@ -1479,6 +1517,11 @@ impl ToFragmentExt for RustOp {
                 lhs.to_fragment_precedence(inherent)
                     .cat(Fragment::string(op.token()))
                     .cat(rhs.to_fragment_precedence(inherent)),
+                prec,
+                inherent,
+            ),
+            RustOp::PrefixOp(op, inner) => cond_paren(
+                Fragment::string(op.token()).cat(inner.to_fragment_precedence(inherent)),
                 prec,
                 inherent,
             ),
@@ -1617,7 +1660,7 @@ impl RustExpr {
         )
     }
 
-    pub fn infix(lhs: Self, op: Operator, rhs: Self) -> Self {
+    pub fn infix(lhs: Self, op: InfixOperator, rhs: Self) -> Self {
         Self::Operation(RustOp::InfixOp(op, Box::new(lhs), Box::new(rhs)))
     }
 
@@ -1699,10 +1742,13 @@ impl RustExpr {
             RustExpr::Try(..) => None,
             RustExpr::Operation(op) => match op {
                 RustOp::InfixOp(op, lhs, rhs) => {
-                    match (lhs.try_get_primtype(), rhs.try_get_primtype()) {
-                        (Some(lhs_type), Some(rhs_type)) => op.out_type(lhs_type, rhs_type),
-                        _ => None,
-                    }
+                    let lhs_type = lhs.try_get_primtype()?;
+                    let rhs_type = rhs.try_get_primtype()?;
+                    op.out_type(lhs_type, rhs_type)
+                }
+                RustOp::PrefixOp(op, expr) => {
+                    let expr_type = expr.try_get_primtype()?;
+                    op.out_type(expr_type)
                 }
                 RustOp::AsCast(expr, typ) => {
                     let out_typ = typ.try_as_primtype()?;
@@ -1756,6 +1802,7 @@ impl RustExpr {
             RustExpr::Try(..) => false,
             RustExpr::Operation(op) => match op {
                 RustOp::InfixOp(.., lhs, rhs) => lhs.is_pure() && rhs.is_pure() && op.is_sound(),
+                RustOp::PrefixOp(.., inner) => inner.is_pure() && op.is_sound(),
                 // NOTE - illegal casts like `x as u8` where x >= 256 are language-level errors that are neither pure nor impure
                 RustOp::AsCast(expr, ..) => expr.is_pure() && op.is_sound(),
             },

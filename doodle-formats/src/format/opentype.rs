@@ -57,29 +57,23 @@ fn loca_offset_pairs(loca: Expr) -> Expr {
 /// Converts a `u8` value to an `i16` value within the `Expr` model
 /// according to a bit-flag for signedness `pos_bit` (`1` for positive, `0` for negative).
 // FIXME - this currently uses the two's-complement u16 value that maps to the proper i16 value
-fn u8_to_i16(x: Expr, pos_bit: Expr) -> Expr {
-    expr_match(
-        pos_bit,
-        [
-            (Pattern::U8(1), Expr::AsU16(Box::new(x.clone()))),
-            // FIXME - this will be off if `x == 0`
-            (
-                Pattern::U8(0),
-                expr_match(
-                    x,
-                    [
-                        (Pattern::U8(0), Expr::U16(0)),
-                        (
-                            bind("n"),
-                            sub(
-                                Expr::U16(u16::MAX),
-                                sub(Expr::AsU16(Box::new(var("n"))), Expr::U16(1)),
-                            ),
-                        ),
-                    ],
+fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
+    expr_if_else(
+        is_positive,
+        Expr::AsU16(Box::new(x.clone())),
+        expr_match(
+            x,
+            [
+                (Pattern::U8(0), Expr::U16(0)),
+                (
+                    bind("n"),
+                    sub(
+                        Expr::U16(u16::MAX),
+                        sub(Expr::AsU16(Box::new(var("n"))), Expr::U16(1)),
+                    ),
                 ),
-            ),
-        ],
+            ],
+        ),
     )
 }
 
@@ -417,13 +411,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             // Format 0 : Byte encoding table
             let cmap_subtable_format0 = module.define_format_args(
                 "opentype.cmap_subtable.format0",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", base.u16be()), // == 0
                         ("length", base.u16be()),
-                        ("language", cmap_language_id(var("platform"))),
+                        ("language", cmap_language_id(var("_platform"))),
                         (
                             "glyph_id_array",
                             repeat_count(Expr::U16(256), small_glyph_id),
@@ -444,7 +438,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             // Format 2: High-byte mapping through table
             let cmap_subtable_format2 = module.define_format_args(
                 "opentype.cmap_subtable.format2",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
@@ -462,7 +456,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ),
                             ),
                         ),
-                        ("language", cmap_language_id(var("platform"))),
+                        ("language", cmap_language_id(var("_platform"))),
                         (
                             "sub_header_keys",
                             repeat_count(Expr::U16(256), base.u16be()),
@@ -482,13 +476,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             // # Format 4: Segment mapping to delta values
             let cmap_subtable_format4 = module.define_format_args(
                 "opentype.cmap_subtable.format4",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", expect_u16be(base, 4)),
                         ("length", base.u16be()),
-                        ("language", cmap_language_id(var("platform"))),
+                        ("language", cmap_language_id(var("_platform"))),
                         (
                             "seg_count",
                             map(
@@ -514,13 +508,13 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let cmap_subtable_format6 = module.define_format_args(
                 "opentype.cmap_subtable.format6",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", expect_u16be(base, 6)),
                         ("length", base.u16be()),
-                        ("language", cmap_language_id(var("platform"))),
+                        ("language", cmap_language_id(var("_platform"))),
                         ("first_code", base.u16be()),
                         ("entry_count", base.u16be()),
                         (
@@ -542,14 +536,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let cmap_subtable_format8 = module.define_format_args(
                 "opentype.cmap_subtable.format8",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", expect_u16be(base, 8)),
                         ("__reserved", expect_u16be(base, 0)),
                         ("length", base.u32be()),
-                        ("language", cmap_language_id32(var("platform"))),
+                        ("language", cmap_language_id32(var("_platform"))),
                         // REVIEW - should this be 8x as long and consist of bits?
                         ("is32", repeat_count(Expr::U16(8192), base.u8())), // packed bit-array where a bit at index `i` signals whether the 16-bit value index `i` is the start of a 32-bit character code
                         ("num_groups", base.u32be()),
@@ -563,14 +557,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let cmap_subtable_format10 = module.define_format_args(
                 "opentype.cmap_subtable.format10",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", expect_u16be(base, 10)),
                         ("__reserved", expect_u16be(base, 0)),
                         ("length", base.u32be()),
-                        ("language", cmap_language_id32(var("platform"))),
+                        ("language", cmap_language_id32(var("_platform"))),
                         ("start_char_code", base.u32be()),
                         ("num_chars", base.u32be()),
                         (
@@ -583,14 +577,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let cmap_subtable_format12 = module.define_format_args(
                 "opentype.cmap_subtable.format12",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", expect_u16be(base, 12)),
                         ("__reserved", expect_u16be(base, 0)),
                         ("length", base.u32be()),
-                        ("language", cmap_language_id32(var("platform"))),
+                        ("language", cmap_language_id32(var("_platform"))),
                         ("num_groups", base.u32be()),
                         (
                             "groups",
@@ -604,14 +598,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let cmap_subtable_format13 = module.define_format_args(
                 "opentype.cmap_subtable.format13",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 slice_record(
                     "length",
                     [
                         ("format", expect_u16be(base, 13)),
                         ("__reserved", expect_u16be(base, 0)),
                         ("length", base.u32be()),
-                        ("language", cmap_language_id32(var("platform"))),
+                        ("language", cmap_language_id32(var("_platform"))),
                         ("num_groups", base.u32be()),
                         (
                             "groups",
@@ -688,7 +682,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let cmap_subtable = module.define_format_args(
                 "opentype.cmap_subtable",
-                vec![(Label::Borrowed("platform"), ValueType::Base(BaseType::U16))],
+                vec![(Label::Borrowed("_platform"), ValueType::Base(BaseType::U16))],
                 record([
                     ("table_start", pos32()),
                     ("format", Format::Peek(Box::new(base.u16be()))),
@@ -700,42 +694,42 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     Pattern::U16(0),
                                     "Format0",
-                                    cmap_subtable_format0.call_args(vec![var("platform")]),
+                                    cmap_subtable_format0.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(2),
                                     "Format2",
-                                    cmap_subtable_format2.call_args(vec![var("platform")]),
+                                    cmap_subtable_format2.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(4),
                                     "Format4",
-                                    cmap_subtable_format4.call_args(vec![var("platform")]),
+                                    cmap_subtable_format4.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(6),
                                     "Format6",
-                                    cmap_subtable_format6.call_args(vec![var("platform")]),
+                                    cmap_subtable_format6.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(8),
                                     "Format8",
-                                    cmap_subtable_format8.call_args(vec![var("platform")]),
+                                    cmap_subtable_format8.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(10),
                                     "Format10",
-                                    cmap_subtable_format10.call_args(vec![var("platform")]),
+                                    cmap_subtable_format10.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(12),
                                     "Format12",
-                                    cmap_subtable_format12.call_args(vec![var("platform")]),
+                                    cmap_subtable_format12.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(13),
                                     "Format13",
-                                    cmap_subtable_format13.call_args(vec![var("platform")]),
+                                    cmap_subtable_format13.call_args(vec![var("_platform")]),
                                 ),
                                 (
                                     Pattern::U16(14),
@@ -792,23 +786,24 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let xy_min_max = record_repeat(["x_min", "y_min", "x_max", "y_max"], s16be(base));
 
-            let head_table_style_flags = where_lambda(
-                packed_bits_u16(
-                    [9, 1, 1, 1, 1, 1, 1, 1],
-                    [
-                        "__reserved",
-                        "extended",
-                        "condensed",
-                        "shadow",
-                        "outline",
-                        "underline",
-                        "italic",
-                        "bold",
-                    ],
-                ),
-                "x",
-                expr_eq(record_proj(var("x"), "__reserved"), Expr::U16(0)),
-            );
+            let head_table_style_flags = flags_bits16([
+                None, // Bit 15 (MSB)
+                None, // Bit 14
+                None, // Bit 13
+                None, // Bit 12
+                None, // Bit 11
+                None, // Bit 10
+                None, // Bit 9
+                None, // Bit 8
+                None, // Bit 7
+                Some("extended"),
+                Some("condensed"),
+                Some("shadow"),
+                Some("outline"),
+                Some("underline"),
+                Some("italic"),
+                Some("bold"),
+            ]);
 
             // NOTE - Should be 2 for modern fonts but we shouldn't enforce that too strongly
             /* ConstEnum(s16be) {
@@ -1253,19 +1248,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             // NOTE - variable-length expanded version of the packed flags being parsed
             let glyf_flags_simple = |num_coordinates: Expr| -> Format {
                 // individual flag-set we are parsing
-                let flags = packed_bits_u8(
-                    [1; 8],
-                    [
-                        "__reserved",
-                        "overlap_simple",
-                        "y_is_same_or_positive_y_short_vector",
-                        "x_is_same_or_positive_x_short_vector",
-                        "repeat_flag",
-                        "y_short_vector",
-                        "x_short_vector",
-                        "on_curve_point",
-                    ],
-                );
+                let flags = flags_bits8([
+                    None,
+                    Some("overlap_simple"),
+                    Some("y_is_same_or_positive_y_short_vector"),
+                    Some("x_is_same_or_positive_x_short_vector"),
+                    Some("repeat_flag"),
+                    Some("y_short_vector"),
+                    Some("x_short_vector"),
+                    Some("on_curve_point"),
+                ]);
                 // Format that parses a flag-entry into its conditionally-parsed repetition-count and relevant, reordered fields
                 let flag_list_entry = chain(
                     flags,
@@ -1275,7 +1267,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         (
                             "repeats",
                             if_then_else(
-                                is_nonzero_u8(record_proj(var("flags"), "repeat_flag")),
+                                record_proj(var("flags"), "repeat_flag"),
                                 base.u8(),
                                 compute(Expr::U8(0)),
                             ),
@@ -1298,7 +1290,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 );
                 // Lambda that tells us whether we are done reading flags
                 let is_finished =
-                    lambda_tuple(["totlen", "seq"], expr_gte(var("totlen"), num_coordinates));
+                    lambda_tuple(["totlen", "_seq"], expr_gte(var("totlen"), num_coordinates));
                 let update_totlen = lambda_tuple(
                     ["acc", "flags"],
                     add(
@@ -1347,7 +1339,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let x_coords = |field_set: Expr| -> Format {
                 if_then_else(
-                    is_nonzero_u8(record_proj(field_set.clone(), "x_short_vector")),
+                    record_proj(field_set.clone(), "x_short_vector"),
                     // this wants to be i16
                     map(
                         base.u8(),
@@ -1363,10 +1355,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     ),
                     if_then_else(
-                        is_nonzero_u8(record_proj(
-                            field_set.clone(),
-                            "x_is_same_or_positive_x_short_vector",
-                        )),
+                        record_proj(field_set.clone(), "x_is_same_or_positive_x_short_vector"),
                         // this wants to be i16
                         compute(Expr::U16(0)),
                         s16be(base),
@@ -1376,7 +1365,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
 
             let y_coords = |field_set: Expr| -> Format {
                 if_then_else(
-                    is_nonzero_u8(record_proj(field_set.clone(), "y_short_vector")),
+                    record_proj(field_set.clone(), "y_short_vector"),
                     // this wants to be i16
                     map(
                         base.u8(),
@@ -1392,10 +1381,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         ),
                     ),
                     if_then_else(
-                        is_nonzero_u8(record_proj(
-                            field_set.clone(),
-                            "y_is_same_or_positive_y_short_vector",
-                        )),
+                        record_proj(field_set.clone(), "y_is_same_or_positive_y_short_vector"),
                         // this wants to be i16
                         compute(Expr::U16(0)),
                         s16be(base),
@@ -1403,82 +1389,87 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 )
             };
 
-            let simple_glyf_table = |n_contours: Expr| {
-                record([
-                    (
-                        "end_points_of_contour",
-                        repeat_count(n_contours, base.u16be()),
-                    ),
-                    ("instruction_length", base.u16be()),
-                    (
-                        "instructions",
-                        repeat_count(var("instruction_length"), base.u8()),
-                    ),
-                    (
-                        "number_of_coordinates",
-                        compute(add(Expr::U16(1), last_elem("end_points_of_contour"))),
-                    ),
-                    ("flags", glyf_flags_simple(var("number_of_coordinates"))),
-                    (
-                        "x_coordinates",
-                        for_each(var("flags"), "flag_vals", x_coords(var("flag_vals"))),
-                    ),
-                    (
-                        "y_coordinates",
-                        for_each(var("flags"), "flag_vals", y_coords(var("flag_vals"))),
-                    ),
-                ])
-            };
-
-            let glyf_arg = |are_words: Expr, are_xy_values: Expr| -> Format {
-                if_then_else(
-                    are_words,
-                    if_then_else(
-                        are_xy_values.clone(),
-                        fmt_variant("Int16", s16be(base)),
-                        fmt_variant("Uint16", base.u16be()),
-                    ),
-                    if_then_else(
-                        are_xy_values,
-                        fmt_variant("Int8", s8(base)),
-                        fmt_variant("Uint8", base.u8()),
-                    ),
+            let simple_glyf_table = {
+                module.define_format_args(
+                    "opentype.glyf.simple",
+                    vec![(
+                        Label::Borrowed("n_contours"),
+                        ValueType::Base(BaseType::U16),
+                    )],
+                    record([
+                        (
+                            "end_points_of_contour",
+                            repeat_count(var("n_contours"), base.u16be()),
+                        ),
+                        ("instruction_length", base.u16be()),
+                        (
+                            "instructions",
+                            repeat_count(var("instruction_length"), base.u8()),
+                        ),
+                        (
+                            "number_of_coordinates",
+                            compute(add(Expr::U16(1), last_elem("end_points_of_contour"))),
+                        ),
+                        ("flags", glyf_flags_simple(var("number_of_coordinates"))),
+                        (
+                            "x_coordinates",
+                            for_each(var("flags"), "flag_vals", x_coords(var("flag_vals"))),
+                        ),
+                        (
+                            "y_coordinates",
+                            for_each(var("flags"), "flag_vals", y_coords(var("flag_vals"))),
+                        ),
+                    ]),
                 )
             };
 
             let composite_glyf_table = {
-                let glyf_flags_composite = packed_bits_u16(
-                    [3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    [
-                        "__reserved_msb3",           // bits 15, 14, and 13 - reserved, should be 0
-                        "unscaled_component_offset", // bit 12 - set if component offset is not to be scaled
-                        "scaled_component_offset", // bit 11 - set if component offset is to be scaled
-                        "overlap_compound", // bit 10 - hint for whether the component overlap
-                        "use_my_metrics", // bit 9 - when set, composite glyph inherits aw, lsb, rsb of current component glyph
-                        "we_have_instructions", // bit 8 - instructions present after final component
-                        "we_have_a_two_by_two", // bit 7 - we have a two by two transformation that will be used to scale the glyph
-                        "we_have_an_x_and_y_scale", // bit 6 - when set, x has a different scale from y
-                        "more_components", // bit 5 - continuation bit (1 when more follow, 0 if final)
-                        "__reserved_bit4", // bit 4 - reserved, should be 0
-                        "we_have_a_scale", // bit 3 - when 1, component has simple scale; otherwise scale is 1.0
-                        "round_xy_to_grid", // bit 2 - when set (and when `args_are_xy_values` is set), xy values are rounded to nearest grid line
-                        "args_are_xy_values", // bit 1 - when set, args are signed xy values; otherwise, they are unsigned point numbers
-                        "arg_1_and_2_are_words", // bit 0 - set for args of type u16 or i16; clear for args of type u8 or i8
-                    ],
-                );
+                let glyf_arg = |are_words: Expr, are_xy_values: Expr| -> Format {
+                    if_then_else(
+                        are_words,
+                        if_then_else(
+                            are_xy_values.clone(),
+                            fmt_variant("Int16", s16be(base)),
+                            fmt_variant("Uint16", base.u16be()),
+                        ),
+                        if_then_else(
+                            are_xy_values,
+                            fmt_variant("Int8", s8(base)),
+                            fmt_variant("Uint8", base.u8()),
+                        ),
+                    )
+                };
+                let glyf_flags_composite = flags_bits16([
+                    None,                              // bit 15 - reserved (0 implied but not enforced)
+                    None, // bit 14 - reserved (0 implied but not enforced)
+                    None, // bit 13 - reserved (0 implied but not enforced)
+                    Some("unscaled_component_offset"), // bit 12 - set if component offset is not to be scaled
+                    Some("scaled_component_offset"), // bit 11 - set if component offset is to be scaled
+                    Some("overlap_compound"), // bit 10 - hint for whether the component overlap
+                    Some("use_my_metrics"), // bit 9 - when set, composite glyph inherits aw, lsb, rsb of current component glyph
+                    Some("we_have_instructions"), // bit 8 - instructions present after final component
+                    Some("we_have_a_two_by_two"), // bit 7 - we have a two by two transformation that will be used to scale the glyph
+                    Some("we_have_an_x_and_y_scale"), // bit 6 - when set, x has a different scale from y
+                    Some("more_components"), // bit 5 - continuation bit (1 when more follow, 0 if final)
+                    Some("__reserved_bit4"), // bit 4 - reserved, should be 0
+                    Some("we_have_a_scale"), // bit 3 - when 1, component has simple scale; otherwise scale is 1.0
+                    Some("round_xy_to_grid"), // bit 2 - when set (and when `args_are_xy_values` is set), xy values are rounded to nearest grid line
+                    Some("args_are_xy_values"), // bit 1 - when set, args are signed xy values; otherwise, they are unsigned point numbers
+                    Some("arg_1_and_2_are_words"), // bit 0 - set for args of type u16 or i16; clear for args of type u8 or i8
+                ]);
 
                 let glyf_scale = |flags: Expr| -> Format {
                     if_then_else(
-                        is_nonzero_u16(record_proj(flags.clone(), "we_have_a_scale")),
+                        record_proj(flags.clone(), "we_have_a_scale"),
                         format_some(fmt_variant("Scale", f2dot14(base))),
                         if_then_else(
-                            is_nonzero_u16(record_proj(flags.clone(), "we_have_an_x_and_y_scale")),
+                            record_proj(flags.clone(), "we_have_an_x_and_y_scale"),
                             format_some(fmt_variant(
                                 "XY",
                                 record_repeat(["x_scale", "y_scale"], f2dot14(base)),
                             )),
                             if_then_else(
-                                is_nonzero_u16(record_proj(flags, "we_have_a_two_by_two")),
+                                record_proj(flags, "we_have_a_two_by_two"),
                                 format_some(fmt_variant(
                                     "Matrix",
                                     tuple_repeat(2, tuple_repeat(2, f2dot14(base))),
@@ -1495,30 +1486,25 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     (
                         "argument1",
                         glyf_arg(
-                            is_nonzero_u16(record_proj(var("flags"), "arg_1_and_2_are_words")),
-                            is_nonzero_u16(record_proj(var("flags"), "args_are_xy_values")),
+                            record_proj(var("flags"), "arg_1_and_2_are_words"),
+                            record_proj(var("flags"), "args_are_xy_values"),
                         ),
                     ),
                     (
                         "argument2",
                         glyf_arg(
-                            is_nonzero_u16(record_proj(var("flags"), "arg_1_and_2_are_words")),
-                            is_nonzero_u16(record_proj(var("flags"), "args_are_xy_values")),
+                            record_proj(var("flags"), "arg_1_and_2_are_words"),
+                            record_proj(var("flags"), "args_are_xy_values"),
                         ),
                     ),
                     ("scale", glyf_scale(var("flags"))),
                 ]);
 
                 let is_last = lambda_tuple(
-                    ["has_instructions", "seq"],
+                    ["_has_instructions", "seq"],
                     expr_option_map_or(
                         Expr::Bool(false),
-                        |elt| {
-                            expr_eq(
-                                record_projs(elt, &["flags", "more_components"]),
-                                Expr::U16(0),
-                            )
-                        },
+                        |elt| expr_not(record_projs(elt, &["flags", "more_components"])),
                         seq_opt_last(var("seq")),
                     ),
                 );
@@ -1526,53 +1512,59 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ["acc", "glyph"],
                     or(
                         var("acc"),
-                        is_nonzero_u16(record_projs(
-                            var("glyph"),
-                            &["flags", "we_have_instructions"],
-                        )),
+                        record_projs(var("glyph"), &["flags", "we_have_instructions"]),
                     ),
                 );
-                chain(
-                    accum_until(
-                        is_last,
-                        update_any_instructions,
-                        Expr::Bool(false),
-                        ValueType::Base(BaseType::Bool),
-                        glyf_component,
-                    ),
-                    "acc_glyphs",
-                    record([
-                        ("glyphs", compute(tuple_proj(var("acc_glyphs"), 1))),
-                        (
-                            "instructions",
-                            if_then_else(
-                                tuple_proj(var("acc_glyphs"), 0),
-                                chain(
-                                    base.u16be(),
-                                    "instructions_length",
-                                    repeat_count(var("instructions_length"), base.u8()),
-                                ),
-                                compute(seq_empty()),
-                            ),
+
+                module.define_format(
+                    "opentype.glyf.composite",
+                    chain(
+                        accum_until(
+                            is_last,
+                            update_any_instructions,
+                            Expr::Bool(false),
+                            ValueType::Base(BaseType::Bool),
+                            glyf_component,
                         ),
-                    ]),
+                        "acc_glyphs",
+                        record([
+                            ("glyphs", compute(tuple_proj(var("acc_glyphs"), 1))),
+                            (
+                                "instructions",
+                                if_then_else(
+                                    tuple_proj(var("acc_glyphs"), 0),
+                                    chain(
+                                        base.u16be(),
+                                        "instructions_length",
+                                        repeat_count(var("instructions_length"), base.u8()),
+                                    ),
+                                    compute(seq_empty()),
+                                ),
+                            ),
+                        ]),
+                    ),
                 )
             };
 
-            let glyf_description = |n_contours: Expr| {
+            let glyf_description = module.define_format_args(
+                "opentype.glyf.description",
+                vec![(
+                    Label::Borrowed("n_contours"),
+                    ValueType::Base(BaseType::U16),
+                )],
                 match_variant(
-                    n_contours.clone(),
+                    var("n_contours"),
                     [
                         (Pattern::U16(0), "HeaderOnly", Format::EMPTY),
                         (
                             Pattern::Int(Bounds::new(1, i16::MAX as usize)),
                             "Simple",
-                            simple_glyf_table(n_contours.clone()),
+                            simple_glyf_table.call_args(vec![var("n_contours")]),
                         ),
-                        (Pattern::Wildcard, "Composite", composite_glyf_table),
+                        (Pattern::Wildcard, "Composite", composite_glyf_table.call()),
                     ],
-                )
-            };
+                ),
+            );
 
             let glyf_table_entry = |start_offset: Expr, offset_pair: Expr| {
                 if_then_else(
@@ -1592,7 +1584,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 ("y_min", s16be(base)),
                                 ("x_max", s16be(base)),
                                 ("y_max", s16be(base)),
-                                ("description", glyf_description(var("number_of_contours"))),
+                                (
+                                    "description",
+                                    glyf_description.call_args(vec![var("number_of_contours")]),
+                                ),
                             ]),
                         ),
                     ),
@@ -1776,7 +1771,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         module.define_format_args(
             "opentype.ttc_header",
             vec![START_ARG],
-            // STUB - implement ttc
             record([
                 (
                     "ttc_tag",

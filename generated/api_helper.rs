@@ -309,19 +309,18 @@ pub mod oft_metrics {
         format!("{}.{}", major, minor)
     }
 
-
     fn show_cmap_table(cmap: &OpentypeCmap) {
-        println!("cmap: table version {}, {} encoding tables", cmap.version, cmap.num_tables);
+        println!(
+            "cmap: table version {}, {} encoding tables",
+            cmap.version, cmap.num_tables
+        );
     }
-
 
     fn show_head_table(head: &OpentypeHead) {
         println!("head: {:?}", head);
     }
 
-    fn show_glyph_table(
-        glyf: &Option<Vec<OpentypeGlyph>>,
-    ) {
+    fn show_glyph_table(glyf: &Option<Vec<OpentypeGlyph>>) {
         let Some(glyf) = glyf.as_ref() else {
             println!("glyf: <not present>");
             return;
