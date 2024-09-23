@@ -343,7 +343,7 @@
 │       │   │           ├── 9 := 0
 │       │   │           ~
 │       │   │           └── 3636 := 15
-│       │   ├── dnl <- _ |...| _ := { none := () }
+│       │   ├── dnl <- _ |...| _ := none
 │       │   └── scans <- repeat jpeg.scan := []
 │       └── eoi <- jpeg.eoi
 └── end <- end-of-input

@@ -79,7 +79,7 @@
 │       │                   │       ├── sort-flag := 0
 │       │                   │       ├── reserved := 0
 │       │                   │       └── table-size := 0
-│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := { none := () }
+│       │                   ├── local-color-table <- maybe (descriptor.flags.table-flag != 0) (repeat-count (2 << as-u16 (descriptor.flags.table-size)) gif.color-table-entry) := none
 │       │                   └── data <- gif.table-based-image-data :=
 │       │                       ├── lzw-min-code-size <- base.u8 := 5
 │       │                       ├── image-data <- repeat gif.subblock :=

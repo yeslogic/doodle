@@ -706,7 +706,7 @@
 │           │           │                                                           │   ├── 1 <- base.u8 := 0
 │           │           │                                                           │   └── 2 <- base.u8 := 0
 │           │           │                                                           ├── grouping_type <- base.u32be := 1919904876
-│           │           │                                                           ├── grouping_type_parameter <- maybe (version == 1) base.u32be := { none := () }
+│           │           │                                                           ├── grouping_type_parameter <- maybe (version == 1) base.u32be := none
 │           │           │                                                           ├── entry_count <- base.u32be := 1
 │           │           │                                                           └── sample_groups <- repeat-count entry_count { ... } :=
 │           │           │                                                               └── 0 :=
@@ -769,10 +769,10 @@
 │           │   ├── size-field <- base.u32be := 8
 │           │   ├── type <- mpeg4.tag := "free"
 │           │   ├── size <- match size-field { ... } := 0
-│           │   └── data <- slice size (match type { ... }) := { free := () }
+│           │   └── data <- slice size (match type { ... }) := free
 │           └── 3 <- mpeg4.atom :=
 │               ├── size-field <- base.u32be := 916014
 │               ├── type <- mpeg4.tag := "mdat"
 │               ├── size <- match size-field { ... } := 916006
-│               └── data <- slice size (match type { ... }) := { mdat := () }
+│               └── data <- slice size (match type { ... }) := mdat
 └── end <- end-of-input

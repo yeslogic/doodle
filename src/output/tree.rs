@@ -539,7 +539,7 @@ impl<'module> MonoidalPrinter<'module> {
                 match value {
                     Value::Option(opt_val) => match opt_val {
                         Some(val) => self.compile_variant("some", val, Some(inner)),
-                        None => self.compile_variant("none", &Value::UNIT, None),
+                        None => self.compile_variant("none", &Value::UNIT, Some(&Format::EMPTY)),
                     },
                     _ => panic!("expected Option, found {value:?}"),
                 }
@@ -1124,7 +1124,9 @@ impl<'module> MonoidalPrinter<'module> {
         value: &ParsedValue,
         format: Option<&Format>,
     ) -> Fragment {
-        if self.is_atomic_parsed_value(value, format) {
+        if self.flags.omit_implied_values && format.is_some_and(|format| self.is_implied_value_format(format)) {
+            Fragment::string(label.to_string())
+        } else if self.is_atomic_parsed_value(value, format) {
             let mut frag = Fragment::new();
             frag.encat(Fragment::String(format!("{{ {label} := ").into()));
             if let Some(format) = format {
@@ -1141,7 +1143,9 @@ impl<'module> MonoidalPrinter<'module> {
     }
 
     fn compile_variant(&mut self, label: &str, value: &Value, format: Option<&Format>) -> Fragment {
-        if self.is_atomic_value(value, format) {
+        if self.flags.omit_implied_values && format.is_some_and(|format| self.is_implied_value_format(format)) {
+            Fragment::string(label.to_string())
+        } else if self.is_atomic_value(value, format) {
             let mut frag = Fragment::new();
             frag.encat(Fragment::String(format!("{{ {label} := ").into()));
             if let Some(format) = format {
