@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
+pub(crate) mod rebind;
+
 use crate::output::{Fragment, FragmentBuilder};
 
 use crate::precedence::{cond_paren, Precedence};

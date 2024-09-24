@@ -29,7 +29,7 @@ pub fn main(
             ), // NOTE: < 2^31
             ("tag", tag),
             ("data", slice(var("length"), data)),
-            ("crc", base.u32be()), // FIXME check this
+            ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
         ])
     };
 
@@ -40,7 +40,7 @@ pub fn main(
     //   - Non-breaking space (160) not permitted in particular
     let keyword = module.define_format(
         "png.keyword",
-        // FIXME - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
+        // TODO - all we can enforce for now without more complex logic is the character set, space-rules are not something we can enforce easily
         repeat_between(
             Expr::U32(1),
             Expr::U32(79),
@@ -73,7 +73,6 @@ pub fn main(
     let ihdr_type = module.get_format_type(ihdr.get_level()).clone();
 
     let idat_tag = module.define_format("png.idat-tag", is_bytes(b"IDAT"));
-    // FIXME - IDAT should be decompressed after concatenation
     let idat_data = module.define_format("png.idat-data", repeat(base.u8()));
     let idat = module.define_format("png.idat", chunk(idat_tag.call(), idat_data.call()));
 
@@ -138,7 +137,7 @@ pub fn main(
         ]),
     );
 
-    // FIXME: do we want to map the value to its intended scale (y := x / 100_000)?
+    // REVIEW: do we want to map the value to its intended scale (y := x / 100_000)?
     let gama = module.define_format("png.gama", record(vec![("gamma", base.u32be())]));
 
     let zlib_utf8text = chain(
@@ -259,7 +258,7 @@ pub fn main(
         "zlib",
         Format::DecodeBytes(
             Box::new(record_projs(var("zlib"), &["data", "inflate"])),
-            // FIXME - we need to define a new format for latin1 without a null terminal (viz. why asciiz_string won't work)
+            // TODO - we need to define a new format for latin1 without a null terminal (viz. why asciiz_string won't work)
             Box::new(utf8text.call()),
         ),
     );
@@ -448,16 +447,16 @@ pub fn main(
                                 "bKGD",
                                 bkgd.call_args(vec![var("ihdr")]),
                             ),
-                            (pattern_bytestring(b"hIST"), "hIST", hist.call()), // FIXME - hist can only occur when there is a PLTE chunk to correspond it to
+                            (pattern_bytestring(b"hIST"), "hIST", hist.call()), // TODO - hist can only occur when there is a PLTE chunk to correspond it to
                             (pattern_bytestring(b"pHYs"), "pHYs", phys.call()),
                             (pattern_bytestring(b"sPLT"), "sPLT", splt.call()),
                             (pattern_bytestring(b"tIME"), "tIME", time.call()),
-                            (Pattern::Wildcard, "unknown", repeat(base.u8())),
+                            (Pattern::Wildcard, "unknown", repeat(base.u8())), // TODO - preserve an artefact of the unknown tag
                         ],
                     )),
                 ),
             ),
-            ("crc", base.u32be()), // FIXME check this
+            ("crc", base.u32be()), // REVIEW - do we want to attempt to validate this?
         ]),
     );
 

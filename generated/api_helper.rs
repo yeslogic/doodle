@@ -3,23 +3,23 @@ use super::*;
 pub type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>>;
 
 // Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
-pub type Top = main;
-pub type OpentypeData = main_opentype;
-pub type TarBlock = main_tar_contents_inSeq;
-pub type PngData = main_png;
-pub type JpegData = main_jpeg;
-pub type JpegApp01 = main_jpeg_frame_initial_segment;
-pub type JfifData = main_jpeg_frame_initial_segment_app0_data_data_jfif;
-pub type TiffData = main_jpeg_frame_initial_segment_app1_data_data_exif_exif;
-pub type App0Data = main_jpeg_frame_initial_segment_app0_data_data;
-pub type App1Data = main_jpeg_frame_initial_segment_app1_data_data;
-pub type ExifData = main_jpeg_frame_initial_segment_app1_data_data_exif;
-pub type XmpData = main_jpeg_frame_initial_segment_app1_data_data_xmp;
-pub type GifData = main_gif;
-pub type GifLogicalScreenDesc = main_gif_logical_screen_descriptor;
-pub type RiffData = main_riff;
-pub type ExifByteOrder = main_jpeg_frame_initial_segment_app1_data_data_exif_exif_byte_order;
-pub type GzipChunk = main_gzip_inSeq;
+pub type Top = main_data;
+pub type OpentypeData = opentype_main;
+pub type TarBlock = tar_main_contents;
+pub type PngData = png_main;
+pub type JpegData = jpeg_main;
+pub type JpegApp01 = jpeg_main_frame_initial_segment;
+pub type JfifData = jpeg_main_frame_initial_segment_app0_data_data_jfif;
+pub type TiffData = jpeg_main_frame_initial_segment_app1_data_data_exif;
+pub type App0Data = jpeg_main_frame_initial_segment_app0_data;
+pub type App1Data = jpeg_main_frame_initial_segment_app1_data;
+pub type ExifData = jpeg_main_frame_initial_segment_app1_data_data_exif;
+pub type XmpData = jpeg_main_frame_initial_segment_app1_data_data_xmp;
+pub type GifData = gif_main;
+pub type GifLogicalScreenDesc = gif_main_logical_screen_descriptor;
+pub type RiffData = riff_main;
+pub type ExifByteOrder = main_data_tiff_byte_order;
+pub type GzipChunk = gzip_main;
 
 pub fn try_decode_gzip(test_file: &str) -> TestResult<Vec<GzipChunk>> {
     let buffer = std::fs::read(std::path::Path::new(test_file))?;
@@ -116,15 +116,15 @@ pub mod png_metrics {
         let mut metrics = PngMetrics::default();
         for chunk in dat.chunks.iter().chain(dat.more_chunks.iter()) {
             match &chunk.data {
-                main_png_chunks_inSeq_data::PLTE(_) => (), // ignoring critical chunk PLTE
-                main_png_chunks_inSeq_data::sRGB(_) => metrics.sRGB.count += 1,
-                main_png_chunks_inSeq_data::bKGD(_) => metrics.bKGD.count += 1,
-                main_png_chunks_inSeq_data::cHRM(_) => metrics.cHRM.count += 1,
-                main_png_chunks_inSeq_data::gAMA(_) => metrics.gAMA.count += 1,
-                main_png_chunks_inSeq_data::iCCP(_) => {
+                main_data_png_chunks_data::PLTE(_) => (), // ignoring critical chunk PLTE
+                main_data_png_chunks_data::sRGB(_) => metrics.sRGB.count += 1,
+                main_data_png_chunks_data::bKGD(_) => metrics.bKGD.count += 1,
+                main_data_png_chunks_data::cHRM(_) => metrics.cHRM.count += 1,
+                main_data_png_chunks_data::gAMA(_) => metrics.gAMA.count += 1,
+                main_data_png_chunks_data::iCCP(_) => {
                     metrics.iCCP.is_present = true;
                 }
-                main_png_chunks_inSeq_data::iTXt(x) => match x.compression_flag {
+                main_data_png_chunks_data::iTXt(x) => match x.compression_flag {
                     0 => metrics.iTXt.push(OptZlibMetrics {
                         is_compressed: false,
                     }),
@@ -133,15 +133,15 @@ pub mod png_metrics {
                     }),
                     other => unreachable!("compression flag {other} is not recognized"),
                 },
-                main_png_chunks_inSeq_data::pHYs(_) => metrics.pHYs.count += 1,
-                main_png_chunks_inSeq_data::tEXt(_) => metrics.tEXt.count += 1,
-                main_png_chunks_inSeq_data::tIME(_) => metrics.tIME.count += 1,
-                main_png_chunks_inSeq_data::tRNS(_) => metrics.tRNS.count += 1,
-                main_png_chunks_inSeq_data::zTXt(_) => metrics.zTXt.count += 1,
-                main_png_chunks_inSeq_data::hIST(_) => metrics.hIST.count += 1,
-                main_png_chunks_inSeq_data::sBIT(_) => metrics.sBIT.count += 1,
-                main_png_chunks_inSeq_data::sPLT(_) => metrics.sPLT.count += 1,
-                main_png_chunks_inSeq_data::unknown(_) => eprintln!(
+                main_data_png_chunks_data::pHYs(_) => metrics.pHYs.count += 1,
+                main_data_png_chunks_data::tEXt(_) => metrics.tEXt.count += 1,
+                main_data_png_chunks_data::tIME(_) => metrics.tIME.count += 1,
+                main_data_png_chunks_data::tRNS(_) => metrics.tRNS.count += 1,
+                main_data_png_chunks_data::zTXt(_) => metrics.zTXt.count += 1,
+                main_data_png_chunks_data::hIST(_) => metrics.hIST.count += 1,
+                main_data_png_chunks_data::sBIT(_) => metrics.sBIT.count += 1,
+                main_data_png_chunks_data::sPLT(_) => metrics.sPLT.count += 1,
+                main_data_png_chunks_data::unknown(_) => eprintln!(
                     "unknown png chunk type: {}",
                     String::from_utf8_lossy(&chunk.tag)
                 ),
@@ -213,25 +213,24 @@ pub mod png_metrics {
 pub mod oft_metrics {
     use super::*;
 
-    pub type OpentypeFontDirectory =
-        main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link;
-    pub type OpentypeGlyph = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq;
-    pub type GlyphDescription = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description;
-    pub type SimpleGlyph = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_glyf_inSeq_Glyph_description_Simple;
-    pub type OpentypeCmap = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_cmap;
-    pub type OpentypeHead = main_opentype_font_directory_TTCHeader_header_Version1_table_directories_inSeq_link_table_links_head;
+    pub type OpentypeFontDirectory = main_data_opentype_font_directory_TableDirectory;
+    pub type OpentypeGlyph = main_data_opentype_font_directory_TableDirectory_table_links_glyf;
+    pub type GlyphDescription = main_data_opentype_font_directory_TableDirectory_table_links_glyf_Glyph_description;
+    pub type SimpleGlyph = main_data_opentype_font_directory_TableDirectory_table_links_glyf_Glyph_description_Simple;
+    pub type OpentypeCmap =  main_data_opentype_font_directory_TableDirectory_table_links_cmap;
+    pub type OpentypeHead =  main_data_opentype_font_directory_TableDirectory_table_links_head;
 
     pub fn show_opentype_stats(parsed_data: &OpentypeData) {
         // STUB - show more specific data
         show_magic(parsed_data.font.magic);
         match &parsed_data.font.directory {
-            main_opentype_font_directory::TTCHeader(ttc) => {
+            main_data_opentype_font::TTCHeader(ttc) => {
                 println!("TTC: version {}.{}", ttc.major_version, ttc.minor_version);
                 match &ttc.header {
-                    main_opentype_font_directory_TTCHeader_header::UnknownVersion(n) => {
+                    main_data_opentype_font_directory_TTCHeader_header::UnknownVersion(n) => {
                         println!("<unrecognized version {}.*", n)
                     }
-                    main_opentype_font_directory_TTCHeader_header::Version1(hv1) => {
+                    main_data_opentype_font_directory_TTCHeader_header::Version1(hv1) => {
                         println!("TTC Version 1 ({} fonts)", hv1.num_fonts);
                         for (i, table_dir) in hv1.table_directories.iter().enumerate() {
                             match table_dir.link.as_ref() {
@@ -245,7 +244,7 @@ pub mod oft_metrics {
                             }
                         }
                     }
-                    main_opentype_font_directory_TTCHeader_header::Version2(hv2) => {
+                    main_data_opentype_font_directory_TTCHeader_header::Version2(hv2) => {
                         println!("TTC Version 2 ({} fonts)", hv2.num_fonts);
                         for (i, table_dir) in hv2.table_directories.iter().enumerate() {
                             match table_dir.link.as_ref() {
@@ -261,10 +260,10 @@ pub mod oft_metrics {
                     }
                 }
             }
-            main_opentype_font_directory::TableDirectory(table_dir) => {
+            main_data_opentype_font_directory::TableDirectory(table_dir) => {
                 show_font_directory(table_dir)
             }
-            main_opentype_font_directory::UnknownTable => println!("<unknown>"),
+            main_data_opentype_font_directory::UnknownTable => println!("<unknown>"),
         }
     }
 

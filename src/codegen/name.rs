@@ -50,6 +50,39 @@ impl std::fmt::Display for NameAtom {
 
 pub type PathLabel = Vec<NameAtom>;
 
+// Basic heuristic for whether a variation `y` is a 'better alternative' (refinement) compared to an original `x`
+pub(crate) fn is_refinement(x: &PathLabel, y: &PathLabel) -> bool {
+    for (elt0, elt1) in Iterator::zip(x.iter().rev(), y.iter().rev()) {
+        match (elt0, elt1) {
+            (NameAtom::Explicit(name0), NameAtom::Explicit(name1)) => {
+                if name0 != name1 {
+                    match name0.len().cmp(&name1.len()) {
+                        std::cmp::Ordering::Less => return false,
+                        std::cmp::Ordering::Equal => return false,
+                        std::cmp::Ordering::Greater => return true,
+                    }
+                } else {
+                    return false;
+                }
+            }
+            (NameAtom::Explicit(_), _) => return false,
+            (_, NameAtom::Explicit(_)) => return true,
+            (_, _) => continue,
+        }
+    }
+    return false;
+}
+
+/// If `y` is a refinement over `x`, then `x` is replaced with `y`
+pub(crate) fn pick_best_path(x: &mut PathLabel, y: PathLabel) {
+    if y.len() < x.len()
+        || NameCtxt::generate_name(&y) < NameCtxt::generate_name(x)
+        || is_refinement(x, &y)
+    {
+        *x = y;
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct NameCtxt {
     stack: Vec<NameAtom>,
@@ -199,7 +232,7 @@ impl NameCtxt {
             .insert(location.clone());
     }
 
-    /// Constructs a locally-unique identifier-string from a `PathLabel`
+    /// Statically translates a `PathLabel` into a locally-unique identifier-string
     pub(crate) fn generate_name(location: &PathLabel) -> Label {
         let mut buffer = Fragment::Empty;
         for atom in location.iter().rev() {
@@ -230,8 +263,8 @@ impl NameCtxt {
         }
     }
 
-    /// Registers the current PathLabel on-stack into the appropriate [`PHeap`] in the association-table,
-    /// returning it for later promotion using [`NameCtxt::find_name_for`]
+    /// Registers the current `PathLabel` on-stack into the appropriate [`PHeap`] in the association-table,
+    /// returning a duplicate copy of it, which can then be promoted using [`NameCtxt::find_name_for`]
     pub fn produce_name(&mut self) -> PathLabel {
         let identifier = Self::generate_name(&self.stack);
         Self::resolve(&mut self.table, identifier.clone(), &self.stack);
@@ -239,6 +272,7 @@ impl NameCtxt {
     }
 }
 
+/// Simple dodging scheme for generating a unique name from a possibly-shared base-name
 fn dedup(rawname: Label, ix: usize) -> Label {
     if ix == 0 {
         rawname

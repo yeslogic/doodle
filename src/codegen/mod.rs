@@ -4,6 +4,7 @@ pub(crate) mod typed_decoder;
 pub(crate) mod typed_format;
 pub use rust_ast::ToFragment;
 
+
 use crate::{
     byte_set::ByteSet,
     typecheck::{TypeChecker, UScope, UVar},
@@ -19,7 +20,7 @@ use std::{
 };
 
 use name::{NameAtom, WrapperKind};
-use rust_ast::*;
+use rust_ast::{*, rebind::Rebindable};
 
 use typed_format::{GenType, TypedExpr, TypedFormat, TypedPattern};
 
@@ -40,7 +41,7 @@ fn get_trace(state: &impl std::hash::Hash) -> u64 {
 
 mod path_names {
     use super::{
-        name::{NameCtxt, PathLabel},
+        name::{is_refinement, pick_best_path, NameCtxt, PathLabel},
         rust_ast::RustTypeDef,
     };
     use crate::Label;
@@ -49,7 +50,10 @@ mod path_names {
     pub struct NameGen {
         pub(super) ctxt: NameCtxt,
         ctr: usize,
+        // Reverse mapping from a RustTypeDef to its index in the ad-hoc type inventory and the PathLabel it is to be assigned
         pub(super) rev_map: HashMap<RustTypeDef, (usize, PathLabel)>,
+        // Reassociation table for converting first-pass name selections into their ideal seed-PathLabel
+        pub(super) name_remap: HashMap<Label, PathLabel>,
     }
 
     impl NameGen {
@@ -58,7 +62,12 @@ mod path_names {
                 ctxt: NameCtxt::new(),
                 ctr: 0,
                 rev_map: HashMap::new(),
+                name_remap: HashMap::new(),
             }
+        }
+
+        pub fn manifest_renaming_table(&mut self) -> HashMap<Label, Label> {
+            self.name_remap.iter().map(|(k, v)| (k.clone(), self.ctxt.find_name_for(v).unwrap())).collect()
         }
 
         /// Finds an existing name, or generates a new name, for a [`RustTypeDef`]
@@ -67,18 +76,30 @@ mod path_names {
         ///
         /// Returns `(new, (ix, true))` otherwise, where `ix` is the uniquely-identifying index of the newly defined type at time-of-invocation, and `new` is a fresh path-based name for the type.
         pub fn get_name(&mut self, def: &RustTypeDef) -> (Label, (usize, bool)) {
+            let this_path = self.ctxt.get_loc().clone();
+
             match self.rev_map.get(def) {
                 Some((ix, path)) => match self.ctxt.find_name_for(path).ok() {
-                    Some(name) => (name.clone(), (*ix, false)),
+                    Some(name) => {
+                        // Guard against eager renaming
+                        if is_refinement(path, &this_path) {
+                            let path = self.ctxt.produce_name();
+                            self.name_remap
+                                .entry(name.clone())
+                                .and_modify(|prior| pick_best_path(prior, path.clone()))
+                                .or_insert(this_path);
+                        }
+                        (name, (*ix, false))
+                    },
                     None => unreachable!("no identifier associated with path, but path is in use"),
                 },
                 None => {
                     let ix = self.ctr;
                     self.ctr += 1;
                     let (path, ret) = {
-                        let path = self.ctxt.get_loc().clone();
                         let loc = self.ctxt.produce_name();
-                        (path, self.ctxt.find_name_for(&loc).unwrap())
+                        let name = self.ctxt.find_name_for(&loc).unwrap();
+                        (loc, name)
                     };
                     self.rev_map.insert(def.clone(), (ix, path));
                     (ret, (ix, true))
@@ -143,7 +164,7 @@ impl CodeGen {
         }
     }
 
-    /// Converts a `ValueType` to a `RustType`, potentially creating new ad-hoc names
+    /// Converts a `ValueType` to a `PreGenType`, potentially creating new ad-hoc names
     /// for any records or unions encountered, and registering any new ad-hoc type definitions
     /// in `self`.
     fn lift_type(&mut self, vt: &ValueType) -> GenType {
@@ -164,27 +185,15 @@ impl CodeGen {
                     [v] => RustType::AnonTuple(vec![self.lift_type(v).to_rust_type()]).into(),
                     _ => {
                         let mut buf = Vec::with_capacity(vs.len());
-                        // FIXME - hard-coded path_names version
-                        self.name_gen.ctxt.push_atom(NameAtom::Positional(0));
                         for v in vs.iter() {
                             buf.push(self.lift_type(v).to_rust_type());
-                            // FIXME - hardcoded path_names version
-                            self.name_gen.ctxt.increment_index();
                         }
-                        // FIXME - hard-coded path_names version
-                        self.name_gen.ctxt.escape();
                         RustType::AnonTuple(buf).into()
                     }
                 }
             }
             ValueType::Seq(t) => {
-                // FIXME - hard-coded path_names version
-                self.name_gen
-                    .ctxt
-                    .push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let inner = self.lift_type(t.as_ref()).to_rust_type();
-                // FIXME - hard-coded path_names version
-                self.name_gen.ctxt.escape();
                 CompType::Vec(Box::new(inner)).into()
             }
             ValueType::Any => panic!("ValueType::Any"),
@@ -528,7 +537,6 @@ impl CodeGen {
                         Box::new(cl_f),
                     )
                 )
-
             }
             TypedDecoder::Match(_t, scrutinee, cases) => {
                 let scrutinized = embed_expr(scrutinee, ExprInfo::Natural);
@@ -2673,8 +2681,9 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
 
     let Generator {
         sourcemap,
-        elaborator,
+        mut elaborator,
     } = Generator::compile(module, top_format);
+    let table = elaborator.codegen.name_gen.manifest_renaming_table();
     let mut tdefs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|tdef| {
         elaborator
             .codegen
@@ -2721,6 +2730,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     }
     content.add_submodule(RustSubmodule::new("codegen_tests"));
     content.add_submodule(RustSubmodule::new_pub("api_helper"));
+    // content.rebind(&table);
     content
 }
 
@@ -2849,6 +2859,7 @@ impl<'a> Generator<'a> {
             };
             gen.sourcemap.decoder_skels.push(dec_fn);
         }
+
         gen
     }
 }
@@ -3021,6 +3032,7 @@ impl<'a> Elaborator<'a> {
                     ret
                 };
                 let gt = self.get_gt_from_index(index);
+                self.codegen.name_gen.ctxt.escape();
                 TypedFormat::FormatCall(gt, *level, t_args, t_inner)
             }
             Format::ForEach(expr, lbl, inner) => {
@@ -3084,25 +3096,34 @@ impl<'a> Elaborator<'a> {
             Format::UnionNondet(branches) => self.elaborate_format_union(branches, dyns, false),
             Format::Tuple(elts) => {
                 let index = self.get_and_increment_index();
-                let (gt, t_elts) = if !elts.is_empty() {
-                    let mut t_elts = Vec::with_capacity(elts.len());
-                    for t in elts {
-                        let t_elt = self.elaborate_format(t, dyns);
-                        t_elts.push(t_elt);
+                let t_elts = match &elts[..] {
+                    [] => Vec::new(),
+                    [v] => vec![self.elaborate_format(v, dyns)],
+                    elts => {
+                        let mut t_elts = Vec::with_capacity(elts.len());
+                        // FIXME - hard-coded path_names version
+                        self.codegen.name_gen.ctxt.push_atom(NameAtom::Positional(0));
+                        for t in elts {
+                            let t_elt = self.elaborate_format(t, dyns);
+                            t_elts.push(t_elt);
+                            // FIXME - hardcoded path_names version
+                            self.codegen.name_gen.ctxt.increment_index();
+                        }
+                        self.codegen.name_gen.ctxt.escape();
+                        t_elts
                     }
-                    let ret = self.get_gt_from_index(index);
-                    (ret, t_elts)
-                } else {
-                    (self.get_gt_from_index(index), Vec::new())
                 };
+                let gt = self.get_gt_from_index(index);
                 TypedFormat::Tuple(gt, t_elts)
             }
             Format::Record(flds) => {
                 let index = self.get_and_increment_index();
                 let mut t_flds = Vec::with_capacity(flds.len());
                 for (lbl, t) in flds {
+                    self.codegen.name_gen.ctxt.push_atom(NameAtom::RecordField(lbl.clone()));
                     let t_fld = self.elaborate_format(t, dyns);
                     t_flds.push((lbl.clone(), t_fld));
+                    self.codegen.name_gen.ctxt.escape();
                 }
                 let gt = self.get_gt_from_index(index);
                 match gt.try_as_adhoc() {
@@ -3121,20 +3142,26 @@ impl<'a> Elaborator<'a> {
             }
             Format::Repeat(inner) => {
                 let index = self.get_and_increment_index();
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Repeat(gt, Box::new(t_inner))
             }
             Format::Repeat1(inner) => {
                 let index = self.get_and_increment_index();
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::Repeat1(gt, Box::new(t_inner))
             }
             Format::RepeatCount(expr, inner) => {
                 let index = self.get_and_increment_index();
                 let t_expr = self.elaborate_expr(expr);
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatCount(gt, Box::new(t_expr), Box::new(t_inner))
             }
@@ -3142,7 +3169,9 @@ impl<'a> Elaborator<'a> {
                 let index = self.get_and_increment_index();
                 let t_min_expr = self.elaborate_expr(min_expr);
                 let t_max_expr = self.elaborate_expr(max_expr);
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatBetween(
                     gt,
@@ -3154,14 +3183,18 @@ impl<'a> Elaborator<'a> {
             Format::RepeatUntilLast(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatUntilLast(gt, Box::new(t_lambda), Box::new(t_inner))
             }
             Format::RepeatUntilSeq(lambda, inner) => {
                 let index = self.get_and_increment_index();
                 let t_lambda = self.elaborate_expr_lambda(lambda);
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::RepeatUntilSeq(gt, Box::new(t_lambda), Box::new(t_inner))
             }
@@ -3170,7 +3203,9 @@ impl<'a> Elaborator<'a> {
                 let t_cond = self.elaborate_expr_lambda(cond);
                 let t_update = self.elaborate_expr_lambda(update);
                 let t_init = self.elaborate_expr(init);
+                self.codegen.name_gen.ctxt.push_atom(NameAtom::Wrapped(WrapperKind::Sequence));
                 let t_inner = self.elaborate_format(inner, dyns);
+                self.codegen.name_gen.ctxt.escape();
                 let gt = self.get_gt_from_index(index);
                 TypedFormat::AccumUntil(
                     gt,

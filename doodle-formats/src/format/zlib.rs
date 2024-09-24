@@ -19,15 +19,15 @@ pub fn main(module: &mut FormatModule, base: &BaseModule, deflate: FormatRef) ->
         "zlib.main",
         record([
             ("compression-method-flags", method_and_flags),
-            // FIXME - fcheck is chosen such that the first 16 bytes of the zlib block as a u16be is 0 mod 31
+            // REVIEW - fcheck is chosen such that the first 16 bits of the zlib block as a u16be is 0 mod 31
             (
                 "flags",
                 packed_bits_u8([2, 1, 5], ["flevel", "fdict", "fcheck"]),
             ),
-            // FIXME - this should be a 'known' dictionary if it appears, but that is domain-specific and hard to get a handle on
+            // TODO - this should be a 'known' dictionary if it appears, but that is domain-specific and hard to get a handle on
             ("dict-id", cond_maybe(has_dict(var("flags")), base.u32be())),
             ("data", Format::Bits(Box::new(deflate.call()))),
-            // FIXME - adler32 is supposed to be an Adler-32 checksum of the decompressed bytes
+            // NOTE - adler32 is supposed to be an Adler-32 checksum of the decompressed bytes
             ("adler32", base.u32be()),
         ]),
     )
