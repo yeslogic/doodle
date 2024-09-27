@@ -16,9 +16,7 @@ impl<T: Rebindable> Rebindable for Box<T> {
 
 impl<T: Rebindable> Rebindable for Vec<T> {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
-        self.iter_mut().for_each(|item| {
-            item.rebind(table)
-        });
+        self.iter_mut().for_each(|item| item.rebind(table));
     }
 }
 
@@ -29,7 +27,6 @@ impl<T: Rebindable> Rebindable for Option<T> {
         }
     }
 }
-
 
 impl Rebindable for RustProgram {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
@@ -91,7 +88,7 @@ impl Rebindable for RustStmt {
 impl Rebindable for RustEntity {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
-            RustEntity::Local(_lab) =>  (), // REVIEW - this should be good
+            RustEntity::Local(_lab) => (),
             RustEntity::Scoped(path, _lab) => {
                 for lab in path.iter_mut() {
                     if table.contains_key(lab) {
@@ -108,7 +105,7 @@ impl Rebindable for RustExpr {
         match self {
             RustExpr::Entity(ent) => ent.rebind(table),
             RustExpr::PrimitiveLit(..) => (),
-            RustExpr::ArrayLit(_arr) => (), // REVIW - do we need to introspect?
+            RustExpr::ArrayLit(arr) => arr.rebind(table),
             RustExpr::MethodCall(head, _, args) => {
                 head.rebind(table);
                 args.rebind(table);
@@ -119,11 +116,19 @@ impl Rebindable for RustExpr {
                 args.rebind(table);
             }
             RustExpr::Tuple(elts) => elts.rebind(table),
-            RustExpr::Struct(ent, flds) => {
-                ent.rebind(table);
-                flds.iter_mut().for_each(|(_, fld)| fld.rebind(table));
+            RustExpr::Struct(con, expr) => {
+                con.rebind(table);
+                match expr {
+                    StructExpr::RecordExpr(flds) => {
+                        flds.iter_mut().for_each(|(_, fld)| fld.rebind(table))
+                    }
+                    StructExpr::TupleExpr(vals) => {
+                        vals.iter_mut().for_each(|val| val.rebind(table))
+                    }
+                    StructExpr::EmptyExpr => (),
+                }
             }
-            | RustExpr::CloneOf(inner)
+            RustExpr::CloneOf(inner)
             | RustExpr::Deref(inner)
             | RustExpr::Borrow(inner)
             | RustExpr::BorrowMut(inner)
@@ -177,7 +182,6 @@ impl Rebindable for ClosureBody {
     }
 }
 
-
 impl Rebindable for RustControl {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
@@ -218,7 +222,6 @@ impl Rebindable for RustMatchBody {
     }
 }
 
-
 impl Rebindable for RustMatchCase {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         self.0.rebind(table);
@@ -241,7 +244,7 @@ impl Rebindable for MatchCaseLHS {
 impl Rebindable for RustPattern {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
-            | RustPattern::PrimLiteral(..)
+            RustPattern::PrimLiteral(..)
             | RustPattern::PrimRange(..)
             | RustPattern::Fill
             | RustPattern::CatchAll(..)
@@ -260,7 +263,11 @@ impl Rebindable for RustPattern {
 impl Rebindable for Constructor {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
-            Constructor::Simple(_) => (),
+            Constructor::Simple(name) => {
+                if table.contains_key(&*name) {
+                    *name = table[&*name].clone();
+                }
+            }
             Constructor::Compound(name, _) => {
                 if table.contains_key(&*name) {
                     *name = table[&*name].clone();
@@ -346,7 +353,7 @@ impl Rebindable for LocalType {
 impl Rebindable for CompType {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
-            | CompType::Vec(t)
+            CompType::Vec(t)
             | CompType::Option(t)
             | CompType::Result(t, ..)
             | CompType::Borrow(.., t) => t.rebind(table),

@@ -1245,10 +1245,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
         let glyf_table = {
-            // NOTE - variable-length expanded version of the packed flags being parsed
-            let glyf_flags_simple = |num_coordinates: Expr| -> Format {
-                // individual flag-set we are parsing
-                let flags = flags_bits8([
+            let simple_flags_raw = module.define_format(
+                "opentype.glyph-description.simple.flags-raw",
+                flags_bits8([
                     None,
                     Some("overlap_simple"),
                     Some("y_is_same_or_positive_y_short_vector"),
@@ -1257,10 +1256,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Some("y_short_vector"),
                     Some("x_short_vector"),
                     Some("on_curve_point"),
-                ]);
+                ]),
+            );
+
+            // NOTE - variable-length expanded version of the packed flags being parsed
+            let glyf_flags_simple = |num_coordinates: Expr| -> Format {
+                // individual flag-set we are parsing
+
                 // Format that parses a flag-entry into its conditionally-parsed repetition-count and relevant, reordered fields
                 let flag_list_entry = chain(
-                    flags,
+                    simple_flags_raw.call(),
                     "flags",
                     record([
                         // NOTE - indicates number of additional repeats, base value 0 for singleton or N for run of N+1 overall
