@@ -6,17 +6,19 @@ use anyhow::anyhow;
 use crate::output::Fragment;
 use crate::Label;
 
-/// Classification of type-entities that enclose other type-entities
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum WrapperKind {
-    /// ParentType :~ Vec<LocalType>
-    Sequence,
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum Derivation {
+    // Incidental type that is mapped or transformed (e.g. via Format::LetFormat, Format::Map, Format::DecodeBytes)
+    Preimage,
+    // Inner-Type that appears inside of a Maybe-Context
+    Yes,
 }
 
-impl WrapperKind {
-    pub fn describe(&self) -> &'static str {
+impl Derivation {
+    pub(crate) fn token(&self) -> &'static str {
         match self {
-            WrapperKind::Sequence => "Seq",
+            Derivation::Preimage => "raw",
+            Derivation::Yes => "yes",
         }
     }
 }
@@ -32,8 +34,10 @@ pub(crate) enum NameAtom {
     RecordField(Label),
     /// Type-Entity that is embedded within a variant of an existing enum
     Variant(Label),
-    /// Type-Entity accessed via one of the [`WrapperKind`] constants defined above
-    Wrapped(WrapperKind),
+    /// Type-entity that is derived from another via an abstracted relation
+    Derived(Derivation),
+    /// 'Poison' atom to prevent local ascription of misleading names to entities whose provenance is hierarchically distinct
+    DeadEnd,
 }
 
 impl std::fmt::Display for NameAtom {
@@ -43,7 +47,8 @@ impl std::fmt::Display for NameAtom {
             NameAtom::Positional(pos) => write!(f, "ix{}", pos),
             NameAtom::RecordField(fld) => write!(f, "{}", fld),
             NameAtom::Variant(vn) => write!(f, "{}", vn),
-            NameAtom::Wrapped(wk) => write!(f, "in{}", wk.describe()),
+            NameAtom::Derived(dev) => write!(f, "{}", dev.token()),
+            NameAtom::DeadEnd => write!(f, "POISON"),
         }
     }
 }
@@ -52,33 +57,52 @@ pub type PathLabel = Vec<NameAtom>;
 
 // Basic heuristic for whether a variation `y` is a 'better alternative' (refinement) compared to an original `x`
 pub(crate) fn is_refinement(x: &PathLabel, y: &PathLabel) -> bool {
-    for (elt0, elt1) in Iterator::zip(x.iter().rev(), y.iter().rev()) {
-        match (elt0, elt1) {
-            (NameAtom::Explicit(name0), NameAtom::Explicit(name1)) => {
-                if name0 != name1 {
-                    match name0.len().cmp(&name1.len()) {
-                        std::cmp::Ordering::Less => return false,
-                        std::cmp::Ordering::Equal => return false,
-                        std::cmp::Ordering::Greater => return true,
-                    }
-                } else {
-                    return false;
+    let mut x_iter = x.iter().rev().fuse();
+    let mut y_iter = y.iter().rev().fuse();
+    // NOTE - x and y may have different lengths, and we don't want to truncate either
+    loop {
+        let x_elt = x_iter.next();
+        let y_elt = y_iter.next();
+        match (x_elt, y_elt) {
+            (None, None) => break,
+            (None, Some(y_atom)) => match y_atom {
+                // NOTE - bypass backup heuristics by returning rather than breaking
+                NameAtom::DeadEnd => return false,
+                NameAtom::Explicit(_) => return true,
+                _ => continue,
+            },
+            (Some(x_atom), None) => match x_atom {
+                NameAtom::DeadEnd => return true,
+                NameAtom::Explicit(_) => return false,
+                _ => continue,
+            },
+            (Some(x_atom), Some(y_atom)) => match (x_atom, y_atom) {
+                (NameAtom::DeadEnd, _) => {
+                    return true;
                 }
-            }
-            (NameAtom::Explicit(_), _) => return false,
-            (_, NameAtom::Explicit(_)) => return true,
-            (_, _) => continue,
+                (_, NameAtom::DeadEnd) => return false,
+                (NameAtom::Explicit(labx), NameAtom::Explicit(laby)) => {
+                    if labx == laby {
+                        continue;
+                    } else {
+                        // REVIEW - this might be better off as a guard, or constant-false
+                        return true;
+                    }
+                }
+                (NameAtom::Explicit(_), _) => return false,
+                (_, NameAtom::Explicit(_)) => return true,
+                (_, _) => continue,
+            },
         }
     }
-    return false;
+    // NOTE - we would normally just return false, but to allow conditional bypass of backup heuristics for DeadEnd, we pply them outside the loop
+    y.len() < x.len() || NameCtxt::generate_name(&y).len() < NameCtxt::generate_name(x).len()
 }
 
 /// If `y` is a refinement over `x`, then `x` is replaced with `y`
 pub(crate) fn pick_best_path(x: &mut PathLabel, y: PathLabel) {
-    if y.len() < x.len()
-        || NameCtxt::generate_name(&y) < NameCtxt::generate_name(x)
-        || is_refinement(x, &y)
-    {
+    if is_refinement(x, &y) {
+        // eprintln!("{} -> {}", NameCtxt::generate_name(&*x), NameCtxt::generate_name(&y));
         *x = y;
     }
 }
@@ -176,11 +200,6 @@ impl NameCtxt {
         // eprintln!("{:?} (<- -{:?})", &self.stack[..self.stack.len() - 1], &self.stack[self.stack.len() - 1]);
         self.stack.pop()?;
         Some(self)
-    }
-
-    /// Returns a reference to the current stack as a borrowed PathLabel.
-    pub fn get_loc(&self) -> &PathLabel {
-        &self.stack
     }
 
     /// Unconditionally pops the top-of-stack [`NameAtom`]
@@ -383,5 +402,20 @@ mod tests {
             ctxt.find_name_for(&root_extra_varno).unwrap(),
             "root_extra_No"
         );
+    }
+
+    #[test]
+    fn test_refinement() {
+        let x = vec![
+            NameAtom::Explicit(Label::from("main")),
+            NameAtom::RecordField(Label::from("data")),
+            NameAtom::Variant(Label::from("Opentype")),
+        ];
+        let y = vec![NameAtom::Explicit("opentype.main".into())];
+        let z = x.iter().chain(y.iter()).cloned().collect::<Vec<_>>();
+        assert!(is_refinement(&x, &y));
+        assert!(is_refinement(&x, &z));
+        assert!(!is_refinement(&y, &x));
+        assert!(!is_refinement(&z, &x));
     }
 }

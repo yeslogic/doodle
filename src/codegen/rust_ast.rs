@@ -1173,6 +1173,35 @@ impl ToFragment for MethodSpecifier {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum StructExpr {
+    EmptyExpr,
+    RecordExpr(Vec<(Label, Option<Box<RustExpr>>)>),
+    TupleExpr(Vec<RustExpr>),
+}
+
+impl ToFragment for StructExpr {
+    fn to_fragment(&self) -> Fragment {
+        match self {
+            StructExpr::RecordExpr(fields) => Fragment::seq(
+                fields.iter().map(|(lab, expr)| {
+                    Fragment::intervene(
+                        lab.to_fragment(),
+                        Fragment::string(": "),
+                        expr.as_ref().map_or(Fragment::Empty, |x| {
+                            x.to_fragment_precedence(Precedence::Top)
+                        }),
+                    )
+                }),
+                Some(Fragment::string(", ")),
+            )
+            .delimit(Fragment::string(" { "), Fragment::string(" }")),
+            StructExpr::TupleExpr(elts) => RustExpr::paren_list_prec(elts, Precedence::Top),
+            StructExpr::EmptyExpr => Fragment::Empty,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) enum RustExpr {
     Entity(RustEntity),
     PrimitiveLit(RustPrimLit),
@@ -1181,7 +1210,7 @@ pub(crate) enum RustExpr {
     FieldAccess(Box<RustExpr>, SubIdent), // can be used for receiver methods as well, with FunctionCall
     FunctionCall(Box<RustExpr>, Vec<RustExpr>), // can be used for tuple constructors as well
     Tuple(Vec<RustExpr>),
-    Struct(RustEntity, Vec<(Label, Option<Box<RustExpr>>)>),
+    Struct(Constructor, StructExpr),
     CloneOf(Box<RustExpr>),
     // FIXME: this variant is unused
     #[allow(dead_code)]
@@ -1794,9 +1823,13 @@ impl RustExpr {
             RustExpr::FunctionCall(..) | RustExpr::MethodCall(..) => false,
             RustExpr::FieldAccess(expr, ..) => expr.is_pure(),
             RustExpr::Tuple(tuple) => tuple.iter().all(Self::is_pure),
-            RustExpr::Struct(_, assigns) => assigns
-                .iter()
-                .all(|(_, val)| val.as_deref().map_or(true, Self::is_pure)),
+            RustExpr::Struct(_, assigns) => match assigns {
+                StructExpr::RecordExpr(assigns) => assigns
+                    .iter()
+                    .all(|(_, val)| val.as_deref().map_or(true, Self::is_pure)),
+                StructExpr::TupleExpr(values) => values.iter().all(|val| val.is_pure()),
+                StructExpr::EmptyExpr => true,
+            },
             RustExpr::Deref(expr) | RustExpr::Borrow(expr) | RustExpr::BorrowMut(expr) => {
                 expr.is_pure()
             }
@@ -1881,23 +1914,9 @@ impl ToFragmentExt for RustExpr {
                     .delimit(Fragment::Char('('), Fragment::string(",)")),
                 _ => Self::paren_list_prec(elts, Precedence::Top),
             },
-            RustExpr::Struct(con, fields) => {
-                let f_fields = Fragment::seq(
-                    fields.iter().map(|(lab, expr)| {
-                        Fragment::intervene(
-                            lab.to_fragment(),
-                            Fragment::string(": "),
-                            expr.as_ref().map_or(Fragment::Empty, |x| {
-                                x.to_fragment_precedence(Precedence::Top)
-                            }),
-                        )
-                    }),
-                    Some(Fragment::string(", ")),
-                );
-                con.to_fragment()
-                    .cat(Fragment::Char(' '))
-                    .cat(f_fields.delimit(Fragment::string("{ "), Fragment::string(" }")))
-            }
+            RustExpr::Struct(con, contents) => RustEntity::from(con.clone())
+                .to_fragment()
+                .cat(contents.to_fragment()),
             RustExpr::Deref(expr) => {
                 Fragment::Char('*').cat(expr.to_fragment_precedence(Precedence::Prefix))
             }
