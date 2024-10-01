@@ -217,8 +217,22 @@ pub mod oft_metrics {
     pub type OpentypeGlyph = opentype_glyf_table;
     pub type GlyphDescription = opentype_glyf_description;
     pub type SimpleGlyph = opentype_glyf_simple;
+
     pub type OpentypeCmap = opentype_cmap_table;
     pub type OpentypeHead = opentype_head_table;
+    pub type OpentypeHhea = opentype_hhea_table;
+
+    pub type OpentypeHmtx = opentype_hmtx_table;
+    pub type OpentypeHmtxHmetric = opentype_hmtx_table_h_metrics;
+
+    pub fn analyze_font(test_file: &str) -> TestResult<()> {
+        let buffer = std::fs::read(std::path::Path::new(test_file))?;
+        let mut input = Parser::new(&buffer);
+        let dat = Decoder14(&mut input)?;
+        // TODO: do we want to collect (and return) any metrics here?
+        show_opentype_stats(&dat);
+        Ok(())
+    }
 
     pub fn show_opentype_stats(parsed_data: &OpentypeData) {
         // STUB - show more specific data
@@ -288,8 +302,8 @@ pub mod oft_metrics {
         // STUB - add in more tailored printing of each table according to what it contains
         show_cmap_table(&links.cmap);
         show_head_table(&links.head);
-        // println!("hhea: {:?}", &links.hhea);
-        // println!("hmtx: {:?}", &links.hmtx);
+        show_hhea_table(&links.hhea);
+        show_hmtx_table(&links.hmtx);
         // println!("maxp: {:?}", &links.maxp);
         // println!("name: {:?}", &links.name);
         // println!("os2: {:?}", &links.os2);
@@ -300,9 +314,39 @@ pub mod oft_metrics {
         show_glyph_table(&links.glyf);
     }
 
+    /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
+    ///
+    /// Each item is shown with `show_fn`, and the `elision_message` is printed (along with the range of indices skipped)
+    /// if the slice length exceeds than 2 * `bookend`, in between the initial and terminal span of `bookend` items.
+    fn show_items_elided<T>(
+        items: &[T],
+        show_fn: impl Fn(usize, &T),
+        bookend: usize,
+        fn_message: impl Fn(usize, usize) -> String,
+    ) {
+        let count = items.len();
+        if count > bookend * 2 {
+            for ix in 0..bookend {
+                show_fn(ix, &items[ix]);
+            }
+            println!("{}", fn_message(bookend, count - bookend));
+            for ix in (count - bookend)..count {
+                show_fn(ix, &items[ix]);
+            }
+        } else {
+            for (ix, item) in items.iter().enumerate() {
+                show_fn(ix, item);
+            }
+        }
+    }
+
     fn format_version16dot16(v: u32) -> String {
-        let major = v >> 16;
-        let minor = (v & 0xf000) >> 12;
+        let major = (v >> 16) as u16;
+        let minor = ((v & 0xf000) >> 12) as u16;
+        format_version_major_minor(major, minor)
+    }
+
+    fn format_version_major_minor(major: u16, minor: u16) -> String {
         format!("{}.{}", major, minor)
     }
 
@@ -313,37 +357,103 @@ pub mod oft_metrics {
         );
     }
 
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(u16)]
+    enum DirectionHint {
+        FullyMixed = 0,
+        StrongLR = 1,
+        NeutralLR = 2,
+        StrongRL = 0xffff, // -1
+        NeutralRL = 0xfffe, // -2
+    }
+
+    impl TryFrom<u16> for DirectionHint {
+        // TODO - replace with actual error-type
+        type Error = ();
+
+        fn try_from(value: u16) -> Result<Self, Self::Error> {
+            match value {
+                0 => Ok(DirectionHint::FullyMixed),
+                1 => Ok(DirectionHint::StrongLR),
+                2 => Ok(DirectionHint::NeutralLR),
+                0xffff => Ok(DirectionHint::StrongRL),
+                0xfffe => Ok(DirectionHint::NeutralRL),
+                _ => Err(()),
+            }
+        }
+    }
+
+    impl std::fmt::Display for DirectionHint {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                DirectionHint::FullyMixed => write!(f, "Fully Mixed-Direction"),
+                DirectionHint::StrongLR => write!(f, "Strong LTR only"),
+                DirectionHint::NeutralLR => write!(f, "Strong LTR or Neutral"),
+                DirectionHint::StrongRL => write!(f, "Strong RTL only"),
+                DirectionHint::NeutralRL => write!(f, "Strong RTL or Neutral"),
+            }
+        }
+    }
+
     fn show_head_table(head: &OpentypeHead) {
-        println!("head: {:?}", head);
+        let dir_hint: DirectionHint = head.font_direction_hint.try_into().unwrap();
+
+        println!("head: table version {}, {}",
+            format_version_major_minor(head.major_version, head.minor_version),
+            dir_hint
+        );
+    }
+
+    fn show_hhea_table(hhea: &OpentypeHhea) {
+        println!("hhea: table version {}, {} horizontal long metrics",
+            format_version_major_minor(hhea.major_version, hhea.minor_version),
+            hhea.number_of_long_horizontal_metrics
+        );
+    }
+
+    fn show_hmtx_table(hmtx: &OpentypeHmtx) {
+        let nmetrics = hmtx.h_metrics.len();
+
+        let show_hmtx_hmetric = |ix: usize, hmet: &OpentypeHmtxHmetric| {
+            println!("Glyph ID [{ix}]: advanceWidth={}, lsb={}", hmet.advance_width, as_s16(hmet.left_side_bearing));
+        };
+        let show_hmtx_left_bearing = |ix: usize, lsb: &u16| {
+            println!("Glyph ID [{}]: lsb={}", ix + nmetrics, as_s16(*lsb));
+        };
+
+        show_items_elided(
+            hmtx.h_metrics.as_slice(),
+            show_hmtx_hmetric,
+            8,
+            |start, stop| format!("skipping hmetrics {start}..{stop}")
+        );
+        show_items_elided(
+            hmtx.left_side_bearings.as_slice(),
+            show_hmtx_left_bearing,
+            8,
+            |start, stop| format!(
+                "skipping left-side-bearings {}..{}",
+                start + nmetrics,
+                stop + nmetrics
+            )
+        );
+    }
+
+    // NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
+    const fn as_s16(v: u16) -> i16 {
+        v as i16
     }
 
     fn show_glyph_table(glyf: &Option<Vec<OpentypeGlyph>>) {
-        let Some(glyf) = glyf.as_ref() else {
-            println!("glyf: <not present>");
-            return;
-        };
-
-        let n_glyphs = glyf.len();
-        println!("glyf: {} glyphs", n_glyphs);
-        const SHOW_CUTOFF: usize = 16;
-        const BEFORE_ELIPSIS: usize = 8;
-        const AFTER_ELIPSIS: usize = 8;
-        if n_glyphs > SHOW_CUTOFF {
-            for i in 0..BEFORE_ELIPSIS {
-                show_single_glyph(i, &glyf[i]);
-            }
-            println!(
-                "skipping glyphs {}..{}",
-                BEFORE_ELIPSIS,
-                n_glyphs - AFTER_ELIPSIS
-            );
-            for i in n_glyphs - AFTER_ELIPSIS..n_glyphs {
-                show_single_glyph(i, &glyf[i]);
-            }
+        if let Some(glyf) = glyf.as_ref() {
+            show_items_elided(
+                glyf.as_slice(),
+                show_single_glyph,
+                8,
+                |start, stop| format!("skipping glyphs {start}..{stop}")
+            )
         } else {
-            for i in 0..n_glyphs {
-                show_single_glyph(i, &glyf[i]);
-            }
+            println!("glyf: <not present>")
         }
     }
 
