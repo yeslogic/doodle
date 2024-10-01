@@ -11,6 +11,10 @@ path = "sample_codegen.rs"
 path = "bin/pnginfo.rs"
 name = "pnginfo"
 
+[[bin]]
+path = "bin/fontinfo.rs"
+name = "fontinfo"
+
 [[bench]]
 name = "gen_benchmark"
 path = "benches/gen_benchmark.rs"
