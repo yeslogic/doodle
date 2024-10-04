@@ -10,7 +10,7 @@ fn test_png_signature_decoder() {
     // PNG signature
     let input = b"\x89PNG\r\n\x1A\n";
     let mut parser = Parser::new(input);
-    let ret = Decoder99(&mut parser);
+    let ret = Decoder103(&mut parser);
     assert!(ret.is_ok());
 }
 
@@ -35,7 +35,7 @@ fn test_decoder_font() -> TestResult {
         "../prince/tests/data/fonts/lsansuni.ttf",
     )))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder14(&mut input)?;
+    let parsed_data = Decoder_opentype_main(&mut input)?;
     show_opentype_stats(&parsed_data);
     Ok(())
 }
@@ -179,7 +179,7 @@ fn test_decoder_riff() -> TestResult {
 fn test_decoder_tar() -> TestResult {
     let buffer = std::fs::read(std::path::Path::new(&testpath("test.tar")))?;
     let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder88(&mut input)?;
+    let parsed_data = Decoder_tar_header_with_data(&mut input)?;
     match parsed_data {
         TarBlock {
             header,
@@ -335,7 +335,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder9(&mut input)?;
+        let dat = Decoder_png_main(&mut input)?;
         print_png_breadcrumb(dat);
         Ok(())
     }
@@ -344,7 +344,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder7(&mut input)?;
+        let dat = Decoder_jpeg_main(&mut input)?;
         print_jpeg_breadcrumb(dat);
         Ok(())
     }
@@ -353,7 +353,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder4(&mut input)?;
+        let dat = Decoder_gif_main(&mut input)?;
         print_gif_breadcrumb(dat);
         Ok(())
     }
@@ -362,7 +362,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder11(&mut input)?;
+        let dat = Decoder_tiff_main(&mut input)?;
         print_tiff_breadcrumb(dat);
         Ok(())
     }
@@ -371,7 +371,7 @@ mod test_files {
         let buffer = std::fs::read(std::path::Path::new(filename))?;
         let mut input = Parser::new(&buffer);
         print!("[{filename}]: ");
-        let dat = Decoder10(&mut input)?;
+        let dat = Decoder_riff_main(&mut input)?;
         print_riff_breadcrumb(dat);
         Ok(())
     }

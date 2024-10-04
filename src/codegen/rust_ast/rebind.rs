@@ -65,6 +65,9 @@ impl Rebindable for RustTypeDef {
 
 impl Rebindable for RustFn {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
+        if table.contains_key(&self.name) {
+            self.name = table[&*self.name].clone();
+        }
         self.sig.rebind(table);
         self.body.iter_mut().for_each(|stmt| stmt.rebind(table))
     }
@@ -88,7 +91,11 @@ impl Rebindable for RustStmt {
 impl Rebindable for RustEntity {
     fn rebind(&mut self, table: &HashMap<Label, Label>) {
         match self {
-            RustEntity::Local(_lab) => (),
+            RustEntity::Local(lab) => {
+                if table.contains_key(lab) {
+                    *lab = table[lab].clone();
+                }
+            }
             RustEntity::Scoped(path, _lab) => {
                 for lab in path.iter_mut() {
                     if table.contains_key(lab) {

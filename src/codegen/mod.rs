@@ -14,7 +14,7 @@ use crate::{
 
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     hash::{Hash, Hasher},
     rc::Rc,
 };
@@ -2683,7 +2683,8 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         sourcemap,
         mut elaborator,
     } = Generator::compile(module, top_format);
-    let table = elaborator.codegen.name_gen.manifest_renaming_table();
+    let mut table = elaborator.codegen.name_gen.manifest_renaming_table();
+    let mut fn_renames = BTreeSet::<Label>::new();
     let mut tdefs = Vec::from_iter(elaborator.codegen.defined_types.iter().map(|tdef| {
         elaborator
             .codegen
@@ -2710,10 +2711,23 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
         items.push(it);
     }
 
-    for decfn in sourcemap.decoder_skels.iter() {
-        items.push(RustItem::from_decl(RustDecl::Function(
-            decfn.to_ast(ProdCtxt::default()),
-        )));
+    for mut decfn in sourcemap.decoder_skels {
+        decfn.rebind(&table);
+        match &decfn.adhoc_name {
+            Some(name) => {
+                let replacement_name = Label::from(format!("Decoder_{}", sanitize_label(name)));
+                // If the ideal name already exists, prevent it from being reused
+                if fn_renames.contains(&replacement_name) {
+                    let _ = decfn.adhoc_name.take();
+                } else {
+                    fn_renames.insert(replacement_name.clone());
+                    table.insert(decoder_fname(decfn.ixlabel), replacement_name);
+                }
+            }
+            None => (),
+        };
+        let func = decfn.to_ast(ProdCtxt::default());
+        items.push(RustItem::from_decl(RustDecl::Function(func)));
     }
 
     let mut content = RustProgram::from_iter(items);
@@ -2743,6 +2757,20 @@ pub struct DecoderFn<ExprT> {
     ret_type: RustType,
 }
 
+impl<ExprT> Rebindable for DecoderFn<ExprT> {
+    fn rebind(&mut self, table: &HashMap<Label, Label>) {
+        if let Some(ref mut name) = self.adhoc_name {
+            if table.contains_key(&*name) {
+                *name = table[&*name].clone();
+            }
+        }
+    }
+}
+
+fn decoder_fname(ixlabel: IxLabel) -> Label {
+    Label::from(format!("Decoder{}", ixlabel.to_usize()))
+}
+
 impl<ExprT> ToAst for DecoderFn<ExprT>
 where
     CaseLogic<ExprT>: ToAst<AstElem = RustBlock>,
@@ -2751,10 +2779,7 @@ where
     type AstElem = RustFn;
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
-        let name = match &self.adhoc_name {
-            Some(name) => Label::from(format!("Decoder_{name}")),
-            None => Label::from(format!("Decoder{}", self.ixlabel.to_usize()))
-        };
+        let name = decoder_fname(self.ixlabel);
         let params = {
             let mut tmp = DefParams::new();
             tmp.push_lifetime("'input");
@@ -2853,9 +2878,14 @@ impl<'a> Generator<'a> {
             let dec_fn = {
                 let dec = dec_ext.get_dec();
                 let args = dec_ext.get_args();
+                let dec_gt = dec.get_type();
+                let adhoc_name = dec_gt.and_then(|t| match t.as_ref() {
+                    GenType::Def((_, name), ..) => Some(name.clone()),
+                    _ => None,
+                });
                 let cl = elab.codegen.translate(dec);
                 DecoderFn {
-                    adhoc_name: None, // FIXME: replace with Some for explicitly named formats
+                    adhoc_name,
                     ixlabel: IxLabel::from(ix),
                     logic: cl,
                     extra_args: args.clone(),

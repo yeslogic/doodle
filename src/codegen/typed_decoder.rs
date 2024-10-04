@@ -1,6 +1,7 @@
 use crate::byte_set::ByteSet;
 use crate::{Format, FormatModule, Label, MatchTree, MaybeTyped, Next};
 use anyhow::{anyhow, Result as AResult};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -10,6 +11,7 @@ use super::{
     typed_format::{TypedDynFormat, TypedExpr, TypedFormat},
     GTFormat,
 };
+use super::{PrimType, RustType};
 
 #[derive(Clone, Debug)]
 pub(crate) struct TypedDecoderExt<TypeRep> {
@@ -42,6 +44,50 @@ impl<TypeRep> From<TypedDecoder<TypeRep>> for TypedDecoderExt<TypeRep> {
         Self {
             dec: value,
             args: None,
+        }
+    }
+}
+
+impl TypedDecoder<GenType> {
+    pub(crate) fn get_type(&self) -> Option<Cow<'_, GenType>> {
+        match self {
+            TypedDecoder::Fail => None,
+            TypedDecoder::Align(_) | TypedDecoder::SkipRemainder | TypedDecoder::EndOfInput => {
+                Some(Cow::Owned(GenType::Inline(RustType::from(PrimType::Unit))))
+            }
+            TypedDecoder::Byte(set) => {
+                (!set.is_empty()).then_some(Cow::Owned(GenType::from(PrimType::U8)))
+            }
+            TypedDecoder::Pos => Some(Cow::Owned(GenType::from(PrimType::U64))),
+            TypedDecoder::Call(t, ..)
+            | TypedDecoder::Variant(t, ..)
+            | TypedDecoder::Parallel(t, ..)
+            | TypedDecoder::Branch(t, ..)
+            | TypedDecoder::Tuple(t, ..)
+            | TypedDecoder::Record(t, ..)
+            | TypedDecoder::Repeat0While(t, ..)
+            | TypedDecoder::Repeat1Until(t, ..)
+            | TypedDecoder::RepeatCount(t, ..)
+            | TypedDecoder::RepeatBetween(t, ..)
+            | TypedDecoder::RepeatUntilLast(t, ..)
+            | TypedDecoder::RepeatUntilSeq(t, ..)
+            | TypedDecoder::Peek(t, ..)
+            | TypedDecoder::PeekNot(t, ..)
+            | TypedDecoder::Slice(t, ..)
+            | TypedDecoder::Bits(t, ..)
+            | TypedDecoder::WithRelativeOffset(t, ..)
+            | TypedDecoder::Map(t, ..)
+            | TypedDecoder::Where(t, ..)
+            | TypedDecoder::Compute(t, ..)
+            | TypedDecoder::Let(t, ..)
+            | TypedDecoder::Match(t, ..)
+            | TypedDecoder::Dynamic(t, ..)
+            | TypedDecoder::Apply(t, ..)
+            | TypedDecoder::Maybe(t, ..)
+            | TypedDecoder::ForEach(t, ..)
+            | TypedDecoder::DecodeBytes(t, ..)
+            | TypedDecoder::LetFormat(t, ..)
+            | TypedDecoder::AccumUntil(t, ..) => Some(Cow::Borrowed(t)),
         }
     }
 }
