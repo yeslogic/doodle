@@ -5,14 +5,14 @@ pub type TestResult<T = ()> = Result<T, Box<dyn Send + Sync + std::error::Error>
 // Stabilization aliases to avoid hard-coding shifting numbers as formats are enriched with more possibilities
 pub type Top = main_data;
 pub type OpentypeData = opentype_main;
-pub type TarBlock = tar_main;
+pub type TarBlock = tar_header_with_data;
 pub type PngData = png_main;
 pub type JpegData = jpeg_main;
 pub type JpegApp01 = jpeg_frame_initial_segment;
 pub type JfifData = jpeg_app0_jfif;
 pub type TiffData = tiff_main;
 pub type App0Data = jpeg_app0_data_data;
-pub type App1Data = jpeg_app1_data;
+pub type App1Data = jpeg_app1_data_data;
 pub type ExifData = jpeg_app1_exif;
 pub type XmpData = jpeg_app1_xmp;
 pub type GifData = gif_main;
@@ -112,7 +112,7 @@ pub mod png_metrics {
     pub fn analyze_png(test_file: &str) -> TestResult<PngMetrics> {
         let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
-        let dat = Decoder9(&mut input)?;
+        let dat = Decoder_png_main(&mut input)?;
         let mut metrics = PngMetrics::default();
         for chunk in dat.chunks.iter().chain(dat.more_chunks.iter()) {
             match &chunk.data {
