@@ -341,11 +341,16 @@ impl<'a> GTCompiler<'a> {
             GTFormat::Byte(bs) => Ok(TypedDecoder::Byte(*bs)),
             GTFormat::Variant(gt, label, f) => {
                 let d = self.compile_gt_format(f, None, next.clone())?;
-                Ok(TypedDecoder::Variant(
-                    gt.clone(),
-                    label.clone(),
-                    Box::new(d),
-                ))
+                // FIXME - this is a bit slipshod, maybe we want an inductive method for determining what formats are constructive vs void
+                if matches!(&d.dec, TypedDecoder::Fail) {
+                    Ok(TypedDecoder::Fail)
+                } else {
+                    Ok(TypedDecoder::Variant(
+                        gt.clone(),
+                        label.clone(),
+                        Box::new(d),
+                    ))
+                }
             }
             GTFormat::Union(gt, branches) => {
                 let mut fs = Vec::with_capacity(branches.len());
