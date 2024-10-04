@@ -2736,6 +2736,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
 
 #[derive(Clone, Debug)]
 pub struct DecoderFn<ExprT> {
+    adhoc_name: Option<Label>,
     ixlabel: IxLabel,
     logic: CaseLogic<ExprT>,
     extra_args: Option<Vec<(Label, GenType)>>,
@@ -2750,7 +2751,10 @@ where
     type AstElem = RustFn;
 
     fn to_ast(&self, _ctxt: ProdCtxt<'_>) -> RustFn {
-        let name = Label::from(format!("Decoder{}", self.ixlabel.to_usize()));
+        let name = match &self.adhoc_name {
+            Some(name) => Label::from(format!("Decoder_{name}")),
+            None => Label::from(format!("Decoder{}", self.ixlabel.to_usize()))
+        };
         let params = {
             let mut tmp = DefParams::new();
             tmp.push_lifetime("'input");
@@ -2851,6 +2855,7 @@ impl<'a> Generator<'a> {
                 let args = dec_ext.get_args();
                 let cl = elab.codegen.translate(dec);
                 DecoderFn {
+                    adhoc_name: None, // FIXME: replace with Some for explicitly named formats
                     ixlabel: IxLabel::from(ix),
                     logic: cl,
                     extra_args: args.clone(),
