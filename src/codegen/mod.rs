@@ -3023,7 +3023,7 @@ impl<'a> Elaborator<'a> {
 
         let mut t_branches = Vec::with_capacity(branches.len());
         for branch in branches.iter() {
-            let t_branch = match branch {
+            match branch {
                 Format::Variant(name, inner) => {
                     self.codegen
                         .name_gen
@@ -3031,11 +3031,18 @@ impl<'a> Elaborator<'a> {
                         .push_atom(NameAtom::Variant(name.clone()));
                     let t_inner = self.elaborate_format(inner, dyns);
                     self.codegen.name_gen.ctxt.escape();
-                    TypedFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner))
+                    if t_inner.get_type().is_none() {
+                        continue;
+                    }
+                    let t_branch =
+                        TypedFormat::Variant(gt.clone(), name.clone(), Box::new(t_inner));
+                    t_branches.push(t_branch);
                 }
-                _ => self.elaborate_format(branch, dyns),
-            };
-            t_branches.push(t_branch);
+                _ => {
+                    let t_branch = self.elaborate_format(branch, dyns);
+                    t_branches.push(t_branch);
+                }
+            }
         }
 
         if is_det {

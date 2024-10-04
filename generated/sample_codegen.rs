@@ -2060,7 +2060,6 @@ pub struct opentype_ttc_header {
 pub enum opentype_font_directory {
     TTCHeader(opentype_ttc_header),
     TableDirectory(opentype_table_directory),
-    UnknownTable,
 }
 
 #[derive(Debug, Clone)]

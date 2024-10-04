@@ -18,16 +18,23 @@ pub fn main() -> std::io::Result<()> {
 }
 
 fn do_work(iter: impl Iterator<Item = String>) -> std::io::Result<()> {
+    let mut accum = Vec::new();
     for name in iter {
         eprint!("[{name}]: ...");
         match analyze_font(name.as_str()) {
-            Ok(()) => {
-                // eprintln!("Success!");
+            Ok(metric) => {
+                eprintln!("Success!");
+                accum.push((name, metric))
             }
             Err(e) => {
                 eprintln!("Failed! ({e})")
             }
         }
+    }
+    for (filename, metrics) in accum {
+        println!("====== [Font File]: {filename} =======");
+        show_opentype_stats(&metrics);
+        println!("====== END OF FONT FILE ======\n\n");
     }
     Ok(())
 }

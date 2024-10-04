@@ -214,7 +214,7 @@ pub mod oft_metrics {
     use super::*;
 
     pub type OpentypeFontDirectory = opentype_table_directory;
-    pub type OpentypeGlyph = opentype_glyf_table;
+    pub type OpentypeGlyf = opentype_glyf_table;
     pub type GlyphDescription = opentype_glyf_description;
     pub type SimpleGlyph = opentype_glyf_simple;
 
@@ -225,61 +225,435 @@ pub mod oft_metrics {
     pub type OpentypeHmtx = opentype_hmtx_table;
     pub type OpentypeHmtxHmetric = opentype_hmtx_table_h_metrics;
 
-    pub fn analyze_font(test_file: &str) -> TestResult<()> {
+    pub type OpentypeMaxp = opentype_maxp_table;
+    pub type OpentypeName = opentype_name_table;
+    pub type OpentypeOs2 = opentype_os2_table;
+    pub type OpentypePost = opentype_post_table;
+
+    #[derive(Clone, Debug)]
+    pub enum OpentypeMetrics {
+        MultiFont(MultiFontMetrics),
+        SingleFont(SingleFontMetrics),
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct MultiFontMetrics {
+        version: (u16, u16),
+        num_fonts: usize,
+        font_metrics: Vec<Option<SingleFontMetrics>>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct SingleFontMetrics {
+        sfnt_version: u32, // magic(0x0001_0000 | b"OTTO")
+        num_tables: usize,
+        required: RequiredTableMetrics,
+        optional: OptionalTableMetrics,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    // STUB - enrich with any further details we care about presenting
+    struct CmapMetrics {
+        version: u16,
+        num_tables: usize,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    // STUB - enrich with any further details we care about presenting
+    struct HeadMetrics {
+        major_version: u16,
+        minor_version: u16,
+        dir_hint: DirectionHint,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    // STUB - enrich with any further details we care about presenting
+    struct HheaMetrics {
+        major_version: u16,
+        minor_version: u16,
+        num_lhm: usize,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    enum MaxpMetrics {
+        Postscript { version: u32 }, // version 0.5
+        // STUB - enrich with any further details we care about presenting
+        Version1 { version: u32 }, // version 1.0
+        UnknownVersion { version: u32 }, // anything else
+    }
+
+    #[derive(Clone, Debug)]
+    struct HmtxMetrics(Vec<UnifiedHmtxMetric>);
+
+    #[derive(Copy, Clone, Debug)]
+    struct UnifiedHmtxMetric {
+        advance_width: Option<u16>,
+        left_side_bearing: i16,
+    }
+
+    #[derive(Clone, Debug)]
+    // STUB - enrich with any further details we care about presenting
+    struct NameMetrics {
+        version: u16,
+        name_count: usize,
+        name_records: Vec<NameRecord>,
+        lang_tag_records: Option<Vec<LangTagRecord>>,
+    }
+
+    #[derive(Clone, Debug)]
+    // STUB - this is probably less than we eventually want (assuming we care about presenting this info)
+    struct NameRecord {
+        name_id: NameId,
+        buf: Option<String>,
+    }
+
+    // STUB - turn into enum?
+    type NameId = u16;
+
+    #[derive(Clone, Debug)]
+    struct LangTagRecord {
+        lang_tag: Option<String>,
+    }
+
+    // STUB - placeholder for selective field-summary
+    type Os2Metrics = OpentypeOs2;
+
+    // STUB - placeholder for selective field-summary
+    type PostMetrics = OpentypePost;
+
+    #[derive(Clone, Debug)]
+    pub struct RequiredTableMetrics {
+        cmap: CmapMetrics,
+        head: HeadMetrics,
+        hhea: HheaMetrics,
+        maxp: MaxpMetrics,
+        hmtx: HmtxMetrics,
+        name: NameMetrics,
+        os2: Os2Metrics,
+        post: PostMetrics,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    #[repr(transparent)]
+    // number of elements in the contained array
+    pub struct RawArrayMetrics(usize);
+
+    type CvtMetrics = RawArrayMetrics;
+    type FpgmMetrics = RawArrayMetrics;
+
+    #[derive(Clone, Debug)]
+    pub struct GlyfMetrics {
+        num_glyphs: usize,
+        glyphs: Vec<GlyphMetric>,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum GlyphMetric {
+        Empty,
+        Simple(SimpleGlyphMetric),
+        Composite(CompositeGlyphMetric),
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct SimpleGlyphMetric {
+        contours: usize,
+        coordinates: usize,
+        instructions: usize,
+        bounding_box: BoundingBox,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct CompositeGlyphMetric {
+        components: usize,
+        instructions: usize,
+        bounding_box: BoundingBox,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub struct BoundingBox {
+        x_min: i16,
+        y_min: i16,
+        x_max: i16,
+        y_max: i16,
+    }
+
+    impl std::fmt::Display for BoundingBox {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "[({}, {}) <-> ({}, {})]", self.x_min, self.y_min, self.x_max, self.y_max)
+        }
+    }
+
+
+    type LocaMetrics = ();
+
+    #[derive(Clone, Debug)]
+    pub struct OptionalTableMetrics {
+        cvt: Option<CvtMetrics>,
+        fpgm: Option<FpgmMetrics>,
+        loca: Option<LocaMetrics>,
+        glyf: Option<GlyfMetrics>,
+        // STUB - add more tables as we expand opentype definition
+    }
+
+    #[derive(Debug)]
+    pub struct UnknownValueError<T> {
+        what: String,
+        bad_value: T,
+    }
+
+    impl<T> std::fmt::Display for UnknownValueError<T>
+    where
+        T: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "bad {}: {}", self.what, self.bad_value)
+        }
+    }
+
+    impl<T> std::error::Error for UnknownValueError<T> where T: std::fmt::Display + std::fmt::Debug {}
+
+    pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
         let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
         let dat = Decoder14(&mut input)?;
         // TODO: do we want to collect (and return) any metrics here?
-        show_opentype_stats(&dat);
-        Ok(())
+        match dat.font.directory {
+            opentype_font_directory::TTCHeader(multi) => {
+                let version = (multi.major_version, multi.minor_version);
+                let (num_fonts, font_metrics) = match multi.header {
+                    opentype_ttc_header_header::UnknownVersion(n) => {
+                        return Err(Box::new(UnknownValueError {
+                            what: format!("ttc header version"),
+                            bad_value: n,
+                        }));
+                    }
+                    opentype_ttc_header_header::Version1(v1header) => {
+                        let mut font_metrics = Vec::with_capacity(v1header.table_directories.len());
+                        for font in v1header.table_directories.iter() {
+                            let tmp = match &font.link {
+                                Some(dir) => Some(analyze_table_directory(dir)?),
+                                None => None,
+                            };
+                            font_metrics.push(tmp);
+                        }
+                        (v1header.num_fonts as usize, font_metrics)
+                    }
+                    opentype_ttc_header_header::Version2(v2header) => {
+                        let mut font_metrics = Vec::with_capacity(v2header.table_directories.len());
+                        for font in v2header.table_directories.iter() {
+                            let tmp = match &font.link {
+                                Some(dir) => Some(analyze_table_directory(dir)?),
+                                None => None,
+                            };
+                            font_metrics.push(tmp);
+                        }
+                        (v2header.num_fonts as usize, font_metrics)
+                    }
+                };
+                let ret = MultiFontMetrics {
+                    version,
+                    num_fonts,
+                    font_metrics,
+                };
+                Ok(OpentypeMetrics::MultiFont(ret))
+            }
+            opentype_font_directory::TableDirectory(single) => Ok(OpentypeMetrics::SingleFont(
+                analyze_table_directory(&single)?,
+            )),
+        }
     }
 
-    pub fn show_opentype_stats(parsed_data: &OpentypeData) {
-        // STUB - show more specific data
-        show_magic(parsed_data.font.magic);
-        match &parsed_data.font.directory {
-            opentype_font_directory::TTCHeader(ttc) => {
-                println!("TTC: version {}.{}", ttc.major_version, ttc.minor_version);
-                match &ttc.header {
-                    opentype_ttc_header_header::UnknownVersion(n) => {
-                        println!("<unrecognized version {}.*", n)
+    pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<SingleFontMetrics> {
+        let required = {
+            let cmap = {
+                let cmap = &dir.table_links.cmap;
+                CmapMetrics {
+                    version: cmap.version,
+                    num_tables: cmap.num_tables as usize,
+                }
+            };
+            let head = {
+                let head = &dir.table_links.head;
+                HeadMetrics {
+                    major_version: head.major_version,
+                    minor_version: head.minor_version,
+                    dir_hint: head.font_direction_hint.try_into().unwrap(),
+                }
+            };
+            let hhea = {
+                let hhea = &dir.table_links.hhea;
+                HheaMetrics {
+                    major_version: hhea.major_version,
+                    minor_version: hhea.minor_version,
+                    num_lhm: hhea.number_of_long_horizontal_metrics as usize,
+                }
+            };
+            let maxp = {
+                let maxp = &dir.table_links.maxp;
+                let version = maxp.version;
+                match &maxp.data {
+                    opentype_maxp_table_data::MaxpPostScript => MaxpMetrics::Postscript { version },
+                    opentype_maxp_table_data::MaxpV1(_table) => MaxpMetrics::Version1 { version },
+                    opentype_maxp_table_data::MaxpUnknown(_) => MaxpMetrics::UnknownVersion { version },
+                }
+            };
+            let hmtx = {
+                let hmtx = &dir.table_links.hmtx;
+                let mut accum = Vec::with_capacity(hmtx.h_metrics.len() + hmtx.left_side_bearings.len());
+                for hmet in hmtx.h_metrics.iter() {
+                    accum.push(UnifiedHmtxMetric {
+                        advance_width: Some(hmet.advance_width),
+                        left_side_bearing: as_s16(hmet.left_side_bearing),
+                    });
+                }
+                for lsb in hmtx.left_side_bearings.iter() {
+                    accum.push(UnifiedHmtxMetric {
+                        advance_width: None,
+                        left_side_bearing: as_s16(*lsb),
+                    });
+                }
+                HmtxMetrics(accum)
+            };
+            let name = {
+                let name = &dir.table_links.name;
+                let name_records = {
+                    let mut tmp = Vec::with_capacity(name.name_records.len());
+                    for record in name.name_records.iter() {
+                        let buf = match &record.offset.link {
+                            Some(link) => Some(String::from_utf8_lossy(&link).into_owned()),
+                            None => None,
+                        };
+                        tmp.push(NameRecord { name_id: record.name_id, buf });
                     }
-                    opentype_ttc_header_header::Version1(hv1) => {
-                        println!("TTC Version 1 ({} fonts)", hv1.num_fonts);
-                        for (i, table_dir) in hv1.table_directories.iter().enumerate() {
-                            match table_dir.link.as_ref() {
-                                Some(table_dir) => {
-                                    println!("=== Font @ Index {i} ===");
-                                    show_font_directory(table_dir);
-                                }
-                                None => {
-                                    println!("=== Skipping Index {i} ===");
-                                }
+                    tmp
+                };
+                let lang_tag_records = {
+                    match &name.data {
+                        opentype_name_table_data::NameVersion0 => None,
+                        opentype_name_table_data::NameVersion1(v1data) => {
+                            let mut tmp = Vec::with_capacity(v1data.lang_tag_records.len());
+                            for record in v1data.lang_tag_records.iter() {
+                                let lang_tag = match &record.offset.link {
+                                    Some(link) => Some(String::from_utf8_lossy(&link).into_owned()),
+                                    None => None,
+                                };
+                                tmp.push(LangTagRecord { lang_tag })
+                            }
+                            Some(tmp)
+                        }
+                        opentype_name_table_data::NameVersionUnknown(ver) => {
+                            return Err(Box::new(UnknownValueError { what: format!("name table version"), bad_value: *ver }))
+                        }
+                    }
+                };
+                NameMetrics {
+                    version: name.version,
+                    name_count: name.name_count as usize,
+                    name_records,
+                    lang_tag_records,
+                }
+            };
+            let os2 = {
+                let os2 = &dir.table_links.os2;
+                // FIXME - implement type for Os2Metrics
+                os2.clone()
+            };
+            let post = {
+                let post = &dir.table_links.post;
+                // FIXME - implement type for PostMetrics
+                post.clone()
+            };
+            RequiredTableMetrics {
+                cmap,
+                head,
+                hhea,
+                maxp,
+                hmtx,
+                name,
+                os2,
+                post,
+            }
+        };
+        let optional = {
+            let cvt = dir.table_links.cvt.as_ref().map(|cvt| RawArrayMetrics(cvt.len()));
+            let fpgm = dir.table_links.fpgm.as_ref().map(|fpgm| RawArrayMetrics(fpgm.len()));
+            let loca = dir.table_links.loca.as_ref().map(|_| ());
+            let glyf = dir.table_links.glyf.as_ref().map(|glyf| {
+                let num_glyphs = glyf.len();
+                let glyphs = glyf.iter().map(|g| {
+                    match g {
+                        opentype_glyf_table::EmptyGlyph => GlyphMetric::Empty,
+                        opentype_glyf_table::Glyph(gl) => match &gl.description {
+                            GlyphDescription::HeaderOnly => GlyphMetric::Empty,
+                            GlyphDescription::Simple(simple) => {
+                                GlyphMetric::Simple(SimpleGlyphMetric {
+                                    contours: gl.number_of_contours as usize,
+                                    coordinates: *simple.end_points_of_contour.last().unwrap() as usize + 1,
+                                    instructions: simple.instruction_length as usize,
+                                    bounding_box: bounding_box(gl),
+                                })
+                            }
+                            GlyphDescription::Composite(comp) => {
+                                GlyphMetric::Composite(CompositeGlyphMetric {
+                                    components: comp.glyphs.len(),
+                                    instructions: comp.instructions.len(),
+                                    bounding_box: bounding_box(gl),
+                                })
                             }
                         }
                     }
-                    opentype_ttc_header_header::Version2(hv2) => {
-                        println!("TTC Version 2 ({} fonts)", hv2.num_fonts);
-                        for (i, table_dir) in hv2.table_directories.iter().enumerate() {
-                            match table_dir.link.as_ref() {
-                                Some(table_dir) => {
-                                    println!("=== Font @ Index {i} ===");
-                                    show_font_directory(table_dir);
-                                }
-                                None => {
-                                    println!("=== Skipping Index {i} ===");
-                                }
-                            }
+                }).collect();
+                GlyfMetrics { num_glyphs, glyphs }
+            });
+            OptionalTableMetrics {
+                cvt,
+                fpgm,
+                loca,
+                glyf,
+            }
+        };
+        Ok(SingleFontMetrics {
+            sfnt_version: dir.sfnt_version,
+            num_tables: dir.num_tables as usize,
+            required,
+            optional,
+        })
+    }
+
+    fn bounding_box(gl: &opentype_glyf_table_Glyph) -> BoundingBox {
+        BoundingBox {
+            x_min: as_s16(gl.x_min),
+            y_min: as_s16(gl.y_min),
+            x_max: as_s16(gl.x_max),
+            y_max: as_s16(gl.y_max),
+        }
+    }
+
+    pub fn show_opentype_stats(metrics: &OpentypeMetrics) {
+        match metrics {
+            OpentypeMetrics::MultiFont(multi) => {
+                println!("TTC: version {} ({} fonts)", format_version_major_minor(multi.version.0, multi.version.1), multi.num_fonts);
+                for (i, o_font) in multi.font_metrics.iter().enumerate() {
+                    match o_font.as_ref() {
+                        Some(font) => {
+                            println!("=== Font @ Index {i} ===");
+                            show_font_metrics(font);
+                        }
+                        None => {
+                            println!("=== Skipping Index {i} ===");
                         }
                     }
                 }
             }
-            opentype_font_directory::TableDirectory(table_dir) => show_font_directory(table_dir),
-            opentype_font_directory::UnknownTable => println!("<unknown>"),
+            OpentypeMetrics::SingleFont(single) => show_font_metrics(single),
         }
     }
 
     fn show_magic(magic: u32) {
+        println!("Magic: {}", format_magic(magic));
+    }
+
+    fn format_magic(magic: u32) -> String {
         let bytes = magic.to_be_bytes();
         let show = |b: u8| {
             if b.is_ascii_alphanumeric() {
@@ -288,30 +662,60 @@ pub mod oft_metrics {
                 format!("{:02x}", b)
             }
         };
-        println!(
-            "Magic: {}{}{}{}",
+        format!(
+            "{}{}{}{}",
             show(bytes[0]),
             show(bytes[1]),
             show(bytes[2]),
             show(bytes[3])
-        );
+        )
     }
 
-    fn show_font_directory(table_dir: &OpentypeFontDirectory) {
-        let links = &table_dir.table_links;
-        // STUB - add in more tailored printing of each table according to what it contains
-        show_cmap_table(&links.cmap);
-        show_head_table(&links.head);
-        show_hhea_table(&links.hhea);
-        show_hmtx_table(&links.hmtx);
-        // println!("maxp: {:?}", &links.maxp);
-        // println!("name: {:?}", &links.name);
-        // println!("os2: {:?}", &links.os2);
-        // println!("post: {:?}", &links.post);
-        // println!("cvt: {:?}", &links.cvt);
-        // println!("fpgm: {:?}", &links.fpgm);
-        // println!("loca: {:?}", &links.loca);
-        show_glyph_table(&links.glyf);
+    fn show_font_metrics(font: &SingleFontMetrics) {
+        show_magic(font.sfnt_version);
+        show_required_metrics(&font.required);
+        show_optional_metrics(&font.optional);
+
+
+    }
+
+    fn show_required_metrics(required: &RequiredTableMetrics) {
+        show_cmap_metrics(&required.cmap);
+        show_head_metrics(&required.head);
+        show_hhea_metrics(&required.hhea);
+        show_htmx_metrics(&required.hmtx);
+        show_maxp_metrics(&required.maxp);
+        show_name_metrics(&required.name);
+        show_os2_metrics(&required.os2);
+        show_post_metrics(&required.post);
+    }
+
+    fn show_optional_metrics(optional: &OptionalTableMetrics) {
+        show_cvt_metrics(&optional.cvt);
+        show_fpgm_metrics(&optional.fpgm);
+        show_loca_metrics(&optional.loca);
+        show_glyf_metrics(&optional.glyf);
+    }
+
+    fn show_cvt_metrics(cvt: &Option<CvtMetrics>) {
+        match cvt {
+            Some(RawArrayMetrics(count)) => println!("cvt: FWORD[{count}]"),
+            None => ()
+        }
+    }
+
+    fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>) {
+        match fpgm {
+            Some(RawArrayMetrics(count)) => println!("fpgm: uint8[{count}]"),
+            None => (),
+        }
+    }
+
+    fn show_loca_metrics(loca: &Option<LocaMetrics>) {
+        match loca {
+            Some(()) => println!("loca"),
+            None => (),
+        }
     }
 
     /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
@@ -350,9 +754,9 @@ pub mod oft_metrics {
         format!("{}.{}", major, minor)
     }
 
-    fn show_cmap_table(cmap: &OpentypeCmap) {
+    fn show_cmap_metrics(cmap: &CmapMetrics) {
         println!(
-            "cmap: table version {}, {} encoding tables",
+            "cmap: version {}, {} encoding tables",
             cmap.version, cmap.num_tables
         );
     }
@@ -363,7 +767,7 @@ pub mod oft_metrics {
         FullyMixed = 0,
         StrongLR = 1,
         NeutralLR = 2,
-        StrongRL = 0xffff, // -1
+        StrongRL = 0xffff,  // -1
         NeutralRL = 0xfffe, // -2
     }
 
@@ -395,90 +799,100 @@ pub mod oft_metrics {
         }
     }
 
-    fn show_head_table(head: &OpentypeHead) {
-        let dir_hint: DirectionHint = head.font_direction_hint.try_into().unwrap();
-
-        println!("head: table version {}, {}",
+    fn show_head_metrics(head: &HeadMetrics) {
+        println!(
+            "head: version {}, {}",
             format_version_major_minor(head.major_version, head.minor_version),
-            dir_hint
+            head.dir_hint,
         );
     }
 
-    fn show_hhea_table(hhea: &OpentypeHhea) {
-        println!("hhea: table version {}, {} horizontal long metrics",
+    fn show_hhea_metrics(hhea: &HheaMetrics) {
+        println!(
+            "hhea: table version {}, {} horizontal long metrics",
             format_version_major_minor(hhea.major_version, hhea.minor_version),
-            hhea.number_of_long_horizontal_metrics
+            hhea.num_lhm,
         );
     }
 
-    fn show_hmtx_table(hmtx: &OpentypeHmtx) {
-        let nmetrics = hmtx.h_metrics.len();
-
-        let show_hmtx_hmetric = |ix: usize, hmet: &OpentypeHmtxHmetric| {
-            println!("Glyph ID [{ix}]: advanceWidth={}, lsb={}", hmet.advance_width, as_s16(hmet.left_side_bearing));
-        };
-        let show_hmtx_left_bearing = |ix: usize, lsb: &u16| {
-            println!("Glyph ID [{}]: lsb={}", ix + nmetrics, as_s16(*lsb));
+    fn show_htmx_metrics(hmtx: &HmtxMetrics) {
+        let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| {
+            match &hmet.advance_width {
+                Some(width) => println!("Glyph ID [{ix}]: advanceWidth={width}, lsb={}", hmet.left_side_bearing),
+                None => println!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
+            }
         };
 
         show_items_elided(
-            hmtx.h_metrics.as_slice(),
-            show_hmtx_hmetric,
+            &hmtx.0,
+            show_unified,
             8,
-            |start, stop| format!("skipping hmetrics {start}..{stop}")
-        );
-        show_items_elided(
-            hmtx.left_side_bearings.as_slice(),
-            show_hmtx_left_bearing,
-            8,
-            |start, stop| format!(
-                "skipping left-side-bearings {}..{}",
-                start + nmetrics,
-                stop + nmetrics
-            )
+            |start, stop| format!("skipping hmetrics {start}..{stop}"),
         );
     }
+
+    fn show_maxp_metrics(maxp: &MaxpMetrics) {
+        match maxp {
+            MaxpMetrics::Postscript { version } => println!("maxp: version {} (PostScript)", format_version16dot16(*version)),
+            MaxpMetrics::UnknownVersion { version} => println!("maxp: version {} (not recognized)", format_version16dot16(*version)),
+            // STUB - currently limited by definition of Version1 variant, but the information available in the type may be enriched later
+            MaxpMetrics::Version1 { version } => println!("maxp: version {} (contents omitted)", format_version16dot16(*version)),
+        }
+    }
+
+    fn show_name_metrics(name: &NameMetrics) {
+        // STUB - add more details if appropriate
+        match &name.lang_tag_records {
+            Some(records) => println!("name: version {}, {} name_records, {} language tag records", name.version, name.name_count, records.len()),
+            None => println!("name: version {}, {} name_records", name.version, name.name_count),
+        }
+    }
+
+    fn show_os2_metrics(os2: &Os2Metrics) {
+        // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
+        println!("os/2: version {}", os2.version);
+    }
+
+    fn show_post_metrics(post: &PostMetrics) {
+        // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
+        println!("post: version {}", format_version16dot16(post.version));
+    }
+
 
     // NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
     const fn as_s16(v: u16) -> i16 {
         v as i16
     }
 
-    fn show_glyph_table(glyf: &Option<Vec<OpentypeGlyph>>) {
+    fn show_glyf_metrics(glyf: &Option<GlyfMetrics>) {
         if let Some(glyf) = glyf.as_ref() {
-            show_items_elided(
-                glyf.as_slice(),
-                show_single_glyph,
-                8,
-                |start, stop| format!("skipping glyphs {start}..{stop}")
-            )
+            show_items_elided(glyf.glyphs.as_slice(), show_glyph_metric, 8, |start, stop| {
+                format!("skipping glyphs {start}..{stop}")
+            })
         } else {
             println!("glyf: <not present>")
         }
     }
 
-    fn show_single_glyph(ix: usize, glyf: &OpentypeGlyph) {
+    fn show_glyph_metric(ix: usize, glyf: &GlyphMetric) {
         print!("[{ix}]: ");
         match glyf {
-            OpentypeGlyph::EmptyGlyph => println!("<empty>"),
-            OpentypeGlyph::Glyph(glyph) => match &glyph.description {
-                GlyphDescription::HeaderOnly => println!("<empty (implied)>"),
-                GlyphDescription::Simple(sglyph) => {
-                    println!("Simple Glyph [{} contours, {} coordinates, {} instructions, xy: [({}, {}) <-> ({}, {})]]",
-                        glyph.number_of_contours,
-                        sglyph.end_points_of_contour.last().unwrap() + 1,
-                        sglyph.instruction_length,
-                        glyph.x_min, glyph.y_min, glyph.x_max, glyph.y_max
-                    );
-                }
-                GlyphDescription::Composite(cglyph) => {
-                    println!("Composite Glyph [{} components, {} instructions, xy: [({}, {}) <-> ({}, {})]]",
-                        cglyph.glyphs.len(),
-                        cglyph.instructions.len(),
-                        glyph.x_min, glyph.y_min, glyph.x_max, glyph.y_max
-                    );
-                }
-            },
+            GlyphMetric::Empty => println!("<empty>"),
+            GlyphMetric::Simple(simple) => {
+                println!("Simple Glyph [{} contours, {} coordinates, {} instructions, xy: {}]",
+                    simple.contours,
+                    simple.coordinates,
+                    simple.instructions,
+                    simple.bounding_box
+                );
+            }
+            GlyphMetric::Composite(composite) => {
+                println!("Composite Glyph [{} components, {} instructions, xy: {}]",
+                    composite.components,
+                    composite.instructions,
+                    composite.bounding_box,
+                );
+            }
         }
     }
 }

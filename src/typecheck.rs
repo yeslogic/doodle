@@ -2794,7 +2794,12 @@ impl TypeChecker {
         let vm = self.varmaps.get_varmap(vmid);
         let mut branches = BTreeMap::new();
         for (label, ut) in vm.iter() {
-            branches.insert(label.clone(), self.reify(ut.clone())?);
+            let variant_type = self.reify(ut.clone())?;
+            // NOTE - if the variant's inner type is unconstructable, the variant in question can be pruned safely
+            if matches!(variant_type, ValueType::Empty) {
+                continue;
+            }
+            branches.insert(label.clone(), variant_type);
         }
         Some(ValueType::Union(branches))
     }
