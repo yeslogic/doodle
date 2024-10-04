@@ -278,7 +278,7 @@ pub mod oft_metrics {
     enum MaxpMetrics {
         Postscript { version: u32 }, // version 0.5
         // STUB - enrich with any further details we care about presenting
-        Version1 { version: u32 }, // version 1.0
+        Version1 { version: u32 },       // version 1.0
         UnknownVersion { version: u32 }, // anything else
     }
 
@@ -379,10 +379,13 @@ pub mod oft_metrics {
 
     impl std::fmt::Display for BoundingBox {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "[({}, {}) <-> ({}, {})]", self.x_min, self.y_min, self.x_max, self.y_max)
+            write!(
+                f,
+                "[({}, {}) <-> ({}, {})]",
+                self.x_min, self.y_min, self.x_max, self.y_max
+            )
         }
     }
-
 
     type LocaMetrics = ();
 
@@ -494,12 +497,15 @@ pub mod oft_metrics {
                 match &maxp.data {
                     opentype_maxp_table_data::MaxpPostScript => MaxpMetrics::Postscript { version },
                     opentype_maxp_table_data::MaxpV1(_table) => MaxpMetrics::Version1 { version },
-                    opentype_maxp_table_data::MaxpUnknown(_) => MaxpMetrics::UnknownVersion { version },
+                    opentype_maxp_table_data::MaxpUnknown(_) => {
+                        MaxpMetrics::UnknownVersion { version }
+                    }
                 }
             };
             let hmtx = {
                 let hmtx = &dir.table_links.hmtx;
-                let mut accum = Vec::with_capacity(hmtx.h_metrics.len() + hmtx.left_side_bearings.len());
+                let mut accum =
+                    Vec::with_capacity(hmtx.h_metrics.len() + hmtx.left_side_bearings.len());
                 for hmet in hmtx.h_metrics.iter() {
                     accum.push(UnifiedHmtxMetric {
                         advance_width: Some(hmet.advance_width),
@@ -523,7 +529,10 @@ pub mod oft_metrics {
                             Some(link) => Some(String::from_utf8_lossy(&link).into_owned()),
                             None => None,
                         };
-                        tmp.push(NameRecord { name_id: record.name_id, buf });
+                        tmp.push(NameRecord {
+                            name_id: record.name_id,
+                            buf,
+                        });
                     }
                     tmp
                 };
@@ -542,7 +551,10 @@ pub mod oft_metrics {
                             Some(tmp)
                         }
                         opentype_name_table_data::NameVersionUnknown(ver) => {
-                            return Err(Box::new(UnknownValueError { what: format!("name table version"), bad_value: *ver }))
+                            return Err(Box::new(UnknownValueError {
+                                what: format!("name table version"),
+                                bad_value: *ver,
+                            }))
                         }
                     }
                 };
@@ -575,20 +587,31 @@ pub mod oft_metrics {
             }
         };
         let optional = {
-            let cvt = dir.table_links.cvt.as_ref().map(|cvt| RawArrayMetrics(cvt.len()));
-            let fpgm = dir.table_links.fpgm.as_ref().map(|fpgm| RawArrayMetrics(fpgm.len()));
+            let cvt = dir
+                .table_links
+                .cvt
+                .as_ref()
+                .map(|cvt| RawArrayMetrics(cvt.len()));
+            let fpgm = dir
+                .table_links
+                .fpgm
+                .as_ref()
+                .map(|fpgm| RawArrayMetrics(fpgm.len()));
             let loca = dir.table_links.loca.as_ref().map(|_| ());
             let glyf = dir.table_links.glyf.as_ref().map(|glyf| {
                 let num_glyphs = glyf.len();
-                let glyphs = glyf.iter().map(|g| {
-                    match g {
+                let glyphs = glyf
+                    .iter()
+                    .map(|g| match g {
                         opentype_glyf_table::EmptyGlyph => GlyphMetric::Empty,
                         opentype_glyf_table::Glyph(gl) => match &gl.description {
                             GlyphDescription::HeaderOnly => GlyphMetric::Empty,
                             GlyphDescription::Simple(simple) => {
                                 GlyphMetric::Simple(SimpleGlyphMetric {
                                     contours: gl.number_of_contours as usize,
-                                    coordinates: *simple.end_points_of_contour.last().unwrap() as usize + 1,
+                                    coordinates: *simple.end_points_of_contour.last().unwrap()
+                                        as usize
+                                        + 1,
                                     instructions: simple.instruction_length as usize,
                                     bounding_box: bounding_box(gl),
                                 })
@@ -600,9 +623,9 @@ pub mod oft_metrics {
                                     bounding_box: bounding_box(gl),
                                 })
                             }
-                        }
-                    }
-                }).collect();
+                        },
+                    })
+                    .collect();
                 GlyfMetrics { num_glyphs, glyphs }
             });
             OptionalTableMetrics {
@@ -632,7 +655,11 @@ pub mod oft_metrics {
     pub fn show_opentype_stats(metrics: &OpentypeMetrics) {
         match metrics {
             OpentypeMetrics::MultiFont(multi) => {
-                println!("TTC: version {} ({} fonts)", format_version_major_minor(multi.version.0, multi.version.1), multi.num_fonts);
+                println!(
+                    "TTC: version {} ({} fonts)",
+                    format_version_major_minor(multi.version.0, multi.version.1),
+                    multi.num_fonts
+                );
                 for (i, o_font) in multi.font_metrics.iter().enumerate() {
                     match o_font.as_ref() {
                         Some(font) => {
@@ -675,8 +702,6 @@ pub mod oft_metrics {
         show_magic(font.sfnt_version);
         show_required_metrics(&font.required);
         show_optional_metrics(&font.optional);
-
-
     }
 
     fn show_required_metrics(required: &RequiredTableMetrics) {
@@ -700,7 +725,7 @@ pub mod oft_metrics {
     fn show_cvt_metrics(cvt: &Option<CvtMetrics>) {
         match cvt {
             Some(RawArrayMetrics(count)) => println!("cvt: FWORD[{count}]"),
-            None => ()
+            None => (),
         }
     }
 
@@ -816,35 +841,50 @@ pub mod oft_metrics {
     }
 
     fn show_htmx_metrics(hmtx: &HmtxMetrics) {
-        let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| {
-            match &hmet.advance_width {
-                Some(width) => println!("Glyph ID [{ix}]: advanceWidth={width}, lsb={}", hmet.left_side_bearing),
-                None => println!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
-            }
+        let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| match &hmet.advance_width {
+            Some(width) => println!(
+                "Glyph ID [{ix}]: advanceWidth={width}, lsb={}",
+                hmet.left_side_bearing
+            ),
+            None => println!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
         };
 
-        show_items_elided(
-            &hmtx.0,
-            show_unified,
-            8,
-            |start, stop| format!("skipping hmetrics {start}..{stop}"),
-        );
+        show_items_elided(&hmtx.0, show_unified, 8, |start, stop| {
+            format!("skipping hmetrics {start}..{stop}")
+        });
     }
 
     fn show_maxp_metrics(maxp: &MaxpMetrics) {
         match maxp {
-            MaxpMetrics::Postscript { version } => println!("maxp: version {} (PostScript)", format_version16dot16(*version)),
-            MaxpMetrics::UnknownVersion { version} => println!("maxp: version {} (not recognized)", format_version16dot16(*version)),
+            MaxpMetrics::Postscript { version } => println!(
+                "maxp: version {} (PostScript)",
+                format_version16dot16(*version)
+            ),
+            MaxpMetrics::UnknownVersion { version } => println!(
+                "maxp: version {} (not recognized)",
+                format_version16dot16(*version)
+            ),
             // STUB - currently limited by definition of Version1 variant, but the information available in the type may be enriched later
-            MaxpMetrics::Version1 { version } => println!("maxp: version {} (contents omitted)", format_version16dot16(*version)),
+            MaxpMetrics::Version1 { version } => println!(
+                "maxp: version {} (contents omitted)",
+                format_version16dot16(*version)
+            ),
         }
     }
 
     fn show_name_metrics(name: &NameMetrics) {
         // STUB - add more details if appropriate
         match &name.lang_tag_records {
-            Some(records) => println!("name: version {}, {} name_records, {} language tag records", name.version, name.name_count, records.len()),
-            None => println!("name: version {}, {} name_records", name.version, name.name_count),
+            Some(records) => println!(
+                "name: version {}, {} name_records, {} language tag records",
+                name.version,
+                name.name_count,
+                records.len()
+            ),
+            None => println!(
+                "name: version {}, {} name_records",
+                name.version, name.name_count
+            ),
         }
     }
 
@@ -858,7 +898,6 @@ pub mod oft_metrics {
         println!("post: version {}", format_version16dot16(post.version));
     }
 
-
     // NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
     const fn as_s16(v: u16) -> i16 {
         v as i16
@@ -866,9 +905,12 @@ pub mod oft_metrics {
 
     fn show_glyf_metrics(glyf: &Option<GlyfMetrics>) {
         if let Some(glyf) = glyf.as_ref() {
-            show_items_elided(glyf.glyphs.as_slice(), show_glyph_metric, 8, |start, stop| {
-                format!("skipping glyphs {start}..{stop}")
-            })
+            show_items_elided(
+                glyf.glyphs.as_slice(),
+                show_glyph_metric,
+                8,
+                |start, stop| format!("skipping glyphs {start}..{stop}"),
+            )
         } else {
             println!("glyf: <not present>")
         }
@@ -879,18 +921,15 @@ pub mod oft_metrics {
         match glyf {
             GlyphMetric::Empty => println!("<empty>"),
             GlyphMetric::Simple(simple) => {
-                println!("Simple Glyph [{} contours, {} coordinates, {} instructions, xy: {}]",
-                    simple.contours,
-                    simple.coordinates,
-                    simple.instructions,
-                    simple.bounding_box
+                println!(
+                    "Simple Glyph [{} contours, {} coordinates, {} instructions, xy: {}]",
+                    simple.contours, simple.coordinates, simple.instructions, simple.bounding_box
                 );
             }
             GlyphMetric::Composite(composite) => {
-                println!("Composite Glyph [{} components, {} instructions, xy: {}]",
-                    composite.components,
-                    composite.instructions,
-                    composite.bounding_box,
+                println!(
+                    "Composite Glyph [{} components, {} instructions, xy: {}]",
+                    composite.components, composite.instructions, composite.bounding_box,
                 );
             }
         }
