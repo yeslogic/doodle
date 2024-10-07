@@ -418,7 +418,7 @@ pub mod oft_metrics {
     pub fn analyze_font(test_file: &str) -> TestResult<OpentypeMetrics> {
         let buffer = std::fs::read(std::path::Path::new(test_file))?;
         let mut input = Parser::new(&buffer);
-        let dat = Decoder14(&mut input)?;
+        let dat = Decoder_opentype_main(&mut input)?;
         // TODO: do we want to collect (and return) any metrics here?
         match dat.font.directory {
             opentype_font_directory::TTCHeader(multi) => {

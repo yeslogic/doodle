@@ -31,12 +31,10 @@ fn test_decoder_tgz() -> TestResult {
 
 #[test]
 fn test_decoder_font() -> TestResult {
-    let buffer = std::fs::read(std::path::Path::new(&testpath(
+    let metrics = analyze_font(&testpath(
         "../prince/tests/data/fonts/lsansuni.ttf",
-    )))?;
-    let mut input = Parser::new(&buffer);
-    let parsed_data = Decoder_opentype_main(&mut input)?;
-    show_opentype_stats(&parsed_data);
+    ))?;
+    show_opentype_stats(&metrics);
     Ok(())
 }
 
