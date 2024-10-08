@@ -958,7 +958,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 const NID_COPYRIGHT_NOTICE: u16 = 0;
                 const NID_FAMILY_NAME: u16 = 1;
                 const NID_SUBFAMILY_NAME: u16 = 2;
-                const NID_UNIQUE_FONT_IDENTIFICATION: u16 = 4;
+                const NID_UNIQUE_FONT_IDENTIFICATION: u16 = 3;
                 const NID_FULL_FONT_NAME: u16 = 4;
                 const NID_VERSION_STRING: u16 = 5;
                 const NID_POSTSCRIPT_NAME: u16 = 6;

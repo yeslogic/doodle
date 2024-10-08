@@ -210,8 +210,12 @@ pub mod png_metrics {
     }
 }
 
-pub mod oft_metrics {
+pub mod otf_metrics {
     use super::*;
+    use encoding::{
+        all::{MAC_ROMAN, UTF_16BE},
+        DecoderTrap, Encoding,
+    };
 
     pub type OpentypeFontDirectory = opentype_table_directory;
     pub type OpentypeGlyf = opentype_glyf_table;
@@ -303,12 +307,297 @@ pub mod oft_metrics {
     #[derive(Clone, Debug)]
     // STUB - this is probably less than we eventually want (assuming we care about presenting this info)
     struct NameRecord {
+        plat_encoding_lang: PlatformEncodingLanguageId,
         name_id: NameId,
         buf: Option<String>,
     }
 
     // STUB - turn into enum?
-    type NameId = u16;
+    #[repr(transparent)]
+    #[derive(Clone, Copy, PartialOrd, PartialEq, Debug, Ord, Eq, Hash)]
+    struct NameId(u16);
+
+    impl NameId {
+        pub const COPYRIGHT_NOTICE: Self = NameId(0);
+        pub const FAMILY_NAME: Self = NameId(1);
+        pub const SUBFAMILY_NAME: Self = NameId(2);
+        pub const UNIQUE_FONT_IDENTIFICATION: Self = NameId(3);
+        pub const FULL_FONT_NAME: Self = NameId(4);
+        pub const VERSION_STRING: Self = NameId(5);
+        pub const POSTSCRIPT_NAME: Self = NameId(6);
+        pub const TRADEMARK: Self = NameId(7);
+        pub const MANUFACTURER_NAME: Self = NameId(8);
+        pub const DESIGNER_NAME: Self = NameId(9);
+        pub const DESCRIPTION: Self = NameId(10);
+        pub const VENDOR_URL: Self = NameId(11);
+        pub const DESIGNER_URL: Self = NameId(12);
+        pub const LICENSE_DESCRIPTION: Self = NameId(13);
+        pub const LICENSE_INFO_URL: Self = NameId(14);
+        pub const TYPOGRAPHIC_FAMILY_NAME: Self = NameId(16);
+        pub const TYPOGRAPHIC_SUBFAMILY_NAME: Self = NameId(17);
+        pub const COMPAT_FULL_NAME: Self = NameId(18);
+        pub const SAMPLE_TEXT: Self = NameId(19);
+        pub const POSTSCRIPT_FONT_NAME: Self = NameId(20);
+        pub const WWS_FAMILY_NAME: Self = NameId(21);
+        pub const WWS_SUBFAMILY_NAME: Self = NameId(22);
+        pub const LIGHT_BACKGROUND_PALETTE: Self = NameId(23);
+        pub const DARK_BACKGROUND_PALETTE: Self = NameId(24);
+        pub const VARIATIONS_POSTSCRIPT_NAME_PREFIX: Self = NameId(25);
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+    enum PlatformEncodingLanguageId {
+        Unicode(UnicodeEncodingId),                          // 0
+        Macintosh(MacintoshEncodingId, MacintoshLanguageId), // 1
+        Windows(WindowsEncodingId, WindowsLanguageId),       // 3
+    }
+
+    impl PlatformEncodingLanguageId {
+        fn matches_locale(&self, buf: &str) -> bool {
+            match self {
+                PlatformEncodingLanguageId::Unicode(_) => buf.is_ascii(),
+                PlatformEncodingLanguageId::Macintosh(
+                    macintosh_encoding_id,
+                    macintosh_language_id,
+                ) => match macintosh_encoding_id {
+                    MacintoshEncodingId::Roman => macintosh_language_id.is_english(),
+                    _ => false,
+                },
+                PlatformEncodingLanguageId::Windows(_, windows_language_id) => {
+                    windows_language_id.is_english()
+                }
+            }
+        }
+
+        fn convert(&self, link: &[u8]) -> String {
+            match self {
+                PlatformEncodingLanguageId::Macintosh(MacintoshEncodingId::Roman, ..) => MAC_ROMAN
+                    .decode(link, DecoderTrap::Ignore)
+                    .unwrap()
+                    .to_owned(),
+                PlatformEncodingLanguageId::Macintosh(..)
+                | PlatformEncodingLanguageId::Unicode(_) => UTF_16BE
+                    .decode(link, DecoderTrap::Ignore)
+                    .unwrap()
+                    .to_owned(),
+                PlatformEncodingLanguageId::Windows(..) => UTF_16BE
+                    .decode(link, DecoderTrap::Ignore)
+                    .unwrap()
+                    .to_owned(),
+            }
+        }
+    }
+
+    impl TryFrom<(u16, u16, u16)> for PlatformEncodingLanguageId {
+        type Error = UnknownValueError<u16>;
+
+        fn try_from(value: (u16, u16, u16)) -> Result<Self, Self::Error> {
+            let (platform_id, encoding_id, language_id) = value;
+
+            match platform_id {
+                0 => Ok(Self::Unicode(UnicodeEncodingId::try_from(encoding_id)?)),
+                1 => {
+                    let macintosh_encoding_id = MacintoshEncodingId::try_from(encoding_id)?;
+                    let macintosh_language_id = MacintoshLanguageId::try_from(language_id)?;
+                    Ok(Self::Macintosh(
+                        macintosh_encoding_id,
+                        macintosh_language_id,
+                    ))
+                }
+                3 => {
+                    let windows_encoding_id = WindowsEncodingId::try_from(encoding_id)?;
+                    // NOTE - this conversion is currently infallible, but if we refine it, replace with try_from() with `?`
+                    let windows_language_id = WindowsLanguageId::from(language_id);
+                    Ok(Self::Windows(windows_encoding_id, windows_language_id))
+                }
+                bad_value => Err(UnknownValueError {
+                    what: String::from("platform ID"),
+                    bad_value,
+                }),
+            }
+        }
+    }
+
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+    enum UnicodeEncodingId {
+        Semantics_Unicode1Dot0 = 0, // deprecated
+        Semantics_Unicode1Dot1 = 1, // deprecated
+        Semantics_UCS = 2,          // deprecated
+        Semantics_Unicode2_BMP = 3,
+        Semantics_Unicode2_Full = 4,
+    }
+
+    impl TryFrom<u16> for UnicodeEncodingId {
+        type Error = UnknownValueError<u16>;
+
+        fn try_from(value: u16) -> Result<Self, Self::Error> {
+            match value {
+                0 => Ok(Self::Semantics_Unicode1Dot0),
+                1 => Ok(Self::Semantics_Unicode1Dot1),
+                2 => Ok(Self::Semantics_UCS),
+                3 => Ok(Self::Semantics_Unicode2_BMP),
+                4 => Ok(Self::Semantics_Unicode2_Full),
+                _ => Err(UnknownValueError {
+                    what: "Unicode Encoding ID".into(),
+                    bad_value: value,
+                }),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+    #[repr(u16)]
+    enum MacintoshEncodingId {
+        Roman = 0,
+        Japanese = 1,
+        TradChinese = 2,
+        Korean = 3,
+        Arabic = 4,
+        Hebrew = 5,
+        Greek = 6,
+        Russian = 7,
+        RSymbol = 8,
+        Devanagari = 9,
+        Gurmukhi = 10,
+        Gujarati = 11,
+        Oriya = 12,
+        Bengali = 13,
+        Tamil = 14,
+        Telugu = 15,
+        Kannada = 16,
+        Malayalam = 17,
+        Sinhalese = 18,
+        Burmese = 19,
+        Khmer = 20,
+        Thai = 21,
+        Laotian = 22,
+        Georgian = 23,
+        Armenian = 24,
+        SimplChinese = 25,
+        Tibetan = 26,
+        Mongolian = 27,
+        Geez = 28,
+        Slavic = 29,
+        Vietnamese = 30,
+        Sindhi = 31,
+        Uninterpreted = 32,
+    }
+
+    impl TryFrom<u16> for MacintoshEncodingId {
+        type Error = UnknownValueError<u16>;
+
+        fn try_from(value: u16) -> Result<Self, Self::Error> {
+            match value {
+                0..=32 => unsafe { Ok(std::mem::transmute(value)) },
+                bad_value => Err(UnknownValueError {
+                    what: "Macintosh Encoding ID".into(),
+                    bad_value,
+                }),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+    #[repr(u16)]
+    enum MacintoshLanguageId {
+        English, // 0
+        // STUB - for this API, we don't necessarily need to have a full list of all languages as first-class variants, but it might be nice for later if we decide to present certain languages preferentially on a per-font basis
+        Other(u16), // 1..=150
+    }
+
+    impl TryFrom<u16> for MacintoshLanguageId {
+        type Error = UnknownValueError<u16>;
+
+        fn try_from(value: u16) -> Result<Self, Self::Error> {
+            match value {
+                // NOTE - only values 0..=150 are populated according to [this spec](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6name.html)
+                0 => Ok(MacintoshLanguageId::English),
+                1..=150 => Ok(MacintoshLanguageId::Other(value)),
+                bad_value => Err(UnknownValueError {
+                    what: String::from("Macintosh language ID"),
+                    bad_value,
+                }),
+            }
+        }
+    }
+
+    impl MacintoshLanguageId {
+        const fn is_english(self) -> bool {
+            matches!(self, Self::English)
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+    #[repr(u16)]
+    enum WindowsEncodingId {
+        Symbol = 0,
+        UnicodeBMP = 1, // preferred
+        ShiftJIS = 2,
+        PRC = 3,
+        Big5 = 4,
+        Wansung = 5,
+        Johab = 6,
+        UnicodeFull = 10,
+    }
+
+    impl TryFrom<u16> for WindowsEncodingId {
+        type Error = UnknownValueError<u16>;
+
+        fn try_from(value: u16) -> Result<Self, Self::Error> {
+            Ok(match value {
+                0 => Self::Symbol,
+                1 => Self::UnicodeBMP,
+                2 => Self::ShiftJIS,
+                3 => Self::PRC,
+                4 => Self::Big5,
+                5 => Self::Wansung,
+                6 => Self::Johab,
+                // 7..=9 are reserved
+                10 => Self::UnicodeFull,
+                bad_value => {
+                    return Err(UnknownValueError {
+                        what: String::from("Windows Encoding ID"),
+                        bad_value,
+                    })
+                }
+            })
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+    #[repr(transparent)]
+    struct WindowsLanguageId(u16);
+
+    impl From<u16> for WindowsLanguageId {
+        fn from(value: u16) -> Self {
+            Self(value)
+        }
+    }
+
+    impl WindowsLanguageId {
+        // STUB - there are more English locales, and many more non-English language tags, but we don't need a full list for now
+        pub const EN: Self = WindowsLanguageId(0x0009);
+        pub const EN_US: Self = WindowsLanguageId(0x0409);
+        pub const EN_GB: Self = WindowsLanguageId(0x0809);
+        pub const EN_AU: Self = WindowsLanguageId(0x0C09);
+        pub const EN_CA: Self = WindowsLanguageId(0x1009);
+        pub const EN_NZ: Self = WindowsLanguageId(0x1409);
+
+        const fn is_english(self) -> bool {
+            // FIXME - there are other English locales but we don't expect to find them that often, at least in abstract
+            matches!(
+                self,
+                Self::EN | Self::EN_US | Self::EN_GB | Self::EN_AU | Self::EN_CA | Self::EN_NZ
+            )
+        }
+    }
+
+    impl std::fmt::Display for NameId {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // REVIEW - might we want to write out the meaning (as a string) instead, where possible?
+            write!(f, "{}", self.0)
+        }
+    }
 
     #[derive(Clone, Debug)]
     struct LangTagRecord {
@@ -466,6 +755,30 @@ pub mod oft_metrics {
         }
     }
 
+    fn utf16be_convert(buf: &[u8]) -> String {
+        // NOTE - taken from the source of nightly-only String::from_utf16be_lossy
+        match (cfg!(target_endian = "big"), unsafe {
+            buf.align_to::<u16>()
+        }) {
+            (true, ([], v, [])) => String::from_utf16_lossy(v),
+            (true, ([], v, [_remainder])) => String::from_utf16_lossy(v) + "\u{FFFD}",
+            _ => {
+                let mut iter = buf.chunks_exact(2);
+                let string = char::decode_utf16(iter.by_ref().map(|hilo| match hilo {
+                    &[hi, lo] => u16::from_be_bytes([hi, lo]),
+                    _ => unreachable!("bad hilo"),
+                }))
+                .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
+                .collect();
+                if iter.remainder().is_empty() {
+                    string
+                } else {
+                    string + "\u{FFFD}"
+                }
+            }
+        }
+    }
+
     pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<SingleFontMetrics> {
         let required = {
             let cmap = {
@@ -525,12 +838,18 @@ pub mod oft_metrics {
                 let name_records = {
                     let mut tmp = Vec::with_capacity(name.name_records.len());
                     for record in name.name_records.iter() {
+                        let plat_encoding_lang = PlatformEncodingLanguageId::try_from((
+                            record.platform,
+                            record.encoding,
+                            record.language,
+                        ))?;
                         let buf = match &record.offset.link {
-                            Some(link) => Some(String::from_utf8_lossy(&link).into_owned()),
+                            Some(link) => Some(plat_encoding_lang.convert(&link)),
                             None => None,
                         };
                         tmp.push(NameRecord {
-                            name_id: record.name_id,
+                            plat_encoding_lang,
+                            name_id: NameId(record.name_id),
                             buf,
                         });
                     }
@@ -543,7 +862,7 @@ pub mod oft_metrics {
                             let mut tmp = Vec::with_capacity(v1data.lang_tag_records.len());
                             for record in v1data.lang_tag_records.iter() {
                                 let lang_tag = match &record.offset.link {
-                                    Some(link) => Some(String::from_utf8_lossy(&link).into_owned()),
+                                    Some(link) => Some(utf16be_convert(&link)),
                                     None => None,
                                 };
                                 tmp.push(LangTagRecord { lang_tag })
@@ -843,14 +1162,14 @@ pub mod oft_metrics {
     fn show_htmx_metrics(hmtx: &HmtxMetrics) {
         let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| match &hmet.advance_width {
             Some(width) => println!(
-                "Glyph ID [{ix}]: advanceWidth={width}, lsb={}",
+                "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
                 hmet.left_side_bearing
             ),
-            None => println!("Glyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
+            None => println!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
         };
 
         show_items_elided(&hmtx.0, show_unified, 8, |start, stop| {
-            format!("skipping hmetrics {start}..{stop}")
+            format!("    (skipping hmetrics {start}..{stop})")
         });
     }
 
@@ -875,16 +1194,35 @@ pub mod oft_metrics {
     fn show_name_metrics(name: &NameMetrics) {
         // STUB - add more details if appropriate
         match &name.lang_tag_records {
-            Some(records) => println!(
-                "name: version {}, {} name_records, {} language tag records",
-                name.version,
-                name.name_count,
-                records.len()
-            ),
+            Some(records) => {
+                println!(
+                    "name: version {}, {} name_records, {} language tag records",
+                    name.version,
+                    name.name_count,
+                    records.len()
+                );
+            }
             None => println!(
                 "name: version {}, {} name_records",
                 name.version, name.name_count
             ),
+        }
+        let mut no_name_yet = true;
+        for record in name.name_records.iter() {
+            match record {
+                // STUB - if there are any more name records we care about, add them here
+                &NameRecord {
+                    name_id: NameId::FULL_FONT_NAME,
+                    plat_encoding_lang,
+                    buf: Some(ref buf),
+                } => {
+                    if no_name_yet && plat_encoding_lang.matches_locale(buf) {
+                        println!("\tFull Font Name: {}", buf);
+                        no_name_yet = false;
+                    }
+                }
+                _ => continue,
+            }
         }
     }
 
@@ -905,11 +1243,12 @@ pub mod oft_metrics {
 
     fn show_glyf_metrics(glyf: &Option<GlyfMetrics>) {
         if let Some(glyf) = glyf.as_ref() {
+            println!("glyf: {} glyphs", glyf.num_glyphs);
             show_items_elided(
                 glyf.glyphs.as_slice(),
                 show_glyph_metric,
                 8,
-                |start, stop| format!("skipping glyphs {start}..{stop}"),
+                |start, stop| format!("    (skipping glyphs {start}..{stop})"),
             )
         } else {
             println!("glyf: <not present>")
@@ -917,7 +1256,7 @@ pub mod oft_metrics {
     }
 
     fn show_glyph_metric(ix: usize, glyf: &GlyphMetric) {
-        print!("[{ix}]: ");
+        print!("\t[{ix}]: ");
         match glyf {
             GlyphMetric::Empty => println!("<empty>"),
             GlyphMetric::Simple(simple) => {
@@ -936,5 +1275,5 @@ pub mod oft_metrics {
     }
 }
 
-pub use oft_metrics::*;
+pub use otf_metrics::*;
 pub use png_metrics::*;
