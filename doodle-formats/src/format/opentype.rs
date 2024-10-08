@@ -1186,6 +1186,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ("version", version16_16(base)),
                     ("italic_angle", fixed32be(base)),
                     ("underline_position", s16be(base)),
+                    ("underline_thickness", s16be(base)),
                     ("is_fixed_pitch", base.u32be()), // nonzero <=> fixed pitch
                     ("min_mem_type42", base.u32be()),
                     ("max_mem_type42", base.u32be()),

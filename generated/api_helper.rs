@@ -604,11 +604,18 @@ pub mod otf_metrics {
         lang_tag: Option<String>,
     }
 
-    // STUB - placeholder for selective field-summary
-    type Os2Metrics = OpentypeOs2;
+    #[derive(Clone, Debug)]
+    struct Os2Metrics {
+        version: u16,
+        // STUB - is anything else relevant?
+    }
 
-    // STUB - placeholder for selective field-summary
-    type PostMetrics = OpentypePost;
+    #[derive(Clone, Debug)]
+    struct PostMetrics {
+        version: u32,
+        is_fixed_pitch: bool,
+        // STUB - is anything else relevant?
+    }
 
     #[derive(Clone, Debug)]
     pub struct RequiredTableMetrics {
@@ -756,27 +763,10 @@ pub mod otf_metrics {
     }
 
     fn utf16be_convert(buf: &[u8]) -> String {
-        // NOTE - taken from the source of nightly-only String::from_utf16be_lossy
-        match (cfg!(target_endian = "big"), unsafe {
-            buf.align_to::<u16>()
-        }) {
-            (true, ([], v, [])) => String::from_utf16_lossy(v),
-            (true, ([], v, [_remainder])) => String::from_utf16_lossy(v) + "\u{FFFD}",
-            _ => {
-                let mut iter = buf.chunks_exact(2);
-                let string = char::decode_utf16(iter.by_ref().map(|hilo| match hilo {
-                    &[hi, lo] => u16::from_be_bytes([hi, lo]),
-                    _ => unreachable!("bad hilo"),
-                }))
-                .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
-                .collect();
-                if iter.remainder().is_empty() {
-                    string
-                } else {
-                    string + "\u{FFFD}"
-                }
-            }
-        }
+        UTF_16BE
+            .decode(buf, DecoderTrap::Ignore)
+            .unwrap()
+            .to_owned()
     }
 
     pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<SingleFontMetrics> {
@@ -886,13 +876,16 @@ pub mod otf_metrics {
             };
             let os2 = {
                 let os2 = &dir.table_links.os2;
-                // FIXME - implement type for Os2Metrics
-                os2.clone()
+                Os2Metrics {
+                    version: os2.version,
+                }
             };
             let post = {
                 let post = &dir.table_links.post;
-                // FIXME - implement type for PostMetrics
-                post.clone()
+                PostMetrics {
+                    version: post.version,
+                    is_fixed_pitch: post.is_fixed_pitch != 0,
+                }
             };
             RequiredTableMetrics {
                 cmap,
@@ -1233,7 +1226,15 @@ pub mod otf_metrics {
 
     fn show_post_metrics(post: &PostMetrics) {
         // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
-        println!("post: version {}", format_version16dot16(post.version));
+        println!(
+            "post: version {} ({})",
+            format_version16dot16(post.version),
+            if post.is_fixed_pitch {
+                "monospaced"
+            } else {
+                "proportionally spaced"
+            }
+        );
     }
 
     // NOTE - scaffolding to mark the values we currently parse into u16 but which are logically i16, to flag changes to the gencode API as they crop up
