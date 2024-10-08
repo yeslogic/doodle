@@ -31,9 +31,7 @@ fn test_decoder_tgz() -> TestResult {
 
 #[test]
 fn test_decoder_font() -> TestResult {
-    let metrics = analyze_font(&testpath(
-        "../prince/tests/data/fonts/lsansuni.ttf",
-    ))?;
+    let metrics = analyze_font(&testpath("../prince/tests/data/fonts/lsansuni.ttf"))?;
     show_opentype_stats(&metrics);
     Ok(())
 }
