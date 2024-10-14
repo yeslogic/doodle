@@ -212,6 +212,7 @@ pub mod png_metrics {
 
 pub mod otf_metrics {
     use super::*;
+    use doodle::Label;
     use encoding::{
         all::{MAC_ROMAN, UTF_16BE},
         DecoderTrap, Encoding,
@@ -684,6 +685,22 @@ pub mod otf_metrics {
     }
 
     type LocaMetrics = ();
+    type PrepMetrics = RawArrayMetrics;
+    #[derive(Clone, Debug)]
+    struct GaspMetrics {
+        version: u16,
+        num_ranges: usize,
+        ranges: Vec<GaspRange>,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct GaspRange {
+        range_max_ppem: u16,
+        range_gasp_behavior: GaspBehaviorFlags,
+    }
+
+    // NOTE - Version 1 contains all the fields that version 0 contains, so it can be used as the unifying type
+    type GaspBehaviorFlags = opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1;
 
     #[derive(Clone, Debug)]
     pub struct OptionalTableMetrics {
@@ -691,6 +708,8 @@ pub mod otf_metrics {
         fpgm: Option<FpgmMetrics>,
         loca: Option<LocaMetrics>,
         glyf: Option<GlyfMetrics>,
+        prep: Option<PrepMetrics>,
+        gasp: Option<GaspMetrics>,
         // STUB - add more tables as we expand opentype definition
     }
 
@@ -940,11 +959,47 @@ pub mod otf_metrics {
                     .collect();
                 GlyfMetrics { num_glyphs, glyphs }
             });
+            let prep = {
+                let prep = &dir.table_links.prep;
+                prep.as_ref().map(|prep| RawArrayMetrics(prep.len()))
+            };
+            let gasp = {
+                let gasp = &dir.table_links.gasp;
+                gasp.as_ref().map(|gasp| GaspMetrics {
+                    version: gasp.version,
+                    num_ranges: gasp.num_ranges as usize,
+                    ranges: gasp
+                        .gasp_ranges
+                        .iter()
+                        .map(|r| GaspRange {
+                            range_max_ppem: r.range_max_ppem,
+                            range_gasp_behavior: match &r.range_gasp_behavior {
+                                &opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version0(
+                                    opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version0 {
+                                        dogray,
+                                        gridfit,
+                                    },
+                                ) => GaspBehaviorFlags {
+                                    symmetric_smoothing: false,
+                                    symmetric_gridfit: false,
+                                    dogray,
+                                    gridfit,
+                                },
+                                opentype_gasp_table_gasp_ranges_range_gasp_behavior::Version1(
+                                    x,
+                                ) => *x,
+                            },
+                        })
+                        .collect(),
+                })
+            };
             OptionalTableMetrics {
                 cvt,
                 fpgm,
                 loca,
                 glyf,
+                prep,
+                gasp,
             }
         };
         Ok(SingleFontMetrics {
@@ -1032,26 +1087,88 @@ pub mod otf_metrics {
         show_fpgm_metrics(&optional.fpgm);
         show_loca_metrics(&optional.loca);
         show_glyf_metrics(&optional.glyf);
+        show_prep_metrics(&optional.prep);
+        show_gasp_metrics(&optional.gasp);
     }
 
     fn show_cvt_metrics(cvt: &Option<CvtMetrics>) {
-        match cvt {
-            Some(RawArrayMetrics(count)) => println!("cvt: FWORD[{count}]"),
-            None => (),
+        if let Some(RawArrayMetrics(count)) = cvt {
+            println!("cvt: FWORD[{count}]")
         }
     }
 
     fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>) {
-        match fpgm {
-            Some(RawArrayMetrics(count)) => println!("fpgm: uint8[{count}]"),
-            None => (),
+        if let Some(RawArrayMetrics(count)) = fpgm {
+            println!("fpgm: uint8[{count}]")
+        }
+    }
+
+    fn show_prep_metrics(prep: &Option<PrepMetrics>) {
+        if let Some(RawArrayMetrics(count)) = prep {
+            println!("prep: uint8[{count}]")
         }
     }
 
     fn show_loca_metrics(loca: &Option<LocaMetrics>) {
-        match loca {
-            Some(()) => println!("loca"),
-            None => (),
+        if let Some(()) = loca {
+            println!("loca: (details omitted)")
+        }
+    }
+
+    fn show_gasp_metrics(gasp: &Option<GaspMetrics>) {
+        if let Some(GaspMetrics {
+            version,
+            num_ranges,
+            ranges,
+        }) = gasp
+        {
+            let show_gasp_range = |_ix: usize, range: &GaspRange| {
+                let GaspBehaviorFlags {
+                    symmetric_smoothing: syms,
+                    symmetric_gridfit: symgrift,
+                    dogray: dg,
+                    gridfit: grift,
+                } = range.range_gasp_behavior;
+                // NOTE - Meanings attributed [here](https://learn.microsoft.com/en-us/typography/opentype/spec/gasp)
+                let disp = {
+                    let mut sep = ""; // Dynamic separator that starts out empty but becomes " | " if any flag-string is pushed
+                    let mut buffer = String::new();
+                    for flag in [
+                        if syms { "SYMMETRIC_SMOOTHING" } else { "" },
+                        if symgrift { "SYMMETRIC_GRIDFIT" } else { "" },
+                        if dg { "DOGRAY" } else { "" },
+                        if grift { "GRIDFIT" } else { "" },
+                    ]
+                    .iter()
+                    {
+                        if flag.is_empty() {
+                            continue;
+                        } else {
+                            buffer.push_str(sep);
+                            buffer.push_str(flag);
+                            sep = " | ";
+                        }
+                    }
+                    if buffer.is_empty() {
+                        Label::Borrowed("(no flags)")
+                    } else {
+                        Label::Owned(format!("({buffer})"))
+                    }
+                };
+                if _ix == 0 && range.range_max_ppem == 0xFFFF {
+                    println!("\t[∀ PPEM] {}", disp);
+                } else {
+                    println!("\t[PPEM <= {}]  {}", range.range_max_ppem, disp)
+                }
+            };
+            println!("gasp: version {version}, {num_ranges} ranges");
+            show_items_elided(&ranges, show_gasp_range, 8, |start, stop| {
+                format!(
+                    "    skipping gasp ranges for max_ppem values {}..={}",
+                    &ranges[start].range_max_ppem,
+                    &ranges[stop - 1].range_max_ppem
+                )
+            });
         }
     }
 
