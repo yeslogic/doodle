@@ -1622,6 +1622,77 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let prep_table = repeat(base.u8());
+        // REVIEW - the generated names for gasp subtypes can be run-on, consider pruning name tokens or module.define_format(_args) for brevity
+        let gasp_table = {
+            let ver0flags = flags_bits16([
+                None, // Bit 15 - Reserved
+                None, // Bit 14 - Reserved
+                None, // Bit 13 - Reserved
+                None, // Bit 12 - Reserved
+                None, // Bit 11 - Reserved
+                None, // Bit 10 - Reserved
+                None, // Bit 9 - Reserved
+                None, // Bit 8 - Reserved
+                None, // Bit 7 - Reserved
+                None, // Bit 6 - Reserved
+                None, // Bit 5 - Reserved
+                None, // Bit 4 - Reserved
+                None, // Bit 3 - Version 1 Only
+                None, // Bit 2 - Version 1 Only
+                Some("dogray"),
+                Some("gridfit"),
+            ]);
+
+            let ver1flags = flags_bits16([
+                None, // Bit 15 - Reserved
+                None, // Bit 14 - Reserved
+                None, // Bit 13 - Reserved
+                None, // Bit 12 - Reserved
+                None, // Bit 11 - Reserved
+                None, // Bit 10 - Reserved
+                None, // Bit 9 - Reserved
+                None, // Bit 8 - Reserved
+                None, // Bit 7 - Reserved
+                None, // Bit 6 - Reserved
+                None, // Bit 5 - Reserved
+                None, // Bit 4 - Reserved
+                Some("symmetric_smoothing"),
+                Some("symmetric_gridfit"),
+                Some("dogray"),
+                Some("gridfit"),
+            ]);
+
+            let gasp_record = |ver: Expr| -> Format {
+                record([
+                    ("range_max_ppem", base.u16be()),
+                    (
+                        "range_gasp_behavior",
+                        match_variant(
+                            ver,
+                            [
+                                (Pattern::U16(0), "Version0", ver0flags),
+                                (Pattern::U16(1), "Version1", ver1flags),
+                                (Pattern::Wildcard, "BadVersion", Format::Fail), // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere
+                            ],
+                        ),
+                    ),
+                ])
+            };
+
+            module.define_format(
+                "opentype.gasp_table",
+                record([
+                    ("version", base.u16be()),
+                    ("num_ranges", base.u16be()),
+                    (
+                        "gasp_ranges",
+                        repeat_count(var("num_ranges"), gasp_record(var("version"))),
+                    ),
+                ]),
+            )
+        };
+
         module.define_format_args(
             "opentype.table_directory.table_links",
             vec![
@@ -1703,6 +1774,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     ),
                 ),
                 // !SECTION
+                (
+                    "prep",
+                    optional_table("start", "tables", magic(b"prep"), prep_table),
+                ),
+                (
+                    "gasp",
+                    optional_table("start", "tables", magic(b"gasp"), gasp_table.call()),
+                ),
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
             ]),
