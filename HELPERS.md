@@ -266,4 +266,18 @@ pub fn discard_suffix(f: Format, suffix: Format) -> Format {
 pub fn fmt_try_index(seq: Expr, index: Expr) -> Format {
     fmt_unwrap(index_checked(seq, index))
 }
+
+/// Similar to [`chain`], but for cases where the result of `f0` is not used.
+#[inline]
+pub fn keep_last(f0: Format, f: Format) -> Format {
+    // TODO: implement a first-class Format variant for this case
+    Format::LetFormat(Box::new(f0), Label::Borrowed("_"), Box::new(f))
+}
+
+/// Dual method to [`keep_last`], where the order of evaluation is the same
+/// but the return value is that of the first format, not the last.
+pub fn keep_first(f: Format, f1: Format) -> Format {
+    // NOTE: compared to `keep_last`, there is far less of a reason to create a Format primitive to avoid this construction
+    chain(f, "x", keep_last(f1, compute(var("x"))))
+}
 ```
