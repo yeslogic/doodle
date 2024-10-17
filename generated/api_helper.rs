@@ -218,6 +218,56 @@ pub mod otf_metrics {
         DecoderTrap, Encoding,
     };
 
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Config {
+        bookend_size: usize,
+        extra_only: bool,
+    }
+
+    impl std::default::Default for Config {
+        fn default() -> Self {
+            Self {
+                bookend_size: Self::DEFAULT_BOOKEND_SIZE,
+                extra_only: false,
+            }
+        }
+    }
+
+    impl Config {
+        const DEFAULT_BOOKEND_SIZE: usize = 8;
+    }
+
+    pub struct ConfigBuilder {
+        bookend_size: Option<usize>,
+        extra_only: Option<bool>,
+    }
+
+    impl ConfigBuilder {
+        pub fn new() -> Self {
+            Self {
+                bookend_size: None,
+                extra_only: None,
+            }
+        }
+
+        pub fn bookend_size(mut self, bookend_size: usize) -> Self {
+            self.bookend_size = Some(bookend_size);
+            self
+        }
+
+        pub fn extra_only(mut self, extra_only: bool) -> Self {
+            self.extra_only = Some(extra_only);
+            self
+        }
+
+        pub fn build(self) -> Config {
+            Config {
+                bookend_size: self.bookend_size.unwrap_or(Config::DEFAULT_BOOKEND_SIZE),
+                extra_only: self.extra_only.unwrap_or_default(),
+            }
+        }
+    }
+
     pub type OpentypeFontDirectory = opentype_table_directory;
     pub type OpentypeGlyf = opentype_glyf_table;
     pub type GlyphDescription = opentype_glyf_description;
@@ -254,6 +304,7 @@ pub mod otf_metrics {
         num_tables: usize,
         required: RequiredTableMetrics,
         optional: OptionalTableMetrics,
+        extraMagic: Vec<u32>,
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -1002,12 +1053,30 @@ pub mod otf_metrics {
                 gasp,
             }
         };
+        let extraMagic = dir
+            .table_records
+            .iter()
+            .map(|r| r.table_id)
+            .filter(is_extra)
+            .collect();
         Ok(SingleFontMetrics {
             sfnt_version: dir.sfnt_version,
             num_tables: dir.num_tables as usize,
             required,
             optional,
+            extraMagic,
         })
+    }
+
+    /// Returns `true` if `table_id` is not a first-class OpenType table in our current implementation
+    fn is_extra(table_id: &u32) -> bool {
+        let bytes = table_id.to_be_bytes();
+        match &bytes {
+            b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
+            b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
+            // FIXME - update with more cases as we handle more table records
+            _ => true,
+        }
     }
 
     fn bounding_box(gl: &opentype_glyf_table_Glyph) -> BoundingBox {
@@ -1019,7 +1088,7 @@ pub mod otf_metrics {
         }
     }
 
-    pub fn show_opentype_stats(metrics: &OpentypeMetrics) {
+    pub fn show_opentype_stats(metrics: &OpentypeMetrics, conf: &Config) {
         match metrics {
             OpentypeMetrics::MultiFont(multi) => {
                 println!(
@@ -1031,7 +1100,7 @@ pub mod otf_metrics {
                     match o_font.as_ref() {
                         Some(font) => {
                             println!("=== Font @ Index {i} ===");
-                            show_font_metrics(font);
+                            show_font_metrics(font, conf);
                         }
                         None => {
                             println!("=== Skipping Index {i} ===");
@@ -1039,7 +1108,7 @@ pub mod otf_metrics {
                     }
                 }
             }
-            OpentypeMetrics::SingleFont(single) => show_font_metrics(single),
+            OpentypeMetrics::SingleFont(single) => show_font_metrics(single, conf),
         }
     }
 
@@ -1065,57 +1134,66 @@ pub mod otf_metrics {
         )
     }
 
-    fn show_font_metrics(font: &SingleFontMetrics) {
-        show_magic(font.sfnt_version);
-        show_required_metrics(&font.required);
-        show_optional_metrics(&font.optional);
+    fn show_font_metrics(font: &SingleFontMetrics, conf: &Config) {
+        if !conf.extra_only {
+            show_magic(font.sfnt_version);
+            show_required_metrics(&font.required, conf);
+            show_optional_metrics(&font.optional, conf);
+        }
+        show_extra_magic(&font.extraMagic);
     }
 
-    fn show_required_metrics(required: &RequiredTableMetrics) {
-        show_cmap_metrics(&required.cmap);
-        show_head_metrics(&required.head);
-        show_hhea_metrics(&required.hhea);
-        show_htmx_metrics(&required.hmtx);
-        show_maxp_metrics(&required.maxp);
-        show_name_metrics(&required.name);
-        show_os2_metrics(&required.os2);
-        show_post_metrics(&required.post);
+    fn show_extra_magic(table_ids: &[u32]) {
+        for id in table_ids.iter() {
+            println!("[MISSING IMPL]: `{}`", format_magic(*id));
+        }
     }
 
-    fn show_optional_metrics(optional: &OptionalTableMetrics) {
-        show_cvt_metrics(&optional.cvt);
-        show_fpgm_metrics(&optional.fpgm);
-        show_loca_metrics(&optional.loca);
-        show_glyf_metrics(&optional.glyf);
-        show_prep_metrics(&optional.prep);
-        show_gasp_metrics(&optional.gasp);
+    fn show_required_metrics(required: &RequiredTableMetrics, conf: &Config) {
+        show_cmap_metrics(&required.cmap, conf);
+        show_head_metrics(&required.head, conf);
+        show_hhea_metrics(&required.hhea, conf);
+        show_htmx_metrics(&required.hmtx, conf);
+        show_maxp_metrics(&required.maxp, conf);
+        show_name_metrics(&required.name, conf);
+        show_os2_metrics(&required.os2, conf);
+        show_post_metrics(&required.post, conf);
     }
 
-    fn show_cvt_metrics(cvt: &Option<CvtMetrics>) {
+    fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
+        show_cvt_metrics(&optional.cvt, conf);
+        show_fpgm_metrics(&optional.fpgm, conf);
+        show_loca_metrics(&optional.loca, conf);
+        show_glyf_metrics(&optional.glyf, conf);
+        show_prep_metrics(&optional.prep, conf);
+        show_gasp_metrics(&optional.gasp, conf);
+    }
+
+    fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
         if let Some(RawArrayMetrics(count)) = cvt {
             println!("cvt: FWORD[{count}]")
         }
     }
 
-    fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>) {
+    fn show_fpgm_metrics(fpgm: &Option<FpgmMetrics>, _conf: &Config) {
         if let Some(RawArrayMetrics(count)) = fpgm {
             println!("fpgm: uint8[{count}]")
         }
     }
 
-    fn show_prep_metrics(prep: &Option<PrepMetrics>) {
+    fn show_prep_metrics(prep: &Option<PrepMetrics>, _conf: &Config) {
         if let Some(RawArrayMetrics(count)) = prep {
             println!("prep: uint8[{count}]")
         }
     }
 
-    fn show_loca_metrics(loca: &Option<LocaMetrics>) {
+    fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &Config) {
         if let Some(()) = loca {
             println!("loca: (details omitted)")
         }
     }
 
-    fn show_gasp_metrics(gasp: &Option<GaspMetrics>) {
+    fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
         if let Some(GaspMetrics {
             version,
             num_ranges,
@@ -1162,13 +1240,18 @@ pub mod otf_metrics {
                 }
             };
             println!("gasp: version {version}, {num_ranges} ranges");
-            show_items_elided(&ranges, show_gasp_range, 8, |start, stop| {
-                format!(
-                    "    skipping gasp ranges for max_ppem values {}..={}",
-                    &ranges[start].range_max_ppem,
-                    &ranges[stop - 1].range_max_ppem
-                )
-            });
+            show_items_elided(
+                &ranges,
+                show_gasp_range,
+                conf.bookend_size,
+                |start, stop| {
+                    format!(
+                        "    skipping gasp ranges for max_ppem values {}..={}",
+                        &ranges[start].range_max_ppem,
+                        &ranges[stop - 1].range_max_ppem
+                    )
+                },
+            );
         }
     }
 
@@ -1208,7 +1291,7 @@ pub mod otf_metrics {
         format!("{}.{}", major, minor)
     }
 
-    fn show_cmap_metrics(cmap: &CmapMetrics) {
+    fn show_cmap_metrics(cmap: &CmapMetrics, _conf: &Config) {
         println!(
             "cmap: version {}, {} encoding tables",
             cmap.version, cmap.num_tables
@@ -1253,7 +1336,7 @@ pub mod otf_metrics {
         }
     }
 
-    fn show_head_metrics(head: &HeadMetrics) {
+    fn show_head_metrics(head: &HeadMetrics, _conf: &Config) {
         println!(
             "head: version {}, {}",
             format_version_major_minor(head.major_version, head.minor_version),
@@ -1261,7 +1344,7 @@ pub mod otf_metrics {
         );
     }
 
-    fn show_hhea_metrics(hhea: &HheaMetrics) {
+    fn show_hhea_metrics(hhea: &HheaMetrics, _conf: &Config) {
         println!(
             "hhea: table version {}, {} horizontal long metrics",
             format_version_major_minor(hhea.major_version, hhea.minor_version),
@@ -1269,7 +1352,7 @@ pub mod otf_metrics {
         );
     }
 
-    fn show_htmx_metrics(hmtx: &HmtxMetrics) {
+    fn show_htmx_metrics(hmtx: &HmtxMetrics, conf: &Config) {
         let show_unified = |ix: usize, hmet: &UnifiedHmtxMetric| match &hmet.advance_width {
             Some(width) => println!(
                 "\tGlyph ID [{ix}]: advanceWidth={width}, lsb={}",
@@ -1278,12 +1361,12 @@ pub mod otf_metrics {
             None => println!("\tGlyph ID [{ix}]: lsb={}", hmet.left_side_bearing),
         };
 
-        show_items_elided(&hmtx.0, show_unified, 8, |start, stop| {
+        show_items_elided(&hmtx.0, show_unified, conf.bookend_size, |start, stop| {
             format!("    (skipping hmetrics {start}..{stop})")
         });
     }
 
-    fn show_maxp_metrics(maxp: &MaxpMetrics) {
+    fn show_maxp_metrics(maxp: &MaxpMetrics, _conf: &Config) {
         match maxp {
             MaxpMetrics::Postscript { version } => println!(
                 "maxp: version {} (PostScript)",
@@ -1301,7 +1384,7 @@ pub mod otf_metrics {
         }
     }
 
-    fn show_name_metrics(name: &NameMetrics) {
+    fn show_name_metrics(name: &NameMetrics, _conf: &Config) {
         // STUB - add more details if appropriate
         match &name.lang_tag_records {
             Some(records) => {
@@ -1336,12 +1419,12 @@ pub mod otf_metrics {
         }
     }
 
-    fn show_os2_metrics(os2: &Os2Metrics) {
-        // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
+    fn show_os2_metrics(os2: &Os2Metrics, _conf: &Config) {
+        // TODO - Metrics type is a stub, enrich if anything is 'interesting'
         println!("os/2: version {}", os2.version);
     }
 
-    fn show_post_metrics(post: &PostMetrics) {
+    fn show_post_metrics(post: &PostMetrics, _conf: &Config) {
         // STUB - Metrics is just an alias for the raw type, enrich and refactor if appropriate
         println!(
             "post: version {} ({})",
@@ -1359,13 +1442,13 @@ pub mod otf_metrics {
         v as i16
     }
 
-    fn show_glyf_metrics(glyf: &Option<GlyfMetrics>) {
+    fn show_glyf_metrics(glyf: &Option<GlyfMetrics>, conf: &Config) {
         if let Some(glyf) = glyf.as_ref() {
             println!("glyf: {} glyphs", glyf.num_glyphs);
             show_items_elided(
                 glyf.glyphs.as_slice(),
                 show_glyph_metric,
-                8,
+                conf.bookend_size,
                 |start, stop| format!("    (skipping glyphs {start}..{stop})"),
             )
         } else {

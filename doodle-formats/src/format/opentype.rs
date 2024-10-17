@@ -77,6 +77,7 @@ fn u8_to_i16(x: Expr, is_positive: Expr) -> Expr {
     )
 }
 
+/// Given a U32-typed pos and U16-typed offset, computes their sum as a U32-typed target position
 fn pos_add_u16(pos32: Expr, offset16: Expr) -> Expr {
     add(pos32, Expr::AsU32(Box::new(offset16)))
 }
@@ -111,6 +112,7 @@ fn s64be(base: &BaseModule) -> Format {
     base.u64be()
 }
 
+/// Helper function for parsing a big-endian u24 (3-byte) value
 fn u24be(base: &BaseModule) -> Format {
     map(
         Format::Tuple(vec![compute(Expr::U8(0)), base.u8(), base.u8(), base.u8()]),
@@ -123,7 +125,7 @@ fn version16_16(base: &BaseModule) -> Format {
     base.u32be()
 }
 
-// helper to turn b"..." literals into u32 at compile-time
+/// Helper function for compile-time conversion of b"..." literals into u32 (big-endian) values.
 const fn magic(tag: &'static [u8; 4]) -> u32 {
     u32::from_be_bytes(*tag)
 }
@@ -133,6 +135,39 @@ fn expect_u16be(base: &BaseModule, val: u16) -> Format {
     where_lambda(base.u16be(), "x", expr_eq(var("x"), Expr::U16(val)))
 }
 
+/// Constructs a format that peeks the value of a single field in a record (or the common prefix of a union of related records),
+/// discarding the values of all fields that come before it; the result of this speculative parse is then
+/// fed back under the original field-name (in `field_prefix`) to the format `dep_format` that depends on it,
+/// via `LetFormat`.
+fn peek_field_then<Name>(field_prefix: &[(Name, Format)], dep_format: Format) -> Format
+where
+    Name: IntoLabel + Clone + AsRef<str>,
+{
+    let Some(((field_name, field_format), init)) = field_prefix.split_last() else {
+        panic!("field_prefix must be non-empty")
+    };
+
+    chain(
+        chain(
+            // Process all the fields before the one we care about and discard their cumulative value
+            record(init.into_iter().cloned()),
+            "_",
+            field_format.clone(),
+        ),
+        field_name.clone(),
+        dep_format,
+    )
+}
+
+/// Specialized format-construction designed for supporting `cmap` sub-tables.
+///
+/// Speculatively peeks the shortest prefix of fields required to witness a field with the
+/// indicated label (`length_field`), which is interpreted as a positive integer byte-length
+/// constraining the entire record (and not just subsequent fields); this value is extracted
+/// and forms the length of a slice around parsing the complete record.
+///
+/// Handles the construction of the record format from the given fields, which are provided
+/// in a raw form to allow for ease of introspection.
 fn slice_record<Name, const N: usize>(
     length_field: &'static str,
     fields: [(Name, Format); N],
@@ -155,17 +190,22 @@ where
         full.push((name, format));
     }
 
-    chain(
-        Format::Peek(Box::new(record(prefix))),
-        "x",
-        Format::Slice(
-            Box::new(record_proj(var("x"), length_field)),
-            Box::new(record(full)),
-        ),
+    peek_field_then(
+        &prefix[..],
+        Format::Slice(Box::new(var(length_field)), Box::new(record(full))),
     )
+
+    // chain(
+    //     Format::Peek(Box::new(record(prefix))),
+    //     "x",
+    //     Format::Slice(
+    //         Box::new(record_proj(var("x"), length_field)),
+    //         Box::new(record(full)),
+    //     ),
+    // )
 }
 
-// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option)
+/// Computes the maximum value of `x / 8` for `x: U16` in seq (return value wrapped in Option to handle empty list)
 fn subheader_index(seq: Expr) -> Expr {
     // REVIEW - because of how narrow the use-case is, we might be able to use 0 as the init-accum value and avoid Option entirely
     expr_unwrap(left_fold(
@@ -191,8 +231,21 @@ fn subheader_index(seq: Expr) -> Expr {
 const START_VAR: Expr = Expr::Var(Label::Borrowed("start"));
 const START_ARG: (Label, ValueType) = (Label::Borrowed("start"), ValueType::Base(BaseType::U32));
 
-// FIXME - this is a crude approximation that could be improved with the right primitives in-hand
+/// Given `Expr`s `table_records` and a `query_table_id` of the appropriate type,
+/// seeks through `table_records` and extracts the first one whose projected field `table_id`
+/// is a one-to-one match for `query_table_id`.
+///
+/// # Notes
+///
+/// Currently, only existence (and not uniqueness) of a match is required for
+/// this construction to function correctly, but non-unique matches are not
+/// intentionally supported and may be an error in future.
+///
+/// Also note that while in principle a binary search is ideal, the constructions
+/// we have on hand only allow for linear search without short-circuiting for
+/// `Θ(N)` performance regardless of where the match is in the list.
 fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
+    // FIXME - this is a naive algorithm that could be improved with the right primitives in-hand
     // TODO: accelerate using binary search
     // TODO: make use of `search_range` etc.
     let matches_query = |table_record: Expr| {
@@ -201,6 +254,7 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
             Expr::U32(query_table_id),
         )
     };
+    // FIXME - we have no current means to short-circuit the iteration once a match is found
     let matching_tables = flat_map(
         lambda(
             "table",
@@ -216,7 +270,16 @@ fn find_table(table_records: Expr, query_table_id: u32) -> Expr {
     index_checked(matching_tables, Expr::U32(0))
 }
 
-fn link_offset(sof_offset: Expr, table_offset: Expr, format: Format) -> Format {
+/// Given the appropriate Start-of-Frame absolute-stream-offset (`sof_offset`) and
+/// an SOF-relative `target_offset`, produce a relative-lookahead format that
+/// seeks to the appropriate stream-location and parses `format`.
+///
+/// # Notes
+///
+/// Though not directly stated, the assumed type of `sof_offset` and `target_offset` is
+/// `U32`, and if this is not satisfied, the invocation of this function will produce a
+/// type-error when expanded.
+fn link_offset(sof_offset: Expr, target_offset: Expr, format: Format) -> Format {
     let rel_offset = |sof_offset: Expr, here_offset: Expr, target_offset: Expr| -> Expr {
         /*
          * Here := here_offset (abs)
@@ -234,14 +297,15 @@ fn link_offset(sof_offset: Expr, table_offset: Expr, format: Format) -> Format {
         pos32(),
         "offset",
         Format::WithRelativeOffset(
-            Box::new(rel_offset(sof_offset, var("offset"), table_offset)),
+            Box::new(rel_offset(sof_offset, var("offset"), target_offset)),
             Box::new(format),
         ),
     )
 }
 
-/// Converts an absolute offset (or, relative to SOF) into a relative offset
-/// given the absolute file-offset we are currently parsing from.
+/// Converts an absolute offset (or, an offset relative to SOF) into a non-negative
+/// delta-value relative to `here`, an expression representing the immediate
+/// position in the stream we are parsing from (i.e. as the variable in `chain(Format::Pos, <var>, ...)`).
 fn relativize_offset(abs_offset: Expr, here: Expr) -> Expr {
     sub(abs_offset, here)
 }
@@ -258,9 +322,19 @@ fn link(abs_offset: Expr, format: Format) -> Format {
     )
 }
 
-// FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
+/// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
+/// parses a u16be as a positive delta from `base_offset` and returns the linked content parsed according
+/// to `format` at that location.
+///
+/// Returns a record `{ offset: u16, link := (offset > 0) ? Some(format) : None }`
+///
+/// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
+/// that there is no associated data, in which case `None` is yielded for the `link`.)
+///
+/// Additionally takes argument `base` of type `BaseModule` to parse u16be values without code duplication.
 fn offset16(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
+    // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
     record([
         ("offset", base.u16be()),
         (
@@ -274,9 +348,19 @@ fn offset16(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     ])
 }
 
-// FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
+/// Given a value of `base_offset` (the absolute stream-position relative to which offsets are to be interpreted),
+/// parses a u32be as a positive delta from `base_offset` and returns the linked content parsed according
+/// to `format` at that location.
+///
+/// Returns a record `{ offset: u32, link := (offset > 0) ? Some(format) : None }`
+///
+/// (Implicitly includes a semantic shortcut whereby an offset-value (parsed) of `0` signals
+/// that there is no associated data, in which case `None` is yielded for the `link`.)
+///
+/// Additionally takes argument `base` of type `BaseModule` to parse u32be values without code duplication.
 fn offset32(base_offset: Expr, format: Format, base: &BaseModule) -> Format {
     shadow_check(&base_offset, "offset");
+    // FIXME - should we use `chain` instead of `record` to elide the offset and flatten the link?
     record([
         ("offset", base.u32be()),
         (
@@ -312,6 +396,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
     );
 
     let table_type = module.get_format_type(table_record.get_level()).clone();
+
+    // let stub_table = module.define_format("opentype.table_stub", Format::EMPTY);
 
     let table_links = {
         fn required_table(
@@ -1692,6 +1778,389 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
+        let base_table = {
+            module.define_format(
+                "opentype.base_table",
+                // STUB - implement base table
+                Format::EMPTY,
+            )
+        };
+
+        // Class Definition Table - https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table
+        let class_def = {
+            // - [Microsoft's OpenType Spec: Class Definition Table Format 1](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table-format-1)
+            let class_format_1 = record([
+                ("start_glyph_id", base.u16be()),
+                ("glyph_count", base.u16be()),
+                (
+                    "class_value_array",
+                    repeat_count(var("glyph_count"), base.u16be()),
+                ),
+            ]);
+
+            // - [Microsoft's OpenType Spec: Class Definition Table Format 2](https://docs.microsoft.com/en-us/typography/opentype/spec/chapter2#class-definition-table-format-2)
+            let class_format_2 = {
+                let class_range_record = record([
+                    ("start_glyph_id", base.u16be()),
+                    ("end_glyph_id", base.u16be()),
+                    ("class", base.u16be()),
+                ]);
+
+                record([
+                    ("class_range_count", base.u16be()),
+                    (
+                        "class_range_records",
+                        repeat_count(var("class_range_count"), class_range_record),
+                    ),
+                ])
+            };
+
+            // # Class Definition Table
+            //
+            // | Class | Description                                               |
+            // |-------|-----------------------------------------------------------|
+            // | 1     | Base glyph (single character, spacing glyph)              |
+            // | 2     | Ligature glyph (multiple character, spacing glyph)        |
+            // | 3     | Mark glyph (non-spacing combining glyph)                  |
+            // | 4     | Component glyph (part of single character, spacing glyph) |
+            module.define_format(
+                "opentype.class_def",
+                record([
+                    ("class_format", base.u16be()),
+                    (
+                        "data",
+                        match_variant(
+                            var("class_format"),
+                            [
+                                (Pattern::U16(1), "Format1", class_format_1),
+                                (Pattern::U16(2), "Format2", class_format_2),
+                                // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
+
+        let coverage_table = {
+            // REVIEW - should this be a module definition (to shorten type-name)?
+            let coverage_format_1 = record([
+                ("glyph_count", base.u16be()),
+                (
+                    "glyph_array",
+                    repeat_count(var("glyph_count"), base.u16be()),
+                ),
+            ]);
+
+            // REVIEW - should this be a module definition (to shorten type-name)?
+            let coverage_format_2 = {
+                // REVIEW - should this be a module definition (to shorten type-name)?
+                let range_record = record([
+                    ("start_glyph_id", base.u16be()),
+                    ("end_glyph_id", base.u16be()),
+                    ("start_coverage_index", base.u16be()),
+                ]);
+
+                record([
+                    ("range_count", base.u16be()),
+                    (
+                        "range_records",
+                        repeat_count(var("range_count"), range_record),
+                    ),
+                ])
+            };
+
+            module.define_format(
+                "opentype.coverage_table",
+                record([
+                    ("coverage_format", base.u16be()),
+                    (
+                        "data",
+                        match_variant(
+                            var("coverage_format"),
+                            [
+                                (Pattern::U16(1), "Format1", coverage_format_1),
+                                (Pattern::U16(2), "Format2", coverage_format_2),
+                                // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere
+                                // REVIEW - should this be a hard failure?
+                                (Pattern::Wildcard, "BadFormat", Format::Fail),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
+        let gdef_table = {
+            // REVIEW - should this be a module definition (to shorten type-name)?
+
+            let mark_glyphs_set = module.define_format(
+                "opentype.mark_glyphs_set",
+                record([
+                    ("table_start", pos32()),
+                    ("format", expect_u16be(base, 1)), // FIXME - base.u16be() instead if this is validation fails
+                    ("mark_glyphs_set_count", base.u16be()),
+                    (
+                        "coverage",
+                        repeat_count(
+                            var("mark_glyphs_set_count"),
+                            offset32(var("table_start"), coverage_table.call(), base),
+                        ),
+                    ),
+                ]),
+            );
+
+            let gdef_header_version_1_2 = |gdef_start_pos: Expr| {
+                record([(
+                    "mark_glyph_sets_def",
+                    offset16(gdef_start_pos, mark_glyphs_set.call(), base),
+                )])
+            };
+
+            let gdef_header_version_1_3 = |_gdef_start_pos: Expr| {
+                // TODO - implement Item Variation Store
+                record([
+                    // STUB - no implementation for Item Variation Store, so this offset is currently recorded but uninterpreted and unused
+                    ("item_var_store", base.u32be()),
+                ])
+            };
+
+            let attach_list = {
+                let attach_point_table = record([
+                    ("point_count", base.u16be()),
+                    (
+                        "point_indices",
+                        repeat_count(var("point_count"), base.u16be()),
+                    ),
+                ]);
+
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "coverage",
+                        offset16(var("table_start"), coverage_table.call(), base),
+                    ),
+                    ("glyph_count", base.u16be()),
+                    (
+                        "attach_point_offsets",
+                        repeat_count(
+                            var("glyph_count"),
+                            offset16(var("table_start"), attach_point_table, base),
+                        ),
+                    ),
+                ])
+            };
+            let lig_caret_list = {
+                let caret_value = {
+                    let caret_value_format_1 = record([("coordinate", s16be(base))]);
+
+                    let caret_value_format_2 = record([("caret_value_point_index", base.u16be())]);
+
+                    let device_or_variation_index_table = {
+                        let device_table = {
+                            // quotient = numerator / denominator # int division (u16 -> u16 -> u16)
+                            // if quotient * denominator < numerator:
+                            //     quotient + 1
+                            // else:
+                            //     quotient
+                            let u16_div_ceil = |numerator: Expr, denominator: Expr| {
+                                let quotient = div(numerator.clone(), denominator.clone());
+                                expr_if_else(
+                                    expr_lt(mul(quotient.clone(), denominator), numerator),
+                                    add(quotient.clone(), Expr::U16(1)),
+                                    quotient,
+                                )
+                            };
+
+                            let delta_bits = |delta_format: Expr, num_sizes: Expr| {
+                                mul(
+                                    num_sizes,
+                                    expr_match(
+                                        delta_format,
+                                        [
+                                            (Pattern::U16(1), Expr::U16(2)),
+                                            (Pattern::U16(2), Expr::U16(4)),
+                                            (Pattern::U16(3), Expr::U16(8)),
+                                            (Pattern::Wildcard, Expr::U16(0)),
+                                        ],
+                                    ),
+                                )
+                            };
+
+                            let num_sizes =
+                                |start: Expr, end: Expr| add(sub(end, start), Expr::U16(1));
+
+                            record([
+                                ("start_size", base.u16be()),
+                                ("end_size", base.u16be()),
+                                ("delta_format", base.u16be()),
+                                (
+                                    "delta_values",
+                                    repeat_count(
+                                        u16_div_ceil(
+                                            delta_bits(
+                                                var("delta_format"),
+                                                num_sizes(var("start_size"), var("end_size")),
+                                            ),
+                                            Expr::U16(16),
+                                        ),
+                                        base.u16be(),
+                                    ),
+                                ),
+                            ])
+                        };
+
+                        let variation_index_table = record([
+                            ("delta_set_outer_index", base.u16be()),
+                            ("delta_set_inner_index", base.u16be()),
+                            ("delta_format", is_bytes(&(0x8000u16).to_be_bytes())),
+                        ]);
+
+                        peek_field_then(
+                            &[
+                                ("__skipped0", base.u16be()), // `startSize` or `deltaSetOuterIndex`
+                                ("__skipped1", base.u16be()), // `endSize` or `deltaSetInnerIndex`
+                                ("delta_format", base.u16be()),
+                            ],
+                            match_variant(
+                                var("delta_format"),
+                                [
+                                    (Pattern::Int(Bounds::new(1, 3)), "DeviceTable", device_table),
+                                    (
+                                        Pattern::U16(0x8000),
+                                        "VariationIndexTable",
+                                        variation_index_table,
+                                    ),
+                                    // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere" )
+                                    (Pattern::Wildcard, "BadFormat", Format::Fail),
+                                ],
+                            ),
+                        )
+                    };
+
+                    let caret_value_format_3 = |table_start: Expr| {
+                        record([
+                            ("coordinate", s16be(base)),
+                            (
+                                "table",
+                                offset16(table_start, device_or_variation_index_table, base),
+                            ),
+                        ])
+                    };
+
+                    record([
+                        ("table_start", pos32()),
+                        ("caret_value_format", base.u16be()),
+                        (
+                            "data",
+                            match_variant(
+                                var("caret_value_format"),
+                                [
+                                    (Pattern::U16(1), "Format1", caret_value_format_1),
+                                    (Pattern::U16(2), "Format2", caret_value_format_2),
+                                    (
+                                        Pattern::U16(3),
+                                        "Format3",
+                                        caret_value_format_3(var("table_start")),
+                                    ),
+                                    // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere
+                                    (Pattern::Wildcard, "BadFormat", Format::Fail),
+                                ],
+                            ),
+                        ),
+                    ])
+                };
+
+                let lig_glyph = record([
+                    ("table_start", pos32()),
+                    ("caret_count", base.u16be()),
+                    (
+                        "caret_values",
+                        repeat_count(
+                            var("caret_count"),
+                            offset16(var("table_start"), caret_value, base),
+                        ),
+                    ),
+                ]);
+
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "coverage",
+                        offset16(var("table_start"), coverage_table.call(), base),
+                    ),
+                    ("lig_glyph_count", base.u16be()),
+                    (
+                        "lig_glyph_offsets",
+                        repeat_count(
+                            var("lig_glyph_count"),
+                            offset16(var("table_start"), lig_glyph, base),
+                        ),
+                    ),
+                ])
+            };
+
+            module.define_format(
+                "opentype.gdef_table",
+                record([
+                    // Starting offset of `GDEF` table
+                    ("table_start", pos32()),
+                    // Major Version of `GDEF` table - only 1[.x] defined
+                    ("major_version", expect_u16be(base, 1)), // NOTE - only major version 1 is defined: https://learn.microsoft.com/en-us/typography/opentype/spec/gdef#gdef-table-structures
+                    // Minor Version (can be [1.]0, [1.]2, or [1.]3)
+                    ("minor_version", base.u16be()),
+                    // Class definition table for glyph type (may be NULL)
+                    (
+                        "glyph_class_def",
+                        offset16(var("table_start"), class_def.call(), base),
+                    ),
+                    // Attachment point list table (may be NULL)
+                    (
+                        "attach_list",
+                        offset16(var("table_start"), attach_list, base),
+                    ),
+                    // Ligature caret list table (may be NULL)
+                    (
+                        "lig_caret_list",
+                        offset16(var("table_start"), lig_caret_list, base),
+                    ),
+                    // Class definition table for mark attachment type (may be NULL)
+                    (
+                        "mark_attach_class_def",
+                        offset16(var("table_start"), class_def.call(), base),
+                    ),
+                    // Version-specific data, if > 1.0
+                    // REVIEW - do we want to flatten this variant abstraction into two Option<...> fields instead?
+                    (
+                        "data",
+                        match_variant(
+                            var("minor_version"),
+                            [
+                                (Pattern::U16(0), "Version1_0", Format::EMPTY),
+                                // NOTE - the variant `Version1_1` will not actually appear in the generated type due to Void-pruning
+                                (Pattern::U16(1), "Version1_1", Format::Fail), // FIXME - should this be EMPTY instead?
+                                (
+                                    Pattern::U16(2),
+                                    "Version1_2",
+                                    gdef_header_version_1_2(var("table_start")),
+                                ),
+                                (
+                                    Pattern::U16(3),
+                                    "Version1_3",
+                                    gdef_header_version_1_3(var("table_start")),
+                                ),
+                                // NOTE - this case covers everything after version 1.3 - following the Fathom definition that falls back onto the latest version we support
+                                (
+                                    Pattern::Wildcard,
+                                    "Version1_3",
+                                    gdef_header_version_1_3(var("table_start")),
+                                ),
+                            ],
+                        ),
+                    ),
+                ]),
+            )
+        };
 
         module.define_format_args(
             "opentype.table_directory.table_links",
@@ -1743,7 +2212,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "post",
                     required_table("start", "tables", magic(b"post"), post_table.call()),
                 ),
-                // SECTION - truetype outline tables
+                // SECTION - TrueType Outline
                 (
                     "cvt",
                     optional_table("start", "tables", magic(b"cvt "), cvt_table),
@@ -1773,7 +2242,6 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         glyf_table.call_args(vec![loca_offset_pairs(var("loca"))]),
                     ),
                 ),
-                // !SECTION
                 (
                     "prep",
                     optional_table("start", "tables", magic(b"prep"), prep_table),
@@ -1782,6 +2250,33 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     "gasp",
                     optional_table("start", "tables", magic(b"gasp"), gasp_table.call()),
                 ),
+                // !SECTION
+                // SECTION - CFF Outline
+                // TODO - `CFF ` deferred for reasons of complexity
+                // TODO - `CFF2` deferred for reasons of complexity
+                // TODO - `VORG` deferred as it collocates with CFF{ ,2}
+                // !SECTION
+                // SECTION - SVG Outline
+                // FIXME - `SVG ` postponed due to rarity (15 of 659 tested fonts)
+                // !SECTION
+                // SECTION - Bitmap Glyphs
+                // FIXME - `EBDT` postponed due to rarity (15 of 659 tested fonts)
+                // FIXM - `EBLC` postponed due to rarity (15 of 659 tested fonts)
+                // FIXME - `EBSC` postponed due to rarity (no occurrences among 659 tested fonts)
+                // FIXME - `CBDT` postponed due to rarity (2 of 659 tested fonts)
+                // FIXME - `CBLC` postponed due to rarity (2 of 659 tested fonts)
+                // FIXME - `sbix` postponed due to rarity (1 of 659 tested fonts)
+                // !SECTION
+                // SECTION - Advanced Typography
+                (
+                    "base",
+                    optional_table("start", "tables", magic(b"BASE"), base_table.call()),
+                ),
+                (
+                    "gdef",
+                    optional_table("start", "tables", magic(b"GDEF"), gdef_table.call()),
+                ),
+                // !SECTION
                 // STUB - add more tables
                 ("__skip", Format::SkipRemainder),
             ]),
