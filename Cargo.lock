@@ -306,6 +306,7 @@ dependencies = [
 name = "doodle_gencode"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "criterion",
  "doodle",
  "encoding",
