@@ -148,12 +148,12 @@ where
     };
 
     chain(
-        chain(
+        Format::Peek(Box::new(chain(
             // Process all the fields before the one we care about and discard their cumulative value
             record(init.into_iter().cloned()),
             "_",
             field_format.clone(),
-        ),
+        ))),
         field_name.clone(),
         dep_format,
     )
@@ -1894,16 +1894,16 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let gdef_table = {
             // REVIEW - should this be a module definition (to shorten type-name)?
 
-            let mark_glyphs_set = module.define_format(
-                "opentype.mark_glyphs_set",
+            let mark_glyph_set = module.define_format(
+                "opentype.mark_glyph_set",
                 record([
                     ("table_start", pos32()),
                     ("format", expect_u16be(base, 1)), // FIXME - base.u16be() instead if this is validation fails
-                    ("mark_glyphs_set_count", base.u16be()),
+                    ("mark_glyph_set_count", base.u16be()),
                     (
                         "coverage",
                         repeat_count(
-                            var("mark_glyphs_set_count"),
+                            var("mark_glyph_set_count"),
                             offset32(var("table_start"), coverage_table.call(), base),
                         ),
                     ),
@@ -1913,7 +1913,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             let gdef_header_version_1_2 = |gdef_start_pos: Expr| {
                 record([(
                     "mark_glyph_sets_def",
-                    offset16(gdef_start_pos, mark_glyphs_set.call(), base),
+                    offset16(gdef_start_pos, mark_glyph_set.call(), base),
                 )])
             };
 
@@ -1972,18 +1972,19 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 )
                             };
 
-                            let delta_bits = |delta_format: Expr, num_sizes: Expr| {
-                                mul(
-                                    num_sizes,
-                                    expr_match(
-                                        delta_format,
-                                        [
-                                            (Pattern::U16(1), Expr::U16(2)),
-                                            (Pattern::U16(2), Expr::U16(4)),
-                                            (Pattern::U16(3), Expr::U16(8)),
-                                            (Pattern::Wildcard, Expr::U16(0)),
-                                        ],
-                                    ),
+                            // NOTE - Converts a 'number of delta-values' to a `number of 16-bit words', based on the implied bit-width of a single delta-value,
+                            let packed_array_length = |delta_format: Expr, num_sizes: Expr| {
+                                let divide_by = |divisor: u16| {
+                                    u16_div_ceil(num_sizes.clone(), Expr::U16(divisor))
+                                };
+                                expr_match(
+                                    delta_format,
+                                    [
+                                        (Pattern::U16(1), divide_by(8)),   // 2-bit deltas, 8 per Uint16
+                                        (Pattern::U16(2), divide_by(4)), // 4-bit deltas, 4 per Uint16
+                                        (Pattern::U16(3), divide_by(2)), // 8-bit deltas, 2 per Uint16
+                                        (Pattern::Wildcard, Expr::U16(0)), // Wrong Branch
+                                    ],
                                 )
                             };
 
@@ -1997,12 +1998,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                                 (
                                     "delta_values",
                                     repeat_count(
-                                        u16_div_ceil(
-                                            delta_bits(
-                                                var("delta_format"),
-                                                num_sizes(var("start_size"), var("end_size")),
-                                            ),
-                                            Expr::U16(16),
+                                        packed_array_length(
+                                            var("delta_format"),
+                                            num_sizes(var("start_size"), var("end_size")),
                                         ),
                                         base.u16be(),
                                     ),
