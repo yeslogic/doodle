@@ -2217,23 +2217,23 @@ pub struct opentype_gdef_table_lig_caret_list {
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_mark_glyphs_set_coverage {
+pub struct opentype_mark_glyph_set_coverage {
     offset: u32,
     link: Option<opentype_coverage_table>,
 }
 
 #[derive(Debug, Clone)]
-pub struct opentype_mark_glyphs_set {
+pub struct opentype_mark_glyph_set {
     table_start: u32,
     format: u16,
-    mark_glyphs_set_count: u16,
-    coverage: Vec<opentype_mark_glyphs_set_coverage>,
+    mark_glyph_set_count: u16,
+    coverage: Vec<opentype_mark_glyph_set_coverage>,
 }
 
 #[derive(Debug, Clone)]
 pub struct opentype_gdef_table_data_Version1_2_mark_glyph_sets_def {
     offset: u16,
-    link: Option<opentype_mark_glyphs_set>,
+    link: Option<opentype_mark_glyph_set>,
 }
 
 #[derive(Debug, Clone)]
@@ -7016,12 +7016,17 @@ _input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
 let ret = ((|| PResult::Ok({
 let inner = {
 let delta_format = {
+_input.open_peek_context();
+let ret = ((|| PResult::Ok({
 let _ = {
 let __skipped0 = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let __skipped1 = ((|| PResult::Ok((Decoder24(_input))?))())?;
 opentype_gdef_table_lig_caret_list_link_raw_lig_glyph_offsets_link_raw_caret_values_link_raw_data_Format3_table_link_raw_raw_raw { __skipped0, __skipped1 }
 };
 (Decoder24(_input))?
+}))())?;
+_input.close_peek_context()?;
+ret
 };
 match delta_format {
 1u16..=3u16 => {
@@ -7031,77 +7036,45 @@ let end_size = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let delta_format = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let delta_values = ((|| PResult::Ok({
 let mut accum = Vec::new();
-for _ in 0..match ((((try_sub!(end_size, start_size)) + 1u16) * match delta_format {
+for _ in 0..match delta_format {
 1u16 => {
-2u16
-},
-
-2u16 => {
-4u16
-},
-
-3u16 => {
-8u16
-},
-
-_ => {
-0u16
-}
-}) / 16u16) * 16u16 < ((try_sub!(end_size, start_size)) + 1u16) * match delta_format {
-1u16 => {
-2u16
-},
-
-2u16 => {
-4u16
-},
-
-3u16 => {
-8u16
-},
-
-_ => {
-0u16
-}
-} {
+match (((try_sub!(end_size, start_size)) + 1u16) / 8u16) * 8u16 < (try_sub!(end_size, start_size)) + 1u16 {
 true => {
-(((try_sub!(end_size, start_size)) + 1u16) * match delta_format {
-1u16 => {
-2u16
-},
-
-2u16 => {
-4u16
-},
-
-3u16 => {
-8u16
-},
-
-_ => {
-0u16
-}
-}) / 16u16 + 1u16
+((try_sub!(end_size, start_size)) + 1u16) / 8u16 + 1u16
 },
 
 false => {
-(((try_sub!(end_size, start_size)) + 1u16) * match delta_format {
-1u16 => {
-2u16
+((try_sub!(end_size, start_size)) + 1u16) / 8u16
+}
+}
 },
 
 2u16 => {
-4u16
+match (((try_sub!(end_size, start_size)) + 1u16) / 4u16) * 4u16 < (try_sub!(end_size, start_size)) + 1u16 {
+true => {
+((try_sub!(end_size, start_size)) + 1u16) / 4u16 + 1u16
+},
+
+false => {
+((try_sub!(end_size, start_size)) + 1u16) / 4u16
+}
+}
 },
 
 3u16 => {
-8u16
+match (((try_sub!(end_size, start_size)) + 1u16) / 2u16) * 2u16 < (try_sub!(end_size, start_size)) + 1u16 {
+true => {
+((try_sub!(end_size, start_size)) + 1u16) / 2u16 + 1u16
+},
+
+false => {
+((try_sub!(end_size, start_size)) + 1u16) / 2u16
+}
+}
 },
 
 _ => {
 0u16
-}
-}) / 16u16
 }
 } {
 accum.push((Decoder24(_input))?);
@@ -7281,8 +7254,8 @@ opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets { offset, link }
                                         let ret = ((|| {
                                             PResult::Ok({
                                                 let inner =
-                                                    (Decoder_opentype_mark_glyphs_set(_input))?;
-                                                ((|val: opentype_mark_glyphs_set| {
+                                                    (Decoder_opentype_mark_glyph_set(_input))?;
+                                                ((|val: opentype_mark_glyph_set| {
                                                     PResult::Ok(Some(val))
                                                 })(
                                                     inner
@@ -7467,9 +7440,9 @@ fn Decoder_opentype_coverage_table<'input>(
     })
 }
 
-fn Decoder_opentype_mark_glyphs_set<'input>(
+fn Decoder_opentype_mark_glyph_set<'input>(
     _input: &mut Parser<'input>,
-) -> Result<opentype_mark_glyphs_set, ParseError> {
+) -> Result<opentype_mark_glyph_set, ParseError> {
     let table_start = ((|| {
         PResult::Ok({
             let inner = _input.get_offset_u64();
@@ -7486,11 +7459,11 @@ fn Decoder_opentype_mark_glyphs_set<'input>(
             }
         })
     })())?;
-    let mark_glyphs_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+    let mark_glyph_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
     let coverage = ((|| {
         PResult::Ok({
             let mut accum = Vec::new();
-            for _ in 0..mark_glyphs_set_count {
+            for _ in 0..mark_glyph_set_count {
                 accum.push({
                     let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
                     let link = ((|| {
@@ -7509,16 +7482,16 @@ fn Decoder_opentype_mark_glyphs_set<'input>(
                             None
                         })
                     })())?;
-                    opentype_mark_glyphs_set_coverage { offset, link }
+                    opentype_mark_glyph_set_coverage { offset, link }
                 });
             }
             accum
         })
     })())?;
-    PResult::Ok(opentype_mark_glyphs_set {
+    PResult::Ok(opentype_mark_glyph_set {
         table_start,
         format,
-        mark_glyphs_set_count,
+        mark_glyph_set_count,
         coverage,
     })
 }
@@ -8285,11 +8258,18 @@ fn Decoder_opentype_cmap_subtable_format0<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format0, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| PResult::Ok((Decoder24(_input))?))())?;
-            opentype_cmap_subtable_format14_raw_raw { format }
-        };
-        (Decoder24(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| PResult::Ok((Decoder24(_input))?))())?;
+                    opentype_cmap_subtable_format14_raw_raw { format }
+                };
+                (Decoder24(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8324,25 +8304,32 @@ fn Decoder_opentype_cmap_subtable_format2<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format2, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 2u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format14_raw_raw { format }
-        };
-        let inner = (Decoder24(_input))?;
-        if ((|l: u16| PResult::Ok((l >= 518u16) && (l % 2u16 == 0u16)))(inner.clone()))? {
-            inner
-        } else {
-            return Err(ParseError::FalsifiedWhere);
-        }
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 2u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format14_raw_raw { format }
+                };
+                let inner = (Decoder24(_input))?;
+                if ((|l: u16| PResult::Ok((l >= 518u16) && (l % 2u16 == 0u16)))(inner.clone()))? {
+                    inner
+                } else {
+                    return Err(ParseError::FalsifiedWhere);
+                }
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8465,20 +8452,27 @@ fn Decoder_opentype_cmap_subtable_format4<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format4, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 4u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format14_raw_raw { format }
-        };
-        (Decoder24(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 4u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format14_raw_raw { format }
+                };
+                (Decoder24(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8600,20 +8594,27 @@ fn Decoder_opentype_cmap_subtable_format6<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format6, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 6u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format14_raw_raw { format }
-        };
-        (Decoder24(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 6u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format14_raw_raw { format }
+                };
+                (Decoder24(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8661,30 +8662,37 @@ fn Decoder_opentype_cmap_subtable_format8<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format8, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 8u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            let __reserved = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format13_raw_raw { format, __reserved }
-        };
-        (Decoder21(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 8u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    let __reserved = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format13_raw_raw { format, __reserved }
+                };
+                (Decoder21(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8751,30 +8759,37 @@ fn Decoder_opentype_cmap_subtable_format10<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format10, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 10u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            let __reserved = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format13_raw_raw { format, __reserved }
-        };
-        (Decoder21(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 10u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    let __reserved = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format13_raw_raw { format, __reserved }
+                };
+                (Decoder21(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8833,30 +8848,37 @@ fn Decoder_opentype_cmap_subtable_format13<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format13, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 12u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            let __reserved = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format13_raw_raw { format, __reserved }
-        };
-        (Decoder21(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 12u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    let __reserved = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format13_raw_raw { format, __reserved }
+                };
+                (Decoder21(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8913,30 +8935,37 @@ fn Decoder62<'input>(
     _platform: u16,
 ) -> Result<opentype_cmap_subtable_format13, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 13u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            let __reserved = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format13_raw_raw { format, __reserved }
-        };
-        (Decoder21(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 13u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    let __reserved = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 0u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format13_raw_raw { format, __reserved }
+                };
+                (Decoder21(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
@@ -8993,20 +9022,27 @@ fn Decoder_opentype_cmap_subtable_format14<'input>(
     table_start: u32,
 ) -> Result<opentype_cmap_subtable_format14, ParseError> {
     let length = {
-        let _ = {
-            let format = ((|| {
-                PResult::Ok({
-                    let inner = (Decoder24(_input))?;
-                    if ((|x: u16| PResult::Ok(x == 14u16))(inner.clone()))? {
-                        inner
-                    } else {
-                        return Err(ParseError::FalsifiedWhere);
-                    }
-                })
-            })())?;
-            opentype_cmap_subtable_format14_raw_raw { format }
-        };
-        (Decoder21(_input))?
+        _input.open_peek_context();
+        let ret = ((|| {
+            PResult::Ok({
+                let _ = {
+                    let format = ((|| {
+                        PResult::Ok({
+                            let inner = (Decoder24(_input))?;
+                            if ((|x: u16| PResult::Ok(x == 14u16))(inner.clone()))? {
+                                inner
+                            } else {
+                                return Err(ParseError::FalsifiedWhere);
+                            }
+                        })
+                    })())?;
+                    opentype_cmap_subtable_format14_raw_raw { format }
+                };
+                (Decoder21(_input))?
+            })
+        })())?;
+        _input.close_peek_context()?;
+        ret
     };
     let sz = length as usize;
     _input.start_slice(sz)?;
