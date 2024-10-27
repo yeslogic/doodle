@@ -12,17 +12,20 @@ use encoding::{
 pub struct Config {
     // STUB - Currently only controls bookending, and whether to dump only uncovered tables
     bookend_size: usize,
+    inline_bookend: usize,
     extra_only: bool,
 }
 
 impl Config {
     const DEFAULT_BOOKEND_SIZE: usize = 8;
+    const DEFAULT_INLINE_BOOKEND: usize = 3;
 }
 
 impl std::default::Default for Config {
     fn default() -> Self {
         Self {
             bookend_size: Self::DEFAULT_BOOKEND_SIZE,
+            inline_bookend: Self::DEFAULT_INLINE_BOOKEND,
             extra_only: false,
         }
     }
@@ -31,6 +34,7 @@ impl std::default::Default for Config {
 /// Builder-pattern for [`Config`]
 pub struct ConfigBuilder {
     bookend_size: Option<usize>,
+    inline_bookend: Option<usize>,
     extra_only: Option<bool>,
 }
 
@@ -39,6 +43,7 @@ impl ConfigBuilder {
     pub fn new() -> Self {
         Self {
             bookend_size: None,
+            inline_bookend: None,
             extra_only: None,
         }
     }
@@ -48,8 +53,18 @@ impl ConfigBuilder {
     ///
     /// Currently controls all such array-elisions across the entire output, without any mechanism for different
     /// bookending sizes per table or section.
-    pub fn bookend_size(mut self, bookend_size: usize) -> Self {
-        self.bookend_size = Some(bookend_size);
+    pub fn bookend_size(mut self, size: usize) -> Self {
+        self.bookend_size = Some(size);
+        self
+    }
+
+    /// Overwrites the default value of `inline_bookend`, which determines how long a prefix and suffix are shown
+    /// around the elided middle of a long array to be displayed inline.
+    ///
+    /// Currently controls all such inline-array-elisions across the entire output, without any mechanism for different
+    /// inline-bookending sizes per table or section.
+    pub fn inline_bookend(mut self, size: usize) -> Self {
+        self.inline_bookend = Some(size);
         self
     }
 
@@ -66,6 +81,7 @@ impl ConfigBuilder {
     pub fn build(self) -> Config {
         Config {
             bookend_size: self.bookend_size.unwrap_or(Config::DEFAULT_BOOKEND_SIZE),
+            inline_bookend: self.inline_bookend.unwrap_or(Config::DEFAULT_INLINE_BOOKEND),
             extra_only: self.extra_only.unwrap_or_default(),
         }
     }
@@ -621,7 +637,17 @@ struct GaspRange {
 // NOTE - Version 1 contains all the fields that version 0 contains, so it can be used as the unifying type
 type GaspBehaviorFlags = opentype_gasp_table_gasp_ranges_range_gasp_behavior_Version1;
 
-type CoverageRangeRecord = OpentypeCoverageRangeRecord;
+type CoverageRangeRecord = RangeRecord<u16>;
+
+impl Promote<OpentypeCoverageRangeRecord> for CoverageRangeRecord {
+    fn promote(orig: &OpentypeCoverageRangeRecord) -> Self {
+        RangeRecord {
+            start_glyph_id: orig.start_glyph_id,
+            end_glyph_id: orig.end_glyph_id,
+            value: orig.start_coverage_index,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 enum CoverageTable {
@@ -652,7 +678,7 @@ impl Promote<OpentypeCoverageTableData> for CoverageTable {
                 range_records,
                 ..
             }) => Self::Format2 {
-                range_records: range_records.clone(),
+                range_records: promote_vec(range_records),
             },
         }
     }
@@ -717,10 +743,29 @@ impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
 enum GdefTableDataMetrics {
     NoData,
     MarkGlyphSetsDef(Option<MarkGlyphSet>),
-    ItemVarStore(ItemVariationStore),
+    ItemVarStore(ItemVariationStore)
 }
 
+/**
+   0 <=> No Glyph Class assigned (implicit default)
+   1 <=> Base glyph (single character, spacing glyph)
+   2 <=> Ligature glyph (multiple character, spacing glyph)
+   3 <=> Mark glyph (non-spacing combining glyph)
+   4 <=> Component glyph (part of a single character, spacing glyph)
+*/
 type GlyphClass = u16; // REVIEW - consider replacing with semantically distinguished const-enum
+
+fn show_glyph_class(gc: &GlyphClass) -> &'static str {
+    // REVIEW - to the extent we present this info, decide whether to include semantics, numerals, or both
+    match gc {
+        0 => "0(none)",
+        1 => "1(base)",
+        2 => "2(liga)",
+        3 => "3(mark)",
+        4 => "4(comp)",
+        _ => unreachable!("Unexpected glyph class value: {}", gc),
+    }
+}
 
 #[derive(Clone, Debug)]
 enum ClassDef {
@@ -787,7 +832,7 @@ struct AttachPoint {
 #[derive(Clone, Debug)]
 struct AttachList {
     coverage: Option<CoverageTable>,
-    attach_point_offsets: Vec<Option<AttachPoint>>,
+    attach_points: Vec<Option<AttachPoint>>,
 }
 
 impl Promote<OpentypeAttachPoint> for AttachPoint {
@@ -804,7 +849,7 @@ impl Promote<OpentypeAttachList> for AttachList {
     fn promote(orig: &OpentypeAttachList) -> Self {
         AttachList {
             coverage: promote_opt(&orig.coverage.link),
-            attach_point_offsets: orig
+            attach_points: orig
                 .attach_point_offsets
                 .iter()
                 .map(|offset| promote_opt(&offset.link))
@@ -1493,6 +1538,8 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_glyf_metrics(&optional.glyf, conf);
     show_prep_metrics(&optional.prep, conf);
     show_gasp_metrics(&optional.gasp, conf);
+    // STUB - anything between gasp and gdef go here
+    show_gdef_metrics(&optional.gdef, conf);
 }
 
 fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
@@ -1517,6 +1564,242 @@ fn show_loca_metrics(loca: &Option<LocaMetrics>, _conf: &Config) {
     if let Some(()) = loca {
         println!("loca: (details omitted)")
     }
+}
+
+fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
+    if let Some(GdefMetrics {
+        major_version,
+        minor_version,
+        glyph_class_def,
+        attach_list,
+        lig_caret_list,
+        mark_attach_class_def,
+        data,
+    }) = gdef {
+        println!("GDEF: version {}", format_version_major_minor(*major_version, *minor_version));
+        if let Some(glyph_class_def) = glyph_class_def {
+            show_glyph_class_def(glyph_class_def, conf);
+        }
+        if let Some(attach_list) = attach_list {
+            show_attach_list(attach_list, conf);
+        }
+        if let Some(lig_caret_list) = lig_caret_list {
+            show_lig_caret_list(lig_caret_list, conf);
+        }
+        if let Some(mark_attach_class_def) = mark_attach_class_def {
+            show_mark_attach_class_def(mark_attach_class_def, conf);
+        }
+        match data {
+            GdefTableDataMetrics::NoData => {},
+            GdefTableDataMetrics::MarkGlyphSetsDef(mark_glyph_set) => {
+                match mark_glyph_set {
+                    None => println!("\tMarkGlyphSet: <none>"),
+                    Some(mgs) => show_mark_glyph_set(mgs, conf),
+                }
+            }
+            GdefTableDataMetrics::ItemVarStore(ivs) => {
+                show_item_variation_store(ivs)
+            }
+        }
+    }
+}
+
+fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
+    show_items_elided(
+        &mgs.coverage,
+        |ix, item| {
+            match item {
+                None => println!("\t\t[{ix}]: <none>"),
+                Some(covt) => {
+                    print!("\t\t[{ix}]: ");
+                    show_coverage_table(covt, conf);
+                }
+            }
+        },
+        conf.bookend_size,
+        |start, stop| {
+            format!("\t    (skipping coverage tables {}..{})", start, stop)
+        }
+    )
+}
+
+fn show_item_variation_store(ivs: &ItemVariationStore) {
+    println!("(UNINTERPRETED: ItemVariationStore @GDEF+{:#0x})", *ivs);
+}
+
+fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
+    println!("\tLigCaretList:");
+    if let Some(ref coverage) = lig_caret_list.coverage {
+        // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
+        print!("\t\t");
+        show_coverage_table(coverage, conf);
+    }
+    show_items_elided(
+        &lig_caret_list.lig_glyphs,
+        |ix, opt_lig_glyph| {
+            match opt_lig_glyph {
+                Some(lig_glyph) => {
+                    print!("\t\t[{ix}]: ");
+                    show_items_inline(
+                        &lig_glyph.caret_values,
+                        |opt_caret_value| {
+                            match opt_caret_value {
+                                Some(cv) => format_caret_value(cv),
+                                None => format!("<none>"),
+                            }
+                        },
+                        conf.inline_bookend,
+                        |num_skipped| format!("...({num_skipped})..."),
+                    )
+                }
+                None => println!("\t\t[{ix}]: <no lig glyphs>"),
+            }
+        },
+        conf.bookend_size,
+        |start, stop| format!("\t    (skipping LigGlyphs {}..{})", start, stop),
+    )
+}
+
+fn format_caret_value(cv: &CaretValue) -> String {
+    match cv {
+        // REVIEW - this isn't really a canonical abbreviation, so we might adjust what we show for Design Units (Format 1)
+        CaretValue::DesignUnits(du) => format!("{du}du"),
+        CaretValue::ContourPoint(ix) => format!("#{ix}"),
+        CaretValue::DesignUnitsWithTable { coordinate, device } => {
+            match device {
+                None => format!("{}du", coordinate),
+                Some(dev) => match dev {
+                    DeviceOrVariationIndex::DeviceTable(dev_table) => {
+                        format!("{}du+[{}]", coordinate, format_device_table(dev_table))
+                    }
+                    DeviceOrVariationIndex::VariationIndexTable(var_ix_table) => {
+                        format!("{}du+[{}]", coordinate, format_variation_index_table(var_ix_table))
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn format_device_table(dev_table: &DeviceTable) -> String {
+    // REVIEW - we are so far down the stack there is very little we can display inline for the delta-values, but we have them on hand if we wish to show them in some abbreviated form...
+    format!("{}..{}", dev_table.start_size, dev_table.end_size)
+}
+
+fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
+    format!("{}->{}", var_ix_table.delta_set_outer_index, var_ix_table.delta_set_inner_index)
+}
+
+
+fn show_attach_list(attach_list: &AttachList, conf: &Config) {
+    println!("\tAttachList:");
+    if let Some(ref coverage) = attach_list.coverage {
+        // NOTE - since coverage tables are used in MarkGlyphSet, we don't want to force-indent within the `show_coverage_table` function, so we do it before instead.
+        print!("\t\t");
+        show_coverage_table(coverage, conf);
+    }
+    show_items_elided(
+        &attach_list.attach_points,
+        |ix, item| {
+            match item {
+                Some(AttachPoint { point_indices }) => {
+                    print!("\t\t[{ix}]:");
+                    show_items_inline(
+                        point_indices,
+                        |point_ix| format!("{}", point_ix),
+                        conf.inline_bookend,
+                        |num_skipped| format!("...({num_skipped})..."),
+                    );
+                },
+                None => println!("\t\t[{ix}]: <no attach points>"),
+            }
+        },
+        conf.bookend_size,
+        |start, stop| format!("\t    (skipping attach points for glyphs {}..{})", start, stop),
+    )
+}
+
+fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
+    match cov {
+        CoverageTable::Format1 { ref glyph_array } => {
+            print!("Glyphs Covered: ");
+            show_items_inline(
+                glyph_array,
+                |item| format!("{}", item),
+                conf.inline_bookend,
+                |num_skipped| format!("...({num_skipped})..."),
+            );
+        }
+        CoverageTable::Format2 { ref range_records } => {
+            print!("Glyph Ranges Covered: ");
+            show_items_inline(
+                range_records,
+                format_coverage_range_record,
+                conf.inline_bookend,
+                |num_skipped| format!("...({num_skipped})..."),
+            );
+
+        }
+    }
+}
+
+fn show_mark_attach_class_def(mark_attach_class_def: &ClassDef, conf: &Config) {
+    println!("\tMarkAttachClassDef:");
+    show_class_def(mark_attach_class_def, format_mark_attach_class, conf);
+}
+
+fn format_mark_attach_class(mark_attach_class: &u16) -> String {
+    match mark_attach_class {
+        // STUB - if we come up with a semantic association for specific numbers, add those in before this catchall
+        _ => format!("{}", mark_attach_class),
+    }
+}
+
+fn show_glyph_class_def(class_def: &ClassDef, conf: &Config)
+{
+    println!("\tGlyphClassDef:");
+    show_class_def(class_def, show_glyph_class, conf)
+}
+
+fn show_class_def<S: std::fmt::Display>(class_def: &ClassDef, show_fn: impl Fn(&u16) -> S, conf: &Config) {
+    match class_def {
+        &ClassDef::Format1 { start_glyph_id, ref class_value_array } => {
+            match start_glyph_id {
+                0 => (),
+                1 => println!("\t    (skipping uncovered glyph 0)"),
+                n => println!("\t    (skipping uncovered glyphs 0..{n})"),
+            }
+            show_items_elided(
+                class_value_array,
+                |ix, item| {
+                    let gix = start_glyph_id as usize + ix;
+                    println!("\t\tGlyph [{gix}]: {}", show_fn(item));
+                },
+                conf.bookend_size,
+                |start, stop| format!("\t    (skipping glyphs {}..{})", start_glyph_id as usize + start, start_glyph_id as usize + stop),
+            )
+        }
+        &ClassDef::Format2 { ref class_range_records } => {
+            show_items_elided(
+                class_range_records,
+                |_ix, class_range| {
+                    println!("\t\t({} -> {}): {}", class_range.start_glyph_id, class_range.end_glyph_id, show_fn(&class_range.value));
+                },
+                conf.bookend_size,
+                |start, stop| {
+                    let low_end = class_range_records[start].start_glyph_id;
+                    let high_end = class_range_records[stop - 1].end_glyph_id;
+                    format!("\t    (skipping ranges covering glyphs {}..={})", low_end, high_end)
+                }
+            )
+        }
+    }
+}
+
+fn format_coverage_range_record(coverage_range: &CoverageRangeRecord) -> String {
+    let span = coverage_range.end_glyph_id - coverage_range.start_glyph_id;
+    let end_coverage_index = coverage_range.value + span;
+    format!("({} -> {}): {}(->{})", coverage_range.start_glyph_id, coverage_range.end_glyph_id, coverage_range.value, end_coverage_index)
 }
 
 fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
@@ -1580,6 +1863,33 @@ fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
         );
     }
 }
+
+fn show_items_inline<T>(
+    items: &[T],
+    show_fn: impl Fn(&T) -> String,
+    bookend: usize,
+    ellipsis: impl Fn(usize) -> String,
+) {
+    let count = items.len();
+    if count > bookend * 2 {
+        print!("[");
+        for ix in 0..bookend {
+            if ix > 0 {
+                print!(", ");
+            }
+            print!("{}", show_fn(&items[ix]));
+        }
+        print!("{}", ellipsis(count - bookend * 2));
+        for ix in (count - bookend)..count {
+            if ix > count - bookend {
+                print!(", ");
+            }
+            print!("{}", show_fn(&items[ix]));
+        }
+        println!("]");
+    }
+}
+
 
 /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
 ///
