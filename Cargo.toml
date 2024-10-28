@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "generated/", "doodle-formats/", "micro-stat/", "smallsorts"]
+members = [".", "generated/", "doodle-formats/", "micro-stat/", "smallsorts", "experiments/analytic-engine/"]
 
 [package]
 name = "doodle"
