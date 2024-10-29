@@ -1,3 +1,4 @@
+extern crate proptest;
 use num_bigint::BigInt;
 use num_traits::{One, Signed, Zero};
 
@@ -21,7 +22,7 @@ pub enum BasicUnaryOp {
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum NumRep {
-    Abstract,
+    Abstract { auto: bool },
     Concrete {
         is_signed: bool,
         bit_width: BitWidth,
@@ -62,11 +63,14 @@ impl NumRep {
         is_signed: false,
         bit_width: BitWidth::Bits64,
     };
+
+    pub const AUTO: NumRep = NumRep::Abstract { auto: true };
+    pub const AMBIGUOUS: NumRep = NumRep::Abstract { auto: false };
 }
 
 impl NumRep {
     pub const fn is_abstract(&self) -> bool {
-        matches!(self, NumRep::Abstract)
+        matches!(self, NumRep::Abstract { .. })
     }
 }
 
@@ -85,7 +89,7 @@ macro_rules! bounds_of {
 impl NumRep {
     fn as_bounds(&self) -> Option<Bounds> {
         let (min, max) = match self {
-            NumRep::Abstract => return None,
+            NumRep::Abstract { .. } => return None,
             &NumRep::U8 => bounds_of!(u8),
             &NumRep::U16 => bounds_of!(u16),
             &NumRep::U32 => bounds_of!(u32),
@@ -96,6 +100,10 @@ impl NumRep {
             &NumRep::I64 => bounds_of!(i64),
         };
         Some(Bounds { min, max })
+    }
+
+    pub const fn is_auto(&self) -> bool {
+        matches!(self, NumRep::Abstract { auto: true })
     }
 }
 
@@ -122,12 +130,14 @@ impl std::fmt::Display for TypedConst {
             NumRep::I16 => write!(f, "{}i16", n),
             NumRep::I32 => write!(f, "{}i32", n),
             NumRep::I64 => write!(f, "{}i64", n),
-            NumRep::Abstract => write!(f, "{}??", n),
+            NumRep::AUTO => write!(f, "{}?", n),
+            NumRep::AMBIGUOUS => write!(f, "{}??", n),
         }
     }
 }
 
 impl TypedConst {
+    /// Returns `true` if the stored `NumRep` is abstract (either auto or ambiguous).
     pub fn is_abstract(&self) -> bool {
         self.1.is_abstract()
     }
@@ -147,6 +157,25 @@ impl TypedConst {
 
     pub fn as_raw_value(&self) -> &BigInt {
         &self.0
+    }
+
+    /// Type-agnostic equality on a pure mathematical level.
+    ///
+    /// Does not check for representablity of either value, nor even whether either representative is some flavor of `Abstract`.
+    pub fn eq_val(&self, other: &TypedConst) -> bool {
+        &self.0 == &other.0
+    }
+
+    /// Numeric equality test on `self`, that the value it holds is equal to `other` regardless of type.
+    ///
+    /// Saves the construction of a new TypedConst compared to [`eq_val`] if the query is made starting with a BigInt in mind.
+    pub fn eq_num(&self, other: &BigInt) -> bool {
+        &self.0 == other
+    }
+
+    /// Returns the NumRep of a `TypedConst`.
+    pub fn get_rep(&self) -> NumRep {
+        self.1
     }
 }
 
@@ -169,6 +198,7 @@ impl Value {
         }
     }
 
+    /// Extracts a reference to the `TypedConst` held within a Value, irrespective of its numeric representative.
     pub fn as_const(&self) -> Option<&TypedConst> {
         match self {
             Value::Const(c) => Some(c),
@@ -190,7 +220,7 @@ impl std::fmt::Display for Value {
 #[derive(Clone, Copy, Debug)]
 pub struct BinOp {
     op: BasicBinOp,
-    // If None, picks either the common rep of the two arguments or Abstract if they disagree
+    // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
     out_rep: Option<NumRep>,
 }
 
@@ -280,10 +310,12 @@ impl Expr {
                 let rep_out = match out_rep {
                     Some(rep) => *rep,
                     None => {
-                        if rep0 == rep1 {
+                        if rep0 == rep1 || rep1.is_auto() {
                             rep0
+                        } else if rep0.is_auto() {
+                            rep1
                         } else {
-                            NumRep::Abstract
+                            NumRep::AMBIGUOUS
                         }
                     }
                 };
@@ -330,10 +362,39 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+
+    fn abstract_strategy() -> BoxedStrategy<NumRep> {
+        prop_oneof![
+            Just(NumRep::AUTO),
+            Just(NumRep::AMBIGUOUS)
+        ].boxed()
+    }
+
+    fn concrete_strategy() -> BoxedStrategy<NumRep> {
+        prop_oneof![
+            Just(NumRep::U8),
+            Just(NumRep::U16),
+            Just(NumRep::U32),
+            Just(NumRep::U64),
+            Just(NumRep::I8),
+            Just(NumRep::I16),
+            Just(NumRep::I32),
+            Just(NumRep::I64),
+        ].boxed()
+    }
+
+    fn numrep_strategy() -> BoxedStrategy<NumRep> {
+        prop_oneof![
+            abstract_strategy(),
+            concrete_strategy(),
+        ].boxed()
+    }
 
     #[test]
     fn one_plus_one_is_two() -> Result<(), EvalError> {
-        let one = TypedConst(BigInt::one(), NumRep::Abstract);
+        let one = TypedConst(BigInt::one(), NumRep::AUTO);
         let should_be_two = Expr::BinOp(
             BinOp {
                 op: BasicBinOp::Add,
@@ -342,10 +403,34 @@ mod tests {
             Box::new(Expr::Const(one.clone())),
             Box::new(Expr::Const(one)),
         );
-        assert_eq!(
-            should_be_two.eval()?.as_const().unwrap().as_raw_value(),
-            &BigInt::from(2)
-        );
+        assert!(should_be_two.eval()?.as_const().unwrap().eq_num(&BigInt::from(2)));
         Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn cast_works(orig in numrep_strategy(), tgt in numrep_strategy()) {
+            let one = TypedConst(BigInt::one(), orig);
+            let casted_one = Expr::Cast(tgt, Box::new(Expr::Const(one)));
+            let val = casted_one.eval().unwrap();
+            let rep = val.as_const().unwrap().get_rep();
+            prop_assert_eq!(rep, tgt);
+        }
+
+        #[test]
+        fn auto_is_eagerly_erased(rep in numrep_strategy()) {
+            let one = TypedConst(BigInt::one(), NumRep::AUTO);
+            let rep_one = TypedConst(BigInt::one(), rep);
+            let two_should_be_rep = Expr::BinOp(
+                BinOp {
+                    op: BasicBinOp::Add,
+                    out_rep: None,
+                },
+                Box::new(Expr::Const(one)),
+                Box::new(Expr::Const(rep_one)),
+            );
+            let actual = two_should_be_rep.eval().unwrap().as_const().unwrap().get_rep();
+            prop_assert_eq!(actual, rep);
+        }
     }
 }
