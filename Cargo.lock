@@ -18,6 +18,7 @@ dependencies = [
  "bitflags",
  "num-bigint",
  "num-traits",
+ "proptest",
 ]
 
 [[package]]
