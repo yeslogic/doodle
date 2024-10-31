@@ -22,13 +22,27 @@ pub enum BasicUnaryOp {
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum NumRep {
-    Abstract {
-        auto: bool,
-    },
+    Auto,
     Concrete {
         is_signed: bool,
         bit_width: BitWidth,
     },
+}
+
+impl std::fmt::Display for NumRep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            NumRep::U8 => write!(f, "u8",),
+            NumRep::U16 => write!(f, "u16"),
+            NumRep::U32 => write!(f, "u32"),
+            NumRep::U64 => write!(f, "u64"),
+            NumRep::I8 => write!(f, "i8"),
+            NumRep::I16 => write!(f, "i16"),
+            NumRep::I32 => write!(f, "i32"),
+            NumRep::I64 => write!(f, "i64"),
+            NumRep::AUTO => write!(f, "?"),
+        }
+    }
 }
 
 impl NumRep {
@@ -66,15 +80,10 @@ impl NumRep {
         bit_width: BitWidth::Bits64,
     };
 
-    pub const AUTO: NumRep = NumRep::Abstract { auto: true };
-    pub const AMBIGUOUS: NumRep = NumRep::Abstract { auto: false };
+    pub const AUTO: NumRep = NumRep::Auto;
 }
 
-impl NumRep {
-    pub const fn is_abstract(&self) -> bool {
-        matches!(self, NumRep::Abstract { .. })
-    }
-}
+
 
 
 /// Representative min and max bounds for a numeric type
@@ -91,6 +100,14 @@ impl std::fmt::Display for Bounds {
 }
 
 impl Bounds {
+    pub fn new(min: Number, max: Number) -> Self {
+        Self { min, max }
+    }
+
+    pub fn singleton(n: Number) -> Self {
+        Self { min: n.clone(), max: n }
+    }
+
     /// Returns `true` if every value in `sub_range` is also within `self`.
     ///
     /// If `inferior` has inverted bounds, will panic.
@@ -132,7 +149,7 @@ macro_rules! bounds_of {
 impl NumRep {
     pub(crate) fn as_bounds(&self) -> Option<Bounds> {
         let (min, max) = match self {
-            NumRep::Abstract { .. } => return None,
+            NumRep::Auto  => return None,
             &NumRep::U8 => bounds_of!(u8),
             &NumRep::U16 => bounds_of!(u16),
             &NumRep::U32 => bounds_of!(u32),
@@ -145,8 +162,8 @@ impl NumRep {
         Some(Bounds { min, max })
     }
 
-    pub const fn is_auto(&self) -> bool {
-        matches!(self, NumRep::Abstract { auto: true })
+    pub const fn is_auto(self) -> bool {
+        matches!(self, NumRep::Auto)
     }
 }
 
@@ -159,7 +176,7 @@ pub enum BitWidth {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct TypedConst(BigInt, NumRep);
+pub struct TypedConst(pub BigInt, pub NumRep);
 
 impl std::fmt::Display for TypedConst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -174,15 +191,14 @@ impl std::fmt::Display for TypedConst {
             NumRep::I32 => write!(f, "{}i32", n),
             NumRep::I64 => write!(f, "{}i64", n),
             NumRep::AUTO => write!(f, "{}?", n),
-            NumRep::AMBIGUOUS => write!(f, "{}??", n),
         }
     }
 }
 
 impl TypedConst {
     /// Returns `true` if the stored `NumRep` is abstract (either auto or ambiguous).
-    pub fn is_abstract(&self) -> bool {
-        self.1.is_abstract()
+    pub fn is_abstract(self) -> bool {
+        self.1.is_auto()
     }
 
     /// Returns `true` if `self` is representable, which is true if either:
@@ -193,7 +209,7 @@ impl TypedConst {
         if let Some(bounds) = rep.as_bounds() {
             n >= &bounds.min && n <= &bounds.max
         } else {
-            debug_assert!(rep.is_abstract());
+            debug_assert!(rep.is_auto());
             true
         }
     }
@@ -262,22 +278,34 @@ impl std::fmt::Display for Value {
 
 #[derive(Clone, Copy, Debug)]
 pub struct BinOp {
-    op: BasicBinOp,
+    pub op: BasicBinOp,
     // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
-    out_rep: Option<NumRep>,
+    pub out_rep: Option<NumRep>,
 }
 
 impl BinOp {
-    pub fn output_type(&self, left: NumRep, right: NumRep) -> NumRep {
+    pub fn output_type(&self, left: NumRep, right: NumRep) -> Option<NumRep> {
         if let Some(rep) = self.out_rep {
-            rep
+            Some(rep)
         } else if left == right || right.is_auto() {
-            left
+            Some(left)
         } else if left.is_auto() {
-            right
+            Some(right)
         } else {
-            NumRep::AMBIGUOUS
+            None
         }
+    }
+
+    pub fn cast_rep(&self) -> Option<NumRep> {
+        self.out_rep
+    }
+
+    pub fn is_cast_and(&self, predicate: impl Fn(NumRep) -> bool) -> bool {
+        self.out_rep.is_some_and(predicate)
+    }
+
+    pub(crate) fn get_op(&self) -> BasicBinOp {
+        self.op
     }
 }
 
@@ -289,11 +317,23 @@ pub struct UnaryOp {
 }
 impl UnaryOp {
     fn output_type(&self, in_rep: NumRep) -> NumRep {
-        if let Some(rep) =  self.out_rep {
+        if let Some(rep) = self.out_rep {
             rep
         } else {
             in_rep
         }
+    }
+
+    pub fn cast_rep(&self) -> Option<NumRep> {
+        self.out_rep
+    }
+
+    pub fn is_cast_and(&self, predicate: fn(NumRep) -> bool) -> bool {
+        self.out_rep.is_some_and(predicate)
+    }
+
+    pub(crate) fn get_op(&self) -> BasicUnaryOp {
+        self.op
     }
 }
 
@@ -307,15 +347,15 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub(crate) fn get_rep(&self) -> NumRep {
+    pub(crate) fn get_rep(&self) -> Option<NumRep> {
         match self {
-            Expr::Const(tc) => tc.get_rep(),
-            Expr::Cast(rep, _) => *rep,
+            Expr::Const(tc) => Some(tc.get_rep()),
+            Expr::Cast(rep, _) => Some(*rep),
             Expr::BinOp(bin_op, expr, expr1) => {
-                bin_op.output_type(expr.get_rep(), expr1.get_rep())
+                bin_op.output_type(expr.get_rep()?, expr1.get_rep()?)
             }
             Expr::UnaryOp(unary_op, expr) => {
-                unary_op.output_type(expr.get_rep())
+                Some(unary_op.output_type(expr.get_rep()?))
             }
         }
     }
@@ -325,10 +365,7 @@ impl Expr {
 pub enum EvalError {
     DivideByZero,
     RemainderNonPositive,
-    Unrepresentable(Value),
-    ArithOrCastOption,
-    // TryUnwrapNone,
-    // TryUnwrapConst,
+    Ambiguous(NumRep, NumRep),
 }
 
 impl std::fmt::Display for EvalError {
@@ -336,17 +373,9 @@ impl std::fmt::Display for EvalError {
         match self {
             EvalError::DivideByZero => write!(f, "attempted division by zero"),
             EvalError::RemainderNonPositive => write!(f, "remainder rhs must be positive"),
-            EvalError::Unrepresentable(value) => write!(f, "value `{value}` is unrepresentable"),
-            EvalError::ArithOrCastOption => {
-                write!(f, "arithmetic and casts on Value::Opt not supported")
+            EvalError::Ambiguous(rep0, rep1) => {
+                write!(f, "operation over {rep0} and {rep1} must have an explicit output representation to be evaluated")
             }
-            // EvalError::TryUnwrapNone => {
-            //     write!(f, "TryUnwrap called over expr evaluating to Opt(None)")
-            // }
-            // EvalError::TryUnwrapConst => write!(
-            //     f,
-            //     "TryUnwrap called over expr evaluating to Const (and not Opt)"
-            // ),
         }
     }
 }
@@ -396,7 +425,7 @@ impl Expr {
                         } else if rep0.is_auto() {
                             rep1
                         } else {
-                            NumRep::AMBIGUOUS
+                            return Err(EvalError::Ambiguous(rep0, rep1))
                         }
                     }
                 };
@@ -446,7 +475,7 @@ mod tests {
     use proptest::prelude::*;
 
     fn abstract_strategy() -> BoxedStrategy<NumRep> {
-        prop_oneof![Just(NumRep::AUTO), Just(NumRep::AMBIGUOUS)].boxed()
+        prop_oneof![Just(NumRep::AUTO)].boxed()
     }
 
     fn concrete_strategy() -> BoxedStrategy<NumRep> {
