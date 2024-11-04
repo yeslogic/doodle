@@ -21,7 +21,7 @@ mod tests {
 }
 
 pub fn main() -> std::io::Result<()> {
-    let mut reader = Interface::new("analytic")?;
+    let reader = Interface::new("analytic")?;
     let parser = expr::TreeParser::new();
     reader.set_prompt("α> ")?;
     while let ReadResult::Input(input) = reader.read_line()? {
