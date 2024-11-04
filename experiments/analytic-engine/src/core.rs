@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use num_traits::{One, Signed, Zero};
+use num_traits::{Signed, Zero};
 use std::borrow::Cow;
 
 pub type Number = BigInt;
@@ -83,9 +83,6 @@ impl NumRep {
     pub const AUTO: NumRep = NumRep::Auto;
 }
 
-
-
-
 /// Representative min and max bounds for a numeric type
 #[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Bounds {
@@ -105,7 +102,10 @@ impl Bounds {
     }
 
     pub fn singleton(n: Number) -> Self {
-        Self { min: n.clone(), max: n }
+        Self {
+            min: n.clone(),
+            max: n,
+        }
     }
 
     /// Returns `true` if every value in `sub_range` is also within `self`.
@@ -149,7 +149,7 @@ macro_rules! bounds_of {
 impl NumRep {
     pub(crate) fn as_bounds(&self) -> Option<Bounds> {
         let (min, max) = match self {
-            NumRep::Auto  => return None,
+            NumRep::Auto => return None,
             &NumRep::U8 => bounds_of!(u8),
             &NumRep::U16 => bounds_of!(u16),
             &NumRep::U32 => bounds_of!(u32),
@@ -278,12 +278,16 @@ impl std::fmt::Display for Value {
 
 #[derive(Clone, Copy, Debug)]
 pub struct BinOp {
-    pub op: BasicBinOp,
+    op: BasicBinOp,
     // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
-    pub out_rep: Option<NumRep>,
+    out_rep: Option<NumRep>,
 }
 
 impl BinOp {
+    pub const fn new(op: BasicBinOp, out_rep: Option<NumRep>) -> Self {
+        Self { op, out_rep }
+    }
+
     pub fn output_type(&self, left: NumRep, right: NumRep) -> Option<NumRep> {
         if let Some(rep) = self.out_rep {
             Some(rep)
@@ -315,7 +319,12 @@ pub struct UnaryOp {
     // If None, will pick the same type as the input (even if this produces a temporary unrepresentable)
     out_rep: Option<NumRep>,
 }
+
 impl UnaryOp {
+    pub const fn new(op: BasicUnaryOp, out_rep: Option<NumRep>) -> Self {
+        Self { op, out_rep }
+    }
+
     fn output_type(&self, in_rep: NumRep) -> NumRep {
         if let Some(rep) = self.out_rep {
             rep
@@ -354,9 +363,7 @@ impl Expr {
             Expr::BinOp(bin_op, expr, expr1) => {
                 bin_op.output_type(expr.get_rep()?, expr1.get_rep()?)
             }
-            Expr::UnaryOp(unary_op, expr) => {
-                Some(unary_op.output_type(expr.get_rep()?))
-            }
+            Expr::UnaryOp(unary_op, expr) => Some(unary_op.output_type(expr.get_rep()?)),
         }
     }
 }
@@ -412,10 +419,9 @@ impl Expr {
                         } else {
                             return Err(EvalError::RemainderNonPositive);
                         }
-                    }
-                    // (_, Value::Opt(..), _) | (_, _, Value::Opt(..)) => {
-                    //     return Err(EvalError::ArithOrCastOption)
-                    // }
+                    } // (_, Value::Opt(..), _) | (_, _, Value::Opt(..)) => {
+                      //     return Err(EvalError::ArithOrCastOption)
+                      // }
                 };
                 let rep_out = match out_rep {
                     Some(rep) => *rep,
@@ -425,7 +431,7 @@ impl Expr {
                         } else if rep0.is_auto() {
                             rep1
                         } else {
-                            return Err(EvalError::Ambiguous(rep0, rep1))
+                            return Err(EvalError::Ambiguous(rep0, rep1));
                         }
                     }
                 };
@@ -448,7 +454,6 @@ impl Expr {
                         };
                         Ok(Value::Const(TypedConst(n.abs(), rep_out)))
                     }
-                    // (_, Value::Opt(_)) => return Err(EvalError::ArithOrCastOption),
                 }
             }
             Expr::Cast(num_rep, expr) => {
@@ -457,14 +462,8 @@ impl Expr {
                     Value::Const(TypedConst(num, _rep)) => {
                         Ok(Value::Const(TypedConst(num, *num_rep)))
                     }
-                    // Value::Opt(_) => return Err(EvalError::ArithOrCastOption),
                 }
             }
-            // Expr::TryUnwrap(expr) => match expr.eval()? {
-                // Value::Const(_) => return Err(EvalError::TryUnwrapConst),
-                // Value::Opt(None) => return Err(EvalError::TryUnwrapNone),
-                // Value::Opt(Some(x)) => Ok(*x),
-            // },
         }
     }
 }
@@ -472,6 +471,7 @@ impl Expr {
 #[cfg(test)]
 mod tests {
     use crate::core::*;
+    use num_traits::One;
     use proptest::prelude::*;
 
     fn abstract_strategy() -> BoxedStrategy<NumRep> {
