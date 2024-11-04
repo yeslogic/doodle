@@ -1,4 +1,4 @@
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, NumRep, TypedConst, UnaryOp, Value};
+use crate::core::{BinOp, Expr, NumRep, TypedConst, UnaryOp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub(crate) enum PrimInt {
@@ -12,7 +12,7 @@ pub(crate) enum PrimInt {
     I64,
 }
 
-pub const PRIM_INTS: [PrimInt; 8] = [
+pub(crate) const PRIM_INTS: [PrimInt; 8] = [
     PrimInt::U8,
     PrimInt::U16,
     PrimInt::U32,
@@ -122,7 +122,7 @@ pub(crate) struct TypedUnaryOp<TypeRep> {
 pub(crate) mod inference {
     use std::collections::HashSet;
 
-    use crate::core::{Bounds, Expr, NumRep, TypedConst};
+    use crate::core::{Bounds, Expr, NumRep};
 
     use super::{IntType, PrimInt};
 
@@ -141,9 +141,9 @@ pub(crate) mod inference {
             Self(ix)
         }
 
-        pub fn to_usize(self) -> usize {
-            self.0
-        }
+        // pub fn to_usize(self) -> usize {
+        //     self.0
+        // }
     }
 
     #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -191,19 +191,19 @@ pub(crate) mod inference {
             }
         }
 
-        pub fn as_backref(&self) -> Option<usize> {
-            match self {
-                Alias::Ground | Alias::Canonical(_) => None,
-                Alias::BackRef(ix) => Some(*ix),
-            }
-        }
+        // pub fn as_backref(&self) -> Option<usize> {
+        //     match self {
+        //         Alias::Ground | Alias::Canonical(_) => None,
+        //         Alias::BackRef(ix) => Some(*ix),
+        //     }
+        // }
 
         pub fn add_forward_ref(&mut self, tgt: usize) {
             match self {
                 Alias::Ground => {
                     let _ = std::mem::replace(self, Alias::Canonical(HashSet::from([tgt])));
                 }
-                Alias::BackRef(ix) => panic!("cannot add forward-ref to Alias::BackRef"),
+                Alias::BackRef(_ix) => panic!("cannot add forward-ref to Alias::BackRef"),
                 Alias::Canonical(fwds) => {
                     fwds.insert(tgt);
                 }
@@ -288,20 +288,20 @@ pub(crate) mod inference {
             }
         }
 
-        pub(crate) fn has_unique_assignment(&self) -> bool {
-            // REVIEW - there are smarter ways of calculating this
-            let mut solutions = 0;
-            for prim_int in super::PRIM_INTS.iter() {
-                match self.is_satisfied_by(IntType::Prim(*prim_int)) {
-                    Some(true) => {
-                        solutions += 1;
-                    }
-                    Some(false) => (),
-                    None => return false,
-                }
-            }
-            solutions == 1
-        }
+        // pub(crate) fn has_unique_assignment(&self) -> bool {
+        //     // REVIEW - there are smarter ways of calculating this
+        //     let mut solutions = 0;
+        //     for prim_int in super::PRIM_INTS.iter() {
+        //         match self.is_satisfied_by(IntType::Prim(*prim_int)) {
+        //             Some(true) => {
+        //                 solutions += 1;
+        //             }
+        //             Some(false) => (),
+        //             None => return false,
+        //         }
+        //     }
+        //     solutions == 1
+        // }
 
         // NOTE - should only be called on Encompasses
         pub(crate) fn get_unique_solution(&self) -> InferenceResult<IntType> {
@@ -332,7 +332,7 @@ pub(crate) mod inference {
 
     #[derive(Debug)]
     pub enum InferenceError {
-        Unrepresentable(TypedConst, IntType),
+        // Unrepresentable(TypedConst, IntType),
         BadUnification(Constraint, Constraint),
         AbstractCast,
         Ambiguous,
@@ -344,7 +344,7 @@ pub(crate) mod inference {
     impl std::fmt::Display for InferenceError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                InferenceError::Unrepresentable(c, int_type) => write!(f, "inference requires that `{}` be assigned type `{}`, which cannot represent it", c, int_type),
+                // InferenceError::Unrepresentable(c, int_type) => write!(f, "inference requires that `{}` be assigned type `{}`, which cannot represent it", c, int_type),
                 InferenceError::BadUnification(cx1, cx2) => write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2),
                 InferenceError::AbstractCast => write!(f, "casts and operations cannot explicitly produce abstract NumReps"),
                 InferenceError::Ambiguous => write!(f, "mixed-type binary operation must have out_rep on operation to avoid ambiguity"),
