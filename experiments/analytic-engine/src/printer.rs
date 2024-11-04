@@ -1,8 +1,200 @@
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, UnaryOp};
+use std::borrow::Cow;
+use std::rc::Rc;
+
+use fragment::Fragment;
+use precedence::{cond_paren, Precedence};
+
+use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, NumRep, TypedConst, UnaryOp};
 use crate::elaborator::inference::InferenceEngine;
 use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedExpr, TypedUnaryOp};
 
-fn show_bin_op(bin_op: &BinOp) -> String {
+pub(crate) mod fragment {
+    use std::borrow::Cow;
+    use std::fmt::Write as _;
+    use std::rc::Rc;
+
+
+
+    #[derive(Clone, Default)]
+    pub enum Fragment {
+        #[default]
+        Empty,
+        Char(char),
+        String(Cow<'static, str>),
+        DisplayAtom(Rc<dyn std::fmt::Display>),
+        Cat(Box<Fragment>, Box<Fragment>),
+    }
+
+    impl std::fmt::Debug for Fragment {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Empty => write!(f, "Empty"),
+                Self::Char(c) => f.debug_tuple("Char").field(c).finish(),
+                Self::String(s) => f.debug_tuple("String").field(s).finish(),
+                Self::DisplayAtom(at) => f
+                    .debug_tuple("DisplayAtom")
+                    .field(&format!("{}", at))
+                    .finish(),
+                Self::Cat(x, y) => f.debug_tuple("Cat").field(x).field(y).finish(),
+            }
+        }
+    }
+
+    impl Fragment {
+        pub fn cat(self, frag1: Self) -> Self {
+            Self::Cat(Box::new(self), Box::new(frag1))
+        }
+
+        pub fn delimit(self, before: Self, after: Self) -> Self {
+            Self::cat(before, self).cat(after)
+        }
+
+    }
+
+    impl std::fmt::Display for Fragment {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Fragment::Empty => Ok(()),
+                Fragment::Char(c) => f.write_char(*c),
+                Fragment::String(s) => f.write_str(s.as_ref()),
+                Fragment::DisplayAtom(atom) => std::fmt::Display::fmt(&atom, f),
+                Fragment::Cat(frag0, frag1) => {
+                    frag0.fmt(f)?;
+                    frag1.fmt(f)
+                }
+            }
+        }
+    }
+}
+
+pub(crate) mod precedence {
+    use super::fragment::Fragment;
+
+    #[derive(Copy, Clone, Debug, Default)]
+    pub(crate) enum Precedence {
+        /// Highest precedence, as if implicitly (if not actually) parenthesized
+        #[allow(dead_code)]
+        Atomic,
+        /// Highest natural precedence - used for unary operations and type-casts
+        Mono(MonoLevel),
+        /// Infix arithmetic operation of the designated arithmetic sub-precedence
+        Arith(ArithLevel),
+        /// Lowest natural precedence - used when no particular precedence is required or known        #[default]
+        #[default]
+        Top
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    pub(crate) enum MonoLevel {
+        // AbsVal and Negate
+        Prefix = 0,
+        // Standalone type-casts
+        Postfix,
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    pub(crate) enum ArithLevel {
+        DivRem = 0, // Highest arithmetic Precedence
+        Mul,
+        AddSub,
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub(crate) enum Relation {
+        /// `.<`
+        Inferior,
+        /// `.=`
+        Congruent,
+        /// `.>`
+        Superior,
+        /// `><`
+        Disjoint,
+    }
+
+    pub(crate) trait IntransitiveOrd {
+        fn relate(&self, other: &Self) -> Relation;
+    }
+
+    impl IntransitiveOrd for MonoLevel {
+        fn relate(&self, other: &Self) -> Relation {
+            match (self, other) {
+                (Self::Prefix, Self::Prefix) | (Self::Postfix, Self::Postfix) => Relation::Congruent,
+                (Self::Prefix, Self::Postfix) => Relation::Superior,
+                (Self::Postfix, Self::Prefix) => Relation::Inferior,
+            }
+        }
+    }
+
+    impl IntransitiveOrd for ArithLevel {
+        fn relate(&self, other: &Self) -> Relation {
+            match (self, other) {
+                (Self::DivRem, Self::DivRem)
+                | (Self::Mul, Self::Mul)
+                | (Self::AddSub, Self::AddSub) => Relation::Congruent,
+                (Self::DivRem, Self::Mul) | (Self::Mul, Self::DivRem) => Relation::Disjoint,
+                (Self::AddSub, _) => Relation::Inferior,
+                (_, Self::AddSub) => Relation::Superior,
+            }
+        }
+    }
+
+
+    /// Rules:
+    ///   x .= x
+    ///   Atomic .> Mono .> *Infix .> Top
+    ///   rel(x, y) = rel(ArithInfix(x), ArithInfix(y))
+    ///   rel(x, y) = rel(BitwiseInfix(x), BitwiseInfix(y))
+    ///   rel(x, y) = rel(Calculus(x), Calculus(y))
+    ///   Bitwise(_) >< Arith(_)
+    impl IntransitiveOrd for Precedence {
+        fn relate(&self, other: &Self) -> Relation {
+            match (self, other) {
+                // Trivial Congruences
+                (Precedence::Atomic, Precedence::Atomic) => Relation::Congruent,
+                (Precedence::Top, Precedence::Top) => Relation::Congruent,
+
+                // Descending relations
+                (Precedence::Atomic, _) => Relation::Superior,
+                (_, Precedence::Atomic) => Relation::Superior,
+
+                // Ascending relations
+                (Precedence::Top, _) => Relation::Inferior,
+                (_, Precedence::Top) => Relation::Superior,
+
+                // Implications
+                (Precedence::Mono(x), Precedence::Mono(y)) => x.relate(y),
+                (Precedence::Arith(x), Precedence::Arith(y)) => x.relate(y),
+
+                // Mixed Relations
+                (Precedence::Mono(_), Precedence::Arith(_)) => Relation::Superior,
+                (Precedence::Arith(_), Precedence::Mono(_)) => Relation::Inferior,
+            }
+        }
+    }
+
+    impl Precedence {
+        pub(crate) const TOP: Self = Precedence::Top;
+        pub(crate) const DIVREM: Self = Precedence::Arith(ArithLevel::DivRem);
+        pub(crate) const MUL: Self = Precedence::Arith(ArithLevel::Mul);
+        pub(crate) const ADDSUB: Self = Precedence::Arith(ArithLevel::AddSub);
+        pub(crate) const ABSNEG: Self = Precedence::Mono(MonoLevel::Prefix);
+        pub(crate) const CAST: Self = Precedence::Mono(MonoLevel::Postfix);
+
+        #[allow(dead_code)]
+        pub(crate) const ATOM: Self = Precedence::Atomic;
+    }
+
+    pub(crate) fn cond_paren(frag: Fragment, current: Precedence, cutoff: Precedence) -> Fragment {
+        match current.relate(&cutoff) {
+            Relation::Disjoint | Relation::Superior => {
+                frag.delimit(Fragment::Char('('), Fragment::Char(')'))
+            }
+            Relation::Congruent | Relation::Inferior => frag
+        }
+    }
+}
+
+fn compile_bin_op(bin_op: &BinOp) -> Fragment {
     let token = match bin_op.get_op() {
         BasicBinOp::Add => "+",
         BasicBinOp::Sub => "-",
@@ -11,13 +203,16 @@ fn show_bin_op(bin_op: &BinOp) -> String {
         BasicBinOp::Rem => "%",
     };
     if let Some(rep) = bin_op.cast_rep() {
-        format!("{}{}", token, rep)
+        Fragment::cat(
+            Fragment::String(Cow::Borrowed(token)),
+            Fragment::String(Cow::Borrowed(rep.to_static_str())),
+        )
     } else {
-        format!("{}", token)
+        Fragment::String(Cow::Borrowed(token))
     }
 }
 
-fn show_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> String {
+fn compile_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> Fragment {
     let token = match bin_op.inner.get_op() {
         BasicBinOp::Add => "+",
         BasicBinOp::Sub => "-",
@@ -25,76 +220,205 @@ fn show_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> String {
         BasicBinOp::Div => "/",
         BasicBinOp::Rem => "%",
     };
-    format!(
-        "({} : ({},{}) -> {})",
-        token, bin_op.sig.0 .0, bin_op.sig.0 .1, bin_op.sig.1
-    )
+    let ((t_in_l, t_in_r), t_out) = bin_op.sig;
+    if t_in_l == t_in_r && t_in_l == t_out {
+        // If the input types and output type all agree, render as operator only
+        Fragment::String(Cow::Borrowed(token))
+    } else {
+        Fragment::cat(
+            Fragment::String(Cow::Borrowed(token)),
+            Fragment::String(Cow::Owned(format!("@({},{})->{}", t_in_l, t_in_r, t_out))),
+        )
+    }.delimit(Fragment::Char(' '), Fragment::Char(' '))
 }
 
-fn show_typed_unary_op(unary_op: &TypedUnaryOp<IntType>) -> String {
+fn compile_typed_unary_op(unary_op: &'_ TypedUnaryOp<IntType>) -> Fragment {
     let token = match unary_op.inner.get_op() {
         BasicUnaryOp::Negate => "~",
         BasicUnaryOp::AbsVal => "abs",
     };
-    format!("({} : {} -> {})", token, unary_op.sig.0, unary_op.sig.1)
+    let (t_in, t_out) = unary_op.sig;
+    if t_in == t_out {
+        Fragment::String(Cow::Borrowed(token))
+    } else {
+        Fragment::cat(
+            Fragment::String(Cow::Borrowed(token)),
+            Fragment::String(Cow::Owned(format!("@{}->{}", t_in, t_out))),
+        )
+    }
 }
 
-fn show_unary_op(unary_op: &UnaryOp) -> String {
+fn compile_prefix(op: &UnaryOp, inner: &Expr, inner_prec: Precedence) -> Fragment {
+    Fragment::cat(compile_unary_op(op), compile_expr(inner, inner_prec))
+}
+
+fn compile_postfix<'a>(token: &'static str, rep: NumRep, inner: &Expr, inner_prec: Precedence) -> Fragment {
+    Fragment::cat(compile_expr(inner, inner_prec), Fragment::cat(Fragment::String(Cow::Borrowed(token)), Fragment::String(Cow::Borrowed(rep.to_static_str()))))
+}
+
+
+fn compile_unary_op<'a>(unary_op: &UnaryOp) -> Fragment {
     let token = match unary_op.get_op() {
         BasicUnaryOp::Negate => "~",
         BasicUnaryOp::AbsVal => "abs",
     };
     if let Some(rep) = unary_op.cast_rep() {
-        format!("{}{}", token, rep)
+        Fragment::cat(
+            Fragment::String(Cow::Borrowed(token)),
+            Fragment::String(Cow::Borrowed(rep.to_static_str())),
+        )
     } else {
-        format!("{}", token)
+        Fragment::String(Cow::Borrowed(token))
     }
 }
 
+
+fn compile_binop(op: BinOp, lhs: &Expr, rhs: &Expr, lhs_prec: Precedence, rhs_prec: Precedence) -> Fragment {
+    Fragment::delimit(compile_bin_op(&op), compile_expr(lhs, lhs_prec), compile_expr(rhs, rhs_prec))
+}
+
 // FIXME - adopt pretty-printing engine with precedence rules
-pub fn show_expr(expr: &Expr) -> String {
+fn compile_expr(expr: &Expr, prec: Precedence) -> Fragment {
     match expr {
-        Expr::Const(typed_const) => format!("{}", typed_const),
-        Expr::BinOp(bin_op, expr, expr1) => format!(
-            "({} {} {})",
-            show_expr(expr),
-            show_bin_op(bin_op),
-            show_expr(expr1)
-        ),
-        Expr::UnaryOp(unary_op, expr) => {
-            format!("{}({})", show_unary_op(unary_op), show_expr(expr))
+        Expr::Const(typed_const) => Fragment::DisplayAtom(Rc::new(typed_const.clone())),
+        Expr::BinOp(op, lhs, rhs) => match op.get_op() {
+            BasicBinOp::Add | BasicBinOp::Sub =>
+            cond_paren(
+                compile_binop(*op, lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+                prec,
+                Precedence::ADDSUB,
+            ),
+            BasicBinOp::Mul => cond_paren(
+                compile_binop(*op, lhs, rhs, Precedence::MUL, Precedence::MUL),
+                prec,
+                Precedence::MUL,
+            ),
+            BasicBinOp::Div | BasicBinOp::Rem => cond_paren(
+                compile_binop(*op, lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+                prec,
+                Precedence::DIVREM,
+            ),
         }
-        Expr::Cast(num_rep, expr) => format!("{} as {}", show_expr(expr), num_rep),
+        Expr::UnaryOp(unary_op, expr) =>
+            cond_paren(
+                compile_prefix(unary_op, expr, Precedence::ABSNEG),
+                prec,
+                Precedence::ABSNEG,
+            ),
+        Expr::Cast(num_rep, expr) => cond_paren(
+            compile_postfix(" as ", *num_rep, expr, Precedence::CAST),
+            prec,
+            Precedence::CAST,
+        ),
     }
 }
 
+fn show_expr(expr: &Expr) -> String {
+    format!("{}", compile_expr(expr, Precedence::TOP))
+}
+
+fn compile_elab_const(t: IntType, typed_const: &TypedConst) -> Fragment {
+    if NumRep::from(t) == typed_const.get_rep() {
+        // If the int-type is directly analogous to the original rep, omit the type-annotation
+        Fragment::DisplayAtom(Rc::new(typed_const.clone()))
+    } else {
+        Fragment::cat(
+            Fragment::DisplayAtom(Rc::new(typed_const.clone())),
+            Fragment::cat(Fragment::Char('@'), Fragment::String(Cow::Borrowed(t.to_static_str())))
+
+        )
+    }
+}
+
+fn compile_elab_binop(t: IntType, op: &TypedBinOp<IntType>, lhs: &TypedExpr<IntType>, rhs: &TypedExpr<IntType>, lhs_prec: Precedence, rhs_prec: Precedence) -> Fragment {
+    compile_typed_expr(lhs, lhs_prec)
+        .cat(compile_typed_bin_op(op))
+        .cat(compile_typed_expr(rhs, rhs_prec))
+        .cat(Fragment::String(Cow::Borrowed(" :: ")))
+        .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
+}
+
+fn compile_elab_prefix(t: IntType, op: &TypedUnaryOp<IntType>, inner: &TypedExpr<IntType>, inner_prec: Precedence) -> Fragment {
+    if t == op.sig.0 && op.sig.0 == op.sig.1 {
+        compile_typed_unary_op(op)
+            .cat(compile_typed_expr(inner, inner_prec))
+    } else {
+        compile_typed_unary_op(op)
+            .cat(compile_typed_expr(inner, inner_prec))
+            .cat(Fragment::String(Cow::Borrowed(" :: ")))
+            .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
+    }
+}
+
+fn compile_elab_postfix<'a>(t: IntType, rep: NumRep, inner: &TypedExpr<IntType>, inner_prec: Precedence) -> Fragment {
+    if NumRep::from(t) == rep {
+        // If the int-type is directly analogous to the original rep, omit the type-annotation
+        compile_typed_expr(inner, inner_prec)
+            .cat(Fragment::String(Cow::Borrowed(" as ")))
+            .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
+    } else {
+        // NOTE - this would normally be a panic but we are content to observe it without failing
+        eprintln!("[WARNING]: Postfix operation (assumed to be Cast) has mismatched NumRep and IntType...");
+        compile_typed_expr(inner, inner_prec)
+            .cat(Fragment::String(Cow::Borrowed(" as ")))
+            .cat(Fragment::String(Cow::Borrowed(rep.to_static_str())))
+            .cat(Fragment::String(Cow::Borrowed(" :: ")))
+            .cat(Fragment::String(Cow::Borrowed(t.to_static_str())))
+    }
+}
+
+
 // FIXME - adopt pretty-printing engine with precedence rules
-fn show_typed_expr(t_expr: &TypedExpr<IntType>) -> String {
+fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment {
     match t_expr {
-        TypedExpr::ElabConst(t, typed_const) => {
-            format!("({}: {})", typed_const, t)
+        TypedExpr::ElabConst(t, typed_const) => compile_elab_const(*t, typed_const),
+        TypedExpr::ElabBinOp(t, typed_bin_op, lhs, rhs) => match typed_bin_op.inner.get_op() {
+            BasicBinOp::Add | BasicBinOp::Sub =>
+                cond_paren(
+                    compile_elab_binop(*t, typed_bin_op, lhs, rhs, Precedence::ADDSUB, Precedence::ADDSUB),
+                    prec,
+                    Precedence::ADDSUB,
+                ),
+            BasicBinOp::Mul => cond_paren(
+                compile_elab_binop(*t, typed_bin_op, lhs, rhs, Precedence::MUL, Precedence::MUL),
+                prec,
+                Precedence::MUL,
+            ),
+            BasicBinOp::Div | BasicBinOp::Rem => cond_paren(
+                compile_elab_binop(*t, typed_bin_op, lhs, rhs, Precedence::DIVREM, Precedence::DIVREM),
+                prec,
+                Precedence::DIVREM,
+            ),
         }
-        TypedExpr::ElabBinOp(t, typed_bin_op, typed_expr, typed_expr1) => {
-            format!(
-                "({} {} {} : {})",
-                show_typed_expr(typed_expr),
-                show_typed_bin_op(typed_bin_op),
-                show_typed_expr(typed_expr1),
-                t
+        TypedExpr::ElabUnaryOp(t, typed_unary_op, inner) => {
+            cond_paren(
+                compile_elab_prefix(
+                    *t,
+                    typed_unary_op,
+                    inner,
+                    Precedence::ABSNEG,
+                ),
+                prec,
+                Precedence::ABSNEG
             )
         }
-        TypedExpr::ElabUnaryOp(t, typed_unary_op, typed_expr) => {
-            format!(
-                "({}({}) : {})",
-                show_typed_unary_op(typed_unary_op),
-                show_typed_expr(typed_expr),
-                t
+        TypedExpr::ElabCast(t, num_rep, inner) => {
+            cond_paren(
+                compile_elab_postfix(
+                    *t,
+                    *num_rep,
+                    inner,
+                    Precedence::CAST,
+                ),
+                prec,
+                Precedence::CAST,
             )
-        }
-        TypedExpr::ElabCast(t, num_rep, typed_expr) => {
-            format!("({} as {} : {})", show_typed_expr(typed_expr), num_rep, t)
         }
     }
+}
+
+fn show_typed_expr(expr: &TypedExpr<IntType>) -> String {
+    format!("{}", compile_typed_expr(expr, Precedence::TOP))
 }
 
 pub fn print_conversion(expr: &Expr) {
