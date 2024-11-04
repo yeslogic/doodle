@@ -29,19 +29,35 @@ pub enum NumRep {
     },
 }
 
+impl NumRep {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            NumRep::Auto => "?",
+            NumRep::Concrete { is_signed, bit_width } => {
+                if is_signed {
+                    match bit_width {
+                        BitWidth::Bits8 => "i8",
+                        BitWidth::Bits16 => "i16",
+                        BitWidth::Bits32 => "i32",
+                        BitWidth::Bits64 => "i64",
+                    }
+                } else {
+                    match bit_width {
+                        BitWidth::Bits8 => "u8",
+                        BitWidth::Bits16 => "u16",
+                        BitWidth::Bits32 => "u32",
+                        BitWidth::Bits64 => "u64",
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 impl std::fmt::Display for NumRep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            NumRep::U8 => write!(f, "u8",),
-            NumRep::U16 => write!(f, "u16"),
-            NumRep::U32 => write!(f, "u32"),
-            NumRep::U64 => write!(f, "u64"),
-            NumRep::I8 => write!(f, "i8"),
-            NumRep::I16 => write!(f, "i16"),
-            NumRep::I32 => write!(f, "i32"),
-            NumRep::I64 => write!(f, "i64"),
-            NumRep::AUTO => write!(f, "?"),
-        }
+        write!(f, "{}", self.to_static_str())
     }
 }
 
