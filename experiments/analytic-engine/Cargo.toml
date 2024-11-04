@@ -10,5 +10,4 @@ bench = false
 [dependencies]
 num-bigint = "0.4"
 num-traits = "0.2"
-bitflags = "2.6"
 proptest = "1.5.0"

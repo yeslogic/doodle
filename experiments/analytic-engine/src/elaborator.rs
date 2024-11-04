@@ -1,4 +1,4 @@
-use crate::core::{Expr, NumRep, Value, TypedConst, UnaryOp, BinOp, BasicBinOp, BasicUnaryOp};
+use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, NumRep, TypedConst, UnaryOp, Value};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub(crate) enum PrimInt {
@@ -12,7 +12,16 @@ pub(crate) enum PrimInt {
     I64,
 }
 
-pub const PRIM_INTS: [PrimInt; 8] = [PrimInt::U8, PrimInt::U16, PrimInt::U32, PrimInt::U64, PrimInt::I8, PrimInt::I16, PrimInt::I32, PrimInt::I64];
+pub const PRIM_INTS: [PrimInt; 8] = [
+    PrimInt::U8,
+    PrimInt::U16,
+    PrimInt::U32,
+    PrimInt::U64,
+    PrimInt::I8,
+    PrimInt::I16,
+    PrimInt::I32,
+    PrimInt::I64,
+];
 
 #[derive(Debug)]
 pub struct TryFromAutoError;
@@ -58,7 +67,6 @@ impl From<PrimInt> for NumRep {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum IntType {
     Prim(PrimInt),
@@ -72,11 +80,15 @@ impl std::fmt::Display for IntType {
     }
 }
 
-
 #[derive(Clone, Debug)]
 pub(crate) enum TypedExpr<TypeRep> {
     ElabConst(TypeRep, TypedConst),
-    ElabBinOp(TypeRep, TypedBinOp<TypeRep>, Box<TypedExpr<TypeRep>>, Box<TypedExpr<TypeRep>>),
+    ElabBinOp(
+        TypeRep,
+        TypedBinOp<TypeRep>,
+        Box<TypedExpr<TypeRep>>,
+        Box<TypedExpr<TypeRep>>,
+    ),
     ElabUnaryOp(TypeRep, TypedUnaryOp<TypeRep>, Box<TypedExpr<TypeRep>>),
     ElabCast(TypeRep, NumRep, Box<TypedExpr<TypeRep>>),
 }
@@ -90,7 +102,6 @@ impl<T> TypedExpr<T> {
             TypedExpr::ElabCast(t, _, _) => t,
         }
     }
-
 }
 
 type Sig1<T> = (T, T);
@@ -238,7 +249,6 @@ pub(crate) mod inference {
         Encompasses(crate::core::Bounds),
     }
 
-
     impl std::fmt::Display for Constraint {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
@@ -247,7 +257,6 @@ pub(crate) mod inference {
             }
         }
     }
-
 
     impl From<UType> for Constraint {
         fn from(value: UType) -> Self {
@@ -265,10 +274,16 @@ pub(crate) mod inference {
                 Constraint::Equiv(utype) => match utype {
                     UType::Var(_) => None,
                     UType::Int(int_type) => Some(int_type == &candidate),
-                }
+                },
                 Constraint::Encompasses(bounds) => {
                     let IntType::Prim(candidate) = candidate;
-                    Some(bounds.is_encompassed_by(&<PrimInt as Into<NumRep>>::into(candidate).as_bounds().unwrap()))
+                    Some(
+                        bounds.is_encompassed_by(
+                            &<PrimInt as Into<NumRep>>::into(candidate)
+                                .as_bounds()
+                                .unwrap(),
+                        ),
+                    )
                 }
             }
         }
@@ -308,7 +323,6 @@ pub(crate) mod inference {
             }
         }
     }
-
 
     #[derive(Debug)]
     pub struct InferenceEngine {
@@ -390,7 +404,11 @@ pub(crate) mod inference {
             }
         }
 
-        fn unify_var_constraint(&mut self, uvar: UVar, constraint: Constraint) -> InferenceResult<Constraint> {
+        fn unify_var_constraint(
+            &mut self,
+            uvar: UVar,
+            constraint: Constraint,
+        ) -> InferenceResult<Constraint> {
             let can_ix = self.get_canonical_uvar(uvar).0;
 
             match &self.constraints[can_ix] {
@@ -416,7 +434,11 @@ pub(crate) mod inference {
             self.aliases[lo].add_forward_ref(hi);
         }
 
-        unsafe fn transfer_constraints(&mut self, a1: usize, a2: usize) -> InferenceResult<&Constraints> {
+        unsafe fn transfer_constraints(
+            &mut self,
+            a1: usize,
+            a2: usize,
+        ) -> InferenceResult<&Constraints> {
             if a1 == a2 {
                 return Ok(&self.constraints[a1]);
             }
@@ -427,7 +449,8 @@ pub(crate) mod inference {
                 (_, Constraints::Indefinite) => Ok(self.replace_constraints_from_index(a2, a1)),
                 (Constraints::Invariant(c1), Constraints::Invariant(c2)) => {
                     let c0 = self.unify_constraint_pair(c1.clone(), c2.clone())?;
-                    let _ = self.replace_constraints_with_value(a1, Constraints::Invariant(c0.clone()));
+                    let _ =
+                        self.replace_constraints_with_value(a1, Constraints::Invariant(c0.clone()));
                     let _ = self.replace_constraints_with_value(a2, Constraints::Invariant(c0));
                     Ok(&self.constraints[a1])
                 }
@@ -446,7 +469,6 @@ pub(crate) mod inference {
             self.constraints[ix] = val;
             &self.constraints[ix]
         }
-
 
         fn unify_var_pair(&mut self, v1: UVar, v2: UVar) -> InferenceResult<&Constraints> {
             if v1 == v2 {
@@ -471,7 +493,7 @@ pub(crate) mod inference {
                 (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 > can_ix => unsafe {
                     self.repoint(can_ix, v1.0);
                     self.transfer_constraints(can_ix, v1.0)
-                }
+                },
                 (Alias::Ground, &Alias::BackRef(can_ix)) if v1.0 < can_ix => {
                     debug_assert!(
                         self.aliases[can_ix].is_canonical_nonempty(),
@@ -489,7 +511,7 @@ pub(crate) mod inference {
                 (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 > can_ix => unsafe {
                     self.repoint(can_ix, v2.0);
                     self.transfer_constraints(can_ix, v2.0)
-                }
+                },
                 (&Alias::BackRef(can_ix), Alias::Ground) if v2.0 < can_ix => {
                     debug_assert!(
                         self.aliases[can_ix].is_canonical_nonempty(),
@@ -534,10 +556,10 @@ pub(crate) mod inference {
                 }
                 (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) if ix1 < ix2 => unsafe {
                     self.recanonicalize(ix1, ix2)
-                }
+                },
                 (&Alias::BackRef(ix1), &Alias::BackRef(ix2)) if ix2 < ix1 => unsafe {
                     self.recanonicalize(ix2, ix1)
-                }
+                },
                 (&Alias::BackRef(ix), &Alias::BackRef(_ix)) => {
                     // the two are equal so nothing needs to be changed; we will check both are forward-aliased, however
                     let common = &self.aliases[ix];
@@ -596,7 +618,6 @@ pub(crate) mod inference {
                     let ix1 = v1.0;
                     let ix2 = *tgt;
 
-
                     // check not the actual indices, but the canonical indices for tie-breaking
                     if ix1 < ix2 {
                         unsafe { self.recanonicalize(ix1, ix2) }
@@ -653,29 +674,42 @@ pub(crate) mod inference {
                             unreachable!("equiv should erase encompasses")
                         }
                     }
-
                 }
                 (UType::Int(t0), UType::Int(t1)) => {
                     if t0 != t1 {
-                        return Err(InferenceError::BadUnification(Constraint::Equiv(left), Constraint::Equiv(right)));
+                        return Err(InferenceError::BadUnification(
+                            Constraint::Equiv(left),
+                            Constraint::Equiv(right),
+                        ));
                     }
                     Ok(left)
                 }
             }
         }
 
-        fn unify_utype_bounds(&mut self, utype: UType, bounds: &Bounds) -> InferenceResult<Constraint> {
+        fn unify_utype_bounds(
+            &mut self,
+            utype: UType,
+            bounds: &Bounds,
+        ) -> InferenceResult<Constraint> {
             match utype {
                 UType::Var(uvar) => {
                     self.unify_var_constraint(uvar, Constraint::Encompasses(bounds.clone()))
                 }
                 UType::Int(int_type) => {
                     let IntType::Prim(candidate) = int_type;
-                    let soluble = bounds.is_encompassed_by(&<PrimInt as Into<NumRep>>::into(candidate).as_bounds().unwrap());
+                    let soluble = bounds.is_encompassed_by(
+                        &<PrimInt as Into<NumRep>>::into(candidate)
+                            .as_bounds()
+                            .unwrap(),
+                    );
                     if soluble {
-                       Ok(Constraint::Equiv(utype))
+                        Ok(Constraint::Equiv(utype))
                     } else {
-                        Err(InferenceError::BadUnification(Constraint::Equiv(utype), Constraint::Encompasses(bounds.clone())))
+                        Err(InferenceError::BadUnification(
+                            Constraint::Equiv(utype),
+                            Constraint::Encompasses(bounds.clone()),
+                        ))
                     }
                 }
             }
@@ -686,7 +720,6 @@ pub(crate) mod inference {
             Ok(())
         }
 
-
         fn unify_var_rep(&mut self, uvar: UVar, rep: NumRep) -> InferenceResult<()> {
             if rep.is_auto() {
                 return Ok(());
@@ -695,7 +728,11 @@ pub(crate) mod inference {
             self.unify_var_utype(uvar, t)
         }
 
-        fn unify_constraint_pair(&mut self, c1: Constraint, c2: Constraint) -> InferenceResult<Constraint> {
+        fn unify_constraint_pair(
+            &mut self,
+            c1: Constraint,
+            c2: Constraint,
+        ) -> InferenceResult<Constraint> {
             match (c1, c2) {
                 (Constraint::Equiv(t1), Constraint::Equiv(t2)) => {
                     if t1 == t2 {
@@ -725,17 +762,46 @@ pub(crate) mod inference {
                     let var = match rep {
                         NumRep::AUTO => {
                             let this_var = self.get_new_uvar();
-                            self.unify_var_constraint(this_var, Constraint::Encompasses(Bounds::singleton(typed_const.as_raw_value().clone())))?;
+                            self.unify_var_constraint(
+                                this_var,
+                                Constraint::Encompasses(Bounds::singleton(
+                                    typed_const.as_raw_value().clone(),
+                                )),
+                            )?;
                             this_var
                         }
-                        NumRep::U8 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U8)))?.0,
-                        NumRep::U16 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U16)))?.0,
-                        NumRep::U32 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U32)))?.0,
-                        NumRep::U64 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U64)))?.0,
-                        NumRep::I8 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I8)))?.0,
-                        NumRep::I16 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I16)))?.0,
-                        NumRep::I32 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I32)))?.0,
-                        NumRep::I64 => self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I64)))?.0,
+                        NumRep::U8 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U8)))?
+                                .0
+                        }
+                        NumRep::U16 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U16)))?
+                                .0
+                        }
+                        NumRep::U32 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U32)))?
+                                .0
+                        }
+                        NumRep::U64 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::U64)))?
+                                .0
+                        }
+                        NumRep::I8 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I8)))?
+                                .0
+                        }
+                        NumRep::I16 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I16)))?
+                                .0
+                        }
+                        NumRep::I32 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I32)))?
+                                .0
+                        }
+                        NumRep::I64 => {
+                            self.init_var_simple(UType::Int(IntType::Prim(PrimInt::I64)))?
+                                .0
+                        }
                     };
                     (var, rep)
                 }
@@ -761,18 +827,22 @@ pub(crate) mod inference {
                                         Ok(v) => match v.as_const() {
                                             Some(c) => {
                                                 // NOTE - if there is a const-evaluable result for the computation, use it to refine our constraints on which types satisfy the aliased Auto
-                                                let bounds = Bounds::singleton(c.as_raw_value().clone());
-                                                self.unify_var_constraint(this_var, Constraint::Encompasses(bounds))?;
+                                                let bounds =
+                                                    Bounds::singleton(c.as_raw_value().clone());
+                                                self.unify_var_constraint(
+                                                    this_var,
+                                                    Constraint::Encompasses(bounds),
+                                                )?;
                                             }
                                             None => {
                                                 // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
                                                 unimplemented!("Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr");
                                             }
-                                        }
+                                        },
                                         Err(e) => {
                                             // NOTE - If the computation will fail regardless, there is no need to infer the type-information of the AST
                                             // REVIEW - make sure that we are confident in EvalErrors being sound reasons to fail type-inference, both now and going forward
-                                            return Err(InferenceError::Eval(e))
+                                            return Err(InferenceError::Eval(e));
                                         }
                                     }
                                 }
@@ -815,7 +885,6 @@ pub(crate) mod inference {
                                 }
                             }
                         }
-
                     };
                     (this_var, this_rep)
                 }
@@ -839,18 +908,22 @@ pub(crate) mod inference {
                                         Ok(v) => match v.as_const() {
                                             Some(c) => {
                                                 // NOTE - if there is a const-evaluable result for the computation, use it to refine our constraints on which types satisfy the aliased Auto
-                                                let bounds = Bounds::singleton(c.as_raw_value().clone());
-                                                self.unify_var_constraint(this_var, Constraint::Encompasses(bounds))?;
+                                                let bounds =
+                                                    Bounds::singleton(c.as_raw_value().clone());
+                                                self.unify_var_constraint(
+                                                    this_var,
+                                                    Constraint::Encompasses(bounds),
+                                                )?;
                                             }
                                             None => {
                                                 // FIXME - this isn't a hard error necessarily, but our model isn't complex enough for non-TypedConst values to emerge
                                                 unimplemented!("Value::AsConst returned None (unexpectedly) when called from InferenceEngine::infer_var_expr");
                                             }
-                                        }
+                                        },
                                         Err(e) => {
                                             // NOTE - If the computation will fail regardless, there is no need to infer the type-information of the AST
                                             // REVIEW - make sure that we are confident in EvalErrors being sound reasons to fail type-inference, both now and going forward
-                                            return Err(InferenceError::Eval(e))
+                                            return Err(InferenceError::Eval(e));
                                         }
                                     }
                                 }
@@ -892,7 +965,9 @@ pub(crate) mod inference {
                     match &self.constraints[v0.0] {
                         Constraints::Indefinite => VType::Abstract(v0.into()),
                         Constraints::Invariant(Constraint::Equiv(ut)) => self.to_whnf_vtype(*ut),
-                        Constraints::Invariant(Constraint::Encompasses(bounds)) => VType::Within(bounds.clone()),
+                        Constraints::Invariant(Constraint::Encompasses(bounds)) => {
+                            VType::Within(bounds.clone())
+                        }
                     }
                 }
                 UType::Int(int_type) => VType::Int(int_type),
@@ -904,8 +979,8 @@ pub(crate) mod inference {
                 Constraints::Indefinite => Ok(None),
                 Constraints::Invariant(cx) => Ok(match cx {
                     Constraint::Equiv(ut) => Some(self.to_whnf_vtype(*ut)),
-                    Constraint::Encompasses(bounds) => Some(VType::Within(bounds.clone()))
-                })
+                    Constraint::Encompasses(bounds) => Some(VType::Within(bounds.clone())),
+                }),
             }
         }
     }
@@ -918,18 +993,18 @@ pub(crate) mod inference {
                     match self.substitute_uvar_vtype(v) {
                         Ok(Some(t0)) => match t0 {
                             VType::Int(int_type) => Some(int_type),
-                            VType::Within(bounds) => match Constraint::get_unique_solution(&Constraint::Encompasses(bounds.clone())) {
+                            VType::Within(bounds) => match Constraint::get_unique_solution(
+                                &Constraint::Encompasses(bounds.clone()),
+                            ) {
                                 Ok(int_type) => Some(int_type),
                                 Err(_) => None,
-                            }
+                            },
                             VType::Abstract(utype) => self.reify(utype),
-                        }
+                        },
                         Err(_) => None,
-                        Ok(None) => {
-                            match &self.constraints[v.0] {
-                                _ => None,
-                            }
-                        }
+                        Ok(None) => match &self.constraints[v.0] {
+                            _ => None,
+                        },
                     }
                 }
                 UType::Int(i) => Some(i),
@@ -940,50 +1015,64 @@ pub(crate) mod inference {
 
 use inference::{InferenceEngine, UVar};
 
+/// Alias for whatever value-type we use to associate a failed reification with some indication of what went wrong, or where
+type Hint = usize;
+
+#[derive(Debug)]
+pub enum ElaborationError {
+    BadReification(Hint),
+}
+
+impl std::fmt::Display for ElaborationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ElaborationError::BadReification(hint) => {
+                write!(f, "bad reification on UVar ?{}", hint)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ElaborationError {}
+
+pub(crate) type ElaborationResult<T> = Result<T, ElaborationError>;
+
 pub struct Elaborator {
     next_index: usize,
     ie: InferenceEngine,
 }
 
 impl Elaborator {
+    pub(crate) fn new(ie: InferenceEngine) -> Self {
+        Self { next_index: 0, ie }
+    }
+
     fn get_and_increment_index(&mut self) -> usize {
         let ret = self.next_index;
         self.next_index += 1;
         ret
     }
 
-    fn increment_index(&mut self) {
-        self.next_index += 1;
-    }
-
-    fn get_index(&self) -> usize {
-        self.next_index
-    }
-
-    pub(crate) fn new(ie: InferenceEngine) -> Self {
-        Self { next_index: 0, ie }
-    }
-
-    fn get_type_from_index(&self, index: usize) -> IntType {
+    fn get_type_from_index(&self, index: usize) -> ElaborationResult<IntType> {
         let uvar = UVar::new(index);
         let Some(t) = self.ie.reify(uvar.into()) else {
-            unreachable!("unable to reify {uvar}")
+            return Err(ElaborationError::BadReification(index));
         };
-        t
+        Ok(t)
     }
 
-    pub(crate) fn elaborate_expr(&mut self, expr: &Expr) -> TypedExpr<IntType> {
+    pub(crate) fn elaborate_expr(&mut self, expr: &Expr) -> ElaborationResult<TypedExpr<IntType>> {
         let index = self.get_and_increment_index();
         match expr {
             Expr::Const(typed_const) => {
-                let t = self.get_type_from_index(index);
-                TypedExpr::ElabConst(t, typed_const.clone())
+                let t = self.get_type_from_index(index)?;
+                Ok(TypedExpr::ElabConst(t, typed_const.clone()))
             }
             Expr::BinOp(bin_op, x, y) => {
-                let t_x = self.elaborate_expr(x);
-                let t_y = self.elaborate_expr(y);
-                let t = self.get_type_from_index(index);
-                TypedExpr::ElabBinOp(
+                let t_x = self.elaborate_expr(x)?;
+                let t_y = self.elaborate_expr(y)?;
+                let t = self.get_type_from_index(index)?;
+                Ok(TypedExpr::ElabBinOp(
                     t,
                     TypedBinOp {
                         sig: ((*t_x.get_type(), *t_y.get_type()), t),
@@ -991,24 +1080,24 @@ impl Elaborator {
                     },
                     Box::new(t_x),
                     Box::new(t_y),
-                )
+                ))
             }
             Expr::UnaryOp(unary_op, inner) => {
-                let t_inner = self.elaborate_expr(inner);
-                let t = self.get_type_from_index(index);
-                TypedExpr::ElabUnaryOp(
+                let t_inner = self.elaborate_expr(inner)?;
+                let t = self.get_type_from_index(index)?;
+                Ok(TypedExpr::ElabUnaryOp(
                     t,
                     TypedUnaryOp {
                         sig: (*t_inner.get_type(), t),
                         inner: *unary_op,
                     },
                     Box::new(t_inner),
-                )
+                ))
             }
             Expr::Cast(rep, inner) => {
-                let t_inner = self.elaborate_expr(inner);
-                let t = self.get_type_from_index(index);
-                TypedExpr::ElabCast(t, *rep, Box::new(t_inner))
+                let t_inner = self.elaborate_expr(inner)?;
+                let t = self.get_type_from_index(index)?;
+                Ok(TypedExpr::ElabCast(t, *rep, Box::new(t_inner)))
             }
         }
     }

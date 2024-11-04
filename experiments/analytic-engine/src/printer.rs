@@ -1,7 +1,6 @@
-use crate::elaborator::{TypedExpr, TypedBinOp, TypedUnaryOp, IntType, PrimInt, Elaborator};
-use num_bigint::BigInt;
-use crate::core::{BasicBinOp, BinOp, Expr, NumRep, UnaryOp};
+use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, UnaryOp};
 use crate::elaborator::inference::InferenceEngine;
+use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedExpr, TypedUnaryOp};
 
 fn show_bin_op(bin_op: &BinOp) -> String {
     let token = match bin_op.get_op() {
@@ -26,22 +25,24 @@ fn show_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> String {
         BasicBinOp::Div => "/",
         BasicBinOp::Rem => "%",
     };
-    format!("({} : ({},{}) -> {})", token, bin_op.sig.0.0, bin_op.sig.0.1, bin_op.sig.1)
+    format!(
+        "({} : ({},{}) -> {})",
+        token, bin_op.sig.0 .0, bin_op.sig.0 .1, bin_op.sig.1
+    )
 }
 
 fn show_typed_unary_op(unary_op: &TypedUnaryOp<IntType>) -> String {
     let token = match unary_op.inner.get_op() {
-        crate::core::BasicUnaryOp::Negate => "~",
-        crate::core::BasicUnaryOp::AbsVal => "abs",
+        BasicUnaryOp::Negate => "~",
+        BasicUnaryOp::AbsVal => "abs",
     };
     format!("({} : {} -> {})", token, unary_op.sig.1, unary_op.sig.1)
 }
 
-
 fn show_unary_op(unary_op: &UnaryOp) -> String {
     let token = match unary_op.get_op() {
-        crate::core::BasicUnaryOp::Negate => "~",
-        crate::core::BasicUnaryOp::AbsVal => "abs",
+        BasicUnaryOp::Negate => "~",
+        BasicUnaryOp::AbsVal => "abs",
     };
     if let Some(rep) = unary_op.cast_rep() {
         format!("{}{}", token, rep)
@@ -51,11 +52,18 @@ fn show_unary_op(unary_op: &UnaryOp) -> String {
 }
 
 // FIXME - adopt pretty-printing engine with precedence rules
-fn show_expr(expr: &Expr) -> String {
+pub fn show_expr(expr: &Expr) -> String {
     match expr {
         Expr::Const(typed_const) => format!("{}", typed_const),
-        Expr::BinOp(bin_op, expr, expr1) => format!("({} {} {})", show_expr(expr), show_bin_op(bin_op), show_expr(expr1)),
-        Expr::UnaryOp(unary_op, expr) => format!("{}({})", show_unary_op(unary_op), show_expr(expr)),
+        Expr::BinOp(bin_op, expr, expr1) => format!(
+            "({} {} {})",
+            show_expr(expr),
+            show_bin_op(bin_op),
+            show_expr(expr1)
+        ),
+        Expr::UnaryOp(unary_op, expr) => {
+            format!("{}({})", show_unary_op(unary_op), show_expr(expr))
+        }
         Expr::Cast(num_rep, expr) => format!("{} as {}", show_expr(expr), num_rep),
     }
 }
@@ -67,10 +75,21 @@ fn show_typed_expr(t_expr: &TypedExpr<IntType>) -> String {
             format!("({}: {})", typed_const, t)
         }
         TypedExpr::ElabBinOp(t, typed_bin_op, typed_expr, typed_expr1) => {
-            format!("({} {} {} : {})", show_typed_expr(typed_expr), show_typed_bin_op(typed_bin_op), show_typed_expr(typed_expr1), t)
+            format!(
+                "({} {} {} : {})",
+                show_typed_expr(typed_expr),
+                show_typed_bin_op(typed_bin_op),
+                show_typed_expr(typed_expr1),
+                t
+            )
         }
         TypedExpr::ElabUnaryOp(t, typed_unary_op, typed_expr) => {
-            format!("({}({}) : {})", show_typed_expr(typed_expr), show_typed_unary_op(typed_unary_op), t)
+            format!(
+                "({}({}) : {})",
+                show_typed_expr(typed_expr),
+                show_typed_unary_op(typed_unary_op),
+                t
+            )
         }
         TypedExpr::ElabCast(t, num_rep, typed_expr) => {
             format!("({} as {} : {})", show_typed_expr(typed_expr), num_rep, t)
@@ -83,19 +102,25 @@ pub fn print_conversion(expr: &Expr) {
     match ie.infer_var_expr(expr) {
         Ok(_) => {
             let mut elab = Elaborator::new(ie);
-            let t_expr = elab.elaborate_expr(expr);
-            println!("Raw: {}", show_expr(expr));
-            println!("Elaborated: {}", show_typed_expr(&t_expr));
+            match elab.elaborate_expr(expr) {
+                Ok(t_expr) => {
+                    println!("Raw: {}", show_expr(expr));
+                    println!("Elaborated: {}", show_typed_expr(&t_expr));
+                }
+                Err(elab_err) => {
+                    eprintln!(
+                        "Error encountered during elaboration of `{}`: {}",
+                        show_expr(expr),
+                        elab_err
+                    );
+                }
+            }
         }
         Err(e) => {
             eprintln!("Inference failed ({}) on {:?}", e, expr);
         }
     }
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -106,20 +131,15 @@ mod tests {
     fn test_print_conversion() {
         let expr = {
             Expr::BinOp(
-                BinOp { op: BasicBinOp::Add, out_rep: None },
-                Box::new(
-                    Expr::BinOp( BinOp { op: BasicBinOp::Add, out_rep: Some(NumRep::U32) },
+                BinOp::new(BasicBinOp::Add, None),
+                Box::new(Expr::BinOp(
+                    BinOp::new(BasicBinOp::Add, Some(NumRep::U32)),
                     Box::new(Expr::Const(TypedConst(BigInt::from(10), NumRep::U32))),
                     Box::new(Expr::Const(TypedConst(BigInt::from(-1), NumRep::I32))),
                 )),
-                Box::new(
-                    Expr::Const(TypedConst(BigInt::from(5), NumRep::Auto))
-                )
+                Box::new(Expr::Const(TypedConst(BigInt::from(5), NumRep::Auto))),
             )
         };
-        print_conversion(
-            &expr
-        )
+        print_conversion(&expr)
     }
-
 }
