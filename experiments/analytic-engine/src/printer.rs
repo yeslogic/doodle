@@ -36,7 +36,7 @@ fn show_typed_unary_op(unary_op: &TypedUnaryOp<IntType>) -> String {
         BasicUnaryOp::Negate => "~",
         BasicUnaryOp::AbsVal => "abs",
     };
-    format!("({} : {} -> {})", token, unary_op.sig.1, unary_op.sig.1)
+    format!("({} : {} -> {})", token, unary_op.sig.0, unary_op.sig.1)
 }
 
 fn show_unary_op(unary_op: &UnaryOp) -> String {
@@ -86,8 +86,8 @@ fn show_typed_expr(t_expr: &TypedExpr<IntType>) -> String {
         TypedExpr::ElabUnaryOp(t, typed_unary_op, typed_expr) => {
             format!(
                 "({}({}) : {})",
-                show_typed_expr(typed_expr),
                 show_typed_unary_op(typed_unary_op),
+                show_typed_expr(typed_expr),
                 t
             )
         }

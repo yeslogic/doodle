@@ -325,13 +325,13 @@ impl UnaryOp {
         Self { op, out_rep }
     }
 
-    fn output_type(&self, in_rep: NumRep) -> NumRep {
-        if let Some(rep) = self.out_rep {
-            rep
-        } else {
-            in_rep
-        }
-    }
+    // fn output_type(&self, in_rep: NumRep) -> NumRep {
+    //     if let Some(rep) = self.out_rep {
+    //         rep
+    //     } else {
+    //         in_rep
+    //     }
+    // }
 
     pub fn cast_rep(&self) -> Option<NumRep> {
         self.out_rep
@@ -356,16 +356,16 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub(crate) fn get_rep(&self) -> Option<NumRep> {
-        match self {
-            Expr::Const(tc) => Some(tc.get_rep()),
-            Expr::Cast(rep, _) => Some(*rep),
-            Expr::BinOp(bin_op, expr, expr1) => {
-                bin_op.output_type(expr.get_rep()?, expr1.get_rep()?)
-            }
-            Expr::UnaryOp(unary_op, expr) => Some(unary_op.output_type(expr.get_rep()?)),
-        }
-    }
+    // pub(crate) fn get_rep(&self) -> Option<NumRep> {
+    //     match self {
+    //         Expr::Const(tc) => Some(tc.get_rep()),
+    //         Expr::Cast(rep, _) => Some(*rep),
+    //         Expr::BinOp(bin_op, expr, expr1) => {
+    //             bin_op.output_type(expr.get_rep()?, expr1.get_rep()?)
+    //         }
+    //         Expr::UnaryOp(unary_op, expr) => Some(unary_op.output_type(expr.get_rep()?)),
+    //     }
+    // }
 }
 
 #[derive(Debug)]
