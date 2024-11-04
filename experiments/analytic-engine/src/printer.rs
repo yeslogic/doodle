@@ -209,7 +209,7 @@ fn compile_bin_op(bin_op: &BinOp) -> Fragment {
         )
     } else {
         Fragment::String(Cow::Borrowed(token))
-    }
+    }.delimit(Fragment::Char(' '), Fragment::Char(' '))
 }
 
 fn compile_typed_bin_op(bin_op: &TypedBinOp<IntType>) -> Fragment {
