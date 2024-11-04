@@ -52,6 +52,14 @@ impl TryFrom<NumRep> for PrimInt {
     }
 }
 
+impl From<IntType> for NumRep {
+    fn from(value: IntType) -> Self {
+        match value {
+            IntType::Prim(prim) => NumRep::from(prim),
+        }
+    }
+}
+
 impl From<PrimInt> for NumRep {
     fn from(value: PrimInt) -> Self {
         match value {
@@ -72,11 +80,24 @@ pub(crate) enum IntType {
     Prim(PrimInt),
 }
 
+impl IntType {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            IntType::Prim(PrimInt::U8) => "u8",
+            IntType::Prim(PrimInt::U16) => "u16",
+            IntType::Prim(PrimInt::U32) => "u32",
+            IntType::Prim(PrimInt::U64) => "u64",
+            IntType::Prim(PrimInt::I8) => "i8",
+            IntType::Prim(PrimInt::I16) => "i16",
+            IntType::Prim(PrimInt::I32) => "i32",
+            IntType::Prim(PrimInt::I64) => "i64",
+        }
+    }
+}
+
 impl std::fmt::Display for IntType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IntType::Prim(prim_int) => write!(f, "{:?}", prim_int),
-        }
+        write!(f, "{}", self.to_static_str())
     }
 }
 
