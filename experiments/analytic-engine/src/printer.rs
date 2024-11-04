@@ -241,11 +241,9 @@ fn compile_typed_unary_op(unary_op: &'_ TypedUnaryOp<IntType>) -> Fragment {
     if t_in == t_out {
         Fragment::String(Cow::Borrowed(token))
     } else {
-        Fragment::cat(
-            Fragment::String(Cow::Borrowed(token)),
-            Fragment::String(Cow::Owned(format!("@{}->{}", t_in, t_out))),
-        )
-    }
+        Fragment::String(Cow::Borrowed(token))
+            .cat(Fragment::String(Cow::Owned(format!("@{}->{}", t_in, t_out))))
+    }.cat(Fragment::Char(' '))
 }
 
 fn compile_prefix(op: &UnaryOp, inner: &Expr, inner_prec: Precedence) -> Fragment {
