@@ -33,7 +33,10 @@ impl NumRep {
     pub const fn to_static_str(self) -> &'static str {
         match self {
             NumRep::Auto => "?",
-            NumRep::Concrete { is_signed, bit_width } => {
+            NumRep::Concrete {
+                is_signed,
+                bit_width,
+            } => {
                 if is_signed {
                     match bit_width {
                         BitWidth::Bits8 => "i8",
@@ -53,7 +56,6 @@ impl NumRep {
         }
     }
 }
-
 
 impl std::fmt::Display for NumRep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
