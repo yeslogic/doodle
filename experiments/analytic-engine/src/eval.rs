@@ -110,6 +110,20 @@ macro_rules! widening {
     };
 }
 
+macro_rules! mixed_widening {
+    ( $( $tr:ident, $meth:ident => $( ( $left_t:ty, $right_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+        $(
+            $(
+                $(
+                    pub fn $fname(lhs: $left_t, rhs: $right_t) -> Eval<$out_t> {
+                        Eval::Direct(<$out_t as $tr>::$meth((lhs as $out_t), (rhs as $out_t)))
+                    }
+                )*
+            )*
+        )*
+    };
+}
+
 // SECTION - Combinatorial Explosion
 
 // SECTION - strictly homogenous (T -> T -> T) binary operations
@@ -185,6 +199,67 @@ widening! {
         (i8 => (mul_i8_i16, i16), (mul_i8_i32, i32), (mul_i8_i64, i64)),
         (i16 => (mul_i16_i32, i32), (mul_i16_i64, i64)),
         (i32 => (mul_i32_i64, i64));
+}
+
+mixed_widening! {
+    Add, add =>
+        // <= Bits8
+        (u8, i8 => (add_u8_i8_i16, i16), (add_u8_i8_u32, u32), (add_u8_i8_i32, i32), (add_u8_i8_i64, i64)),
+        (i8, u8 => (add_i8_u8_i16, i16), (add_i8_u8_u32, u32), (add_i8_u8_i32, i32), (add_i8_u8_i64, i64)),
+
+        // >Bits8, <= Bits16
+        (u8, u16 => (add_u8_u16_u32, u32), (add_u8_u16_u64, u64), (add_u8_u16_i32, i32), (add_u8_u16_i64, i64)),
+        (u16, u8 => (add_u16_u8_u32, u32), (add_u16_u8_u64, u64), (add_u16_u8_i32, i32), (add_u16_u8_i64, i64)),
+        (i8, u16 => (add_i8_u16_i32, i32), (add_i8_u16_i64, i64)),
+        (u16, i8 => (add_u16_i8_i32, i32), (add_u16_i8_i64, i64)),
+        (u8, i16 => (add_u8_i16_i32, i32), (add_u8_i16_i64, i64)),
+        (i16, u8 => (add_i16_u8_i32, i32), (add_i16_u8_i64, i64)),
+        (i8, i16 => (add_i8_i16_i32, i32), (add_i8_i16_i64, i64)),
+        (i16, i8 => (add_i16_i8_i32, i32), (add_i16_i8_i64, i64)),
+
+        (u16, i16 => (add_u16_i16_i32, i32), (add_u16_i16_i64, i64)),
+        (i16, u16 => (add_i16_u16_i32, i32), (add_i16_u16_i64, i64)),
+
+        (u32, u8 => (add_u32_u8_u64, u64)),
+        (u8, u32 => (add_u8_u32_u64, u64)),
+        (u32, i8 => (add_u32_i8_u64, u64)),
+        (i8, u32 => (add_i8_u32_u64, u64)),
+        ;
+    Sub, sub =>
+        // <= Bits8
+        (u8, i8 => (sub_u8_i8_i16, i16), (sub_u8_i8_i32, i32), (sub_u8_i8_i64, i64)),
+        (i8, u8 => (sub_i8_u8_i16, i16), (sub_i8_u8_i32, i32), (sub_i8_u8_i64, i64)),
+
+        // >Bits8, <= Bits16
+        (u8, u16 => (sub_u8_u16_i32, i32), (sub_u8_u16_i64, i64)),
+        (u16, u8 => (sub_u16_u8_i32, i32), (sub_u16_u8_i64, i64)),
+        (u8, i16 => (sub_u8_i16_i32, i32), (sub_u8_i16_i64, i64)),
+        (i16, u8 => (sub_i16_u8_i32, i32), (sub_i16_u8_i64, i64)),
+        (i8, u16 => (sub_i8_u16_i32, i32), (sub_i8_u16_i64, i64)),
+        (u16, i8 => (sub_u16_i8_i32, i32), (sub_u16_i8_i64, i64)),
+        (u16, i16 => (sub_u16_i16_i32, i32), (sub_u16_i16_i64, i64)),
+        (i16, u16 => (sub_i16_u16_i32, i32), (sub_i16_u16_i64, i64)),
+        (i8, i16 => (sub_i8_i16_i32, i32), (sub_i8_i16_i64, i64)),
+        (i16, i8 => (sub_i16_i8_i32, i32), (sub_i16_i8_i64, i64)),
+
+        // >Bits16, <= Bits32
+        (u32, u8 => (sub_u32_u8_i64, i64)),
+        (u8, u32 => (sub_u8_u32_i64, i64)),
+        (u32, i8 => (sub_u32_i8_i64, i64)),
+        (i8, u32 => (sub_i8_u32_i64, i64)),
+        (u32, u16 => (sub_u32_u16_i64, i64)),
+        (u16, u32 => (sub_u16_u32_i64, i64)),
+        (u32, i16 => (sub_u32_i16_i64, i64)),
+        (i16, u32 => (sub_i16_u32_i64, i64)),
+
+        (i32, u8 => (sub_i32_u8_i64, i64)),
+        (u8, i32 => (sub_u8_i32_i64, i64)),
+        (i32, u16 => (sub_i32_u16_i64, i64)),
+        (u16, i32 => (sub_u16_i32_i64, i64)),
+        (i32, i8 => (sub_i32_i8_i64, i64)),
+        (i8, i32 => (sub_i8_i32_i64, i64)),
+        (i32, i16 => (sub_i32_i16_i64, i64)),
+        (i16, i32 => (sub_i16_i32_i64, i64));
 }
 
 // !SECTION
