@@ -102,7 +102,10 @@ macro_rules! widening {
             $(
                 $(
                     pub fn $fname(lhs: $in_t, rhs: $in_t) -> Eval<$out_t> {
-                        Eval::Direct(<$out_t as $tr>::$meth((lhs as $out_t), (rhs as $out_t)))
+                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+                            Some(res) => Eval::Direct(res),
+                            None => Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || BigInt::$meth(&BigInt::from(lhs), &BigInt::from(rhs)).unwrap()))) }),
+                        }
                     }
                 )*
             )*
@@ -110,13 +113,51 @@ macro_rules! widening {
     };
 }
 
+macro_rules! widening_quotient {
+    ( $( $tr:ident, $meth:ident => $( ( $in_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+        $(
+            $(
+                $(
+                    pub fn $fname(lhs: $in_t, rhs: $in_t) -> Eval<$out_t> {
+                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+                            Some(res) => Eval::Direct(res),
+                            None => Eval::NaN,
+                        }
+                    }
+                )*
+            )*
+        )*
+    };
+}
+
+/// Macro for bulk definition of heterogenous source-type typed binary operations where the output type can represent every possible input type, but the computation might not succeed
 macro_rules! mixed_widening {
     ( $( $tr:ident, $meth:ident => $( ( $left_t:ty, $right_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
         $(
             $(
                 $(
                     pub fn $fname(lhs: $left_t, rhs: $right_t) -> Eval<$out_t> {
-                        Eval::Direct(<$out_t as $tr>::$meth((lhs as $out_t), (rhs as $out_t)))
+                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+                            Some(res) => Eval::Direct(res),
+                            None => Eval::Indirect(IndirectEval { value: Rc::new(LazyCell::new(Box::new(move || BigInt::$meth(&BigInt::from(lhs), &BigInt::from(rhs)).unwrap()))) }),
+                        }
+                    }
+                )*
+            )*
+        )*
+    };
+}
+
+macro_rules! mixed_widening_quotient {
+    ( $( $tr:ident, $meth:ident => $( ( $left_t:ty, $right_t:ty => $( ( $fname:ident, $out_t:ty ) ),+ $(,)? ) ),+ $(,)? );+ $(;)? ) => {
+        $(
+            $(
+                $(
+                    pub fn $fname(lhs: $left_t, rhs: $right_t) -> Eval<$out_t> {
+                        match <$out_t as $tr>::$meth(&(lhs as $out_t), &(rhs as $out_t)) {
+                            Some(res) => Eval::Direct(res),
+                            None => Eval::NaN,
+                        }
                     }
                 )*
             )*
@@ -126,7 +167,9 @@ macro_rules! mixed_widening {
 
 // SECTION - Combinatorial Explosion
 
-// SECTION - strictly homogenous (T -> T -> T) binary operations
+// SECTION - strictly homogenous (T -> T -> T) binary operations (40 total)
+
+// Responsible for 24 function definitions
 homogenous! {
     CheckedAdd, checked_add =>
         (add_u8, u8),
@@ -157,6 +200,8 @@ homogenous! {
         (mul_i64, i64);
 }
 
+// (T, T) -> T binary operations involving quotients (failure is NaN)
+// Responsible for 16 function definitions
 homogenous_quotient! {
     CheckedDiv, checked_div =>
         (div_u8, u8),
@@ -179,88 +224,277 @@ homogenous_quotient! {
 }
 // !SECTION
 
+// SECTION - heterogenous-type binary operations ( `(T0, T0) -> T1` or `(T0, T1) -> T` )
+// (T0, T0) -> T1 binary operations where the values of T0 are a subset of T1 and failure indicates overflow/underflow
+
+// responsible for 42 function definitions
 widening! {
-    Add, add =>
+    CheckedAdd, checked_add =>
         (u8 => (add_u8_u16, u16), (add_u8_u32, u32), (add_u8_u64, u64), (add_u8_i16, i16), (add_u8_i32, i32), (add_u8_i64, i64)),
         (u16 => (add_u16_u32, u32), (add_u16_u64, u64), (add_u16_i32, i32), (add_u16_i64, i64)),
         (u32 => (add_u32_u64, u64), (add_u32_i64, i64)),
-        (i8 => (add_i8_i16, i16), (add_i8_i32, i32), (add_i8_i64, i64));
-    Sub, sub =>
-        (u8 => (sub_u8_i16, i16), (sub_u8_i32, i32), (sub_u8_i64, i64)),
-        (u16 => (sub_u16_i32, i32), (sub_u16_i64, i64)),
-        (u32 => (sub_u32_i64, i64)),
+        (i8 => (add_i8_i16, i16), (add_i8_i32, i32), (add_i8_i64, i64)),
+        (i16 => (add_i16_i32, i32), (add_i16_i64, i64)),
+        (i32 => (add_i32_i64, i64));
+    CheckedSub, checked_sub =>
+        (u8 => (sub_u8_u16, u16), (sub_u8_u32, u32), (sub_u8_u64, u64), (sub_u8_i16, i16), (sub_u8_i32, i32), (sub_u8_i64, i64)),
+        (u16 => (sub_u16_u32, u32), (sub_u16_u64, u64), (sub_u16_i32, i32), (sub_u16_i64, i64)),
+        (u32 => (sub_u32_u64, u64), (sub_u32_i64, i64)),
         (i8 => (sub_i8_i16, i16), (sub_i8_i32, i32), (sub_i8_i64, i64)),
         (i16 => (sub_i16_i32, i32), (sub_i16_i64, i64)),
         (i32 => (sub_i32_i64, i64));
-    Mul, mul =>
-        (u8 => (mul_u8_u16, u16), (mul_u8_u32, u32), (mul_u8_u64, u64), (mul_u8_i32, i32), (mul_u8_i64, i64)),
-        (u16 => (mul_u16_u32, u32), (mul_u16_u64, u64), (mul_u16_i64, i64)),
-        (u32 => (mul_u32_u64, u64)),
+    CheckedMul, checked_mul =>
+        (u8 => (mul_u8_u16, u16), (mul_u8_u32, u32), (mul_u8_u64, u64), (mul_u8_i16, i16), (mul_u8_i32, i32), (mul_u8_i64, i64)),
+        (u16 => (mul_u16_u32, u32), (mul_u16_u64, u64), (mul_u16_i32, i32), (mul_u16_i64, i64)),
+        (u32 => (mul_u32_u64, u64), (mul_u32_i64, i64)),
         (i8 => (mul_i8_i16, i16), (mul_i8_i32, i32), (mul_i8_i64, i64)),
         (i16 => (mul_i16_i32, i32), (mul_i16_i64, i64)),
         (i32 => (mul_i32_i64, i64));
 }
 
-mixed_widening! {
-    Add, add =>
-        // <= Bits8
-        (u8, i8 => (add_u8_i8_i16, i16), (add_u8_i8_u32, u32), (add_u8_i8_i32, i32), (add_u8_i8_i64, i64)),
-        (i8, u8 => (add_i8_u8_i16, i16), (add_i8_u8_u32, u32), (add_i8_u8_i32, i32), (add_i8_u8_i64, i64)),
+// (T0, T0) -> T1 binary operations where the values of T0 are a subset of T1 and failure indicates NaN
+// Responsible for 28 function definitions
+widening_quotient! {
+    CheckedDiv, checked_div =>
+        // 14 functions
+        (u8 => (div_u8_u16, u16), (div_u8_u32, u32), (div_u8_u64, u64), (div_u8_i16, i16), (div_u8_i32, i32), (div_u8_i64, i64)),
+        (u16 => (div_u16_u32, u32), (div_u16_u64, u64), (div_u16_i32, i32), (div_u16_i64, i64)),
+        (u32 => (div_u32_u64, u64), (div_u32_i64, i64)),
+        (i8 => (div_i8_i16, i16), (div_i8_i32, i32), (div_i8_i64, i64)),
+        (i16 => (div_i16_i32, i32), (div_i16_i64, i64)),
+        (i32 => (div_i32_i64, i64));
+    CheckedRem, checked_rem =>
+        // 14 functions
+        (u8 => (rem_u8_u16, u16), (rem_u8_u32, u32), (rem_u8_u64, u64), (rem_u8_i16, i16), (rem_u8_i32, i32), (rem_u8_i64, i64)), // 6
+        (u16 => (rem_u16_u32, u32), (rem_u16_u64, u64), (rem_u16_i32, i32), (rem_u16_i64, i64)), // 4
+        (u32 => (rem_u32_u64, u64), (rem_u32_i64, i64)), // 2
+        (i8 => (rem_i8_i16, i16), (rem_i8_i32, i32), (rem_i8_i64, i64)), // 3
+        (i16 => (rem_i16_i32, i32), (rem_i16_i64, i64)), // 2
+        (i32 => (rem_i32_i64, i64)); // 1
+}
 
-        // >Bits8, <= Bits16
-        (u8, u16 => (add_u8_u16_u32, u32), (add_u8_u16_u64, u64), (add_u8_u16_i32, i32), (add_u8_u16_i64, i64)),
-        (u16, u8 => (add_u16_u8_u32, u32), (add_u16_u8_u64, u64), (add_u16_u8_i32, i32), (add_u16_u8_i64, i64)),
-        (i8, u16 => (add_i8_u16_i32, i32), (add_i8_u16_i64, i64)),
+// (T0, T1) -> T binary operations
+// Responsible for 210 functions
+mixed_widening! {
+    CheckedAdd, checked_add =>
+        // <= Bits8 (6 functions)
+        (u8, i8 => (add_u8_i8_i16, i16), (add_u8_i8_i32, i32), (add_u8_i8_i64, i64)),
+        (i8, u8 => (add_i8_u8_i16, i16), (add_i8_u8_i32, i32), (add_i8_u8_i64, i64)),
+
+        // >Bits8, <= Bits16 (30 functions)
+        (u16, u8 => (add_u16_u8_u16, u16), (add_u16_u8_u32, u32), (add_u16_u8_u64, u64), (add_u16_u8_i32, i32), (add_u16_u8_i64, i64)),
+        (u8, u16 => (add_u8_u16_u16, u16), (add_u8_u16_u32, u32), (add_u8_u16_u64, u64), (add_u8_u16_i32, i32), (add_u8_u16_i64, i64)),
         (u16, i8 => (add_u16_i8_i32, i32), (add_u16_i8_i64, i64)),
-        (u8, i16 => (add_u8_i16_i32, i32), (add_u8_i16_i64, i64)),
-        (i16, u8 => (add_i16_u8_i32, i32), (add_i16_u8_i64, i64)),
-        (i8, i16 => (add_i8_i16_i32, i32), (add_i8_i16_i64, i64)),
-        (i16, i8 => (add_i16_i8_i32, i32), (add_i16_i8_i64, i64)),
+        (i8, u16 => (add_i8_u16_i32, i32), (add_i8_u16_i64, i64)),
+
+        (i16, u8 => (add_i16_u8_i16, i16), (add_i16_u8_i32, i32), (add_i16_u8_i64, i64)),
+        (u8, i16 => (add_u8_i16_i16, i16), (add_u8_i16_i32, i32), (add_u8_i16_i64, i64)),
+        (i16, i8 => (add_i16_i8_i16, i16), (add_i16_i8_i32, i32), (add_i16_i8_i64, i64)),
+        (i8, i16 => (add_i8_i16_i16, i16), (add_i8_i16_i32, i32), (add_i8_i16_i64, i64)),
 
         (u16, i16 => (add_u16_i16_i32, i32), (add_u16_i16_i64, i64)),
         (i16, u16 => (add_i16_u16_i32, i32), (add_i16_u16_i64, i64)),
 
-        (u32, u8 => (add_u32_u8_u64, u64)),
-        (u8, u32 => (add_u8_u32_u64, u64)),
-        (u32, i8 => (add_u32_i8_u64, u64)),
-        (i8, u32 => (add_i8_u32_u64, u64)),
+        // >Bits16, <=Bits32 (34 functions)
+        (u32, u8 => (add_u32_u8_u32, u32), (add_u32_u8_u64, u64), (add_u32_u8_i64, i64)),
+        (u8, u32 => (add_u8_u32_u32, u32), (add_u8_u32_u64, u64), (add_u8_u32_i64, i64)),
+        (u32, i8 => (add_u32_i8_i64, i64)),
+        (i8, u32 => (add_i8_u32_i64, i64)),
+
+        (u32, u16 => (add_u32_u16_u32, u32), (add_u32_u16_u64, u64), (add_u32_u16_i64, i64)),
+        (u16, u32 => (add_u16_u32_u32, u32), (add_u16_u32_u64, u64), (add_u16_u32_i64, i64)),
+        (u32, i16 => (add_u32_i16_i64, i64)),
+        (i16, u32 => (add_i16_u32_i64, i64)),
+
+        (i32, u8 => (add_i32_u8_i32, i32), (add_i32_u8_i64, i64)),
+        (u8, i32 => (add_u8_i32_i32, i32), (add_u8_i32_i64, i64)),
+        (i32, i8 => (add_i32_i8_i32, i32), (add_i32_i8_i64, i64)),
+        (i8, i32 => (add_i8_i32_i32, i32), (add_i8_i32_i64, i64)),
+
+        (i32, u16 => (add_i32_u16_i32, i32), (add_i32_u16_i64, i64)),
+        (u16, i32 => (add_u16_i32_i32, i32), (add_u16_i32_i64, i64)),
+        (i32, i16 => (add_i32_i16_i32, i32), (add_i32_i16_i64, i64)),
+        (i16, i32 => (add_i16_i32_i32, i32), (add_i16_i32_i64, i64)),
+
+        (u32, i32 => (add_u32_i32_i64, i64)),
+        (i32, u32 => (add_i32_u32_i64, i64)),
         ;
-    Sub, sub =>
-        // <= Bits8
+    CheckedSub, checked_sub =>
+        // <= Bits8 (6 functions)
         (u8, i8 => (sub_u8_i8_i16, i16), (sub_u8_i8_i32, i32), (sub_u8_i8_i64, i64)),
         (i8, u8 => (sub_i8_u8_i16, i16), (sub_i8_u8_i32, i32), (sub_i8_u8_i64, i64)),
 
-        // >Bits8, <= Bits16
-        (u8, u16 => (sub_u8_u16_i32, i32), (sub_u8_u16_i64, i64)),
-        (u16, u8 => (sub_u16_u8_i32, i32), (sub_u16_u8_i64, i64)),
-        (u8, i16 => (sub_u8_i16_i32, i32), (sub_u8_i16_i64, i64)),
-        (i16, u8 => (sub_i16_u8_i32, i32), (sub_i16_u8_i64, i64)),
-        (i8, u16 => (sub_i8_u16_i32, i32), (sub_i8_u16_i64, i64)),
+        // >Bits8, <= Bits16 (30 functions)
+        (u16, u8 => (sub_u16_u8_u16, u16), (sub_u16_u8_u32, u32), (sub_u16_u8_u64, u64), (sub_u16_u8_i32, i32), (sub_u16_u8_i64, i64)),
+        (u8, u16 => (sub_u8_u16_u16, u16), (sub_u8_u16_u32, u32), (sub_u8_u16_u64, u64), (sub_u8_u16_i32, i32), (sub_u8_u16_i64, i64)),
         (u16, i8 => (sub_u16_i8_i32, i32), (sub_u16_i8_i64, i64)),
+        (i8, u16 => (sub_i8_u16_i32, i32), (sub_i8_u16_i64, i64)),
+
+        (u8, i16 => (sub_u8_i16_i16, i16), (sub_u8_i16_i32, i32), (sub_u8_i16_i64, i64)),
+        (i16, u8 => (sub_i16_u8_i16, i16), (sub_i16_u8_i32, i32), (sub_i16_u8_i64, i64)),
+        (i8, i16 => (sub_i8_i16_i16, i16), (sub_i8_i16_i32, i32), (sub_i8_i16_i64, i64)),
+        (i16, i8 => (sub_i16_i8_i16, i16), (sub_i16_i8_i32, i32), (sub_i16_i8_i64, i64)),
+
         (u16, i16 => (sub_u16_i16_i32, i32), (sub_u16_i16_i64, i64)),
         (i16, u16 => (sub_i16_u16_i32, i32), (sub_i16_u16_i64, i64)),
-        (i8, i16 => (sub_i8_i16_i32, i32), (sub_i8_i16_i64, i64)),
-        (i16, i8 => (sub_i16_i8_i32, i32), (sub_i16_i8_i64, i64)),
 
-        // >Bits16, <= Bits32
-        (u32, u8 => (sub_u32_u8_i64, i64)),
-        (u8, u32 => (sub_u8_u32_i64, i64)),
+        // >Bits16, <= Bits32 (34 functions)
+        (u32, u8 => (sub_u32_u8_u32, u32), (sub_u32_u8_u64, u64), (sub_u32_u8_i64, i64)),
+        (u8, u32 => (sub_u8_u32_u32, u32), (sub_u8_u32_u64, u64), (sub_u8_u32_i64, i64)),
         (u32, i8 => (sub_u32_i8_i64, i64)),
         (i8, u32 => (sub_i8_u32_i64, i64)),
-        (u32, u16 => (sub_u32_u16_i64, i64)),
-        (u16, u32 => (sub_u16_u32_i64, i64)),
+
+        (u32, u16 => (sub_u32_u16_u32, u32), (sub_u32_u16_u64, u64), (sub_u32_u16_i64, i64)),
+        (u16, u32 => (sub_u16_u32_u32, u32), (sub_u16_u32_u64, u64), (sub_u16_u32_i64, i64)),
         (u32, i16 => (sub_u32_i16_i64, i64)),
         (i16, u32 => (sub_i16_u32_i64, i64)),
 
-        (i32, u8 => (sub_i32_u8_i64, i64)),
-        (u8, i32 => (sub_u8_i32_i64, i64)),
-        (i32, u16 => (sub_i32_u16_i64, i64)),
-        (u16, i32 => (sub_u16_i32_i64, i64)),
-        (i32, i8 => (sub_i32_i8_i64, i64)),
-        (i8, i32 => (sub_i8_i32_i64, i64)),
-        (i32, i16 => (sub_i32_i16_i64, i64)),
-        (i16, i32 => (sub_i16_i32_i64, i64));
+        (i32, u8 => (sub_i32_u8_i32, i32), (sub_i32_u8_i64, i64)),
+        (u8, i32 => (sub_u8_i32_i32, i32), (sub_u8_i32_i64, i64)),
+        (i32, i8 => (sub_i32_i8_i32, i32), (sub_i32_i8_i64, i64)),
+        (i8, i32 => (sub_i8_i32_i32, i32), (sub_i8_i32_i64, i64)),
+
+        (i32, u16 => (sub_i32_u16_i32, i32), (sub_i32_u16_i64, i64)),
+        (u16, i32 => (sub_u16_i32_i32, i32), (sub_u16_i32_i64, i64)),
+        (i32, i16 => (sub_i32_i16_i32, i32), (sub_i32_i16_i64, i64)),
+        (i16, i32 => (sub_i16_i32_i32, i32), (sub_i16_i32_i64, i64)),
+
+        (u32, i32 => (sub_u32_i32_i64, i64)),
+        (i32, u32 => (sub_i32_u32_i64, i64));
+    CheckedMul, checked_mul =>
+        // <= Bits8 (6 functions)
+        (u8, i8 => (mul_u8_i8_i16, i16), (mul_u8_i8_i32, i32), (mul_u8_i8_i64, i64)),
+        (i8, u8 => (mul_i8_u8_i16, i16), (mul_i8_u8_i32, i32), (mul_i8_u8_i64, i64)),
+
+        // >Bits8, <= Bits16 (30 functions)
+        (u16, u8 => (mul_u16_u8_u16, u16), (mul_u16_u8_u32, u32), (mul_u16_u8_u64, u64), (mul_u16_u8_i32, i32), (mul_u16_u8_i64, i64)),
+        (u8, u16 => (mul_u8_u16_u16, u16), (mul_u8_u16_u32, u32), (mul_u8_u16_u64, u64), (mul_u8_u16_i32, i32), (mul_u8_u16_i64, i64)),
+        (u16, i8 => (mul_u16_i8_i32, i32), (mul_u16_i8_i64, i64)),
+        (i8, u16 => (mul_i8_u16_i32, i32), (mul_i8_u16_i64, i64)),
+
+        (u8, i16 => (mul_u8_i16_i16, i16), (mul_u8_i16_i32, i32), (mul_u8_i16_i64, i64)),
+        (i16, u8 => (mul_i16_u8_i16, i16), (mul_i16_u8_i32, i32), (mul_i16_u8_i64, i64)),
+        (i8, i16 => (mul_i8_i16_i16, i16), (mul_i8_i16_i32, i32), (mul_i8_i16_i64, i64)),
+        (i16, i8 => (mul_i16_i8_i16, i16), (mul_i16_i8_i32, i32), (mul_i16_i8_i64, i64)),
+
+        (u16, i16 => (mul_u16_i16_i32, i32), (mul_u16_i16_i64, i64)),
+        (i16, u16 => (mul_i16_u16_i32, i32), (mul_i16_u16_i64, i64)),
+
+        // >Bits16, <= Bits32 (34 functions)
+        (u32, u8 => (mul_u32_u8_u32, u32), (mul_u32_u8_u64, u64), (mul_u32_u8_i64, i64)),
+        (u8, u32 => (mul_u8_u32_u32, u32), (mul_u8_u32_u64, u64), (mul_u8_u32_i64, i64)),
+        (u32, i8 => (mul_u32_i8_i64, i64)),
+        (i8, u32 => (mul_i8_u32_i64, i64)),
+
+        (u32, u16 => (mul_u32_u16_u32, u32), (mul_u32_u16_u64, u64), (mul_u32_u16_i64, i64)),
+        (u16, u32 => (mul_u16_u32_u32, u32), (mul_u16_u32_u64, u64), (mul_u16_u32_i64, i64)),
+        (u32, i16 => (mul_u32_i16_i64, i64)),
+        (i16, u32 => (mul_i16_u32_i64, i64)),
+
+        (i32, u8 => (mul_i32_u8_i32, i32), (mul_i32_u8_i64, i64)),
+        (u8, i32 => (mul_u8_i32_i32, i32), (mul_u8_i32_i64, i64)),
+        (i32, i8 => (mul_i32_i8_i32, i32), (mul_i32_i8_i64, i64)),
+        (i8, i32 => (mul_i8_i32_i32, i32), (mul_i8_i32_i64, i64)),
+
+        (i32, u16 => (mul_i32_u16_i32, i32), (mul_i32_u16_i64, i64)),
+        (u16, i32 => (mul_u16_i32_i32, i32), (mul_u16_i32_i64, i64)),
+        (i32, i16 => (mul_i32_i16_i32, i32), (mul_i32_i16_i64, i64)),
+        (i16, i32 => (mul_i16_i32_i32, i32), (mul_i16_i32_i64, i64)),
+
+        (u32, i32 => (mul_u32_i32_i64, i64)),
+        (i32, u32 => (mul_i32_u32_i64, i64));
 }
+
+// Responsible for 140 functions
+mixed_widening_quotient! {
+    CheckedDiv, checked_div =>
+        // <= Bits8 (6 functions)
+        (u8, i8 => (div_u8_i8_i16, i16), (div_u8_i8_i32, i32), (div_u8_i8_i64, i64)),
+        (i8, u8 => (div_i8_u8_i16, i16), (div_i8_u8_i32, i32), (div_i8_u8_i64, i64)),
+
+        // >Bits8, <= Bits16 (30 functions)
+        (u16, u8 => (div_u16_u8_u16, u16), (div_u16_u8_u32, u32), (div_u16_u8_u64, u64), (div_u16_u8_i32, i32), (div_u16_u8_i64, i64)),
+        (u8, u16 => (div_u8_u16_u16, u16), (div_u8_u16_u32, u32), (div_u8_u16_u64, u64), (div_u8_u16_i32, i32), (div_u8_u16_i64, i64)),
+        (u16, i8 => (div_u16_i8_i32, i32), (div_u16_i8_i64, i64)),
+        (i8, u16 => (div_i8_u16_i32, i32), (div_i8_u16_i64, i64)),
+
+        (i16, u8 => (div_i16_u8_i16, i16), (div_i16_u8_i32, i32), (div_i16_u8_i64, i64)),
+        (u8, i16 => (div_u8_i16_i16, i16), (div_u8_i16_i32, i32), (div_u8_i16_i64, i64)),
+        (i16, i8 => (div_i16_i8_i16, i16), (div_i16_i8_i32, i32), (div_i16_i8_i64, i64)),
+        (i8, i16 => (div_i8_i16_i16, i16), (div_i8_i16_i32, i32), (div_i8_i16_i64, i64)),
+
+        (u16, i16 => (div_u16_i16_i32, i32), (div_u16_i16_i64, i64)),
+        (i16, u16 => (div_i16_u16_i32, i32), (div_i16_u16_i64, i64)),
+
+        // >Bits16, <=Bits32 (34 functions)
+        (u32, u8 => (div_u32_u8_u32, u32), (div_u32_u8_u64, u64), (div_u32_u8_i64, i64)),
+        (u8, u32 => (div_u8_u32_u32, u32), (div_u8_u32_u64, u64), (div_u8_u32_i64, i64)),
+        (u32, i8 => (div_u32_i8_i64, i64)),
+        (i8, u32 => (div_i8_u32_i64, i64)),
+
+        (u32, u16 => (div_u32_u16_u32, u32), (div_u32_u16_u64, u64), (div_u32_u16_i64, i64)),
+        (u16, u32 => (div_u16_u32_u32, u32), (div_u16_u32_u64, u64), (div_u16_u32_i64, i64)),
+        (u32, i16 => (div_u32_i16_i64, i64)),
+        (i16, u32 => (div_i16_u32_i64, i64)),
+
+        (i32, u8 => (div_i32_u8_i32, i32), (div_i32_u8_i64, i64)),
+        (u8, i32 => (div_u8_i32_i32, i32), (div_u8_i32_i64, i64)),
+        (i32, i8 => (div_i32_i8_i32, i32), (div_i32_i8_i64, i64)),
+        (i8, i32 => (div_i8_i32_i32, i32), (div_i8_i32_i64, i64)),
+
+        (i32, u16 => (div_i32_u16_i32, i32), (div_i32_u16_i64, i64)),
+        (u16, i32 => (div_u16_i32_i32, i32), (div_u16_i32_i64, i64)),
+        (i32, i16 => (div_i32_i16_i32, i32), (div_i32_i16_i64, i64)),
+        (i16, i32 => (div_i16_i32_i32, i32), (div_i16_i32_i64, i64)),
+
+
+        (u32, i32 => (div_u32_i32_i64, i64)),
+        (i32, u32 => (div_i32_u32_i64, i64)),
+        ;
+    CheckedRem, checked_rem =>
+        // <= Bits8 (6 functions)
+        (u8, i8 => (rem_u8_i8_i16, i16), (rem_u8_i8_i32, i32), (rem_u8_i8_i64, i64)),
+        (i8, u8 => (rem_i8_u8_i16, i16), (rem_i8_u8_i32, i32), (rem_i8_u8_i64, i64)),
+
+        // >Bits8, <= Bits16 (30 functions)
+        (u16, u8 => (rem_u16_u8_u16, u16), (rem_u16_u8_u32, u32), (rem_u16_u8_u64, u64), (rem_u16_u8_i32, i32), (rem_u16_u8_i64, i64)),
+        (u8, u16 => (rem_u8_u16_u16, u16), (rem_u8_u16_u32, u32), (rem_u8_u16_u64, u64), (rem_u8_u16_i32, i32), (rem_u8_u16_i64, i64)),
+        (u16, i8 => (rem_u16_i8_i32, i32), (rem_u16_i8_i64, i64)),
+        (i8, u16 => (rem_i8_u16_i32, i32), (rem_i8_u16_i64, i64)),
+
+        (u8, i16 => (rem_u8_i16_i16, i16), (rem_u8_i16_i32, i32), (rem_u8_i16_i64, i64)),
+        (i16, u8 => (rem_i16_u8_i16, i16), (rem_i16_u8_i32, i32), (rem_i16_u8_i64, i64)),
+        (i8, i16 => (rem_i8_i16_i16, i16), (rem_i8_i16_i32, i32), (rem_i8_i16_i64, i64)),
+        (i16, i8 => (rem_i16_i8_i16, i16), (rem_i16_i8_i32, i32), (rem_i16_i8_i64, i64)),
+
+        (u16, i16 => (rem_u16_i16_i32, i32), (rem_u16_i16_i64, i64)),
+        (i16, u16 => (rem_i16_u16_i32, i32), (rem_i16_u16_i64, i64)),
+
+        // >Bits16, <= Bits32 (34 functions)
+        (u32, u8 => (rem_u32_u8_u32, u32), (rem_u32_u8_u64, u64), (rem_u32_u8_i64, i64)),
+        (u8, u32 => (rem_u8_u32_u32, u32), (rem_u8_u32_u64, u64), (rem_u8_u32_i64, i64)),
+        (u32, i8 => (rem_u32_i8_i64, i64)),
+        (i8, u32 => (rem_i8_u32_i64, i64)),
+
+        (u32, u16 => (rem_u32_u16_u32, u32), (rem_u32_u16_u64, u64), (rem_u32_u16_i64, i64)),
+        (u16, u32 => (rem_u16_u32_u32, u32), (rem_u16_u32_u64, u64), (rem_u16_u32_i64, i64)),
+        (u32, i16 => (rem_u32_i16_i64, i64)),
+        (i16, u32 => (rem_i16_u32_i64, i64)),
+
+        (i32, u8 => (rem_i32_u8_i32, i32), (rem_i32_u8_i64, i64)),
+        (u8, i32 => (rem_u8_i32_i32, i32), (rem_u8_i32_i64, i64)),
+        (i32, i8 => (rem_i32_i8_i32, i32), (rem_i32_i8_i64, i64)),
+        (i8, i32 => (rem_i8_i32_i32, i32), (rem_i8_i32_i64, i64)),
+
+        (i32, u16 => (rem_i32_u16_i32, i32), (rem_i32_u16_i64, i64)),
+        (u16, i32 => (rem_u16_i32_i32, i32), (rem_u16_i32_i64, i64)),
+        (i32, i16 => (rem_i32_i16_i32, i32), (rem_i32_i16_i64, i64)),
+        (i16, i32 => (rem_i16_i32_i32, i32), (rem_i16_i32_i64, i64)),
+
+        (u32, i32 => (rem_u32_i32_i64, i64)),
+        (i32, u32 => (rem_i32_u32_i64, i64));
+}
+// !SECTION
 
 // !SECTION
 
