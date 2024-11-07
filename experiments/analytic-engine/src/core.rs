@@ -183,6 +183,19 @@ impl NumRep {
     pub const fn is_auto(self) -> bool {
         matches!(self, NumRep::Auto)
     }
+
+    /// Returns true if `self` and `other` are both concrete types, and the bounds of `self`
+    /// entirely encompass the bounds of `other` (i.e. every value within the assignable range of `other` is representable within self, including when the two are equal).
+    pub(crate) fn encompasses(&self, other: &Self) -> bool {
+        let Some(self_bounds) = self.as_bounds() else {
+            return false;
+        };
+        let Some(other_bounds) = other.as_bounds() else {
+            return false;
+        };
+
+        self_bounds.encompasses(&other_bounds)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
