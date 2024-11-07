@@ -6,7 +6,8 @@ use precedence::{cond_paren, Precedence};
 
 use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, NumRep, TypedConst, UnaryOp};
 use crate::elaborator::inference::InferenceEngine;
-use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedExpr, TypedUnaryOp};
+use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
+use crate::gen::{synthesize, ToFragment};
 
 pub(crate) mod fragment {
     use std::borrow::Cow;
@@ -21,6 +22,10 @@ pub(crate) mod fragment {
         String(Cow<'static, str>),
         DisplayAtom(Rc<dyn std::fmt::Display>),
         Cat(Box<Fragment>, Box<Fragment>),
+        Sequence {
+            sep: Option<Box<Fragment>>,
+            items: Vec<Fragment>,
+        },
     }
 
     impl std::fmt::Debug for Fragment {
@@ -34,6 +39,11 @@ pub(crate) mod fragment {
                     .field(&format!("{}", at))
                     .finish(),
                 Self::Cat(x, y) => f.debug_tuple("Cat").field(x).field(y).finish(),
+                Self::Sequence { sep, items } => f
+                    .debug_struct("Sequence")
+                    .field("sep", sep)
+                    .field("items", items)
+                    .finish(),
             }
         }
     }
@@ -45,6 +55,13 @@ pub(crate) mod fragment {
 
         pub fn delimit(self, before: Self, after: Self) -> Self {
             Self::cat(before, self).cat(after)
+        }
+
+        pub fn seq(items: impl IntoIterator<Item = Fragment>, sep: Option<Fragment>) -> Self {
+            Self::Sequence {
+                items: items.into_iter().collect(),
+                sep: sep.map(Box::new),
+            }
         }
     }
 
@@ -58,6 +75,25 @@ pub(crate) mod fragment {
                 Fragment::Cat(frag0, frag1) => {
                     frag0.fmt(f)?;
                     frag1.fmt(f)
+                }
+                Fragment::Sequence { sep, items } => {
+                    let mut iter = items.iter();
+                    if let Some(head) = iter.next() {
+                        head.fmt(f)?;
+                    } else {
+                        return Ok(());
+                    }
+                    let f_sep: Box<dyn Fn(&mut std::fmt::Formatter<'_>) -> std::fmt::Result> =
+                        if let Some(frag) = sep.as_deref() {
+                            Box::new(|f| frag.fmt(f))
+                        } else {
+                            Box::new(|_| Ok(()))
+                        };
+                    for item in iter {
+                        f_sep(f)?;
+                        item.fmt(f)?;
+                    }
+                    Ok(())
                 }
             }
         }
@@ -443,8 +479,8 @@ fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment
             prec,
             Precedence::ABSNEG,
         ),
-        TypedExpr::ElabCast(t, num_rep, inner) => cond_paren(
-            compile_elab_postfix(*t, *num_rep, inner, Precedence::CAST),
+        TypedExpr::ElabCast(t, TypedCast { _rep, .. }, inner) => cond_paren(
+            compile_elab_postfix(*t, *_rep, inner, Precedence::CAST),
             prec,
             Precedence::CAST,
         ),
@@ -453,6 +489,11 @@ fn compile_typed_expr(t_expr: &TypedExpr<IntType>, prec: Precedence) -> Fragment
 
 fn show_typed_expr(expr: &TypedExpr<IntType>) -> String {
     format!("{}", compile_typed_expr(expr, Precedence::TOP))
+}
+
+fn show_code(expr: &TypedExpr<IntType>) -> String {
+    let ast = synthesize(expr);
+    format!("{}", ast.to_fragment())
 }
 
 pub fn print_conversion(expr: &Expr) {
@@ -464,6 +505,7 @@ pub fn print_conversion(expr: &Expr) {
                 Ok(t_expr) => {
                     println!("Raw: {}", show_expr(expr));
                     println!("Elaborated: {}", show_typed_expr(&t_expr));
+                    println!("Transcribed: {}", show_code(&t_expr));
                 }
                 Err(elab_err) => {
                     eprintln!(

@@ -12,6 +12,28 @@ pub(crate) enum PrimInt {
     I64,
 }
 
+impl PrimInt {
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            PrimInt::U8 => "u8",
+            PrimInt::U16 => "u16",
+            PrimInt::U32 => "u32",
+            PrimInt::U64 => "u64",
+            PrimInt::I8 => "i8",
+            PrimInt::I16 => "i16",
+            PrimInt::I32 => "i32",
+            PrimInt::I64 => "i64",
+        }
+    }
+
+    pub(crate) fn is_unsigned(&self) -> bool {
+        matches!(
+            self,
+            PrimInt::U8 | PrimInt::U16 | PrimInt::U32 | PrimInt::U64
+        )
+    }
+}
+
 pub(crate) const PRIM_INTS: [PrimInt; 8] = [
     PrimInt::U8,
     PrimInt::U16,
@@ -81,16 +103,14 @@ pub(crate) enum IntType {
 }
 
 impl IntType {
+    pub fn to_prim(self) -> PrimInt {
+        let IntType::Prim(ret) = self;
+        ret
+    }
+
     pub const fn to_static_str(self) -> &'static str {
         match self {
-            IntType::Prim(PrimInt::U8) => "u8",
-            IntType::Prim(PrimInt::U16) => "u16",
-            IntType::Prim(PrimInt::U32) => "u32",
-            IntType::Prim(PrimInt::U64) => "u64",
-            IntType::Prim(PrimInt::I8) => "i8",
-            IntType::Prim(PrimInt::I16) => "i16",
-            IntType::Prim(PrimInt::I32) => "i32",
-            IntType::Prim(PrimInt::I64) => "i64",
+            Self::Prim(p) => p.to_static_str(),
         }
     }
 }
@@ -111,7 +131,7 @@ pub(crate) enum TypedExpr<TypeRep> {
         Box<TypedExpr<TypeRep>>,
     ),
     ElabUnaryOp(TypeRep, TypedUnaryOp<TypeRep>, Box<TypedExpr<TypeRep>>),
-    ElabCast(TypeRep, NumRep, Box<TypedExpr<TypeRep>>),
+    ElabCast(TypeRep, TypedCast<TypeRep>, Box<TypedExpr<TypeRep>>),
 }
 
 impl<T> TypedExpr<T> {
@@ -125,8 +145,8 @@ impl<T> TypedExpr<T> {
     }
 }
 
-type Sig1<T> = (T, T);
-type Sig2<T> = ((T, T), T);
+pub(crate) type Sig1<T> = (T, T);
+pub(crate) type Sig2<T> = ((T, T), T);
 
 #[derive(Clone, Debug)]
 pub(crate) struct TypedBinOp<TypeRep> {
@@ -140,6 +160,11 @@ pub(crate) struct TypedUnaryOp<TypeRep> {
     pub(crate) inner: UnaryOp,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TypedCast<TypeRep> {
+    pub(crate) sig: Sig1<TypeRep>,
+    pub(crate) _rep: NumRep,
+}
 pub(crate) mod inference {
     use std::collections::HashSet;
 
@@ -1118,7 +1143,14 @@ impl Elaborator {
             Expr::Cast(rep, inner) => {
                 let t_inner = self.elaborate_expr(inner)?;
                 let t = self.get_type_from_index(index)?;
-                Ok(TypedExpr::ElabCast(t, *rep, Box::new(t_inner)))
+                Ok(TypedExpr::ElabCast(
+                    t,
+                    TypedCast {
+                        sig: (*t_inner.get_type(), t),
+                        _rep: *rep,
+                    },
+                    Box::new(t_inner),
+                ))
             }
         }
     }
