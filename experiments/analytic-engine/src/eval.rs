@@ -1,4 +1,4 @@
-use num_bigint::BigInt;
+use num_bigint::{BigInt, TryFromBigIntError};
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub};
 use std::any::type_name;
 use std::cell::LazyCell;
@@ -44,6 +44,23 @@ where
             (Self::Direct(n), Self::Indirect(IndirectEval { ref value, .. }))
             | (Self::Indirect(IndirectEval { ref value, .. }), Self::Direct(n)) => {
                 &***value == &BigInt::from(*n)
+            }
+        }
+    }
+}
+
+pub enum EvalError {
+    Indirect(BigInt),
+    NotANumber,
+}
+
+impl<T: Copy> Eval<T> {
+    pub fn eval(&self) -> Result<T, EvalError> {
+        match self {
+            Eval::NaN => Err(EvalError::NotANumber),
+            Eval::Direct(x) => Ok(*x),
+            Eval::Indirect(IndirectEval { value, .. }) => {
+                Err(EvalError::Indirect((&***value).clone()))
             }
         }
     }
@@ -505,7 +522,7 @@ pub fn eval_fallback<Lhs, Rhs, Res>(
 ) -> Eval<Res>
 where
     BigInt: From<Lhs> + From<Rhs>,
-    Res: TryFrom<BigInt>,
+    Res: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
 {
     eprintln!("[INFO]: encountered fallback operation `{_op_hint} : (({}, {}) -> {})` that may benefit from standalone function",
          type_name::<Lhs>(), type_name::<Rhs>(), type_name::<Res>()
@@ -514,15 +531,57 @@ where
     let big_r = BigInt::from(rhs);
     let o_big_res = checked_op(&big_l, &big_r);
     if let Some(big_res) = o_big_res {
-        let _big_res = big_res.clone();
-        if let Ok(res) = <Res as TryFrom<BigInt>>::try_from(big_res) {
-            Eval::Direct(res)
-        } else {
-            Eval::Indirect(IndirectEval {
-                value: Rc::new(LazyCell::new(Box::new(move || _big_res))),
-            })
+        match <Res as TryFrom<BigInt>>::try_from(big_res) {
+            Ok(res) => Eval::Direct(res),
+            Err(e) => Eval::Indirect(IndirectEval {
+                value: Rc::new(LazyCell::new(Box::new(move || e.into_original()))),
+            }),
         }
     } else {
         Eval::NaN
     }
 }
+
+// FIXME - to save time we are not defining any first-class unary operations but we should
+pub fn eval_unary_fallback<In, Out>(
+    x: In,
+    _op_hint: &'static str,
+    op: impl FnOnce(&BigInt) -> BigInt,
+) -> Eval<Out>
+where
+    BigInt: From<In>,
+    Out: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
+{
+    eprintln!("[INFO]: encountered fallback operation `{_op_hint} : ({} -> {})` that may benefit from standalone function", type_name::<In>(), type_name::<Out>());
+    let big_x = BigInt::from(x);
+    let big_res = op(&big_x);
+    match <Out as TryFrom<BigInt>>::try_from(big_res) {
+        Ok(res) => Eval::Direct(res),
+        Err(e) => Eval::Indirect(IndirectEval {
+            value: Rc::new(LazyCell::new(Box::new(move || e.into_original()))),
+        }),
+    }
+}
+
+pub fn cast_fallback<In, Out>(x: In) -> Eval<Out>
+where
+    BigInt: From<In>,
+    Out: TryFrom<BigInt, Error = TryFromBigIntError<BigInt>>,
+{
+    eprintln!("[INFO]: encountered fallback cast of type `({} -> {})` that may benefit from standalone function", type_name::<In>(), type_name::<Out>());
+    let big_x = BigInt::from(x);
+    match <Out as TryFrom<BigInt>>::try_from(big_x) {
+        Ok(y) => Eval::Direct(y),
+        Err(e) => Eval::Indirect(IndirectEval {
+            value: Rc::new(LazyCell::new(Box::new(move || e.into_original()))),
+        }),
+    }
+}
+
+#[inline]
+/// Noop function that 'performs' absolute value computation on unsigned integers (where input and output types are the same)
+pub const fn abs_noop<T>(x: T) -> T {
+    x
+}
+
+// TODO - add in 'as'-cast abs for unsigned->wider unsigned conversions, as well as other unary cases
