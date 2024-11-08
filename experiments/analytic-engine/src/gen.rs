@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, NumRep, UnaryOp};
+use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, MachineRep, UnaryOp};
 use crate::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedExpr};
 use crate::printer::fragment::Fragment;
 
@@ -82,9 +82,9 @@ fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
     let r = r.to_prim();
     let o = o.to_prim();
 
-    let lrep = NumRep::from(l);
-    let rrep = NumRep::from(r);
-    let orep = NumRep::from(o);
+    let lrep = MachineRep::from(l);
+    let rrep = MachineRep::from(r);
+    let orep = MachineRep::from(o);
 
     if lrep == rrep {
         if orep == lrep {
@@ -108,8 +108,8 @@ fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<
     let i = i.to_prim();
     let o = o.to_prim();
 
-    let irep = NumRep::from(i);
-    let orep = NumRep::from(o);
+    let irep = MachineRep::from(i);
+    let orep = MachineRep::from(o);
 
     match op {
         None => {
@@ -143,24 +143,24 @@ fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<
     }
 }
 
-fn absval_is_nonlossy(source: NumRep, target: NumRep) -> bool {
+fn absval_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
     if source.is_signed() {
         // Signed -> Unsigned is non-lossy if the target-precision is greater-than-or-equal to target precision
         matches!(
             target.compare_width(source),
-            Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater
         )
     } else {
         target.encompasses(source)
     }
 }
 
-fn negate_is_nonlossy(source: NumRep, target: NumRep) -> bool {
+fn negate_is_nonlossy(source: MachineRep, target: MachineRep) -> bool {
     if source.is_signed() {
         // Neg is effectively a no-op w.r.t the bounds of the input and output, so normal rules apply
         matches!(
             target.compare_width(source),
-            Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater
         )
     } else {
         // Unsigned negation is never lossy because we avoid downcasting entirely

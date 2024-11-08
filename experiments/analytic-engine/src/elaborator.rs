@@ -1,4 +1,4 @@
-use crate::core::{BinOp, Expr, NumRep, TypedConst, UnaryOp};
+use crate::core::{BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum PrimInt {
@@ -55,14 +55,37 @@ impl TryFrom<NumRep> for PrimInt {
     fn try_from(value: NumRep) -> Result<Self, Self::Error> {
         match value {
             NumRep::Auto => Err(TryFromAutoError),
-            NumRep::U8 => Ok(PrimInt::U8),
-            NumRep::U16 => Ok(PrimInt::U16),
-            NumRep::U32 => Ok(PrimInt::U32),
-            NumRep::U64 => Ok(PrimInt::U64),
-            NumRep::I8 => Ok(PrimInt::I8),
-            NumRep::I16 => Ok(PrimInt::I16),
-            NumRep::I32 => Ok(PrimInt::I32),
-            NumRep::I64 => Ok(PrimInt::I64),
+            NumRep::Concrete(mr) => Ok(mr.into()),
+        }
+    }
+}
+
+impl From<MachineRep> for PrimInt {
+    fn from(value: MachineRep) -> Self {
+        match value {
+            MachineRep::U8 => PrimInt::U8,
+            MachineRep::U16 => PrimInt::U16,
+            MachineRep::U32 => PrimInt::U32,
+            MachineRep::U64 => PrimInt::U64,
+            MachineRep::I8 => PrimInt::I8,
+            MachineRep::I16 => PrimInt::I16,
+            MachineRep::I32 => PrimInt::I32,
+            MachineRep::I64 => PrimInt::I64,
+        }
+    }
+}
+
+impl From<PrimInt> for MachineRep {
+    fn from(value: PrimInt) -> Self {
+        match value {
+            PrimInt::U8 => MachineRep::U8,
+            PrimInt::U16 => MachineRep::U16,
+            PrimInt::U32 => MachineRep::U32,
+            PrimInt::U64 => MachineRep::U64,
+            PrimInt::I8 => MachineRep::I8,
+            PrimInt::I16 => MachineRep::I16,
+            PrimInt::I32 => MachineRep::I32,
+            PrimInt::I64 => MachineRep::I64,
         }
     }
 }
@@ -373,7 +396,6 @@ pub(crate) mod inference {
     pub enum InferenceError {
         // Unrepresentable(TypedConst, IntType),
         BadUnification(Constraint, Constraint),
-        AbstractCast,
         Ambiguous,
         NoSolution,
         MultipleSolutions,
@@ -385,7 +407,6 @@ pub(crate) mod inference {
             match self {
                 // InferenceError::Unrepresentable(c, int_type) => write!(f, "inference requires that `{}` be assigned type `{}`, which cannot represent it", c, int_type),
                 InferenceError::BadUnification(cx1, cx2) => write!(f, "constraints `{}` and `{}` cannot be unified", cx1, cx2),
-                InferenceError::AbstractCast => write!(f, "casts and operations cannot explicitly produce abstract NumReps"),
                 InferenceError::Ambiguous => write!(f, "mixed-type binary operation must have out_rep on operation to avoid ambiguity"),
                 InferenceError::Eval(e) => write!(f, "inference abandoned due to evaluation error: {}", e),
                 InferenceError::NoSolution => write!(f, "no valid assignment of PrimInt types produce a fully representable tree"),
@@ -848,17 +869,14 @@ pub(crate) mod inference {
                     let this_var = self.get_new_uvar();
                     let (l_var, l_rep) = self.infer_var_expr(&lhs)?;
                     let (r_var, r_rep) = self.infer_var_expr(&rhs)?;
-                    if bin_op.is_cast_and(NumRep::is_auto) {
-                        return Err(InferenceError::AbstractCast);
-                    }
                     let cast_rep = bin_op.cast_rep();
                     let this_rep = match (l_rep, r_rep) {
                         (NumRep::AUTO, NumRep::AUTO) => {
                             self.unify_var_pair(this_var, l_var)?;
                             self.unify_var_pair(this_var, r_var)?;
                             if let Some(rep) = cast_rep {
-                                self.unify_var_rep(this_var, rep)?;
-                                rep
+                                self.unify_var_rep(this_var, NumRep::Concrete(rep))?;
+                                NumRep::Concrete(rep)
                             } else {
                                 {
                                     // REVIEW - do we need to go this far?
@@ -890,6 +908,7 @@ pub(crate) mod inference {
                         }
                         (rep0, rep1) if rep0 == rep1 => {
                             if let Some(rep) = cast_rep {
+                                let rep = rep.into();
                                 self.unify_var_rep(this_var, rep)?;
                                 rep
                             } else {
@@ -899,6 +918,7 @@ pub(crate) mod inference {
                         }
                         (rep0, rep1) => {
                             if let Some(rep) = cast_rep {
+                                let rep = rep.into();
                                 self.unify_var_rep(this_var, rep)?;
                                 if l_rep.is_auto() {
                                     debug_assert!(!r_rep.is_auto());
@@ -930,14 +950,12 @@ pub(crate) mod inference {
                 Expr::UnaryOp(unary_op, expr) => {
                     let this_var = self.get_new_uvar();
                     let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
-                    if unary_op.is_cast_and(NumRep::is_auto) {
-                        return Err(InferenceError::AbstractCast);
-                    }
                     let cast_rep = unary_op.cast_rep();
                     let this_rep = match inner_rep {
                         NumRep::AUTO => {
                             self.unify_var_pair(this_var, inner_var)?;
                             if let Some(rep) = cast_rep {
+                                let rep = rep.into();
                                 self.unify_var_rep(this_var, rep)?;
                                 rep
                             } else {
@@ -971,6 +989,7 @@ pub(crate) mod inference {
                         }
                         rep0 => {
                             if let Some(rep) = cast_rep {
+                                let rep = rep.into();
                                 self.unify_var_rep(this_var, rep)?;
                                 rep
                             } else {
@@ -981,17 +1000,15 @@ pub(crate) mod inference {
                     };
                     (this_var, this_rep)
                 }
-                Expr::Cast(rep, expr) => {
+                &Expr::Cast(rep, ref expr) => {
                     let this_var = self.get_new_uvar();
                     let (inner_var, inner_rep) = self.infer_var_expr(&expr)?;
-                    if rep.is_auto() {
-                        return Err(InferenceError::AbstractCast);
-                    }
+                    let rep = rep.into();
                     if inner_rep.is_auto() {
-                        self.unify_var_rep(inner_var, *rep)?;
+                        self.unify_var_rep(inner_var, rep)?;
                     }
-                    self.unify_var_rep(this_var, *rep)?;
-                    (this_var, *rep)
+                    self.unify_var_rep(this_var, rep)?;
+                    (this_var, rep)
                 }
             };
             Ok((top_var, top_rep))
@@ -1133,14 +1150,15 @@ impl Elaborator {
                     Box::new(t_inner),
                 ))
             }
-            Expr::Cast(rep, inner) => {
+            &Expr::Cast(rep, ref inner) => {
+                let rep = NumRep::Concrete(rep);
                 let t_inner = self.elaborate_expr(inner)?;
                 let t = self.get_type_from_index(index)?;
                 Ok(TypedExpr::ElabCast(
                     t,
                     TypedCast {
                         sig: (*t_inner.get_type(), t),
-                        _rep: *rep,
+                        _rep: rep,
                     },
                     Box::new(t_inner),
                 ))
