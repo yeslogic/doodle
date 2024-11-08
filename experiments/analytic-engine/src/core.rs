@@ -14,10 +14,31 @@ pub enum BasicBinOp {
     Rem,
 }
 
+impl std::fmt::Display for BasicBinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BasicBinOp::Add => write!(f, "+"),
+            BasicBinOp::Sub => write!(f, "-"),
+            BasicBinOp::Mul => write!(f, "*"),
+            BasicBinOp::Div => write!(f, "/"),
+            BasicBinOp::Rem => write!(f, "%"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BasicUnaryOp {
     Negate,
     AbsVal,
+}
+
+impl std::fmt::Display for BasicUnaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BasicUnaryOp::Negate => write!(f, "~"),
+            BasicUnaryOp::AbsVal => write!(f, "abs"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -343,6 +364,15 @@ pub struct BinOp {
     out_rep: Option<NumRep>,
 }
 
+impl std::fmt::Display for BinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.out_rep {
+            None => write!(f, "{}", self.op),
+            Some(rep) => write!(f, "{}{}", self.op, rep),
+        }
+    }
+}
+
 impl BinOp {
     pub const fn new(op: BasicBinOp, out_rep: Option<NumRep>) -> Self {
         Self { op, out_rep }
@@ -380,6 +410,15 @@ pub struct UnaryOp {
     out_rep: Option<NumRep>,
 }
 
+impl std::fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.out_rep {
+            None => write!(f, "{}", self.op),
+            Some(rep) => write!(f, "{}{}", self.op, rep),
+        }
+    }
+}
+
 impl UnaryOp {
     pub const fn new(op: BasicUnaryOp, out_rep: Option<NumRep>) -> Self {
         Self { op, out_rep }
@@ -406,13 +445,24 @@ impl UnaryOp {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Expr {
     Const(TypedConst),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
     Cast(NumRep, Box<Expr>),
     // TryUnwrap(Box<Expr>),
+}
+
+impl std::fmt::Debug for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Const(arg0) => write!(f, "{}", arg0),
+            Self::BinOp(op, lhs, rhs) => write!(f, "({:?} {} {:?})", lhs, op, rhs),
+            Self::UnaryOp(op, inner) => write!(f, "{}({:?})", op, inner),
+            Self::Cast(rep, inner) => write!(f, "Cast({:?}, {:?})", inner, rep),
+        }
+    }
 }
 
 impl Expr {
