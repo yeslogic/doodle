@@ -4,7 +4,7 @@ use std::rc::Rc;
 use fragment::Fragment;
 use precedence::{cond_paren, Precedence};
 
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, NumRep, TypedConst, UnaryOp};
+use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, Expr, MachineRep, NumRep, TypedConst, UnaryOp};
 use crate::elaborator::inference::InferenceEngine;
 use crate::elaborator::{Elaborator, IntType, TypedBinOp, TypedCast, TypedExpr, TypedUnaryOp};
 use crate::gen::{synthesize, ToFragment};
@@ -291,7 +291,7 @@ fn compile_prefix(op: &UnaryOp, inner: &Expr, inner_prec: Precedence) -> Fragmen
 
 fn compile_postfix<'a>(
     token: &'static str,
-    rep: NumRep,
+    rep: MachineRep,
     inner: &Expr,
     inner_prec: Precedence,
 ) -> Fragment {

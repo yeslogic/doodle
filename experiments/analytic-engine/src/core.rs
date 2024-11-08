@@ -42,38 +42,98 @@ impl std::fmt::Display for BasicUnaryOp {
 }
 
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+pub enum BitWidth {
+    Bits8,
+    Bits16,
+    Bits32,
+    Bits64,
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
+pub struct MachineRep {
+    pub is_signed: bool,
+    pub bit_width: BitWidth,
+}
+
+impl MachineRep {
+    pub const I8: Self = MachineRep {
+        is_signed: true,
+        bit_width: BitWidth::Bits8,
+    };
+    pub const I16: Self = MachineRep {
+        is_signed: true,
+        bit_width: BitWidth::Bits16,
+    };
+    pub const I32: Self = MachineRep {
+        is_signed: true,
+        bit_width: BitWidth::Bits32,
+    };
+    pub const I64: Self = MachineRep {
+        is_signed: true,
+        bit_width: BitWidth::Bits64,
+    };
+
+    pub const U8: Self = MachineRep {
+        is_signed: false,
+        bit_width: BitWidth::Bits8,
+    };
+    pub const U16: Self = MachineRep {
+        is_signed: false,
+        bit_width: BitWidth::Bits16,
+    };
+    pub const U32: Self = MachineRep {
+        is_signed: false,
+        bit_width: BitWidth::Bits32,
+    };
+    pub const U64: Self = MachineRep {
+        is_signed: false,
+        bit_width: BitWidth::Bits64,
+    };
+}
+
+impl From<MachineRep> for NumRep {
+    fn from(value: MachineRep) -> Self {
+        NumRep::Concrete(value)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum NumRep {
     Auto,
-    Concrete {
-        is_signed: bool,
-        bit_width: BitWidth,
-    },
+    Concrete(MachineRep),
+}
+
+impl MachineRep {
+    pub const fn to_static_str(self) -> &'static str {
+        if self.is_signed {
+            match self.bit_width {
+                BitWidth::Bits8 => "i8",
+                BitWidth::Bits16 => "i16",
+                BitWidth::Bits32 => "i32",
+                BitWidth::Bits64 => "i64",
+            }
+        } else {
+            match self.bit_width {
+                BitWidth::Bits8 => "u8",
+                BitWidth::Bits16 => "u16",
+                BitWidth::Bits32 => "u32",
+                BitWidth::Bits64 => "u64",
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for MachineRep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_static_str())
+    }
 }
 
 impl NumRep {
     pub const fn to_static_str(self) -> &'static str {
         match self {
             NumRep::Auto => "?",
-            NumRep::Concrete {
-                is_signed,
-                bit_width,
-            } => {
-                if is_signed {
-                    match bit_width {
-                        BitWidth::Bits8 => "i8",
-                        BitWidth::Bits16 => "i16",
-                        BitWidth::Bits32 => "i32",
-                        BitWidth::Bits64 => "i64",
-                    }
-                } else {
-                    match bit_width {
-                        BitWidth::Bits8 => "u8",
-                        BitWidth::Bits16 => "u16",
-                        BitWidth::Bits32 => "u32",
-                        BitWidth::Bits64 => "u64",
-                    }
-                }
-            }
+            NumRep::Concrete(machine) => machine.to_static_str(),
         }
     }
 }
@@ -85,39 +145,15 @@ impl std::fmt::Display for NumRep {
 }
 
 impl NumRep {
-    pub const I8: NumRep = NumRep::Concrete {
-        is_signed: true,
-        bit_width: BitWidth::Bits8,
-    };
-    pub const I16: NumRep = NumRep::Concrete {
-        is_signed: true,
-        bit_width: BitWidth::Bits16,
-    };
-    pub const I32: NumRep = NumRep::Concrete {
-        is_signed: true,
-        bit_width: BitWidth::Bits32,
-    };
-    pub const I64: NumRep = NumRep::Concrete {
-        is_signed: true,
-        bit_width: BitWidth::Bits64,
-    };
+    pub const I8: NumRep = NumRep::Concrete(MachineRep::I8);
+    pub const I16: NumRep = NumRep::Concrete(MachineRep::I16);
+    pub const I32: NumRep = NumRep::Concrete(MachineRep::I32);
+    pub const I64: NumRep = NumRep::Concrete(MachineRep::I64);
 
-    pub const U8: NumRep = NumRep::Concrete {
-        is_signed: false,
-        bit_width: BitWidth::Bits8,
-    };
-    pub const U16: NumRep = NumRep::Concrete {
-        is_signed: false,
-        bit_width: BitWidth::Bits16,
-    };
-    pub const U32: NumRep = NumRep::Concrete {
-        is_signed: false,
-        bit_width: BitWidth::Bits32,
-    };
-    pub const U64: NumRep = NumRep::Concrete {
-        is_signed: false,
-        bit_width: BitWidth::Bits64,
-    };
+    pub const U8: NumRep = NumRep::Concrete(MachineRep::U8);
+    pub const U16: NumRep = NumRep::Concrete(MachineRep::U16);
+    pub const U32: NumRep = NumRep::Concrete(MachineRep::U32);
+    pub const U64: NumRep = NumRep::Concrete(MachineRep::U64);
 
     pub const AUTO: NumRep = NumRep::Auto;
 }
@@ -185,75 +221,45 @@ macro_rules! bounds_of {
     };
 }
 
-impl NumRep {
-    pub(crate) fn as_bounds(self) -> Option<Bounds> {
+impl MachineRep {
+    pub(crate) fn as_bounds(self) -> Bounds {
         let (min, max) = match self {
-            NumRep::Auto => return None,
-            NumRep::U8 => bounds_of!(u8),
-            NumRep::U16 => bounds_of!(u16),
-            NumRep::U32 => bounds_of!(u32),
-            NumRep::U64 => bounds_of!(u64),
-            NumRep::I8 => bounds_of!(i8),
-            NumRep::I16 => bounds_of!(i16),
-            NumRep::I32 => bounds_of!(i32),
-            NumRep::I64 => bounds_of!(i64),
+            Self::U8 => bounds_of!(u8),
+            Self::U16 => bounds_of!(u16),
+            Self::U32 => bounds_of!(u32),
+            Self::U64 => bounds_of!(u64),
+            Self::I8 => bounds_of!(i8),
+            Self::I16 => bounds_of!(i16),
+            Self::I32 => bounds_of!(i32),
+            Self::I64 => bounds_of!(i64),
         };
-        Some(Bounds { min, max })
+        Bounds { min, max }
     }
 
-    /// Returns `true` if `self` is a signed, concrete representative.
-    ///
-    /// Returns `false` for abstract (i.e. `NumRep::Auto`) and unsigned representatives
-    pub const fn is_signed(self) -> bool {
-        match self {
-            NumRep::Concrete { is_signed, .. } => is_signed,
-            _ => false,
-        }
+    pub(crate) const fn is_signed(self) -> bool {
+        self.is_signed
     }
 
-    /// Returns `true` if `self` is an unsigned, concrete representative.
-    ///
-    /// Returns `false` for abstract (i.e. `NumRep::Auto`) and signed representatives
-    pub const fn is_unsigned(self) -> bool {
-        match self {
-            NumRep::Concrete { is_signed, .. } => !is_signed,
-            _ => false,
-        }
+    pub(crate) fn compare_width(self, other: Self) -> std::cmp::Ordering {
+        self.bit_width.cmp(&other.bit_width)
     }
 
-    pub fn compare_width(self, other: Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (NumRep::Auto, _) | (_, NumRep::Auto) => None,
-            (NumRep::Concrete { bit_width: x, .. }, NumRep::Concrete { bit_width: y, .. }) => {
-                Some(x.cmp(&y))
-            }
-        }
-    }
-
-    pub const fn is_auto(self) -> bool {
-        matches!(self, NumRep::Auto)
-    }
-
-    /// Returns true if `self` and `other` are both concrete types, and the bounds of `self`
-    /// entirely encompass the bounds of `other` (i.e. every value within the assignable range of `other` is representable within self, including when the two are equal).
     pub(crate) fn encompasses(self, other: Self) -> bool {
-        let Some(self_bounds) = self.as_bounds() else {
-            return false;
-        };
-        let Some(other_bounds) = other.as_bounds() else {
-            return false;
-        };
-
-        self_bounds.encompasses(&other_bounds)
+        self.as_bounds().encompasses(&other.as_bounds())
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
-pub enum BitWidth {
-    Bits8,
-    Bits16,
-    Bits32,
-    Bits64,
+impl NumRep {
+    pub(crate) fn as_bounds(self) -> Option<Bounds> {
+        match self {
+            NumRep::Auto => return None,
+            NumRep::Concrete(mr) => Some(mr.as_bounds()),
+        }
+    }
+
+    pub(crate) const fn is_auto(self) -> bool {
+        matches!(self, NumRep::Auto)
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -262,17 +268,8 @@ pub struct TypedConst(pub BigInt, pub NumRep);
 impl std::fmt::Display for TypedConst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let n = &self.0;
-        match self.1 {
-            NumRep::U8 => write!(f, "{}u8", n),
-            NumRep::U16 => write!(f, "{}u16", n),
-            NumRep::U32 => write!(f, "{}u32", n),
-            NumRep::U64 => write!(f, "{}u64", n),
-            NumRep::I8 => write!(f, "{}i8", n),
-            NumRep::I16 => write!(f, "{}i16", n),
-            NumRep::I32 => write!(f, "{}i32", n),
-            NumRep::I64 => write!(f, "{}i64", n),
-            NumRep::AUTO => write!(f, "{}?", n),
-        }
+        let r = &self.1;
+        write!(f, "{n}{r}")
     }
 }
 
@@ -361,7 +358,7 @@ impl std::fmt::Display for Value {
 pub struct BinOp {
     op: BasicBinOp,
     // If None: op(T, T | auto) -> T, op(T0, T1) { T0 != T1 } -> ambiguous; otherwise, forces rep for `Some(rep)``
-    out_rep: Option<NumRep>,
+    out_rep: Option<MachineRep>,
 }
 
 impl std::fmt::Display for BinOp {
@@ -374,27 +371,15 @@ impl std::fmt::Display for BinOp {
 }
 
 impl BinOp {
-    pub const fn new(op: BasicBinOp, out_rep: Option<NumRep>) -> Self {
+    pub const fn new(op: BasicBinOp, out_rep: Option<MachineRep>) -> Self {
         Self { op, out_rep }
     }
 
-    pub fn output_type(&self, left: NumRep, right: NumRep) -> Option<NumRep> {
-        if let Some(rep) = self.out_rep {
-            Some(rep)
-        } else if left == right || right.is_auto() {
-            Some(left)
-        } else if left.is_auto() {
-            Some(right)
-        } else {
-            None
-        }
-    }
-
-    pub fn cast_rep(&self) -> Option<NumRep> {
+    pub fn cast_rep(&self) -> Option<MachineRep> {
         self.out_rep
     }
 
-    pub fn is_cast_and(&self, predicate: impl Fn(NumRep) -> bool) -> bool {
+    pub fn is_cast_and(&self, predicate: impl Fn(MachineRep) -> bool) -> bool {
         self.out_rep.is_some_and(predicate)
     }
 
@@ -407,7 +392,7 @@ impl BinOp {
 pub struct UnaryOp {
     op: BasicUnaryOp,
     // If None, will pick the same type as the input (even if this produces a temporary unrepresentable)
-    out_rep: Option<NumRep>,
+    out_rep: Option<MachineRep>,
 }
 
 impl std::fmt::Display for UnaryOp {
@@ -420,23 +405,15 @@ impl std::fmt::Display for UnaryOp {
 }
 
 impl UnaryOp {
-    pub const fn new(op: BasicUnaryOp, out_rep: Option<NumRep>) -> Self {
+    pub const fn new(op: BasicUnaryOp, out_rep: Option<MachineRep>) -> Self {
         Self { op, out_rep }
     }
 
-    // fn output_type(&self, in_rep: NumRep) -> NumRep {
-    //     if let Some(rep) = self.out_rep {
-    //         rep
-    //     } else {
-    //         in_rep
-    //     }
-    // }
-
-    pub fn cast_rep(&self) -> Option<NumRep> {
+    pub fn cast_rep(&self) -> Option<MachineRep> {
         self.out_rep
     }
 
-    pub fn is_cast_and(&self, predicate: fn(NumRep) -> bool) -> bool {
+    pub fn is_cast_and(&self, predicate: fn(MachineRep) -> bool) -> bool {
         self.out_rep.is_some_and(predicate)
     }
 
@@ -450,8 +427,7 @@ pub enum Expr {
     Const(TypedConst),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
-    Cast(NumRep, Box<Expr>),
-    // TryUnwrap(Box<Expr>),
+    Cast(MachineRep, Box<Expr>),
 }
 
 impl std::fmt::Debug for Expr {
@@ -463,19 +439,6 @@ impl std::fmt::Debug for Expr {
             Self::Cast(rep, inner) => write!(f, "Cast({:?}, {:?})", inner, rep),
         }
     }
-}
-
-impl Expr {
-    // pub(crate) fn get_rep(&self) -> Option<NumRep> {
-    //     match self {
-    //         Expr::Const(tc) => Some(tc.get_rep()),
-    //         Expr::Cast(rep, _) => Some(*rep),
-    //         Expr::BinOp(bin_op, expr, expr1) => {
-    //             bin_op.output_type(expr.get_rep()?, expr1.get_rep()?)
-    //         }
-    //         Expr::UnaryOp(unary_op, expr) => Some(unary_op.output_type(expr.get_rep()?)),
-    //     }
-    // }
 }
 
 #[derive(Debug)]
@@ -506,7 +469,7 @@ impl Expr {
             Expr::BinOp(bin_op, lhs, rhs) => {
                 let lhs = lhs.eval()?;
                 let rhs = rhs.eval()?;
-                let BinOp { op, out_rep } = bin_op;
+                let BinOp { op, out_rep } = *bin_op;
                 let (raw, rep0, rep1) = match (op, lhs, rhs) {
                     (BasicBinOp::Add, Value::Const(lhs), Value::Const(rhs)) => {
                         (lhs.0 + rhs.0, lhs.1, rhs.1)
@@ -534,7 +497,7 @@ impl Expr {
                       // }
                 };
                 let rep_out = match out_rep {
-                    Some(rep) => *rep,
+                    Some(rep) => NumRep::Concrete(rep),
                     None => {
                         if rep0 == rep1 || rep1.is_auto() {
                             rep0
@@ -552,25 +515,25 @@ impl Expr {
                 match (unary_op.op, expr) {
                     (BasicUnaryOp::Negate, Value::Const(TypedConst(n, rep))) => {
                         let rep_out = match unary_op.out_rep {
-                            Some(rep) => rep,
+                            Some(rep) => NumRep::Concrete(rep),
                             None => rep,
                         };
                         Ok(Value::Const(TypedConst(-n, rep_out)))
                     }
                     (BasicUnaryOp::AbsVal, Value::Const(TypedConst(n, rep))) => {
                         let rep_out = match unary_op.out_rep {
-                            Some(rep) => rep,
+                            Some(rep) => NumRep::Concrete(rep),
                             None => rep,
                         };
                         Ok(Value::Const(TypedConst(n.abs(), rep_out)))
                     }
                 }
             }
-            Expr::Cast(num_rep, expr) => {
+            Expr::Cast(mach_rep, expr) => {
                 let val = expr.eval()?;
                 match val {
                     Value::Const(TypedConst(num, _rep)) => {
-                        Ok(Value::Const(TypedConst(num, *num_rep)))
+                        Ok(Value::Const(TypedConst(num, NumRep::Concrete(*mach_rep))))
                     }
                 }
             }
