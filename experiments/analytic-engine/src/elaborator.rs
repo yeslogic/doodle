@@ -184,7 +184,7 @@ pub(crate) struct TypedCast<TypeRep> {
 pub(crate) mod inference {
     use std::collections::HashSet;
 
-    use crate::core::{Bounds, Expr, NumRep};
+    use crate::core::{Bounds, Expr, MachineRep, NumRep};
 
     use super::{IntType, PrimInt};
 
@@ -253,13 +253,6 @@ pub(crate) mod inference {
             }
         }
 
-        // pub fn as_backref(&self) -> Option<usize> {
-        //     match self {
-        //         Alias::Ground | Alias::Canonical(_) => None,
-        //         Alias::BackRef(ix) => Some(*ix),
-        //     }
-        // }
-
         pub fn add_forward_ref(&mut self, tgt: usize) {
             match self {
                 Alias::Ground => {
@@ -327,7 +320,7 @@ pub(crate) mod inference {
     }
 
     impl Constraint {
-        /// Speculatively checks if this constraint is definiitely satisfiable (as-is) by a given type-assignment.
+        /// Speculatively checks if this constraint is definitely satisfiable (as-is) by a given type-assignment.
         ///
         /// If this is not statically deterministic, returns `None`.
         /// Returns `Some(true)` if the constraint is satisfiable by the assignment, and `Some(false)` otherwise.
@@ -341,29 +334,12 @@ pub(crate) mod inference {
                     let IntType::Prim(candidate) = candidate;
                     Some(
                         bounds.is_encompassed_by(
-                            &<PrimInt as Into<NumRep>>::into(candidate)
-                                .as_bounds()
-                                .unwrap(),
+                            &<PrimInt as Into<MachineRep>>::into(candidate).as_bounds()
                         ),
                     )
                 }
             }
         }
-
-        // pub(crate) fn has_unique_assignment(&self) -> bool {
-        //     // REVIEW - there are smarter ways of calculating this
-        //     let mut solutions = 0;
-        //     for prim_int in super::PRIM_INTS.iter() {
-        //         match self.is_satisfied_by(IntType::Prim(*prim_int)) {
-        //             Some(true) => {
-        //                 solutions += 1;
-        //             }
-        //             Some(false) => (),
-        //             None => return false,
-        //         }
-        //     }
-        //     solutions == 1
-        // }
 
         // NOTE - should only be called on Encompasses
         pub(crate) fn get_unique_solution(&self) -> InferenceResult<IntType> {
@@ -759,9 +735,8 @@ pub(crate) mod inference {
                 UType::Int(int_type) => {
                     let IntType::Prim(candidate) = int_type;
                     let soluble = bounds.is_encompassed_by(
-                        &<PrimInt as Into<NumRep>>::into(candidate)
-                            .as_bounds()
-                            .unwrap(),
+                        &<PrimInt as Into<MachineRep>>::into(candidate)
+                            .as_bounds(),
                     );
                     if soluble {
                         Ok(Constraint::Equiv(utype))
