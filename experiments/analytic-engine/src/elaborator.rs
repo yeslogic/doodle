@@ -1,7 +1,7 @@
 use crate::core::{BinOp, Expr, NumRep, TypedConst, UnaryOp};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-pub(crate) enum PrimInt {
+pub enum PrimInt {
     U8,
     U16,
     U32,
@@ -24,13 +24,6 @@ impl PrimInt {
             PrimInt::I32 => "i32",
             PrimInt::I64 => "i64",
         }
-    }
-
-    pub(crate) fn is_unsigned(&self) -> bool {
-        matches!(
-            self,
-            PrimInt::U8 | PrimInt::U16 | PrimInt::U32 | PrimInt::U64
-        )
     }
 }
 
