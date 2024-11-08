@@ -1,11 +1,8 @@
 use std::borrow::Cow;
 
-use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, NumRep, TypedConst, UnaryOp};
-use crate::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedBinOp, TypedExpr, TypedUnaryOp};
-use crate::printer::{
-    fragment::Fragment,
-    precedence::{cond_paren, Precedence},
-};
+use crate::core::{BasicBinOp, BasicUnaryOp, BinOp, NumRep, UnaryOp};
+use crate::elaborator::{IntType, PrimInt, Sig1, Sig2, TypedExpr};
+use crate::printer::fragment::Fragment;
 
 pub(crate) mod ast {
     use crate::{core::TypedConst, elaborator::PrimInt};
@@ -13,12 +10,12 @@ pub(crate) mod ast {
     pub type Label = std::borrow::Cow<'static, str>;
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum SType {
+    pub(crate) enum SType {
         RustPrimInt(PrimInt),
     }
 
     #[derive(Clone, Debug)]
-    pub enum AstEntity {
+    pub(crate) enum AstEntity {
         Unqualified(Label),
         Qualified(Vec<Label>, Label),
     }
@@ -38,27 +35,25 @@ pub(crate) mod ast {
             fname: AstEntity,
             type_params: Vec<SType>,
         },
-        Closure(AstClosure),
     }
 
     #[derive(Clone, Debug)]
-    pub enum AstValue {
+    pub(crate) enum AstValue {
         Var(Label),
         StringLit(Label),
         Const(TypedConst, Option<SType>),
     }
 
     #[derive(Clone, Debug)]
-    pub struct AstClosure {
+    pub(crate) struct AstClosure {
         pub(super) head_args: Vec<Label>,
         pub(super) body: Box<AstExpr>,
     }
 
     #[derive(Clone, Debug)]
-    pub enum AstExpr {
+    pub(crate) enum AstExpr {
         Value(AstValue),
         Invoke(FnEntity, Vec<AstExpr>),
-        ForceEval(Box<AstExpr>),
         Closure(AstClosure),
     }
 }
@@ -77,7 +72,7 @@ enum BinOpClass<T> {
 #[derive(Clone, Copy, Debug)]
 enum UnaryOpClass<T> {
     Pure(T),
-    Wide(T, T),
+    NonLossy(T, T),
     Lossy(T, T),
 }
 
@@ -94,19 +89,21 @@ fn classify_binary(sig: Sig2<IntType>) -> BinOpClass<PrimInt> {
     if lrep == rrep {
         if orep == lrep {
             BinOpClass::Pure(l)
-        } else if orep.encompasses(&lrep) {
+        } else if orep.encompasses(lrep) {
             BinOpClass::HomWide(l, o)
         } else {
             BinOpClass::HomLossy(l, o)
         }
-    } else if orep.encompasses(&lrep) && orep.encompasses(&rrep) {
+    } else if orep.encompasses(lrep) && orep.encompasses(rrep) {
         BinOpClass::HetWide(l, r, o)
     } else {
         BinOpClass::HetLossy(l, r, o)
     }
 }
 
-fn classify_unary(sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
+// NOTE - depending on the op, widening vs lossy might be affected (e.g. Abs(i8) fits in u8)
+// FIXME - while this technically works, there is some fuzziness with regard to the intended semantics vs what we are effectively measuring (i.e. did we bother implementing a backend function we can call)
+fn classify_unary(op: Option<BasicUnaryOp>, sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
     let (i, o) = sig;
     let i = i.to_prim();
     let o = o.to_prim();
@@ -114,19 +111,65 @@ fn classify_unary(sig: Sig1<IntType>) -> UnaryOpClass<PrimInt> {
     let irep = NumRep::from(i);
     let orep = NumRep::from(o);
 
-    if irep == orep {
-        UnaryOpClass::Pure(i)
-    } else if orep.encompasses(&irep) {
-        UnaryOpClass::Wide(i, o)
+    match op {
+        None => {
+            // Cast - no operational influence on OpClass
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if orep.encompasses(irep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+        Some(BasicUnaryOp::AbsVal) => {
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if absval_is_nonlossy(irep, orep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+        Some(BasicUnaryOp::Negate) => {
+            if irep == orep {
+                UnaryOpClass::Pure(i)
+            } else if negate_is_nonlossy(irep, orep) {
+                UnaryOpClass::NonLossy(i, o)
+            } else {
+                UnaryOpClass::Lossy(i, o)
+            }
+        }
+    }
+}
+
+fn absval_is_nonlossy(source: NumRep, target: NumRep) -> bool {
+    if source.is_signed() {
+        // Signed -> Unsigned is non-lossy if the target-precision is greater-than-or-equal to target precision
+        matches!(
+            target.compare_width(source),
+            Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+        )
     } else {
-        UnaryOpClass::Lossy(i, o)
+        target.encompasses(source)
+    }
+}
+
+fn negate_is_nonlossy(source: NumRep, target: NumRep) -> bool {
+    if source.is_signed() {
+        // Neg is effectively a no-op w.r.t the bounds of the input and output, so normal rules apply
+        matches!(
+            target.compare_width(source),
+            Some(std::cmp::Ordering::Equal | std::cmp::Ordering::Greater)
+        )
+    } else {
+        // Unsigned negation is never lossy because we avoid downcasting entirely
+        true
     }
 }
 
 pub(crate) const SYNTHETIC_BINOP: &str = "eval_fallback";
 pub(crate) const SYNTHETIC_UNARY: &str = "eval_unary_fallback";
-pub(crate) const UNSIGNED_HOM_ABS: &str = "abs_noop";
-pub(crate) const SYNTHETIC_CAST: &str = "cast_fallback";
 
 fn induce_binary_fname(op: BinOp, class: BinOpClass<PrimInt>) -> Label {
     let base = match op.get_op() {
@@ -159,14 +202,25 @@ fn induce_unary_fname(op: UnaryOp, class: UnaryOpClass<PrimInt>) -> Label {
     };
     let str = match class {
         UnaryOpClass::Pure(t) => format!("{}_{}", base, t.to_static_str()),
-        UnaryOpClass::Wide(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
+        UnaryOpClass::NonLossy(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
             format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
         }
     };
     Label::Owned(str)
 }
 
-pub fn synthesize_unary(op: UnaryOp) -> AstExpr {
+fn induce_cast_fname(class: UnaryOpClass<PrimInt>) -> Label {
+    let base = "cast";
+    let str = match class {
+        UnaryOpClass::NonLossy(t0, t1) | UnaryOpClass::Lossy(t0, t1) => {
+            format!("{}_{}_{}", base, t0.to_static_str(), t1.to_static_str())
+        }
+        UnaryOpClass::Pure(_) => unreachable!("pure casts should be elided during synthesis"),
+    };
+    Label::Owned(str)
+}
+
+fn synthesize_unary(op: UnaryOp) -> AstExpr {
     let ent = {
         let (qual, meth) = match op.get_op() {
             BasicUnaryOp::Negate => ("Neg", "neg"),
@@ -188,7 +242,7 @@ pub fn synthesize_unary(op: UnaryOp) -> AstExpr {
     AstExpr::Closure(closure)
 }
 
-pub fn synthesize_binop(op: BinOp) -> AstExpr {
+fn synthesize_binop(op: BinOp) -> AstExpr {
     let ent = {
         let qual = Label::Borrowed("BigInt");
         let meth = match op.get_op() {
@@ -260,48 +314,34 @@ pub(crate) fn synthesize(model: &TypedExpr<IntType>) -> ast::AstExpr {
         }
         TypedExpr::ElabUnaryOp(_, op, input) => {
             let input = synthesize(input);
-            match classify_unary(op.sig) {
-                // FIXME - add in cases for predefined unary ops where applicable, as they are implemented
-                UnaryOpClass::Pure(t)
-                    if t.is_unsigned() && matches!(op.inner.get_op(), BasicUnaryOp::AbsVal) =>
-                {
-                    // NOTE - we can use the `abs_noop` function for unsigned abs that preserves type
-                    AstExpr::Invoke(
-                        FnEntity::Specific {
-                            fname: Label::Borrowed(UNSIGNED_HOM_ABS).into(),
-                        },
-                        vec![input],
-                    )
-                }
-                class @ (UnaryOpClass::Pure(t1 @ t0)
-                | UnaryOpClass::Wide(t0, t1)
-                | UnaryOpClass::Lossy(t0, t1)) => {
-                    // FIXME - refine the case guard and body as we add in specific unary operations (besides `abs_noop`)
-                    AstExpr::Invoke(
-                        FnEntity::Synthetic {
-                            fname: AstEntity::Unqualified(Label::Borrowed(SYNTHETIC_UNARY)),
-                            type_params: vec![SType::RustPrimInt(t0), SType::RustPrimInt(t1)],
-                        },
-                        vec![
-                            input,
-                            AstExpr::Value(AstValue::StringLit(induce_unary_fname(
-                                op.inner, class,
-                            ))),
-                            synthesize_unary(op.inner),
-                        ],
-                    )
-                }
+            match classify_unary(Some(op.inner.get_op()), op.sig) {
+                class @ (UnaryOpClass::Pure(..) | UnaryOpClass::NonLossy(..)) => AstExpr::Invoke(
+                    FnEntity::Specific {
+                        fname: AstEntity::Unqualified(induce_unary_fname(op.inner, class)),
+                    },
+                    vec![input],
+                ),
+                class @ UnaryOpClass::Lossy(t0, t1) => AstExpr::Invoke(
+                    FnEntity::Synthetic {
+                        fname: AstEntity::Unqualified(Label::Borrowed(SYNTHETIC_UNARY)),
+                        type_params: vec![SType::RustPrimInt(t0), SType::RustPrimInt(t1)],
+                    },
+                    vec![
+                        input,
+                        AstExpr::Value(AstValue::StringLit(induce_unary_fname(op.inner, class))),
+                        synthesize_unary(op.inner),
+                    ],
+                ),
             }
         }
         TypedExpr::ElabCast(_, cast, input) => {
             let input = synthesize(input);
-            match classify_unary(cast.sig) {
-                // NOTE - we avoid function stubbing for truly noop casts (c.f. abs_noop where we *do* want to keep a record of the operation)
+            match classify_unary(None, cast.sig) {
+                // NOTE - we avoid function stubbing for no-op casts (i.e. T -> T)
                 UnaryOpClass::Pure(_) => input,
-                UnaryOpClass::Lossy(t0, t1) | UnaryOpClass::Wide(t0, t1) => AstExpr::Invoke(
-                    FnEntity::Synthetic {
-                        fname: AstEntity::Unqualified(Label::Borrowed(SYNTHETIC_CAST)),
-                        type_params: vec![SType::RustPrimInt(t0), SType::RustPrimInt(t1)],
+                class @ (UnaryOpClass::Lossy(..) | UnaryOpClass::NonLossy(..)) => AstExpr::Invoke(
+                    FnEntity::Specific {
+                        fname: AstEntity::Unqualified(induce_cast_fname(class)),
                     },
                     vec![input],
                 ),
@@ -379,9 +419,6 @@ impl ToFragment for FnEntity {
                 )
                 .delimit(Fragment::Char('<'), Fragment::Char('>')),
             ),
-            FnEntity::Closure(ast_closure) => ast_closure
-                .to_fragment()
-                .delimit(Fragment::Char('('), Fragment::Char(')')),
         }
     }
 }
@@ -401,10 +438,6 @@ impl ToFragment for AstExpr {
                 fn_spec.cat(paren_list)
             }
             AstExpr::Value(ast_value) => ast_value.to_fragment(),
-            // FIXME - think about this a bit more since it is a bit fiddly
-            AstExpr::ForceEval(ast_expr) => ast_expr
-                .to_fragment()
-                .cat(Fragment::String(Cow::Borrowed(".eval()?"))),
         }
     }
 }
