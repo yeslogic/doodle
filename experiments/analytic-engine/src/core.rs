@@ -165,19 +165,48 @@ macro_rules! bounds_of {
 }
 
 impl NumRep {
-    pub(crate) fn as_bounds(&self) -> Option<Bounds> {
+    pub(crate) fn as_bounds(self) -> Option<Bounds> {
         let (min, max) = match self {
             NumRep::Auto => return None,
-            &NumRep::U8 => bounds_of!(u8),
-            &NumRep::U16 => bounds_of!(u16),
-            &NumRep::U32 => bounds_of!(u32),
-            &NumRep::U64 => bounds_of!(u64),
-            &NumRep::I8 => bounds_of!(i8),
-            &NumRep::I16 => bounds_of!(i16),
-            &NumRep::I32 => bounds_of!(i32),
-            &NumRep::I64 => bounds_of!(i64),
+            NumRep::U8 => bounds_of!(u8),
+            NumRep::U16 => bounds_of!(u16),
+            NumRep::U32 => bounds_of!(u32),
+            NumRep::U64 => bounds_of!(u64),
+            NumRep::I8 => bounds_of!(i8),
+            NumRep::I16 => bounds_of!(i16),
+            NumRep::I32 => bounds_of!(i32),
+            NumRep::I64 => bounds_of!(i64),
         };
         Some(Bounds { min, max })
+    }
+
+    /// Returns `true` if `self` is a signed, concrete representative.
+    ///
+    /// Returns `false` for abstract (i.e. `NumRep::Auto`) and unsigned representatives
+    pub const fn is_signed(self) -> bool {
+        match self {
+            NumRep::Concrete { is_signed, .. } => is_signed,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if `self` is an unsigned, concrete representative.
+    ///
+    /// Returns `false` for abstract (i.e. `NumRep::Auto`) and signed representatives
+    pub const fn is_unsigned(self) -> bool {
+        match self {
+            NumRep::Concrete { is_signed, .. } => !is_signed,
+            _ => false,
+        }
+    }
+
+    pub fn compare_width(self, other: Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (NumRep::Auto, _) | (_, NumRep::Auto) => None,
+            (NumRep::Concrete { bit_width: x, .. }, NumRep::Concrete { bit_width: y, .. }) => {
+                Some(x.cmp(&y))
+            }
+        }
     }
 
     pub const fn is_auto(self) -> bool {
@@ -186,7 +215,7 @@ impl NumRep {
 
     /// Returns true if `self` and `other` are both concrete types, and the bounds of `self`
     /// entirely encompass the bounds of `other` (i.e. every value within the assignable range of `other` is representable within self, including when the two are equal).
-    pub(crate) fn encompasses(&self, other: &Self) -> bool {
+    pub(crate) fn encompasses(self, other: Self) -> bool {
         let Some(self_bounds) = self.as_bounds() else {
             return false;
         };
