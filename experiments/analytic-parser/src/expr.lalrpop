@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use num_bigint::BigInt;
-use analytic_engine::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, Expr, NumRep};
+use analytic_engine::core::{TypedConst, BasicBinOp, BinOp, BasicUnaryOp, UnaryOp, Expr, NumRep, MachineRep};
 
 grammar;
 
@@ -10,7 +10,7 @@ pub Tree: Expr = {
     #[precedence(level="1")]
     <op:Op0> <t:Tree> => Expr::UnaryOp(op, Box::new(t)),
     #[precedence(level="2")]
-    <t:Tree> "as" <r:Rep> => Expr::Cast(r, Box::new(t)),
+    <t:Tree> "as" <mr:MRep> => Expr::Cast(mr, Box::new(t)),
     #[precedence(level="3")] #[assoc(side="left")]
     <l:Tree> <op:Op1> <r:Tree> => Expr::BinOp(op, Box::new(l), Box::new(r)),
     #[precedence(level="4")] #[assoc(side="left")]
@@ -39,18 +39,18 @@ OpCode2: BasicBinOp = {
 }
 
 Op0: UnaryOp = {
-    <op:OpCode0> <r:Rep> => UnaryOp::new(op, Some(r)),
+    <op:OpCode0> <r:MRep> => UnaryOp::new(op, Some(r)),
     <op:OpCode0> => UnaryOp::new(op, None),
 }
 
 Op1: BinOp = {
-    <op:OpCode1> <r:Rep> => BinOp::new(op, Some(r)),
+    <op:OpCode1> <r:MRep> => BinOp::new(op, Some(r)),
     <op:OpCode1> => BinOp::new(op, None),
 }
 
 Op2: BinOp = {
-    <op:OpCode2> <r:Rep> => BinOp::new(op, Some(r)),
-    <op:OpCode2> => BinOp::new(op, None),
+    <op:OpCode2> <r:MRep> => BinOp::new(op, Some(r)),
+    OpCode2 => BinOp::new(<>, None),
 }
 
 Const: TypedConst = {
@@ -59,14 +59,20 @@ Const: TypedConst = {
 }
 
 Rep: NumRep = {
-    "u8" => NumRep::U8,
-    "u16" => NumRep::U16,
-    "u32" => NumRep::U32,
-    "u64" => NumRep::U64,
-    "i8" => NumRep::I8,
-    "i16" => NumRep::I16,
-    "i32" => NumRep::I32,
-    "i64" => NumRep::I64,
+    "?" => NumRep::AUTO,
+    MRep => NumRep::Concrete(<>),
+}
+
+
+MRep: MachineRep = {
+    "u8" => MachineRep::U8,
+    "u16" => MachineRep::U16,
+    "u32" => MachineRep::U32,
+    "u64" => MachineRep::U64,
+    "i8" => MachineRep::I8,
+    "i16" => MachineRep::I16,
+    "i32" => MachineRep::I32,
+    "i64" => MachineRep::I64,
 }
 
 Num: BigInt = <s:r"-?[0-9]+"> => BigInt::from_str(s).unwrap();
