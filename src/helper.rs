@@ -844,6 +844,31 @@ pub fn subset_fields<const N: usize>(original: Expr, field_set: [&'static str; N
     Expr::Record(accum_fields)
 }
 
+pub fn prepend_field<const N: usize>(
+    field: (&'static str, Expr),
+    original: (Expr, [&'static str; N]),
+) -> Expr {
+    let (field_name, field_expr) = field;
+    let (original_expr, original_fields) = original;
+
+    let mut accum_fields = Vec::with_capacity(N + 1);
+    let mut included_fields = BTreeSet::new();
+
+    accum_fields.push((field_name.into(), field_expr));
+    let _ = included_fields.insert(field_name);
+
+    for field_name in original_fields.into_iter() {
+        if !included_fields.insert(field_name) {
+            unreachable!("duplicated field in prepend_field: `{field_name}`");
+        }
+        accum_fields.push((
+            Label::Borrowed(field_name),
+            record_proj(original_expr.clone(), field_name),
+        ));
+    }
+    Expr::Record(accum_fields)
+}
+
 /// Given an expression of type `Seq(Seq(T))`, return an expression of type `Seq(T)` corresponding to the concatenation
 /// of each sub-list in turn.
 #[inline]
