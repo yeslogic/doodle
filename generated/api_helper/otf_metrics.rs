@@ -81,7 +81,9 @@ impl ConfigBuilder {
     pub fn build(self) -> Config {
         Config {
             bookend_size: self.bookend_size.unwrap_or(Config::DEFAULT_BOOKEND_SIZE),
-            inline_bookend: self.inline_bookend.unwrap_or(Config::DEFAULT_INLINE_BOOKEND),
+            inline_bookend: self
+                .inline_bookend
+                .unwrap_or(Config::DEFAULT_INLINE_BOOKEND),
             extra_only: self.extra_only.unwrap_or_default(),
         }
     }
@@ -116,6 +118,8 @@ pub type OpentypeAttachPoint = opentype_gdef_table_attach_list_link_attach_point
 pub type OpentypeCoverageTable = opentype_coverage_table;
 pub type OpentypeCoverageTableData = opentype_coverage_table_data;
 pub type OpentypeCoverageRangeRecord = opentype_coverage_table_data_Format2_range_records;
+
+pub type OpentypeGpos = opentype_gpos_table;
 // !SECTION
 
 // SECTION - Helper traits for consistent-style conversion from generated types to the types we use to represent them in the API Helper
@@ -743,7 +747,7 @@ impl TryPromote<OpentypeGdefTableData> for GdefTableDataMetrics {
 enum GdefTableDataMetrics {
     NoData,
     MarkGlyphSetsDef(Option<MarkGlyphSet>),
-    ItemVarStore(ItemVariationStore)
+    ItemVarStore(ItemVariationStore),
 }
 
 /**
@@ -1106,6 +1110,208 @@ struct GdefMetrics {
     data: GdefTableDataMetrics,
 }
 
+pub type OpentypeLangSys = opentype_common_langsys;
+
+impl Promote<OpentypeLangSys> for LangSys {
+    fn promote(orig: &OpentypeLangSys) -> Self {
+        LangSys {
+            lookup_order_offset: orig.lookup_order_offset,
+            required_feature_index: orig.required_feature_index,
+            feature_indices: orig.feature_indices.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct LangSys {
+    lookup_order_offset: u16, // should be 0x0000
+    required_feature_index: u16,
+    feature_indices: Vec<u16>,
+}
+
+pub type OpentypeLangSysRecord = opentype_common_script_table_lang_sys_records;
+
+impl Promote<OpentypeLangSysRecord> for LangSysRecord {
+    fn promote(orig: &OpentypeLangSysRecord) -> Self {
+        LangSysRecord {
+            lang_sys_tag: orig.lang_sys_tag,
+            lang_sys: promote_opt(&orig.lang_sys.link),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct LangSysRecord {
+    lang_sys_tag: u32,
+    lang_sys: Option<LangSys>,
+}
+
+pub type OpentypeScriptTable = opentype_common_script_table;
+
+impl Promote<OpentypeScriptTable> for ScriptTable {
+    fn promote(orig: &OpentypeScriptTable) -> Self {
+        ScriptTable {
+            default_lang_sys: promote_opt(&orig.default_lang_sys.link),
+            lang_sys_records: promote_vec(&orig.lang_sys_records),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ScriptTable {
+    default_lang_sys: Option<LangSys>,
+    lang_sys_records: Vec<LangSysRecord>,
+}
+
+pub type OpentypeScriptRecord = opentype_common_script_list_script_records;
+
+impl Promote<OpentypeScriptRecord> for ScriptRecord {
+    fn promote(orig: &OpentypeScriptRecord) -> Self {
+        ScriptRecord {
+            script_tag: orig.script_tag,
+            script: promote_opt(&orig.script.link),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ScriptRecord {
+    script_tag: u32,
+    script: Option<ScriptTable>,
+}
+
+pub type OpentypeFeatureTable = opentype_common_feature_table;
+
+impl Promote<OpentypeFeatureTable> for FeatureTable {
+    fn promote(orig: &OpentypeFeatureTable) -> Self {
+        FeatureTable {
+            feature_params: orig.feature_params,
+            lookup_list_indices: orig.lookup_list_indices.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct FeatureTable {
+    feature_params: u16,
+    lookup_list_indices: Vec<u16>,
+}
+
+pub type OpentypeFeatureRecord = opentype_common_feature_list_feature_records;
+
+impl Promote<OpentypeFeatureRecord> for FeatureRecord {
+    fn promote(orig: &OpentypeFeatureRecord) -> Self {
+        FeatureRecord {
+            feature_tag: orig.feature_tag,
+            feature: promote_opt(&orig.feature.link),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct FeatureRecord {
+    feature_tag: u32,
+    feature: Option<FeatureTable>,
+}
+
+pub type OpentypeLookupSubtable = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link;
+
+impl Promote<OpentypeLookupSubtable> for LookupSubtable {
+    fn promote(orig: &OpentypeLookupSubtable) -> Self {
+        match orig {
+            &OpentypeLookupSubtable::ChainCtxPos => LookupSubtable::ChainCtxPos,
+            &OpentypeLookupSubtable::CtxPos => LookupSubtable::CtxPos,
+            &OpentypeLookupSubtable::CursAttach => LookupSubtable::CursAttach,
+            &OpentypeLookupSubtable::ExtPos => LookupSubtable::ExtPos,
+            &OpentypeLookupSubtable::MarkBaseAttach => LookupSubtable::MarkBaseAttach,
+            &OpentypeLookupSubtable::MarkLigAttach => LookupSubtable::MarkLigAttach,
+            &OpentypeLookupSubtable::MarkMarkAttach => LookupSubtable::MarkMarkAttach,
+            &OpentypeLookupSubtable::PairAdjust => LookupSubtable::PairAdjust,
+            &OpentypeLookupSubtable::SingleAdjust => LookupSubtable::SingleAdjust,
+        }
+    }
+}
+
+// STUB - only includes cases for GPOS so far
+// NOTE - not copy because it won't be once we enrich the cases
+#[derive(Clone, Debug)]
+enum LookupSubtable {
+    ChainCtxPos,
+    CtxPos,
+    CursAttach,
+    ExtPos,
+    MarkBaseAttach,
+    MarkLigAttach,
+    MarkMarkAttach,
+    PairAdjust,
+    SingleAdjust,
+}
+
+type LookupFlag = opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag;
+
+pub type OpentypeLookupTable = opentype_gpos_table_lookup_list_link_lookups_link;
+
+impl Promote<OpentypeLookupTable> for LookupTable {
+    fn promote(orig: &OpentypeLookupTable) -> Self {
+        LookupTable {
+            lookup_type: orig.lookup_type,
+            lookup_flag: orig.lookup_flag,
+            subtables: orig
+                .subtables
+                .iter()
+                .map(|offset| promote_opt(&offset.link))
+                .collect(),
+            mark_filtering_set: orig.mark_filtering_set,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct LookupTable {
+    lookup_type: u16,
+    lookup_flag: LookupFlag,
+    subtables: Vec<Option<LookupSubtable>>,
+    mark_filtering_set: Option<u16>,
+}
+
+type ScriptList = Vec<ScriptRecord>;
+type FeatureList = Vec<FeatureRecord>;
+type LookupList = Vec<Option<LookupTable>>;
+
+pub type OpentypeScriptList = opentype_common_script_list;
+pub type OpentypeFeatureList = opentype_common_feature_list;
+pub type OpentypeLookupList = opentype_gpos_table_lookup_list_link;
+
+impl Promote<OpentypeScriptList> for ScriptList {
+    fn promote(orig: &OpentypeScriptList) -> Self {
+        promote_vec(&orig.script_records)
+    }
+}
+
+impl Promote<OpentypeFeatureList> for FeatureList {
+    fn promote(orig: &OpentypeFeatureList) -> Self {
+        promote_vec(&orig.feature_records)
+    }
+}
+
+impl Promote<OpentypeLookupList> for LookupList {
+    fn promote(orig: &OpentypeLookupList) -> Self {
+        orig.lookups
+            .iter()
+            .map(|offset| promote_opt(&offset.link))
+            .collect()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct GposMetrics {
+    major_version: u16,
+    minor_version: u16,
+    script_list: Option<ScriptList>,
+    feature_list: Option<FeatureList>,
+    lookup_list: Option<LookupList>,
+}
+
 #[derive(Clone, Debug)]
 pub struct OptionalTableMetrics {
     cvt: Option<CvtMetrics>,
@@ -1116,7 +1322,37 @@ pub struct OptionalTableMetrics {
     gasp: Option<GaspMetrics>,
     // STUB - more tables may end up in between these fields as we add support for them in the order in which microsoft lists them
     gdef: Option<GdefMetrics>,
+    gpos: Option<GposMetrics>,
     // STUB - add more tables as we expand opentype definition
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum TableDiscriminator {
+    Gpos,
+    Gsub,
+}
+
+#[derive(Debug, Copy, Clone, Default, Hash)]
+struct Ctxt {
+    whence: Option<TableDiscriminator>,
+}
+
+impl From<TableDiscriminator> for Ctxt {
+    fn from(value: TableDiscriminator) -> Self {
+        Self {
+            whence: Some(value),
+        }
+    }
+}
+
+impl Ctxt {
+    fn new() -> Self {
+        Ctxt { whence: None }
+    }
+
+    fn get_disc(self) -> Option<TableDiscriminator> {
+        self.whence
+    }
 }
 
 /// Common error type for marking a parsed value as unexpected/unknown relative to a set of predefined values we recognize
@@ -1412,6 +1648,20 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
                 })
                 .transpose()?
         };
+        let gpos = {
+            let gpos = &dir.table_links.gpos;
+            gpos.as_ref()
+                .map(|gpos| {
+                    TestResult::Ok(GposMetrics {
+                        major_version: gpos.major_version,
+                        minor_version: gpos.minor_version,
+                        script_list: try_promote_opt(&gpos.script_list.link)?,
+                        feature_list: try_promote_opt(&gpos.feature_list.link)?,
+                        lookup_list: try_promote_opt(&gpos.lookup_list.link)?,
+                    })
+                })
+                .transpose()?
+        };
         OptionalTableMetrics {
             cvt,
             fpgm,
@@ -1421,6 +1671,7 @@ pub fn analyze_table_directory(dir: &OpentypeFontDirectory) -> TestResult<Single
             gasp,
             // TODO - add more optional tables as they are added to the spec
             gdef,
+            gpos,
         }
     };
     let extraMagic = dir
@@ -1444,7 +1695,7 @@ fn is_extra(table_id: &u32) -> bool {
     match &bytes {
         b"cmap" | b"head" | b"hhea" | b"hmtx" | b"maxp" | b"name" | b"OS/2" | b"post" => false,
         b"cvt " | b"fpgm" | b"loca" | b"glyf" | b"prep" | b"gasp" => false,
-        b"GDEF" => false,
+        b"GDEF" | b"GPOS" => false,
         // FIXME - update with more cases as we handle more table records
         _ => true,
     }
@@ -1540,6 +1791,7 @@ fn show_optional_metrics(optional: &OptionalTableMetrics, conf: &Config) {
     show_gasp_metrics(&optional.gasp, conf);
     // STUB - anything between gasp and gdef go here
     show_gdef_metrics(&optional.gdef, conf);
+    show_gpos_metrics(&optional.gpos, conf);
 }
 
 fn show_cvt_metrics(cvt: &Option<CvtMetrics>, _conf: &Config) {
@@ -1575,8 +1827,12 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
         lig_caret_list,
         mark_attach_class_def,
         data,
-    }) = gdef {
-        println!("GDEF: version {}", format_version_major_minor(*major_version, *minor_version));
+    }) = gdef
+    {
+        println!(
+            "GDEF: version {}",
+            format_version_major_minor(*major_version, *minor_version)
+        );
         if let Some(glyph_class_def) = glyph_class_def {
             show_glyph_class_def(glyph_class_def, conf);
         }
@@ -1590,16 +1846,268 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
             show_mark_attach_class_def(mark_attach_class_def, conf);
         }
         match data {
-            GdefTableDataMetrics::NoData => {},
-            GdefTableDataMetrics::MarkGlyphSetsDef(mark_glyph_set) => {
-                match mark_glyph_set {
-                    None => println!("\tMarkGlyphSet: <none>"),
-                    Some(mgs) => show_mark_glyph_set(mgs, conf),
+            GdefTableDataMetrics::NoData => {}
+            GdefTableDataMetrics::MarkGlyphSetsDef(mark_glyph_set) => match mark_glyph_set {
+                None => println!("\tMarkGlyphSet: <none>"),
+                Some(mgs) => show_mark_glyph_set(mgs, conf),
+            },
+            GdefTableDataMetrics::ItemVarStore(ivs) => show_item_variation_store(ivs),
+        }
+    }
+}
+
+fn show_gpos_metrics(gpos: &Option<GposMetrics>, conf: &Config) {
+    if let Some(GposMetrics {
+        major_version,
+        minor_version,
+        script_list,
+        feature_list,
+        lookup_list,
+    }) = gpos
+    {
+        println!(
+            "GPOS: version {}",
+            format_version_major_minor(*major_version, *minor_version)
+        );
+        if let Some(script_list) = script_list {
+            show_script_list(&script_list, conf);
+        }
+        if let Some(feature_list) = feature_list {
+            show_feature_list(&feature_list, conf);
+        }
+        if let Some(lookup_list) = lookup_list {
+            let ctxt = Ctxt::from(TableDiscriminator::Gpos);
+            show_lookup_list(&lookup_list, ctxt, conf);
+        }
+    }
+}
+
+fn show_script_list(script_list: &ScriptList, conf: &Config) {
+    println!("\tScriptList");
+    show_items_elided(
+        script_list,
+        |ix, item| match &item.script {
+            None => println!("\t\t[{ix}]: {}", format_magic(item.script_tag)),
+            Some(ScriptTable {
+                default_lang_sys,
+                lang_sys_records,
+            }) => {
+                println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
+                match default_lang_sys {
+                    None => (),
+                    Some(langsys) => {
+                        print!("\t\t    [Default LangSys]:");
+                        show_langsys(langsys, conf);
+                        println!()
+                    }
+                }
+                println!("\t\t    LangSysRecords:");
+                show_items_elided(
+                    lang_sys_records,
+                    |ix, item| {
+                        print!("\t\t\t[{ix}]: {}", format_magic(item.lang_sys_tag));
+                        if let Some(langsys) = &item.lang_sys {
+                            print!("; ");
+                            show_langsys(langsys, conf);
+                        }
+                        println!();
+                    },
+                    conf.bookend_size,
+                    |start, stop| format!("\t\t    (skipping LangSysRecords {}..{})", start, stop),
+                )
+            }
+        },
+        conf.bookend_size,
+        |start, stop| format!("skipping ScriptRecords {}..{}", start, stop),
+    );
+}
+
+fn show_langsys(lang_sys: &LangSys, conf: &Config) {
+    let LangSys {
+        lookup_order_offset,
+        required_feature_index,
+        feature_indices,
+    } = lang_sys;
+    debug_assert_eq!(*lookup_order_offset, 0);
+    print!("feature-indices [required: {}]", required_feature_index);
+    show_items_inline(
+        feature_indices,
+        |ix: &u16| format!("{}", ix),
+        conf.inline_bookend,
+        |num_skipped: usize| format!("...({} skipped)...", num_skipped),
+    );
+}
+
+fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
+    println!("\tFeatureList");
+    show_items_elided(
+        feature_list,
+        |ix, item| {
+            let FeatureRecord {
+                feature_tag,
+                feature,
+            } = item;
+            match feature {
+                None => println!("\t\t[{ix}]: {} (<none>)", format_magic(*feature_tag)),
+                Some(feature_table) => {
+                    print!("\t\t[{ix}]: {}", format_magic(*feature_tag));
+                    show_feature_table(feature_table, conf);
+                    println!();
                 }
             }
-            GdefTableDataMetrics::ItemVarStore(ivs) => {
-                show_item_variation_store(ivs)
+        },
+        conf.bookend_size,
+        |start, stop| format!("\t    (skipping FeatureIndices {}..{})", start, stop),
+    );
+}
+
+fn show_feature_table(table: &FeatureTable, conf: &Config) {
+    let FeatureTable {
+        feature_params,
+        lookup_list_indices,
+    } = table;
+    match feature_params {
+        0 => (),
+        offset => print!("[parameters located at SoF+{}B]", offset),
+    }
+    show_items_inline(
+        lookup_list_indices,
+        |index| format!("{}", index),
+        conf.inline_bookend,
+        |num_skipped| format!("...({} skipped)...", num_skipped),
+    );
+}
+
+fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
+    println!("\tLookupList:");
+    show_items_elided(
+        lookup_list,
+        move |ix, item| match item {
+            None => println!("\t\t[{ix}]: <none>"),
+            Some(table) => {
+                print!("\t\t[{ix}]: ");
+                show_lookup_table(table, ctxt, conf);
+                println!();
             }
+        },
+        conf.bookend_size,
+        |start, stop| format!("\t    (skipping LookupTables {}..{})", start, stop),
+    );
+}
+
+fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
+    print!(
+        "LookupTable: kind={}, flags={}",
+        format_lookup_type(ctxt, table.lookup_type),
+        format_lookup_flag(&table.lookup_flag),
+    );
+    if let Some(filtering_set) = table.mark_filtering_set {
+        print!(", markFilteringSet=GDEF->MarkGlyphSet[{}]", filtering_set)
+    }
+    show_items_inline(
+        &table.subtables,
+        format_lookup_subtable,
+        conf.inline_bookend,
+        |n_skipped| format!("...({n_skipped} skipped)..."),
+    );
+}
+
+fn format_lookup_subtable(subtable: &Option<LookupSubtable>) -> String {
+    // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
+    if let Some(subtable) = subtable {
+        match subtable {
+            LookupSubtable::ChainCtxPos => {
+                // STUB
+                format!("ChainCtxtPos(..)")
+            }
+            LookupSubtable::CtxPos => {
+                // STUB
+                format!("CtxPos(..)")
+            }
+            LookupSubtable::CursAttach => {
+                // STUB
+                format!("CursAttach(..)")
+            }
+            LookupSubtable::ExtPos => {
+                // STUB
+                format!("ExtPos(..)")
+            }
+            LookupSubtable::MarkBaseAttach => {
+                // STUB
+                format!("MarkBaseAttach(..)")
+            }
+            LookupSubtable::MarkLigAttach => {
+                // STUB
+                format!("MarkLigAttach(..)")
+            }
+            LookupSubtable::MarkMarkAttach => {
+                // STUB
+                format!("MarkMarkAttach(..)")
+            }
+            LookupSubtable::PairAdjust => {
+                // STUB
+                format!("PairAdjust(..)")
+            }
+            LookupSubtable::SingleAdjust => {
+                // STUB
+                format!("SingleAdjust(..)")
+            }
+        }
+    } else {
+        format!("<none>")
+    }
+}
+
+fn format_lookup_flag(flags: &LookupFlag) -> String {
+    let mut set_flags = Vec::new();
+    if flags.right_to_left {
+        set_flags.push("RIGHT_TO_LEFT");
+    }
+    if flags.ignore_base_glyphs {
+        set_flags.push("IGNORE_BASE_GLYPHS");
+    }
+    if flags.ignore_ligatures {
+        set_flags.push("IGNORE_LIGATURES)");
+    }
+    if flags.ignore_marks {
+        set_flags.push("IGNORE_MARKS");
+    }
+    if flags.use_mark_filtering_set {
+        set_flags.push("USE_MARK_FILTERING_SET");
+    }
+
+    let str_bitflags = if set_flags.is_empty() {
+        String::from("∅")
+    } else {
+        set_flags.join(" | ")
+    };
+
+    let str_macf = match flags.mark_attachment_class_filter {
+        0 => String::from("∅"),
+        n => format!("Class=={n}"),
+    };
+
+    format!("LookupFlag ({str_bitflags} ; mark_attachment_class_filter = {str_macf})")
+}
+
+fn format_lookup_type(ctxt: Ctxt, ltype: u16) -> &'static str {
+    match ctxt.get_disc() {
+        None => unreachable!("format_lookup_kind called with neutral (whence := None) Ctxt"),
+        Some(TableDiscriminator::Gpos) => match ltype {
+            1 => "Single adjustment",
+            2 => "Pair adjustment",
+            3 => "Cursive attachment",
+            4 => "Mark-to-base attachment",
+            5 => "Mark-to-ligature attachment",
+            6 => "Mark-to-mark attachment",
+            7 => "Contextual positioning",
+            8 => "Chained contexts positioning",
+            9 => "Positioning extension",
+            _ => unreachable!("unexpected GPOS lookup-type {ltype} (expected 1..=9)"),
+        },
+        Some(TableDiscriminator::Gsub) => {
+            // STUB - implement this properly once we add support for GSUB
+            unimplemented!("GSUB not implemented yet so this branch is dormant");
         }
     }
 }
@@ -1607,19 +2115,15 @@ fn show_gdef_metrics(gdef: &Option<GdefMetrics>, conf: &Config) {
 fn show_mark_glyph_set(mgs: &MarkGlyphSet, conf: &Config) {
     show_items_elided(
         &mgs.coverage,
-        |ix, item| {
-            match item {
-                None => println!("\t\t[{ix}]: <none>"),
-                Some(covt) => {
-                    print!("\t\t[{ix}]: ");
-                    show_coverage_table(covt, conf);
-                }
+        |ix, item| match item {
+            None => println!("\t\t[{ix}]: <none>"),
+            Some(covt) => {
+                print!("\t\t[{ix}]: ");
+                show_coverage_table(covt, conf);
             }
         },
         conf.bookend_size,
-        |start, stop| {
-            format!("\t    (skipping coverage tables {}..{})", start, stop)
-        }
+        |start, stop| format!("\t    (skipping coverage tables {}..{})", start, stop),
     )
 }
 
@@ -1636,24 +2140,20 @@ fn show_lig_caret_list(lig_caret_list: &LigCaretList, conf: &Config) {
     }
     show_items_elided(
         &lig_caret_list.lig_glyphs,
-        |ix, opt_lig_glyph| {
-            match opt_lig_glyph {
-                Some(lig_glyph) => {
-                    print!("\t\t[{ix}]: ");
-                    show_items_inline(
-                        &lig_glyph.caret_values,
-                        |opt_caret_value| {
-                            match opt_caret_value {
-                                Some(cv) => format_caret_value(cv),
-                                None => format!("<none>"),
-                            }
-                        },
-                        conf.inline_bookend,
-                        |num_skipped| format!("...({num_skipped})..."),
-                    )
-                }
-                None => println!("\t\t[{ix}]: <no lig glyphs>"),
+        |ix, opt_lig_glyph| match opt_lig_glyph {
+            Some(lig_glyph) => {
+                print!("\t\t[{ix}]: ");
+                show_items_inline(
+                    &lig_glyph.caret_values,
+                    |opt_caret_value| match opt_caret_value {
+                        Some(cv) => format_caret_value(cv),
+                        None => format!("<none>"),
+                    },
+                    conf.inline_bookend,
+                    |num_skipped| format!("...({num_skipped})..."),
+                )
             }
+            None => println!("\t\t[{ix}]: <no lig glyphs>"),
         },
         conf.bookend_size,
         |start, stop| format!("\t    (skipping LigGlyphs {}..{})", start, stop),
@@ -1665,19 +2165,21 @@ fn format_caret_value(cv: &CaretValue) -> String {
         // REVIEW - this isn't really a canonical abbreviation, so we might adjust what we show for Design Units (Format 1)
         CaretValue::DesignUnits(du) => format!("{du}du"),
         CaretValue::ContourPoint(ix) => format!("#{ix}"),
-        CaretValue::DesignUnitsWithTable { coordinate, device } => {
-            match device {
-                None => format!("{}du", coordinate),
-                Some(dev) => match dev {
-                    DeviceOrVariationIndex::DeviceTable(dev_table) => {
-                        format!("{}du+[{}]", coordinate, format_device_table(dev_table))
-                    }
-                    DeviceOrVariationIndex::VariationIndexTable(var_ix_table) => {
-                        format!("{}du+[{}]", coordinate, format_variation_index_table(var_ix_table))
-                    }
+        CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
+            None => format!("{}du", coordinate),
+            Some(dev) => match dev {
+                DeviceOrVariationIndex::DeviceTable(dev_table) => {
+                    format!("{}du+[{}]", coordinate, format_device_table(dev_table))
                 }
-            }
-        }
+                DeviceOrVariationIndex::VariationIndexTable(var_ix_table) => {
+                    format!(
+                        "{}du+[{}]",
+                        coordinate,
+                        format_variation_index_table(var_ix_table)
+                    )
+                }
+            },
+        },
     }
 }
 
@@ -1687,9 +2189,11 @@ fn format_device_table(dev_table: &DeviceTable) -> String {
 }
 
 fn format_variation_index_table(var_ix_table: &VariationIndexTable) -> String {
-    format!("{}->{}", var_ix_table.delta_set_outer_index, var_ix_table.delta_set_inner_index)
+    format!(
+        "{}->{}",
+        var_ix_table.delta_set_outer_index, var_ix_table.delta_set_inner_index
+    )
 }
-
 
 fn show_attach_list(attach_list: &AttachList, conf: &Config) {
     println!("\tAttachList:");
@@ -1700,22 +2204,25 @@ fn show_attach_list(attach_list: &AttachList, conf: &Config) {
     }
     show_items_elided(
         &attach_list.attach_points,
-        |ix, item| {
-            match item {
-                Some(AttachPoint { point_indices }) => {
-                    print!("\t\t[{ix}]:");
-                    show_items_inline(
-                        point_indices,
-                        |point_ix| format!("{}", point_ix),
-                        conf.inline_bookend,
-                        |num_skipped| format!("...({num_skipped})..."),
-                    );
-                },
-                None => println!("\t\t[{ix}]: <no attach points>"),
+        |ix, item| match item {
+            Some(AttachPoint { point_indices }) => {
+                print!("\t\t[{ix}]:");
+                show_items_inline(
+                    point_indices,
+                    |point_ix| format!("{}", point_ix),
+                    conf.inline_bookend,
+                    |num_skipped| format!("...({num_skipped})..."),
+                );
             }
+            None => println!("\t\t[{ix}]: <no attach points>"),
         },
         conf.bookend_size,
-        |start, stop| format!("\t    (skipping attach points for glyphs {}..{})", start, stop),
+        |start, stop| {
+            format!(
+                "\t    (skipping attach points for glyphs {}..{})",
+                start, stop
+            )
+        },
     )
 }
 
@@ -1738,7 +2245,6 @@ fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
                 conf.inline_bookend,
                 |num_skipped| format!("...({num_skipped})..."),
             );
-
         }
     }
 }
@@ -1755,15 +2261,21 @@ fn format_mark_attach_class(mark_attach_class: &u16) -> String {
     }
 }
 
-fn show_glyph_class_def(class_def: &ClassDef, conf: &Config)
-{
+fn show_glyph_class_def(class_def: &ClassDef, conf: &Config) {
     println!("\tGlyphClassDef:");
     show_class_def(class_def, show_glyph_class, conf)
 }
 
-fn show_class_def<S: std::fmt::Display>(class_def: &ClassDef, show_fn: impl Fn(&u16) -> S, conf: &Config) {
+fn show_class_def<S: std::fmt::Display>(
+    class_def: &ClassDef,
+    show_fn: impl Fn(&u16) -> S,
+    conf: &Config,
+) {
     match class_def {
-        &ClassDef::Format1 { start_glyph_id, ref class_value_array } => {
+        &ClassDef::Format1 {
+            start_glyph_id,
+            ref class_value_array,
+        } => {
             match start_glyph_id {
                 0 => (),
                 1 => println!("\t    (skipping uncovered glyph 0)"),
@@ -1776,30 +2288,50 @@ fn show_class_def<S: std::fmt::Display>(class_def: &ClassDef, show_fn: impl Fn(&
                     println!("\t\tGlyph [{gix}]: {}", show_fn(item));
                 },
                 conf.bookend_size,
-                |start, stop| format!("\t    (skipping glyphs {}..{})", start_glyph_id as usize + start, start_glyph_id as usize + stop),
-            )
-        }
-        &ClassDef::Format2 { ref class_range_records } => {
-            show_items_elided(
-                class_range_records,
-                |_ix, class_range| {
-                    println!("\t\t({} -> {}): {}", class_range.start_glyph_id, class_range.end_glyph_id, show_fn(&class_range.value));
-                },
-                conf.bookend_size,
                 |start, stop| {
-                    let low_end = class_range_records[start].start_glyph_id;
-                    let high_end = class_range_records[stop - 1].end_glyph_id;
-                    format!("\t    (skipping ranges covering glyphs {}..={})", low_end, high_end)
-                }
+                    format!(
+                        "\t    (skipping glyphs {}..{})",
+                        start_glyph_id as usize + start,
+                        start_glyph_id as usize + stop
+                    )
+                },
             )
         }
+        &ClassDef::Format2 {
+            ref class_range_records,
+        } => show_items_elided(
+            class_range_records,
+            |_ix, class_range| {
+                println!(
+                    "\t\t({} -> {}): {}",
+                    class_range.start_glyph_id,
+                    class_range.end_glyph_id,
+                    show_fn(&class_range.value)
+                );
+            },
+            conf.bookend_size,
+            |start, stop| {
+                let low_end = class_range_records[start].start_glyph_id;
+                let high_end = class_range_records[stop - 1].end_glyph_id;
+                format!(
+                    "\t    (skipping ranges covering glyphs {}..={})",
+                    low_end, high_end
+                )
+            },
+        ),
     }
 }
 
 fn format_coverage_range_record(coverage_range: &CoverageRangeRecord) -> String {
     let span = coverage_range.end_glyph_id - coverage_range.start_glyph_id;
     let end_coverage_index = coverage_range.value + span;
-    format!("({} -> {}): {}(->{})", coverage_range.start_glyph_id, coverage_range.end_glyph_id, coverage_range.value, end_coverage_index)
+    format!(
+        "({} -> {}): {}(->{})",
+        coverage_range.start_glyph_id,
+        coverage_range.end_glyph_id,
+        coverage_range.value,
+        end_coverage_index
+    )
 }
 
 fn show_gasp_metrics(gasp: &Option<GaspMetrics>, conf: &Config) {
@@ -1889,7 +2421,6 @@ fn show_items_inline<T>(
         println!("]");
     }
 }
-
 
 /// Enumerates the contents of a slice, showing only the first and last `bookend` items if the slice is long enough.
 ///

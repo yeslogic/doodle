@@ -280,4 +280,34 @@ pub fn keep_first(f: Format, f1: Format) -> Format {
     // NOTE: compared to `keep_last`, there is far less of a reason to create a Format primitive to avoid this construction
     chain(f, "x", keep_last(f1, compute(var("x"))))
 }
+
+/// Helper function for splicing together two seperate records, with the option to filter the fields included from each
+/// or reorder them internally, but not across the record as a whole (i.e. all fields from the first will strictly precede those of the second).
+pub fn merge_record_subsets<const N: usize, const M: usize>(first: (Expr, [&'static str; N]), second: (Expr, [&'static str; M])) -> Expr {
+    let (first_expr, first_fields) = first;
+    let (second_expr, second_fields) = second;
+
+    let mut accum_fields = Vec::with_capacity(N + M);
+    let mut included_fields = BTreeSet::new();
+
+    for field_name in first_fields.into_iter() {
+        if !included_fields.insert(field_name) {
+            unreachable!("duplicated field in merge_records: `{field_name}`");
+        }
+        accum_fields.push((
+            Label::Borrowed(field_name),
+            record_proj(first_expr.clone(), field_name),
+        ));
+    }
+    for field_name in second_fields.into_iter() {
+        if !included_fields.insert(field_name) {
+            unreachable!("duplicated field in merge_records: `{field_name}`");
+        }
+        accum_fields.push((
+            Label::Borrowed(field_name),
+            record_proj(second_expr.clone(), field_name),
+        ))
+    }
+    Expr::Record(accum_fields)
+}
 ```
