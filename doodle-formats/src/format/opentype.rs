@@ -2159,6 +2159,285 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
+        // SECTION - bulk common definitions for GSUB and GPOS
+
+        let single_substitution = /* STUB */ Format::EMPTY;
+        let multiple_substitution = /* STUB */ Format::EMPTY;
+        let alternate_substitution = /* STUB */ Format::EMPTY;
+        let ligature_substitution = /* STUB */ Format::EMPTY;
+        let contextual_substitution = /* STUB */ Format::EMPTY;
+        let chained_contexts_substitution = /* STUB */ Format::EMPTY;
+        let extension_substitution = /* STUB */ Format::EMPTY;
+        let reverse_chaining_contextual_single_substitution = /* STUB */ Format::EMPTY;
+
+        let single_adjustment = /* STUB */ Format::EMPTY;
+        let pair_adjustment = /* STUB */ Format::EMPTY;
+        let cursive_attachment = /* STUB */ Format::EMPTY;
+        let mark_to_base_attachment = /* STUB */ Format::EMPTY;
+        let mark_to_ligature_attachment = /* STUB */ Format::EMPTY;
+        let mark_to_mark_attachment = /* STUB */ Format::EMPTY;
+        let contextual_positioning = /* STUB */ Format::EMPTY;
+        let chained_contexts_positioning = /* STUB */ Format::EMPTY;
+        let extension_positioning = /* STUB */ Format::EMPTY;
+
+        // shared structure of GSUB and GPOS tables
+        let lookup_table = |tag: u32| {
+            // NOTE - tag is a model-external value, lookup-type is model-internal.
+            let lookup_subtable = |tag: u32, lookup_type: Expr| {
+                const GSUB: u32 = magic(b"GSUB");
+                const GPOS: u32 = magic(b"GPOS");
+                match tag {
+                    // natural pattern-match on tag
+                    GSUB => {
+                        // in-model pattern-match on lookup-type
+                        match_variant(
+                            lookup_type,
+                            [
+                                // REVIEW - are these variant names too concise?
+                                (Pattern::U16(1), "MonoSub", single_substitution),
+                                (Pattern::U16(2), "PolySub", multiple_substitution),
+                                (Pattern::U16(3), "AltSub", alternate_substitution),
+                                (Pattern::U16(4), "LigSub", ligature_substitution),
+                                (Pattern::U16(5), "CtxSub", contextual_substitution),
+                                (
+                                    Pattern::U16(6),
+                                    "ChainCtxSub",
+                                    chained_contexts_substitution,
+                                ),
+                                (Pattern::U16(7), "ExtSub", extension_substitution),
+                                (
+                                    Pattern::U16(8),
+                                    "RevChainCtxMonoSub",
+                                    reverse_chaining_contextual_single_substitution,
+                                ),
+                                // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
+                                (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
+                            ],
+                        )
+                    }
+                    GPOS => {
+                        // in-model pattern-match on lookup-type
+                        match_variant(
+                            lookup_type,
+                            [
+                                (Pattern::U16(1), "SingleAdjust", single_adjustment),
+                                (Pattern::U16(2), "PairAdjust", pair_adjustment),
+                                (Pattern::U16(3), "CursAttach", cursive_attachment),
+                                (Pattern::U16(4), "MarkBaseAttach", mark_to_base_attachment),
+                                (
+                                    Pattern::U16(5),
+                                    "MarkLigAttach",
+                                    mark_to_ligature_attachment,
+                                ),
+                                (Pattern::U16(6), "MarkMarkAttach", mark_to_mark_attachment),
+                                (Pattern::U16(7), "CtxPos", contextual_positioning),
+                                (Pattern::U16(8), "ChainCtxPos", chained_contexts_positioning),
+                                (Pattern::U16(9), "ExtPos", extension_positioning),
+                                // REVIEW - should this be a hard-fail, or do we want to produce a dummy object instead (possibly with a trace of the value of lookup_type)?
+                                (Pattern::Wildcard, "UnknownLookupSubtable", Format::Fail),
+                            ],
+                        )
+                    }
+                    _ => Format::Fail,
+                }
+            };
+            let lookup_flag = {
+                // NOTE - we currently have no good way to group together multiple adjacent bits with flags_bits16 so we will instead parse as a single U8 for the first byte (0xFF00) and then as a series of flags in the second byte (0xFF)
+                let macf = base.u8();
+                let lo_bits = flags_bits8([
+                    None,                           // Bit 7 (0x80) - reserved
+                    None,                           // Bit 6 (0x40) - reserved
+                    None,                           // Bit 5 (0x20) - reserved
+                    Some("use_mark_filtering_set"), // Bit 4 (0x10) - indicator flag for presence of markFilteringSet field in Lookup table structure
+                    Some("ignore_marks"), // Bit 3 (0x8) - if set, skips  over combining marks
+                    Some("ignore_ligatures"), // Bit 2 (0x4) - if set, skips over ligatures
+                    Some("ignore_base_glyphs"), // Bit 1 (0x2) - if set, skips over base glyphs
+                    Some("right_to_left"), // Bit 0 (0x1) - [GPOS type 3 only] when set, last glyph matched input will be positioned on baseline
+                ]);
+                map(
+                    tuple([macf, lo_bits]),
+                    lambda_tuple(
+                        ["macf", "lo"],
+                        prepend_field(
+                            // present the fields in the order listed from LSB-to-MSB in [https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookup-table], though it mostly doesn't matter
+                            ("mark_attachment_class_filter", var("macf")),
+                            (
+                                var("lo"),
+                                [
+                                    "right_to_left",
+                                    "ignore_base_glyphs",
+                                    "ignore_ligatures",
+                                    "ignore_marks",
+                                    "use_mark_filtering_set",
+                                ],
+                            ),
+                        ),
+                    ),
+                )
+            };
+            // STUB - initial pass to merely provide a structure without gaps (but not full-featured coverage of each sub-component)
+            // FIXME - refine and enrich this
+            record([
+                ("table_start", pos32()),
+                ("lookup_type", base.u16be()),
+                ("lookup_flag", lookup_flag),
+                ("sub_table_count", base.u16be()),
+                (
+                    "subtables",
+                    repeat_count(
+                        var("sub_table_count"),
+                        offset16(
+                            var("table_start"),
+                            lookup_subtable(tag, var("lookup_type")),
+                            base,
+                        ),
+                    ),
+                ),
+                (
+                    "mark_filtering_set",
+                    if_then_else(
+                        record_proj(var("lookup_flag"), "use_mark_filtering_set"),
+                        format_some(base.u16be()),
+                        format_none(),
+                    ),
+                ),
+            ])
+        };
+        let lang_sys = {
+            // Language System Table
+            module.define_format(
+                "opentype.common.langsys",
+                record([
+                    ("lookup_order_offset", expect_u16be(base, 0x0000)), // RESERVED - set to NULL
+                    ("required_feature_index", base.u16be()), // 0xFFFF if no features required
+                    ("feature_index_count", base.u16be()),
+                    (
+                        "feature_indices",
+                        repeat_count(var("feature_index_count"), base.u16be()),
+                    ),
+                ]),
+            )
+        };
+        let lang_sys_record = |script_start: Expr| {
+            record([
+                ("lang_sys_tag", tag.call()),
+                ("lang_sys", offset16(script_start, lang_sys.call(), base)),
+            ])
+        };
+        let script_table = {
+            module.define_format(
+                "opentype.common.script_table",
+                record([
+                    ("table_start", pos32()),
+                    (
+                        "default_lang_sys",
+                        offset16(var("table_start"), lang_sys.call(), base),
+                    ),
+                    ("lang_sys_count", base.u16be()),
+                    (
+                        "lang_sys_records",
+                        repeat_count(var("lang_sys_count"), lang_sys_record(var("table_start"))),
+                    ),
+                ]),
+            )
+        };
+        let script_list = {
+            let script_record = |script_list_start: Expr| {
+                record([
+                    ("script_tag", tag.call()),
+                    (
+                        "script",
+                        offset16(script_list_start, script_table.call(), base),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.common.script_list",
+                record([
+                    ("table_start", pos32()),
+                    ("script_count", base.u16be()),
+                    (
+                        "script_records",
+                        repeat_count(var("script_count"), script_record(var("table_start"))),
+                    ),
+                ]),
+            )
+        };
+        let feature_table = {
+            module.define_format(
+                "opentype.common.feature_table",
+                record([
+                    ("table_start", pos32()),
+                    // REVIEW - this is technically an offset16 but we don't have a good handle on what data is stored at the offset, or what FeatureRecord tags allow for parameters
+                    ("feature_params", base.u16be()), // TODO - format of params table depends on the feature tag,
+                    ("lookup_index_count", base.u16be()),
+                    // Array of 0-based indices into LookupList (first lookup at LookupListIndex = 0)
+                    (
+                        "lookup_list_indices",
+                        repeat_count(var("lookup_index_count"), base.u16be()),
+                    ),
+                ]),
+            )
+        };
+        let feature_list = {
+            let feature_record = |feature_list_start: Expr| {
+                record([
+                    ("feature_tag", tag.call()),
+                    (
+                        "feature",
+                        offset16(feature_list_start, feature_table.call(), base),
+                    ),
+                ])
+            };
+            module.define_format(
+                "opentype.common.feature_list",
+                record([
+                    ("table_start", pos32()),
+                    ("feature_count", base.u16be()),
+                    (
+                        "feature_records",
+                        repeat_count(var("feature_count"), feature_record(var("table_start"))),
+                    ),
+                ]),
+            )
+        };
+
+        let lookup_list = |tag: u32| {
+            record([
+                ("table_start", pos32()),
+                ("lookup_count", base.u16be()),
+                (
+                    "lookups",
+                    repeat_count(
+                        var("lookup_count"),
+                        offset16(var("table_start"), lookup_table(tag), base),
+                    ),
+                ),
+            ])
+        };
+
+        let layout_table = |tag: u32| {
+            record([
+                ("table_start", pos32()),
+                ("major_version", expect_u16be(base, 1)),
+                ("minor_version", base.u16be()),
+                (
+                    "script_list",
+                    offset16(var("table_start"), script_list.call(), base),
+                ),
+                (
+                    "feature_list",
+                    offset16(var("table_start"), feature_list.call(), base),
+                ),
+                (
+                    "lookup_list",
+                    offset16(var("table_start"), lookup_list(tag), base),
+                ),
+            ])
+        };
+        // !SECTION
+        let gpos_table =
+            { module.define_format("opentype.gpos_table", layout_table(magic(b"GPOS"))) };
 
         module.define_format_args(
             "opentype.table_directory.table_links",
@@ -2273,6 +2552,10 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 (
                     "gdef",
                     optional_table("start", "tables", magic(b"GDEF"), gdef_table.call()),
+                ),
+                (
+                    "gpos",
+                    optional_table("start", "tables", magic(b"GPOS"), gpos_table.call()),
                 ),
                 // !SECTION
                 // STUB - add more tables
