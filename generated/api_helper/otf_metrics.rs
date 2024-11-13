@@ -1883,43 +1883,52 @@ fn show_gpos_metrics(gpos: &Option<GposMetrics>, conf: &Config) {
 }
 
 fn show_script_list(script_list: &ScriptList, conf: &Config) {
-    println!("\tScriptList");
-    show_items_elided(
-        script_list,
-        |ix, item| match &item.script {
-            None => println!("\t\t[{ix}]: {}", format_magic(item.script_tag)),
-            Some(ScriptTable {
-                default_lang_sys,
-                lang_sys_records,
-            }) => {
-                println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
-                match default_lang_sys {
-                    None => (),
-                    Some(langsys) => {
+    if script_list.is_empty() {
+        println!("\tScriptList [empty]");
+    } else {
+        println!("\tScriptList");
+        show_items_elided(
+            script_list,
+            |ix, item| match &item.script {
+                None => println!("\t\t[{ix}]: {}", format_magic(item.script_tag)),
+                Some(ScriptTable {
+                    default_lang_sys,
+                    lang_sys_records,
+                }) => {
+                    println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
+                    if let Some(langsys) = default_lang_sys {
                         print!("\t\t    [Default LangSys]:");
                         show_langsys(langsys, conf);
-                        println!()
                     }
+                    show_lang_sys_records(lang_sys_records, conf)
                 }
-                println!("\t\t    LangSysRecords:");
-                show_items_elided(
-                    lang_sys_records,
-                    |ix, item| {
-                        print!("\t\t\t[{ix}]: {}", format_magic(item.lang_sys_tag));
-                        if let Some(langsys) = &item.lang_sys {
-                            print!("; ");
-                            show_langsys(langsys, conf);
-                        }
-                        println!();
-                    },
-                    conf.bookend_size,
-                    |start, stop| format!("\t\t    (skipping LangSysRecords {}..{})", start, stop),
-                )
-            }
-        },
-        conf.bookend_size,
-        |start, stop| format!("skipping ScriptRecords {}..{}", start, stop),
-    );
+            },
+            conf.bookend_size,
+            |start, stop| format!("skipping ScriptRecords {}..{}", start, stop),
+        );
+    }
+}
+
+fn show_lang_sys_records(lang_sys_records: &[LangSysRecord], conf: &Config) {
+    if lang_sys_records.is_empty() {
+        println!("\t\t    LangSysRecords: <empty list>");
+    } else {
+        println!("\t\t    LangSysRecords:");
+        show_items_elided(
+            lang_sys_records,
+            |ix, item| {
+                print!("\t\t\t[{ix}]: {}", format_magic(item.lang_sys_tag));
+                if let Some(langsys) = &item.lang_sys {
+                    print!("; ");
+                    show_langsys(langsys, conf);
+                }
+                println!();
+            },
+            conf.bookend_size,
+            |start, stop| format!("\t\t    (skipping LangSysRecords {}..{})", start, stop),
+        )
+    }
+
 }
 
 fn show_langsys(lang_sys: &LangSys, conf: &Config) {
@@ -1929,7 +1938,10 @@ fn show_langsys(lang_sys: &LangSys, conf: &Config) {
         feature_indices,
     } = lang_sys;
     debug_assert_eq!(*lookup_order_offset, 0);
-    print!("feature-indices [required: {}]", required_feature_index);
+    match required_feature_index {
+        0xFFFF => print!("feature-indices: "),
+        other => print!("feature-indices (required: {}): ", other),
+    }
     show_items_inline(
         feature_indices,
         |ix: &u16| format!("{}", ix),
@@ -1939,26 +1951,29 @@ fn show_langsys(lang_sys: &LangSys, conf: &Config) {
 }
 
 fn show_feature_list(feature_list: &FeatureList, conf: &Config) {
-    println!("\tFeatureList");
-    show_items_elided(
-        feature_list,
-        |ix, item| {
-            let FeatureRecord {
-                feature_tag,
-                feature,
-            } = item;
-            match feature {
-                None => println!("\t\t[{ix}]: {} (<none>)", format_magic(*feature_tag)),
-                Some(feature_table) => {
-                    print!("\t\t[{ix}]: {}", format_magic(*feature_tag));
-                    show_feature_table(feature_table, conf);
-                    println!();
+    if feature_list.is_empty() {
+        println!("\tFeatureList [empty]");
+    } else {
+        println!("\tFeatureList");
+        show_items_elided(
+            feature_list,
+            |ix, item| {
+                let FeatureRecord {
+                    feature_tag,
+                    feature,
+                } = item;
+                match feature {
+                    None => println!("\t\t[{ix}]: {} (<none>)", format_magic(*feature_tag)),
+                    Some(feature_table) => {
+                        print!("\t\t[{ix}]: {}", format_magic(*feature_tag));
+                        show_feature_table(feature_table, conf);
+                    }
                 }
-            }
-        },
-        conf.bookend_size,
-        |start, stop| format!("\t    (skipping FeatureIndices {}..{})", start, stop),
-    );
+            },
+            conf.bookend_size,
+            |start, stop| format!("\t    (skipping FeatureIndices {}..{})", start, stop),
+        );
+    }
 }
 
 fn show_feature_table(table: &FeatureTable, conf: &Config) {
@@ -1987,7 +2002,6 @@ fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
             Some(table) => {
                 print!("\t\t[{ix}]: ");
                 show_lookup_table(table, ctxt, conf);
-                println!();
             }
         },
         conf.bookend_size,
@@ -2004,6 +2018,7 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
     if let Some(filtering_set) = table.mark_filtering_set {
         print!(", markFilteringSet=GDEF->MarkGlyphSet[{}]", filtering_set)
     }
+    print!(": ");
     show_items_inline(
         &table.subtables,
         format_lookup_subtable,
@@ -2414,6 +2429,15 @@ fn show_items_inline<T>(
         print!("{}", ellipsis(count - bookend * 2));
         for ix in (count - bookend)..count {
             if ix > count - bookend {
+                print!(", ");
+            }
+            print!("{}", show_fn(&items[ix]));
+        }
+        println!("]");
+    } else {
+        print!("[");
+        for ix in 0..count {
+            if ix > 0 {
                 print!(", ");
             }
             print!("{}", show_fn(&items[ix]));
