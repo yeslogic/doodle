@@ -1897,7 +1897,7 @@ fn show_script_list(script_list: &ScriptList, conf: &Config) {
                 }) => {
                     println!("\t\t[{ix}]: {}", format_magic(item.script_tag));
                     if let Some(langsys) = default_lang_sys {
-                        print!("\t\t    [Default LangSys]:");
+                        print!("\t\t    [Default LangSys]: ");
                         show_langsys(langsys, conf);
                     }
                     show_lang_sys_records(lang_sys_records, conf)
