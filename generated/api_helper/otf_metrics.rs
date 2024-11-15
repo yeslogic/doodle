@@ -1001,6 +1001,7 @@ struct DeviceTable {
     end_size: u16,
     // REVIEW - do we want to unpack the values into i8-valued deltas based on the format?
     delta_values: DeltaValues,
+    // Format is implicated by the discriminant of delta_values, so we omit it
 }
 
 #[derive(Clone, Debug)]
@@ -1011,7 +1012,7 @@ struct VariationIndexTable {
 }
 
 #[derive(Clone, Debug)]
-enum DeviceOrVariationIndex {
+enum DeviceOrVariationIndexTable {
     DeviceTable(DeviceTable),
     VariationIndexTable(VariationIndexTable),
 }
@@ -1022,7 +1023,7 @@ enum CaretValue {
     ContourPoint(u16), // Format2
     DesignUnitsWithTable {
         coordinate: u16,
-        device: Option<DeviceOrVariationIndex>,
+        device: Option<DeviceOrVariationIndexTable>,
     }, // Format3
 }
 
@@ -1037,30 +1038,30 @@ type OpentypeCaretValueFormat2 =
 type OpentypeCaretValueFormat3 =
     opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3;
 
-type OpentypeDeviceOrVariationIndex = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3_table_link;
-type OpentypeDeviceTable = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3_table_link_DeviceTable;
-type OpentypeVariationIndexTable = opentype_gdef_table_lig_caret_list_link_lig_glyph_offsets_link_caret_values_link_data_Format3_table_link_VariationIndexTable;
+type OpentypeDeviceOrVariationIndexTable = opentype_common_device_or_variation_index_table;
+type OpentypeDeviceTable = opentype_common_device_or_variation_index_table_DeviceTable;
+type OpentypeVariationIndexTable = opentype_common_device_or_variation_index_table_VariationIndexTable;
 
-impl TryPromote<OpentypeDeviceOrVariationIndex> for DeviceOrVariationIndex {
+impl TryPromote<OpentypeDeviceOrVariationIndexTable> for DeviceOrVariationIndexTable {
     type Error = UnknownValueError<u16>;
 
-    fn try_promote(orig: &OpentypeDeviceOrVariationIndex) -> Result<Self, Self::Error> {
+    fn try_promote(orig: &OpentypeDeviceOrVariationIndexTable) -> Result<Self, Self::Error> {
         match orig {
-            &OpentypeDeviceOrVariationIndex::DeviceTable(OpentypeDeviceTable {
+            &OpentypeDeviceOrVariationIndexTable::DeviceTable(OpentypeDeviceTable {
                 start_size,
                 end_size,
                 delta_format,
                 ref delta_values,
-            }) => Ok(DeviceOrVariationIndex::DeviceTable(DeviceTable {
+            }) => Ok(DeviceOrVariationIndexTable::DeviceTable(DeviceTable {
                 start_size,
                 end_size,
                 delta_values: DeltaValues::try_from((delta_format, delta_values))?,
             })),
-            &OpentypeDeviceOrVariationIndex::VariationIndexTable(OpentypeVariationIndexTable {
+            &OpentypeDeviceOrVariationIndexTable::VariationIndexTable(OpentypeVariationIndexTable {
                 delta_set_outer_index,
                 delta_set_inner_index,
                 ..
-            }) => Ok(DeviceOrVariationIndex::VariationIndexTable(
+            }) => Ok(DeviceOrVariationIndexTable::VariationIndexTable(
                 VariationIndexTable {
                     delta_set_outer_index,
                     delta_set_inner_index,
@@ -1079,7 +1080,7 @@ impl TryPromote<OpentypeCaretValueRaw> for CaretValue {
 }
 
 impl TryPromote<OpentypeCaretValue> for CaretValue {
-    type Error = <DeviceOrVariationIndex as TryPromote<OpentypeDeviceOrVariationIndex>>::Error;
+    type Error = <DeviceOrVariationIndexTable as TryPromote<OpentypeDeviceOrVariationIndexTable>>::Error;
 
     fn try_promote(orig: &OpentypeCaretValue) -> Result<Self, Self::Error> {
         match orig {
@@ -1216,9 +1217,11 @@ struct FeatureRecord {
 
 pub type OpentypeLookupSubtable = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link;
 
-impl Promote<OpentypeLookupSubtable> for LookupSubtable {
-    fn promote(orig: &OpentypeLookupSubtable) -> Self {
-        match orig {
+impl TryPromote<OpentypeLookupSubtable> for LookupSubtable {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeLookupSubtable) -> Result<Self, Self::Error> {
+        Ok(match orig {
             &OpentypeLookupSubtable::ChainCtxPos => LookupSubtable::ChainCtxPos,
             &OpentypeLookupSubtable::CtxPos => LookupSubtable::CtxPos,
             &OpentypeLookupSubtable::CursAttach => LookupSubtable::CursAttach,
@@ -1227,8 +1230,8 @@ impl Promote<OpentypeLookupSubtable> for LookupSubtable {
             &OpentypeLookupSubtable::MarkLigAttach => LookupSubtable::MarkLigAttach,
             &OpentypeLookupSubtable::MarkMarkAttach => LookupSubtable::MarkMarkAttach,
             &OpentypeLookupSubtable::PairAdjust => LookupSubtable::PairAdjust,
-            &OpentypeLookupSubtable::SingleAdjust => LookupSubtable::SingleAdjust,
-        }
+            OpentypeLookupSubtable::SingleAdjust(single_adjust) => LookupSubtable::SingleAdjust(SingleAdjust::try_promote(single_adjust)?),
+        })
     }
 }
 
@@ -1244,25 +1247,132 @@ enum LookupSubtable {
     MarkLigAttach,
     MarkMarkAttach,
     PairAdjust,
-    SingleAdjust,
+    SingleAdjust(SingleAdjust),
+}
+
+pub type OpentypeSingleAdjust = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust;
+pub type OpentypeSingleAdjustSubtable = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust_subtable;
+
+pub type OpentypeSingleAdjustFormat1 = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust_subtable_Format1;
+pub type OpentypeSingleAdjustFormat2 = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust_subtable_Format2;
+
+impl TryPromote<OpentypeSingleAdjust> for SingleAdjust {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeSingleAdjust) -> Result<Self, Self::Error> {
+        Self::try_promote(&orig.subtable)
+    }
+}
+impl TryPromote<OpentypeSingleAdjustSubtable> for SingleAdjust {
+    type Error = UnknownValueError<u16>;
+
+
+    fn try_promote(orig: &OpentypeSingleAdjustSubtable) -> Result<Self, Self::Error> {
+        Ok(match orig {
+            OpentypeSingleAdjustSubtable::Format1(f1) => {
+                SingleAdjust::Format1(SingleAdjustFormat1::try_promote(f1)?)
+            }
+            OpentypeSingleAdjustSubtable::Format2(f2) => {
+                SingleAdjust::Format2(SingleAdjustFormat2::try_promote(f2)?)
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+enum SingleAdjust {
+    Format1(SingleAdjustFormat1),
+    Format2(SingleAdjustFormat2),
+}
+
+impl TryPromote<OpentypeSingleAdjustFormat1> for SingleAdjustFormat1 {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeSingleAdjustFormat1) -> Result<Self, Self::Error> {
+        Ok(SingleAdjustFormat1 {
+            coverage: promote_opt(&orig.coverage_offset.link),
+            value_record: ValueRecord::try_promote(&orig.value_record)?,
+        })
+    }
+}
+
+impl TryPromote<OpentypeSingleAdjustFormat2> for SingleAdjustFormat2 {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeSingleAdjustFormat2) -> Result<Self, Self::Error> {
+        let mut value_records = Vec::with_capacity(orig.value_records.len());
+        for value_record in orig.value_records.iter() {
+            value_records.push(ValueRecord::try_promote(value_record)?);
+        }
+        Ok(SingleAdjustFormat2 {
+            coverage: promote_opt(&orig.coverage_offset.link),
+            value_records,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SingleAdjustFormat1 {
+    coverage: Option<CoverageTable>,
+    value_record: ValueRecord,
+}
+
+#[derive(Debug, Clone)]
+struct SingleAdjustFormat2 {
+    coverage: Option<CoverageTable>,
+    value_records: Vec<ValueRecord>,
+}
+
+pub type OpentypeValueRecord = opentype_common_value_record;
+
+impl TryPromote<OpentypeValueRecord> for ValueRecord {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeValueRecord) -> Result<Self, Self::Error> {
+        Ok(ValueRecord {
+            x_placement: orig.x_placement.map(as_s16),
+            y_placement: orig.y_placement.map(as_s16),
+            x_advance: orig.x_advance.map(as_s16),
+            y_advance: orig.y_advance.map(as_s16),
+            x_placement_device: orig.x_placement_device.as_ref().map(|offset| try_promote_opt(&offset.link)).transpose()?,
+            y_placement_device: orig.y_placement_device.as_ref().map(|offset| try_promote_opt(&offset.link)).transpose()?,
+            x_advance_device: orig.x_advance_device.as_ref().map(|offset| try_promote_opt(&offset.link)).transpose()?,
+            y_advance_device: orig.y_advance_device.as_ref().map(|offset| try_promote_opt(&offset.link)).transpose()?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ValueRecord {
+    x_placement: Option<i16>,
+    y_placement: Option<i16>,
+    x_advance: Option<i16>,
+    y_advance: Option<i16>,
+    x_placement_device: Option<Option<DeviceOrVariationIndexTable>>,
+    y_placement_device: Option<Option<DeviceOrVariationIndexTable>>,
+    x_advance_device: Option<Option<DeviceOrVariationIndexTable>>,
+    y_advance_device: Option<Option<DeviceOrVariationIndexTable>>,
 }
 
 type LookupFlag = opentype_gpos_table_lookup_list_link_lookups_link_lookup_flag;
 
 pub type OpentypeLookupTable = opentype_gpos_table_lookup_list_link_lookups_link;
 
-impl Promote<OpentypeLookupTable> for LookupTable {
-    fn promote(orig: &OpentypeLookupTable) -> Self {
-        LookupTable {
+impl TryPromote<OpentypeLookupTable> for LookupTable {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeLookupTable) -> Result<Self, Self::Error> {
+        let mut subtables = Vec::with_capacity(orig.subtables.len());
+        for offset in orig.subtables.iter() {
+            subtables.push(try_promote_opt(&offset.link)?);
+        }
+
+        Ok(LookupTable {
             lookup_type: orig.lookup_type,
             lookup_flag: orig.lookup_flag,
-            subtables: orig
-                .subtables
-                .iter()
-                .map(|offset| promote_opt(&offset.link))
-                .collect(),
+            subtables,
             mark_filtering_set: orig.mark_filtering_set,
-        }
+        })
     }
 }
 
@@ -1294,12 +1404,15 @@ impl Promote<OpentypeFeatureList> for FeatureList {
     }
 }
 
-impl Promote<OpentypeLookupList> for LookupList {
-    fn promote(orig: &OpentypeLookupList) -> Self {
-        orig.lookups
-            .iter()
-            .map(|offset| promote_opt(&offset.link))
-            .collect()
+impl TryPromote<OpentypeLookupList> for LookupList {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeLookupList) -> Result<Self, Self::Error> {
+        let mut accum = Vec::with_capacity(orig.lookups.len());
+        for offset in orig.lookups.iter() {
+            accum.push(try_promote_opt(&offset.link)?);
+        }
+        Ok(accum)
     }
 }
 
@@ -1922,7 +2035,6 @@ fn show_lang_sys_records(lang_sys_records: &[LangSysRecord], conf: &Config) {
                     print!("; ");
                     show_langsys(langsys, conf);
                 }
-                println!();
             },
             conf.bookend_size,
             |start, stop| format!("\t\t    (skipping LangSysRecords {}..{})", start, stop),
@@ -2010,6 +2122,8 @@ fn show_lookup_list(lookup_list: &LookupList, ctxt: Ctxt, conf: &Config) {
 }
 
 fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
+    // NOTE - because we print the kind of the lookup here, we don't need to list it for every element
+    // LINK[format-lookup-subtable] -  (see format_lookup_subtable below)
     print!(
         "LookupTable: kind={}, flags={}",
         format_lookup_type(ctxt, table.lookup_type),
@@ -2021,55 +2135,113 @@ fn show_lookup_table(table: &LookupTable, ctxt: Ctxt, conf: &Config) {
     print!(": ");
     show_items_inline(
         &table.subtables,
-        format_lookup_subtable,
+        |subtable| format_lookup_subtable(subtable, false),
         conf.inline_bookend,
         |n_skipped| format!("...({n_skipped} skipped)..."),
     );
 }
 
-fn format_lookup_subtable(subtable: &Option<LookupSubtable>) -> String {
+// ANCHOR[format-lookup-subtable]
+fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: bool) -> String {
     // STUB - because the subtables are both partial (more variants exist) and abridged (existing variants are missing details), reimplement as necessary
     if let Some(subtable) = subtable {
-        match subtable {
+        let (label, contents) = match subtable {
             LookupSubtable::ChainCtxPos => {
-                // STUB
-                format!("ChainCtxtPos(..)")
+                ("ChainCtxtPos", format!("(..)"))
             }
             LookupSubtable::CtxPos => {
-                // STUB
-                format!("CtxPos(..)")
+                ("CtxPos", format!("(..)"))
             }
             LookupSubtable::CursAttach => {
-                // STUB
-                format!("CursAttach(..)")
+                ("CursAttach", format!("(..)"))
             }
             LookupSubtable::ExtPos => {
-                // STUB
-                format!("ExtPos(..)")
+                ("ExtPos", format!("(..)"))
             }
             LookupSubtable::MarkBaseAttach => {
-                // STUB
-                format!("MarkBaseAttach(..)")
+                ("MarkBaseAttach", format!("(..)"))
             }
             LookupSubtable::MarkLigAttach => {
-                // STUB
-                format!("MarkLigAttach(..)")
+                ("MarkLigAttach", format!("(..)"))
             }
             LookupSubtable::MarkMarkAttach => {
-                // STUB
-                format!("MarkMarkAttach(..)")
+                ("MarkMarkAttach", format!("(..)"))
             }
             LookupSubtable::PairAdjust => {
-                // STUB
-                format!("PairAdjust(..)")
+                ("PairAdjust", format!("(..)"))
             }
-            LookupSubtable::SingleAdjust => {
-                // STUB
-                format!("SingleAdjust(..)")
+            LookupSubtable::SingleAdjust(single_adjust) => {
+                let contents = {
+                    match single_adjust {
+                        SingleAdjust::Format1(SingleAdjustFormat1 { value_record, .. }) => {
+                            // REVIEW - when there is a single value, show it instead of the Coverage
+                            format!("single({})", format_value_record(value_record))
+                        },
+                        SingleAdjust::Format2(SingleAdjustFormat2 { coverage, value_records }) => {
+                            // REVIEW - when there are multiple values, show the Coverage instead of the value
+                            if let Some(coverage_table) = coverage {
+                                format!("array({})", format_coverage_table(coverage_table))
+                            } else {
+                                assert!(value_records.is_empty(), "value_records is non-empty but has no coverage-table to correspond to");
+                                format!("array[0]")
+                            }
+                        },
+                    }
+                };
+                ("SingleAdjust", contents)
             }
+        };
+        if show_lookup_type {
+            format!("{label}{contents}")
+        } else {
+            contents
         }
     } else {
         format!("<none>")
+    }
+}
+
+fn format_value_record(record: &ValueRecord) -> String {
+    let ValueRecord {
+        x_placement, y_placement,
+        x_advance, y_advance,
+        x_placement_device, y_placement_device,
+        x_advance_device, y_advance_device
+    } = record;
+    const NUM_FRAGMENTS: usize = 4;
+    let mut buf = Vec::<String>::with_capacity(NUM_FRAGMENTS);
+
+    // helper to indicate whether a field exists
+    let elide = |opt_val: &Option<Option<_>>| -> Option<&'static str> {
+        match opt_val {
+            None => None,
+            Some(None) => Some("none"),
+            Some(Some(_)) => Some("some(..)"),
+        }
+    };
+
+    buf.extend(format_opt_xy("placement", *x_placement, *y_placement));
+    buf.extend(format_opt_xy("advance", *x_advance, *y_advance));
+    buf.extend(format_opt_xy("placement(device)", elide(x_placement_device), elide(y_placement_device)));
+    buf.extend(format_opt_xy("advance(device)", elide(x_advance_device), elide(y_advance_device)));
+
+    if buf.is_empty() {
+        // REVIEW - this is highly unlikely, right..?
+        String::from("<Empty ValueRecord>")
+    } else {
+        buf.join("; ")
+    }
+}
+
+fn format_opt_xy<T>(what: &str, x: Option<T>, y: Option<T>) -> Option<String>
+where
+    T: std::fmt::Display
+{
+    match (x, y) {
+        (None, None) => None,
+        (Some(x), Some(y)) => Some(format!("{what}: ({x},{y})")),
+        (Some(x), None) => Some(format!("{what}[x]: {x}")),
+        (None, Some(y)) => Some(format!("{what}[y]: {y}")),
     }
 }
 
@@ -2183,10 +2355,10 @@ fn format_caret_value(cv: &CaretValue) -> String {
         CaretValue::DesignUnitsWithTable { coordinate, device } => match device {
             None => format!("{}du", coordinate),
             Some(dev) => match dev {
-                DeviceOrVariationIndex::DeviceTable(dev_table) => {
+                DeviceOrVariationIndexTable::DeviceTable(dev_table) => {
                     format!("{}du+[{}]", coordinate, format_device_table(dev_table))
                 }
-                DeviceOrVariationIndex::VariationIndexTable(var_ix_table) => {
+                DeviceOrVariationIndexTable::VariationIndexTable(var_ix_table) => {
                     format!(
                         "{}du+[{}]",
                         coordinate,
@@ -2239,6 +2411,25 @@ fn show_attach_list(attach_list: &AttachList, conf: &Config) {
             )
         },
     )
+}
+
+// FIXME - we might want a more flexible model where the `show_XYZZY`/`format_XYZZY` dichotomy is erased, such as a generic Writer or Fragment-producer...
+fn format_coverage_table(cov: &CoverageTable) -> String {
+    match cov {
+        CoverageTable::Format1 { ref glyph_array } => {
+            let num_glyphs = glyph_array.len();
+            let first_glyph = glyph_array.first().expect("empty glyph-array");
+            let last_glyph = glyph_array.last().expect("empty glyph-array");
+            format!("[{num_glyphs} glyphs in [{first_glyph},{last_glyph}]]")
+        }
+        CoverageTable::Format2 { ref range_records } => {
+            let num_glyphs: u16 = range_records.iter().map(|rr| rr.end_glyph_id - rr.start_glyph_id + 1).sum();
+            let num_ranges = range_records.len();
+            let min_glyph = range_records.first().expect("empty RangeRecord-array").start_glyph_id;
+            let max_glyph = range_records.last().expect("empty RangeRecord-array").end_glyph_id;
+            format!("[{num_ranges} RangeRecords ({num_glyphs} total glyphs) spanning [{min_glyph},{max_glyph}]]")
+        }
+    }
 }
 
 fn show_coverage_table(cov: &CoverageTable, conf: &Config) {
