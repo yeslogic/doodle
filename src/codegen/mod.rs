@@ -2751,6 +2751,7 @@ pub fn generate_code(module: &FormatModule, top_format: &Format) -> impl ToFragm
     for attr_string in ["non_camel_case_types", "non_snake_case", "dead_code"].into_iter() {
         content.add_module_attr(ModuleAttr::Allow(AllowAttr::from(Label::from(attr_string))));
     }
+    content.add_module_attr(ModuleAttr::RustFmtSkip);
     content.add_submodule(RustSubmodule::new("codegen_tests"));
     content.add_submodule(RustSubmodule::new_pub("api_helper"));
     content.rebind(&table);

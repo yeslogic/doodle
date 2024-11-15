@@ -47,6 +47,8 @@ impl ToFragment for AllowAttr {
 
 pub(crate) enum ModuleAttr {
     Allow(AllowAttr),
+    // REVIEW - this feels a bit like a hack since it is a hard-coded one-off
+    RustFmtSkip,
 }
 
 impl ToFragment for ModuleAttr {
@@ -56,6 +58,9 @@ impl ToFragment for ModuleAttr {
                 allow_attr
                     .to_fragment()
                     .delimit(Fragment::Char('['), Fragment::Char(']')),
+            ),
+            ModuleAttr::RustFmtSkip => Fragment::string("#!").cat(
+                Fragment::string("rustfmt::skip").delimit(Fragment::Char('['), Fragment::Char(']')),
             ),
         }
     }

@@ -1891,88 +1891,86 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
-                    let device_or_variation_index_table = {
-                        let device_table = {
-                            // quotient = numerator / denominator # int division (u16 -> u16 -> u16)
-                            // if quotient * denominator < numerator:
-                            //     quotient + 1
-                            // else:
-                            //     quotient
-                            let u16_div_ceil = |numerator: Expr, denominator: Expr| {
-                                let quotient = div(numerator.clone(), denominator.clone());
-                                expr_if_else(
-                                    expr_lt(mul(quotient.clone(), denominator), numerator),
-                                    add(quotient.clone(), Expr::U16(1)),
-                                    quotient,
-                                )
-                            };
+        let device_or_variation_index_table = {
+            let device_table = {
+                // quotient = numerator / denominator # int division (u16 -> u16 -> u16)
+                // if quotient * denominator < numerator:
+                //     quotient + 1
+                // else:
+                //     quotient
+                let u16_div_ceil = |numerator: Expr, denominator: Expr| {
+                    let quotient = div(numerator.clone(), denominator.clone());
+                    expr_if_else(
+                        expr_lt(mul(quotient.clone(), denominator), numerator),
+                        add(quotient.clone(), Expr::U16(1)),
+                        quotient,
+                    )
+                };
 
-                            // NOTE - Converts a 'number of delta-values' to a `number of 16-bit words', based on the implied bit-width of a single delta-value,
-                            let packed_array_length = |delta_format: Expr, num_sizes: Expr| {
-                                let divide_by = |divisor: u16| {
-                                    u16_div_ceil(num_sizes.clone(), Expr::U16(divisor))
-                                };
-                                expr_match(
-                                    delta_format,
-                                    [
-                                        (Pattern::U16(1), divide_by(8)),   // 2-bit deltas, 8 per Uint16
-                                        (Pattern::U16(2), divide_by(4)), // 4-bit deltas, 4 per Uint16
-                                        (Pattern::U16(3), divide_by(2)), // 8-bit deltas, 2 per Uint16
-                                        (Pattern::Wildcard, Expr::U16(0)), // Wrong Branch
-                                    ],
-                                )
-                            };
+                // NOTE - Converts a 'number of delta-values' to a `number of 16-bit words', based on the implied bit-width of a single delta-value,
+                let packed_array_length = |delta_format: Expr, num_sizes: Expr| {
+                    let divide_by =
+                        |divisor: u16| u16_div_ceil(num_sizes.clone(), Expr::U16(divisor));
+                    expr_match(
+                        delta_format,
+                        [
+                            (Pattern::U16(1), divide_by(8)),   // 2-bit deltas, 8 per Uint16
+                            (Pattern::U16(2), divide_by(4)),   // 4-bit deltas, 4 per Uint16
+                            (Pattern::U16(3), divide_by(2)),   // 8-bit deltas, 2 per Uint16
+                            (Pattern::Wildcard, Expr::U16(0)), // Wrong Branch
+                        ],
+                    )
+                };
 
-                            let num_sizes =
-                                |start: Expr, end: Expr| add(sub(end, start), Expr::U16(1));
+                let num_sizes = |start: Expr, end: Expr| add(sub(end, start), Expr::U16(1));
 
-                            record([
-                                ("start_size", base.u16be()),
-                                ("end_size", base.u16be()),
-                                ("delta_format", base.u16be()),
-                                (
-                                    "delta_values",
-                                    repeat_count(
-                                        packed_array_length(
-                                            var("delta_format"),
-                                            num_sizes(var("start_size"), var("end_size")),
-                                        ),
-                                        base.u16be(),
-                                    ),
-                                ),
-                            ])
-                        };
+                record([
+                    ("start_size", base.u16be()),
+                    ("end_size", base.u16be()),
+                    ("delta_format", base.u16be()),
+                    (
+                        "delta_values",
+                        repeat_count(
+                            packed_array_length(
+                                var("delta_format"),
+                                num_sizes(var("start_size"), var("end_size")),
+                            ),
+                            base.u16be(),
+                        ),
+                    ),
+                ])
+            };
 
-                        let variation_index_table = record([
-                            ("delta_set_outer_index", base.u16be()),
-                            ("delta_set_inner_index", base.u16be()),
-                            ("delta_format", is_bytes(&(0x8000u16).to_be_bytes())),
-                        ]);
+            let variation_index_table = record([
+                ("delta_set_outer_index", base.u16be()),
+                ("delta_set_inner_index", base.u16be()),
+                ("delta_format", is_bytes(&(0x8000u16).to_be_bytes())),
+            ]);
 
-                        module.define_format(
-                            "opentype.common.device_or_variation_index_table",
-                            peek_field_then(
-                                &[
-                                    ("__skipped0", base.u16be()), // `startSize` or `deltaSetOuterIndex`
-                                    ("__skipped1", base.u16be()), // `endSize` or `deltaSetInnerIndex`
-                                    ("delta_format", base.u16be()),
-                                ],
-                                match_variant(
-                                    var("delta_format"),
-                                    [
-                                        (Pattern::Int(Bounds::new(1, 3)), "DeviceTable", device_table),
-                                        (
-                                            Pattern::U16(0x8000),
-                                            "VariationIndexTable",
-                                            variation_index_table,
-                                        ),
-                                        // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere" )
-                                        (Pattern::Wildcard, "BadFormat", Format::Fail),
-                                    ],
-                                ),
-                            )
-                        )
-                    };
+            module.define_format(
+                "opentype.common.device_or_variation_index_table",
+                peek_field_then(
+                    &[
+                        ("__skipped0", base.u16be()), // `startSize` or `deltaSetOuterIndex`
+                        ("__skipped1", base.u16be()), // `endSize` or `deltaSetInnerIndex`
+                        ("delta_format", base.u16be()),
+                    ],
+                    match_variant(
+                        var("delta_format"),
+                        [
+                            (Pattern::Int(Bounds::new(1, 3)), "DeviceTable", device_table),
+                            (
+                                Pattern::U16(0x8000),
+                                "VariationIndexTable",
+                                variation_index_table,
+                            ),
+                            // NOTE - the name of this variant is arbitrary since it won't actually appear anywhere" )
+                            (Pattern::Wildcard, "BadFormat", Format::Fail),
+                        ],
+                    ),
+                ),
+            )
+        };
         let gdef_table = {
             // REVIEW - should this be a module definition (to shorten type-name)?
 
@@ -2166,8 +2164,14 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             module.define_format(
                 "opentype.common.value-format-flags",
                 flags_bits16([
-                    None, None, None, None, // 0xF000 - Reserved (set to 0)
-                    None, None, None, None, // 0xF00  - Reserved (set to 0)
+                    None,
+                    None,
+                    None,
+                    None, // 0xF000 - Reserved (set to 0)
+                    None,
+                    None,
+                    None,
+                    None, // 0xF00  - Reserved (set to 0)
                     Some("y_advance_device"),
                     Some("x_advance_device"),
                     Some("y_placement_device"),
@@ -2176,29 +2180,67 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                     Some("x_advance"),
                     Some("y_placement"),
                     Some("x_placement"),
-                ])
+                ]),
             )
         };
         let vf_flags_type = module.get_format_type(value_format_flags.get_level());
 
         let value_record = {
-            let opt_field = |field_name: &'static str, format: Format| (field_name, cond_maybe(record_proj(var("flags"), field_name), format));
+            let opt_field = |field_name: &'static str, format: Format| {
+                (
+                    field_name,
+                    cond_maybe(record_proj(var("flags"), field_name), format),
+                )
+            };
             module.define_format_args(
                 "opentype.common.value_record",
-                vec![(Label::Borrowed("table_start"), ValueType::Base(BaseType::U32)), (Label::Borrowed("flags"), vf_flags_type.clone())],
+                vec![
+                    (
+                        Label::Borrowed("table_start"),
+                        ValueType::Base(BaseType::U32),
+                    ),
+                    (Label::Borrowed("flags"), vf_flags_type.clone()),
+                ],
                 record([
                     opt_field("x_placement", s16be(base)),
                     opt_field("y_placement", s16be(base)),
                     opt_field("x_advance", s16be(base)),
                     opt_field("y_advance", s16be(base)),
-                    opt_field("x_placement_device", offset16(var("table_start"), device_or_variation_index_table.call(), base)),
-                    opt_field("y_placement_device", offset16(var("table_start"), device_or_variation_index_table.call(), base)),
-                    opt_field("x_advance_device", offset16(var("table_start"), device_or_variation_index_table.call(), base)),
-                    opt_field("y_advance_device", offset16(var("table_start"), device_or_variation_index_table.call(), base)),
-                ])
+                    opt_field(
+                        "x_placement_device",
+                        offset16(
+                            var("table_start"),
+                            device_or_variation_index_table.call(),
+                            base,
+                        ),
+                    ),
+                    opt_field(
+                        "y_placement_device",
+                        offset16(
+                            var("table_start"),
+                            device_or_variation_index_table.call(),
+                            base,
+                        ),
+                    ),
+                    opt_field(
+                        "x_advance_device",
+                        offset16(
+                            var("table_start"),
+                            device_or_variation_index_table.call(),
+                            base,
+                        ),
+                    ),
+                    opt_field(
+                        "y_advance_device",
+                        offset16(
+                            var("table_start"),
+                            device_or_variation_index_table.call(),
+                            base,
+                        ),
+                    ),
+                ]),
             )
         };
-
 
         let single_substitution = /* STUB */ Format::EMPTY;
         let multiple_substitution = /* STUB */ Format::EMPTY;
@@ -2212,31 +2254,57 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let single_adjustment = {
             let single_pos_format1 = |table_start: Expr| {
                 record([
-                    ("coverage_offset", offset16(table_start.clone(), coverage_table.call(), base)),
+                    (
+                        "coverage_offset",
+                        offset16(table_start.clone(), coverage_table.call(), base),
+                    ),
                     ("value_format", value_format_flags.call()),
-                    ("value_record", value_record.call_args(vec![table_start, var("value_format")])),
+                    (
+                        "value_record",
+                        value_record.call_args(vec![table_start, var("value_format")]),
+                    ),
                 ])
             };
             let single_pos_format2 = |table_start: Expr| {
                 record([
-                    ("coverage_offset", offset16(table_start.clone(), coverage_table.call(), base)),
+                    (
+                        "coverage_offset",
+                        offset16(table_start.clone(), coverage_table.call(), base),
+                    ),
                     ("value_format", value_format_flags.call()),
                     ("value_count", base.u16be()),
-                    ("value_records", repeat_count(var("value_count"), value_record.call_args(vec![table_start, var("value_format")]))),
+                    (
+                        "value_records",
+                        repeat_count(
+                            var("value_count"),
+                            value_record.call_args(vec![table_start, var("value_format")]),
+                        ),
+                    ),
                 ])
             };
             record([
                 ("table_start", pos32()),
                 ("pos_format", base.u16be()),
-                ("subtable", match_variant(
-                    var("pos_format"),
-                    [
-                        (Pattern::U16(1), "Format1", single_pos_format1(var("table_start"))),
-                        (Pattern::U16(2), "Format2", single_pos_format2(var("table_start"))),
-                        // REVIEW - should this be a permanent hard-failure?
-                        (Pattern::Wildcard, "BadFormat", Format::Fail),
-                    ]
-                ))
+                (
+                    "subtable",
+                    match_variant(
+                        var("pos_format"),
+                        [
+                            (
+                                Pattern::U16(1),
+                                "Format1",
+                                single_pos_format1(var("table_start")),
+                            ),
+                            (
+                                Pattern::U16(2),
+                                "Format2",
+                                single_pos_format2(var("table_start")),
+                            ),
+                            // REVIEW - should this be a permanent hard-failure?
+                            (Pattern::Wildcard, "BadFormat", Format::Fail),
+                        ],
+                    ),
+                ),
             ])
         };
         let pair_adjustment = {
