@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(dead_code)]
-#![rustfmt::skip]
+#![cfg_attr(rustfmt, rustfmt::skip)]
 
 mod codegen_tests;
 pub mod api_helper;
@@ -327,7 +327,7 @@ distance: u16
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes__dupX1 { literal(u8), reference(deflate_main_codes_reference) }
+pub enum deflate_main_codes { literal(u8), reference(deflate_main_codes_reference) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_dynamic_huffman {
@@ -340,7 +340,7 @@ literal_length_distance_alphabet_code_lengths_value: Vec<u8>,
 literal_length_alphabet_code_lengths_value: Vec<u8>,
 distance_alphabet_code_lengths_value: Vec<u8>,
 codes: Vec<deflate_dynamic_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
@@ -360,7 +360,7 @@ extra: Option<deflate_fixed_huffman_codes_values>
 #[derive(Debug, Clone)]
 pub struct deflate_fixed_huffman {
 codes: Vec<deflate_fixed_huffman_codes>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
@@ -369,23 +369,23 @@ align: (),
 len: u16,
 nlen: u16,
 bytes: Vec<u8>,
-codes_values: Vec<deflate_main_codes__dupX1>
+codes_values: Vec<deflate_main_codes>
 }
 
 #[derive(Debug, Clone)]
-pub enum deflate_main_codes { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
+pub enum deflate_main_codes__dupX1 { dynamic_huffman(deflate_dynamic_huffman), fixed_huffman(deflate_fixed_huffman), uncompressed(deflate_uncompressed) }
 
 #[derive(Debug, Clone)]
 pub struct deflate_block {
 r#final: u8,
 r#type: u8,
-data: deflate_main_codes
+data: deflate_main_codes__dupX1
 }
 
 #[derive(Debug, Clone)]
 pub struct deflate_main {
 blocks: Vec<deflate_block>,
-codes: Vec<deflate_main_codes__dupX1>,
+codes: Vec<deflate_main_codes>,
 inflate: Vec<u8>
 }
 
@@ -2129,6 +2129,68 @@ y_advance_device: Option<opentype_common_value_record_x_advance_device>
 }
 
 #[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link_pair_value_records {
+second_glyph: u16,
+value_record1: Option<opentype_common_value_record>,
+value_record2: Option<opentype_common_value_record>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link {
+table_start: u32,
+pair_value_count: u16,
+pair_value_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link_pair_value_records>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets {
+offset: u16,
+link: Option<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1 {
+coverage: opentype_gdef_table_attach_list_link_coverage,
+value_format1: opentype_common_value_format_flags,
+value_format2: opentype_common_value_format_flags,
+pair_set_count: u16,
+pair_sets: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records_class2_records {
+value_record1: Option<opentype_common_value_record>,
+value_record2: Option<opentype_common_value_record>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records {
+class2_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records_class2_records>
+}
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2 {
+coverage: opentype_gdef_table_attach_list_link_coverage,
+value_format1: opentype_common_value_format_flags,
+value_format2: opentype_common_value_format_flags,
+class_def1: opentype_gdef_table_glyph_class_def,
+class_def2: opentype_gdef_table_glyph_class_def,
+class1_count: u16,
+class2_count: u16,
+class1_records: Vec<opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records>
+}
+
+#[derive(Debug, Clone)]
+pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable { Format1(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1), Format2(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2) }
+
+#[derive(Debug, Clone)]
+pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust {
+table_start: u32,
+pos_format: u16,
+subtable: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable
+}
+
+#[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust_subtable_Format1 {
 coverage_offset: opentype_gdef_table_attach_list_link_coverage,
 value_format: opentype_common_value_format_flags,
@@ -2154,7 +2216,7 @@ subtable: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_Singl
 }
 
 #[derive(Debug, Clone)]
-pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { ChainCtxPos, CtxPos, CursAttach, ExtPos, MarkBaseAttach, MarkLigAttach, MarkMarkAttach, PairAdjust, SingleAdjust(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust) }
+pub enum opentype_gpos_table_lookup_list_link_lookups_link_subtables_link { ChainCtxPos, CtxPos, CursAttach, ExtPos, MarkBaseAttach, MarkLigAttach, MarkMarkAttach, PairAdjust(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust), SingleAdjust(opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_SingleAdjust) }
 
 #[derive(Debug, Clone)]
 pub struct opentype_gpos_table_lookup_list_link_lookups_link_subtables {
@@ -2898,7 +2960,7 @@ PResult::Ok(main { data, end })
 }
 
 fn Decoder_waldo_main<'input>(_input: &mut Parser<'input>) -> Result<waldo_main, ParseError> {
-let r#where = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let r#where = ((|| PResult::Ok((Decoder64(_input))?))())?;
 let noise = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -3032,7 +3094,7 @@ return Err(ParseError::InsufficientRepeats);
 break
 }
 } else {
-let next_elem = (Decoder290(_input))?;
+let next_elem = (Decoder293(_input))?;
 accum.push(next_elem);
 }
 }
@@ -3084,7 +3146,7 @@ PResult::Ok(gif_main { header, logical_screen, blocks, trailer })
 }
 
 fn Decoder5<'input>(_input: &mut Parser<'input>) -> Result<Vec<tar_main>, ParseError> {
-let gzip_raw = (Decoder267(_input))?;
+let gzip_raw = (Decoder270(_input))?;
 let mut accum = Vec::new();
 for item in gzip_raw.clone() {
 accum.push({
@@ -3127,7 +3189,7 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 }))())?;
 let fname = ((|| PResult::Ok(if header.file_flags.fname.clone() {
-Some((Decoder260(_input))?)
+Some((Decoder263(_input))?)
 } else {
 None
 }))())?;
@@ -3159,7 +3221,7 @@ PResult::Ok(accum)
 fn Decoder_jpeg_main<'input>(_input: &mut Parser<'input>) -> Result<jpeg_main, ParseError> {
 let soi = ((|| PResult::Ok((Decoder_jpeg_eoi(_input))?))())?;
 let frame = ((|| PResult::Ok((Decoder_jpeg_frame(_input))?))())?;
-let eoi = ((|| PResult::Ok((Decoder189(_input))?))())?;
+let eoi = ((|| PResult::Ok((Decoder192(_input))?))())?;
 PResult::Ok(jpeg_main { soi, frame, eoi })
 }
 
@@ -3189,7 +3251,7 @@ PResult::Ok(mpeg4_main { atoms })
 }
 
 fn Decoder_png_main<'input>(_input: &mut Parser<'input>) -> Result<png_main, ParseError> {
-let signature = ((|| PResult::Ok((Decoder118(_input))?))())?;
+let signature = ((|| PResult::Ok((Decoder121(_input))?))())?;
 let ihdr = ((|| PResult::Ok((Decoder_png_ihdr(_input))?))())?;
 let chunks = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -3377,7 +3439,7 @@ return Err(ParseError::ExcludedBranch(14049552398800766371u64));
 }))())?;
 (field0, field1, field2, field3)
 }))())?;
-let length = ((|| PResult::Ok((Decoder89(_input))?))())?;
+let length = ((|| PResult::Ok((Decoder92(_input))?))())?;
 let data = ((|| PResult::Ok({
 let sz = length as usize<>;
 _input.start_slice(sz)?;
@@ -3469,7 +3531,7 @@ return Err(ParseError::ExcludedBranch(8662494850867647108u64));
 }))())?;
 let magic = ((|| PResult::Ok(match byte_order {
 tiff_main_byte_order::le(..) => {
-(Decoder101(_input))?
+(Decoder104(_input))?
 },
 
 tiff_main_byte_order::be(..) => {
@@ -3478,7 +3540,7 @@ tiff_main_byte_order::be(..) => {
 }))())?;
 let offset = ((|| PResult::Ok(match byte_order {
 tiff_main_byte_order::le(..) => {
-(Decoder89(_input))?
+(Decoder92(_input))?
 },
 
 tiff_main_byte_order::be(..) => {
@@ -3490,21 +3552,21 @@ _input.open_peek_context();
 _input.advance_by(try_sub!(offset, 8u32))?;
 let ret = ((|| PResult::Ok(match byte_order {
 tiff_main_byte_order::le(..) => {
-let num_fields = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let num_fields = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let fields = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..num_fields {
 accum.push({
-let tag = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let length = ((|| PResult::Ok((Decoder89(_input))?))())?;
-let offset_or_data = ((|| PResult::Ok((Decoder89(_input))?))())?;
+let tag = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let length = ((|| PResult::Ok((Decoder92(_input))?))())?;
+let offset_or_data = ((|| PResult::Ok((Decoder92(_input))?))())?;
 tiff_main_ifd_fields { tag, r#type, length, offset_or_data }
 });
 }
 accum
 }))())?;
-let next_ifd_offset = ((|| PResult::Ok((Decoder89(_input))?))())?;
+let next_ifd_offset = ((|| PResult::Ok((Decoder92(_input))?))())?;
 let next_ifd = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -3688,7 +3750,7 @@ elf_types_elf_off::Off64(x64) => {
 x64
 }
 }, __eoh))?;
-let ret = ((|| PResult::Ok((Decoder76(_input, header.ident.data.clone() == 2u8, header.ident.class.clone(), header.phnum.clone()))?))())?;
+let ret = ((|| PResult::Ok((Decoder79(_input, header.ident.data.clone() == 2u8, header.ident.class.clone(), header.phnum.clone()))?))())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
@@ -3717,7 +3779,7 @@ elf_types_elf_off::Off64(x64) => {
 x64
 }
 }, __eoh))?;
-let ret = ((|| PResult::Ok((Decoder77(_input, header.ident.data.clone() == 2u8, header.ident.class.clone(), header.shnum.clone()))?))())?;
+let ret = ((|| PResult::Ok((Decoder80(_input, header.ident.data.clone() == 2u8, header.ident.class.clone(), header.shnum.clone()))?))())?;
 _input.close_peek_context()?;
 Some(ret)
 } else {
@@ -3739,7 +3801,7 @@ elf_types_elf_off::Off64(x64) => {
 x64
 }
 }, __eoh))?;
-let ret = ((|| PResult::Ok((Decoder78(_input, shdr.r#type.clone(), match shdr.size.clone() {
+let ret = ((|| PResult::Ok((Decoder81(_input, shdr.r#type.clone(), match shdr.size.clone() {
 elf_types_elf_full::Full32(x32) => {
 x32 as u64
 },
@@ -4442,7 +4504,7 @@ PResult::Ok(b)
 }
 
 fn Decoder_opentype_table_record<'input>(_input: &mut Parser<'input>, start: u32) -> Result<opentype_table_record, ParseError> {
-let table_id = ((|| PResult::Ok((Decoder48(_input))?))())?;
+let table_id = ((|| PResult::Ok((Decoder52(_input))?))())?;
 let checksum = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let offset = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let length = ((|| PResult::Ok((Decoder21(_input))?))())?;
@@ -5502,8 +5564,8 @@ inner
 return Err(ParseError::FalsifiedWhere);
 }
 }))())?;
-let created = ((|| PResult::Ok((Decoder60(_input))?))())?;
-let modified = ((|| PResult::Ok((Decoder60(_input))?))())?;
+let created = ((|| PResult::Ok((Decoder63(_input))?))())?;
+let modified = ((|| PResult::Ok((Decoder63(_input))?))())?;
 let glyph_extents = ((|| PResult::Ok({
 let x_min = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let y_min = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -5767,7 +5829,7 @@ let ul_unicode_range1 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let ul_unicode_range2 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let ul_unicode_range3 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let ul_unicode_range4 = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let ach_vend_id = ((|| PResult::Ok((Decoder48(_input))?))())?;
+let ach_vend_id = ((|| PResult::Ok((Decoder52(_input))?))())?;
 let fs_selection = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let us_first_char_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let us_last_char_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
@@ -6631,7 +6693,222 @@ opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::SingleAdjust(i
 },
 
 2u16 => {
-opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::PairAdjust
+let inner = {
+let table_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+let pos_format = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let subtable = ((|| PResult::Ok(match pos_format {
+1u16 => {
+let inner = {
+let coverage = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_attach_list_link_coverage { offset, link }
+}))())?;
+let value_format1 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
+let value_format2 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
+let pair_set_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let pair_sets = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..pair_set_count {
+accum.push({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = {
+let table_start = ((|| PResult::Ok({
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+}))())?;
+let pair_value_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let pair_value_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..pair_value_count {
+accum.push({
+let second_glyph = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let value_record1 = ((|| PResult::Ok(if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
+Some((Decoder47(_input, table_start.clone(), value_format1.clone()))?)
+} else {
+None
+}))())?;
+let value_record2 = ((|| PResult::Ok(if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
+Some((Decoder_opentype_common_value_record(_input, table_start.clone(), value_format2.clone()))?)
+} else {
+None
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link_pair_value_records { second_glyph, value_record1, value_record2 }
+});
+}
+accum
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link { table_start, pair_value_count, pair_value_records }
+};
+((|val: opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets { offset, link }
+});
+}
+accum
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1 { coverage, value_format1, value_format2, pair_set_count, pair_sets }
+};
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable::Format1(inner)
+},
+
+2u16 => {
+let inner = {
+let coverage = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_coverage_table(_input))?;
+((|val: opentype_coverage_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_attach_list_link_coverage { offset, link }
+}))())?;
+let value_format1 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
+let value_format2 = ((|| PResult::Ok((Decoder_opentype_common_value_format_flags(_input))?))())?;
+let class_def1 = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_glyph_class_def { offset, link }
+}))())?;
+let class_def2 = ((|| PResult::Ok({
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_class_def(_input))?;
+((|val: opentype_class_def| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+opentype_gdef_table_glyph_class_def { offset, link }
+}))())?;
+let class1_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let class2_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let class1_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..class1_count {
+accum.push({
+let class2_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..class2_count {
+accum.push({
+let value_record1 = ((|| PResult::Ok(if value_format1.x_placement.clone() || value_format1.y_placement.clone() || value_format1.x_advance.clone() || value_format1.y_advance.clone() || value_format1.x_placement_device.clone() || value_format1.y_placement_device.clone() || value_format1.x_advance_device.clone() || value_format1.y_advance_device.clone() {
+Some((Decoder49(_input, table_start.clone(), value_format1.clone()))?)
+} else {
+None
+}))())?;
+let value_record2 = ((|| PResult::Ok(if value_format2.x_placement.clone() || value_format2.y_placement.clone() || value_format2.x_advance.clone() || value_format2.y_advance.clone() || value_format2.x_placement_device.clone() || value_format2.y_placement_device.clone() || value_format2.x_advance_device.clone() || value_format2.y_advance_device.clone() {
+Some((Decoder50(_input, table_start.clone(), value_format2.clone()))?)
+} else {
+None
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records_class2_records { value_record1, value_record2 }
+});
+}
+accum
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records { class2_records }
+});
+}
+accum
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2 { coverage, value_format1, value_format2, class_def1, class_def2, class1_count, class2_count, class1_records }
+};
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable::Format2(inner)
+},
+
+_ => {
+return Err(ParseError::FailToken);
+}
+}))())?;
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust { table_start, pos_format, subtable }
+};
+opentype_gpos_table_lookup_list_link_lookups_link_subtables_link::PairAdjust(inner)
 },
 
 3u16 => {
@@ -6735,7 +7012,7 @@ let script_records = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..script_count {
 accum.push({
-let script_tag = ((|| PResult::Ok((Decoder48(_input))?))())?;
+let script_tag = ((|| PResult::Ok((Decoder52(_input))?))())?;
 let script = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let link = ((|| PResult::Ok(match offset != 0u16 {
@@ -6778,7 +7055,7 @@ let feature_records = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..feature_count {
 accum.push({
-let feature_tag = ((|| PResult::Ok((Decoder48(_input))?))())?;
+let feature_tag = ((|| PResult::Ok((Decoder52(_input))?))())?;
 let feature = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let link = ((|| PResult::Ok(match offset != 0u16 {
@@ -6875,6 +7152,436 @@ PResult::Ok(((|flagbits: u16| PResult::Ok(opentype_common_value_format_flags { y
 }
 
 fn Decoder_opentype_common_value_record<'input>(_input: &mut Parser<'input>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
+let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
+fn Decoder47<'input>(_input: &mut Parser<'input>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
+let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
+fn Decoder_opentype_class_def<'input>(_input: &mut Parser<'input>) -> Result<opentype_class_def, ParseError> {
+let class_format = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let data = ((|| PResult::Ok(match class_format {
+1u16 => {
+let inner = {
+let start_glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let class_value_array = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..glyph_count {
+accum.push((Decoder24(_input))?);
+}
+accum
+}))())?;
+opentype_class_def_data_Format1 { start_glyph_id, glyph_count, class_value_array }
+};
+opentype_class_def_data::Format1(inner)
+},
+
+2u16 => {
+let inner = {
+let class_range_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let class_range_records = ((|| PResult::Ok({
+let mut accum = Vec::new();
+for _ in 0..class_range_count {
+accum.push({
+let start_glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let end_glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let class = ((|| PResult::Ok((Decoder24(_input))?))())?;
+opentype_class_def_data_Format2_class_range_records { start_glyph_id, end_glyph_id, class }
+});
+}
+accum
+}))())?;
+opentype_class_def_data_Format2 { class_range_count, class_range_records }
+};
+opentype_class_def_data::Format2(inner)
+},
+
+_ => {
+return Err(ParseError::FailToken);
+}
+}))())?;
+PResult::Ok(opentype_class_def { class_format, data })
+}
+
+fn Decoder49<'input>(_input: &mut Parser<'input>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
+let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let y_placement = ((|| PResult::Ok(if flags.y_placement.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let x_advance = ((|| PResult::Ok(if flags.x_advance.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let y_advance = ((|| PResult::Ok(if flags.y_advance.clone() {
+Some((Decoder24(_input))?)
+} else {
+None
+}))())?;
+let x_placement_device = ((|| PResult::Ok(if flags.x_placement_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let y_placement_device = ((|| PResult::Ok(if flags.y_placement_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let x_advance_device = ((|| PResult::Ok(if flags.x_advance_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+let y_advance_device = ((|| PResult::Ok(if flags.y_advance_device.clone() {
+let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
+let link = ((|| PResult::Ok(match offset != 0u16 {
+true => {
+let __here = {
+let inner = _input.get_offset_u64();
+((|x: u64| PResult::Ok(x as u32))(inner))?
+};
+_input.open_peek_context();
+_input.advance_by(try_sub!(table_start + (offset as u32), __here))?;
+let ret = ((|| PResult::Ok({
+let inner = (Decoder_opentype_common_device_or_variation_index_table(_input))?;
+((|val: opentype_common_device_or_variation_index_table| PResult::Ok(Some(val)))(inner))?
+}))())?;
+_input.close_peek_context()?;
+ret
+},
+
+false => {
+None
+}
+}))())?;
+Some(opentype_common_value_record_x_advance_device { offset, link })
+} else {
+None
+}))())?;
+PResult::Ok(opentype_common_value_record { x_placement, y_placement, x_advance, y_advance, x_placement_device, y_placement_device, x_advance_device, y_advance_device })
+}
+
+fn Decoder50<'input>(_input: &mut Parser<'input>, table_start: u32, flags: opentype_common_value_format_flags) -> Result<opentype_common_value_record, ParseError> {
 let x_placement = ((|| PResult::Ok(if flags.x_placement.clone() {
 Some((Decoder24(_input))?)
 } else {
@@ -7108,7 +7815,7 @@ return Err(ParseError::FailToken);
 })
 }
 
-fn Decoder48<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
+fn Decoder52<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
 PResult::Ok((Decoder21(_input))?)
 }
 
@@ -7163,7 +7870,7 @@ let lang_sys_records = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..lang_sys_count {
 accum.push({
-let lang_sys_tag = ((|| PResult::Ok((Decoder48(_input))?))())?;
+let lang_sys_tag = ((|| PResult::Ok((Decoder52(_input))?))())?;
 let lang_sys = ((|| PResult::Ok({
 let offset = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let link = ((|| PResult::Ok(match offset != 0u16 {
@@ -7215,52 +7922,6 @@ accum.push((Decoder24(_input))?);
 accum
 }))())?;
 PResult::Ok(opentype_common_langsys { lookup_order_offset, required_feature_index, feature_index_count, feature_indices })
-}
-
-fn Decoder_opentype_class_def<'input>(_input: &mut Parser<'input>) -> Result<opentype_class_def, ParseError> {
-let class_format = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let data = ((|| PResult::Ok(match class_format {
-1u16 => {
-let inner = {
-let start_glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let glyph_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let class_value_array = ((|| PResult::Ok({
-let mut accum = Vec::new();
-for _ in 0..glyph_count {
-accum.push((Decoder24(_input))?);
-}
-accum
-}))())?;
-opentype_class_def_data_Format1 { start_glyph_id, glyph_count, class_value_array }
-};
-opentype_class_def_data::Format1(inner)
-},
-
-2u16 => {
-let inner = {
-let class_range_count = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let class_range_records = ((|| PResult::Ok({
-let mut accum = Vec::new();
-for _ in 0..class_range_count {
-accum.push({
-let start_glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let end_glyph_id = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let class = ((|| PResult::Ok((Decoder24(_input))?))())?;
-opentype_class_def_data_Format2_class_range_records { start_glyph_id, end_glyph_id, class }
-});
-}
-accum
-}))())?;
-opentype_class_def_data_Format2 { class_range_count, class_range_records }
-};
-opentype_class_def_data::Format2(inner)
-},
-
-_ => {
-return Err(ParseError::FailToken);
-}
-}))())?;
-PResult::Ok(opentype_class_def { class_format, data })
 }
 
 fn Decoder_opentype_mark_glyph_set<'input>(_input: &mut Parser<'input>) -> Result<opentype_mark_glyph_set, ParseError> {
@@ -7754,11 +8415,11 @@ return Err(ParseError::FalsifiedWhere);
 PResult::Ok(opentype_maxp_table_version1 { max_points, max_contours, max_composite_points, max_composite_contours, max_zones, max_twilight_points, max_storage, max_function_defs, max_instruction_defs, max_stack_elements, max_size_of_instructions, max_component_elements, max_component_depth })
 }
 
-fn Decoder60<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
-PResult::Ok((Decoder61(_input))?)
+fn Decoder63<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
+PResult::Ok((Decoder64(_input))?)
 }
 
-fn Decoder61<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
+fn Decoder64<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
 let inner = {
 let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -7844,7 +8505,7 @@ opentype_cmap_subtable_data::Format12(inner)
 },
 
 13u16 => {
-let inner = (Decoder71(_input, _platform.clone()))?;
+let inner = (Decoder74(_input, _platform.clone()))?;
 opentype_cmap_subtable_data::Format13(inner)
 },
 
@@ -8360,7 +9021,7 @@ _input.end_slice()?;
 PResult::Ok(ret)
 }
 
-fn Decoder71<'input>(_input: &mut Parser<'input>, _platform: u16) -> Result<opentype_cmap_subtable_format13, ParseError> {
+fn Decoder74<'input>(_input: &mut Parser<'input>, _platform: u16) -> Result<opentype_cmap_subtable_format13, ParseError> {
 let length = {
 _input.open_peek_context();
 let ret = ((|| PResult::Ok({
@@ -8578,23 +9239,23 @@ let ret = ((|| PResult::Ok((Decoder_elf_header_ident(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
-let r#type = ((|| PResult::Ok((Decoder97(_input, ident.data.clone() == 2u8))?))())?;
-let machine = ((|| PResult::Ok((Decoder98(_input, ident.data.clone() == 2u8))?))())?;
-let version = ((|| PResult::Ok((Decoder99(_input, ident.data.clone() == 2u8))?))())?;
+let r#type = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
+let machine = ((|| PResult::Ok((Decoder101(_input, ident.data.clone() == 2u8))?))())?;
+let version = ((|| PResult::Ok((Decoder102(_input, ident.data.clone() == 2u8))?))())?;
 let entry = ((|| PResult::Ok((Decoder_elf_types_elf_addr(_input, ident.data.clone() == 2u8, ident.class.clone()))?))())?;
 let phoff = ((|| PResult::Ok((Decoder_elf_types_elf_off(_input, ident.data.clone() == 2u8, ident.class.clone()))?))())?;
 let shoff = ((|| PResult::Ok((Decoder_elf_types_elf_off(_input, ident.data.clone() == 2u8, ident.class.clone()))?))())?;
-let flags = ((|| PResult::Ok((Decoder80(_input, ident.data.clone() == 2u8))?))())?;
-let ehsize = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
-let phentsize = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
-let phnum = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
-let shentsize = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
-let shnum = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
-let shstrndx = ((|| PResult::Ok((Decoder100(_input, ident.data.clone() == 2u8))?))())?;
+let flags = ((|| PResult::Ok((Decoder83(_input, ident.data.clone() == 2u8))?))())?;
+let ehsize = ((|| PResult::Ok((Decoder103(_input, ident.data.clone() == 2u8))?))())?;
+let phentsize = ((|| PResult::Ok((Decoder103(_input, ident.data.clone() == 2u8))?))())?;
+let phnum = ((|| PResult::Ok((Decoder103(_input, ident.data.clone() == 2u8))?))())?;
+let shentsize = ((|| PResult::Ok((Decoder103(_input, ident.data.clone() == 2u8))?))())?;
+let shnum = ((|| PResult::Ok((Decoder103(_input, ident.data.clone() == 2u8))?))())?;
+let shstrndx = ((|| PResult::Ok((Decoder103(_input, ident.data.clone() == 2u8))?))())?;
 PResult::Ok(elf_header { ident, r#type, machine, version, entry, phoff, shoff, flags, ehsize, phentsize, phnum, shentsize, shnum, shstrndx })
 }
 
-fn Decoder76<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr_table>, ParseError> {
+fn Decoder79<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8, phnum: u16) -> Result<Vec<elf_phdr_table>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..phnum {
 accum.push((Decoder_elf_phdr_table(_input, is_be.clone(), class.clone()))?);
@@ -8602,7 +9263,7 @@ accum.push((Decoder_elf_phdr_table(_input, is_be.clone(), class.clone()))?);
 PResult::Ok(accum)
 }
 
-fn Decoder77<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr_table>, ParseError> {
+fn Decoder80<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8, shnum: u16) -> Result<Vec<elf_shdr_table>, ParseError> {
 let mut accum = Vec::new();
 for _ in 0..shnum {
 accum.push((Decoder_elf_shdr_table(_input, is_be.clone(), class.clone()))?);
@@ -8610,7 +9271,7 @@ accum.push((Decoder_elf_shdr_table(_input, is_be.clone(), class.clone()))?);
 PResult::Ok(accum)
 }
 
-fn Decoder78<'input>(_input: &mut Parser<'input>, r#type: u32, size: u64) -> Result<Vec<u8>, ParseError> {
+fn Decoder81<'input>(_input: &mut Parser<'input>, r#type: u32, size: u64) -> Result<Vec<u8>, ParseError> {
 PResult::Ok(match r#type {
 _ => {
 let mut accum = Vec::new();
@@ -8623,20 +9284,20 @@ accum
 }
 
 fn Decoder_elf_shdr_table<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<elf_shdr_table, ParseError> {
-let name = ((|| PResult::Ok((Decoder80(_input, is_be.clone()))?))())?;
-let r#type = ((|| PResult::Ok((Decoder81(_input, is_be.clone()))?))())?;
+let name = ((|| PResult::Ok((Decoder83(_input, is_be.clone()))?))())?;
+let r#type = ((|| PResult::Ok((Decoder84(_input, is_be.clone()))?))())?;
 let flags = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
 let addr = ((|| PResult::Ok((Decoder_elf_types_elf_addr(_input, is_be.clone(), class.clone()))?))())?;
 let offset = ((|| PResult::Ok((Decoder_elf_types_elf_off(_input, is_be.clone(), class.clone()))?))())?;
 let size = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
-let link = ((|| PResult::Ok((Decoder80(_input, is_be.clone()))?))())?;
-let info = ((|| PResult::Ok((Decoder85(_input, is_be.clone()))?))())?;
+let link = ((|| PResult::Ok((Decoder83(_input, is_be.clone()))?))())?;
+let info = ((|| PResult::Ok((Decoder88(_input, is_be.clone()))?))())?;
 let addralign = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
 let entsize = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
 PResult::Ok(elf_shdr_table { name, r#type, flags, addr, offset, size, link, info, addralign, entsize })
 }
 
-fn Decoder80<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
+fn Decoder83<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
 let _ = _input.skip_align(4)?;
 PResult::Ok(match is_be {
 true => {
@@ -8644,13 +9305,13 @@ true => {
 },
 
 false => {
-(Decoder89(_input))?
+(Decoder92(_input))?
 }
 })
 }
 
-fn Decoder81<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
-let inner = (Decoder80(_input, is_be.clone()))?;
+fn Decoder84<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
+let inner = (Decoder83(_input, is_be.clone()))?;
 PResult::Ok(if ((|sh_type: u32| PResult::Ok(match sh_type {
 0u32..=11u32 => {
 true
@@ -8677,12 +9338,12 @@ return Err(ParseError::FalsifiedWhere);
 fn Decoder_elf_types_elf_full<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<elf_types_elf_full, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder80(_input, is_be.clone()))?;
+let inner = (Decoder83(_input, is_be.clone()))?;
 elf_types_elf_full::Full32(inner)
 },
 
 2u8 => {
-let inner = (Decoder92(_input, is_be.clone()))?;
+let inner = (Decoder95(_input, is_be.clone()))?;
 elf_types_elf_full::Full64(inner)
 },
 
@@ -8695,12 +9356,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 fn Decoder_elf_types_elf_addr<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<elf_types_elf_addr, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder90(_input, is_be.clone()))?;
+let inner = (Decoder93(_input, is_be.clone()))?;
 elf_types_elf_addr::Addr32(inner)
 },
 
 2u8 => {
-let inner = (Decoder91(_input, is_be.clone()))?;
+let inner = (Decoder94(_input, is_be.clone()))?;
 elf_types_elf_addr::Addr64(inner)
 },
 
@@ -8713,12 +9374,12 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 fn Decoder_elf_types_elf_off<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<elf_types_elf_off, ParseError> {
 PResult::Ok(match class {
 1u8 => {
-let inner = (Decoder86(_input, is_be.clone()))?;
+let inner = (Decoder89(_input, is_be.clone()))?;
 elf_types_elf_off::Off32(inner)
 },
 
 2u8 => {
-let inner = (Decoder87(_input, is_be.clone()))?;
+let inner = (Decoder90(_input, is_be.clone()))?;
 elf_types_elf_off::Off64(inner)
 },
 
@@ -8728,11 +9389,11 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-fn Decoder85<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
-PResult::Ok((Decoder80(_input, is_be.clone()))?)
+fn Decoder88<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
+PResult::Ok((Decoder83(_input, is_be.clone()))?)
 }
 
-fn Decoder86<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
+fn Decoder89<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
 let _ = _input.skip_align(4)?;
 PResult::Ok(match is_be {
 true => {
@@ -8740,25 +9401,25 @@ true => {
 },
 
 false => {
-(Decoder89(_input))?
+(Decoder92(_input))?
 }
 })
 }
 
-fn Decoder87<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
+fn Decoder90<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
 let _ = _input.skip_align(8)?;
 PResult::Ok(match is_be {
 true => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 false => {
-(Decoder88(_input))?
+(Decoder91(_input))?
 }
 })
 }
 
-fn Decoder88<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
+fn Decoder91<'input>(_input: &mut Parser<'input>) -> Result<u64, ParseError> {
 let inner = {
 let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -8773,7 +9434,7 @@ let field7 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 PResult::Ok(((|x: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(u64le(x)))(inner))?)
 }
 
-fn Decoder89<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
+fn Decoder92<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
 let inner = {
 let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -8784,7 +9445,7 @@ let field3 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 PResult::Ok(((|x: (u8, u8, u8, u8)| PResult::Ok(u32le(x)))(inner))?)
 }
 
-fn Decoder90<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
+fn Decoder93<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
 let _ = _input.skip_align(4)?;
 PResult::Ok(match is_be {
 true => {
@@ -8792,61 +9453,61 @@ true => {
 },
 
 false => {
-(Decoder89(_input))?
+(Decoder92(_input))?
 }
 })
 }
 
-fn Decoder91<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
+fn Decoder94<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
 let _ = _input.skip_align(8)?;
 PResult::Ok(match is_be {
 true => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 false => {
-(Decoder88(_input))?
+(Decoder91(_input))?
 }
 })
 }
 
-fn Decoder92<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
+fn Decoder95<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u64, ParseError> {
 let _ = _input.skip_align(8)?;
 PResult::Ok(match is_be {
 true => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 false => {
-(Decoder88(_input))?
+(Decoder91(_input))?
 }
 })
 }
 
 fn Decoder_elf_phdr_table<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<elf_phdr_table, ParseError> {
-let r#type = ((|| PResult::Ok((Decoder80(_input, is_be.clone()))?))())?;
-let flags64 = ((|| PResult::Ok((Decoder94(_input, is_be.clone(), class.clone()))?))())?;
+let r#type = ((|| PResult::Ok((Decoder83(_input, is_be.clone()))?))())?;
+let flags64 = ((|| PResult::Ok((Decoder97(_input, is_be.clone(), class.clone()))?))())?;
 let offset = ((|| PResult::Ok((Decoder_elf_types_elf_off(_input, is_be.clone(), class.clone()))?))())?;
 let vaddr = ((|| PResult::Ok((Decoder_elf_types_elf_addr(_input, is_be.clone(), class.clone()))?))())?;
 let paddr = ((|| PResult::Ok((Decoder_elf_types_elf_addr(_input, is_be.clone(), class.clone()))?))())?;
 let filesz = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
 let memsz = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
-let flags32 = ((|| PResult::Ok((Decoder95(_input, is_be.clone(), class.clone()))?))())?;
+let flags32 = ((|| PResult::Ok((Decoder98(_input, is_be.clone(), class.clone()))?))())?;
 let align = ((|| PResult::Ok((Decoder_elf_types_elf_full(_input, is_be.clone(), class.clone()))?))())?;
 PResult::Ok(elf_phdr_table { r#type, flags64, offset, vaddr, paddr, filesz, memsz, flags32, align })
 }
 
-fn Decoder94<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
+fn Decoder97<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
 PResult::Ok(if class == 2u8 {
-Some((Decoder80(_input, is_be.clone()))?)
+Some((Decoder83(_input, is_be.clone()))?)
 } else {
 None
 })
 }
 
-fn Decoder95<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
+fn Decoder98<'input>(_input: &mut Parser<'input>, is_be: bool, class: u8) -> Result<Option<u32>, ParseError> {
 PResult::Ok(if class == 1u8 {
-Some((Decoder80(_input, is_be.clone()))?)
+Some((Decoder83(_input, is_be.clone()))?)
 } else {
 None
 })
@@ -8888,11 +9549,11 @@ return Err(ParseError::ExcludedBranch(14049552398800766371u64));
 }))())?;
 (field0, field1, field2, field3)
 }))())?;
-let class = ((|| PResult::Ok((Decoder102(_input))?))())?;
-let data = ((|| PResult::Ok((Decoder103(_input))?))())?;
-let version = ((|| PResult::Ok((Decoder104(_input))?))())?;
-let os_abi = ((|| PResult::Ok((Decoder105(_input))?))())?;
-let abi_version = ((|| PResult::Ok((Decoder106(_input))?))())?;
+let class = ((|| PResult::Ok((Decoder105(_input))?))())?;
+let data = ((|| PResult::Ok((Decoder106(_input))?))())?;
+let version = ((|| PResult::Ok((Decoder107(_input))?))())?;
+let os_abi = ((|| PResult::Ok((Decoder108(_input))?))())?;
+let abi_version = ((|| PResult::Ok((Decoder109(_input))?))())?;
 let __pad = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -8928,8 +9589,8 @@ accum
 PResult::Ok(elf_header_ident { magic, class, data, version, os_abi, abi_version, __pad })
 }
 
-fn Decoder97<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
-let inner = (Decoder100(_input, is_be.clone()))?;
+fn Decoder100<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
+let inner = (Decoder103(_input, is_be.clone()))?;
 PResult::Ok(if ((|r#type: u16| PResult::Ok(match r#type {
 0u16..=4u16 => {
 true
@@ -8953,12 +9614,12 @@ return Err(ParseError::FalsifiedWhere);
 })
 }
 
-fn Decoder98<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
-PResult::Ok((Decoder100(_input, is_be.clone()))?)
+fn Decoder101<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
+PResult::Ok((Decoder103(_input, is_be.clone()))?)
 }
 
-fn Decoder99<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
-let inner = (Decoder80(_input, is_be.clone()))?;
+fn Decoder102<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u32, ParseError> {
+let inner = (Decoder83(_input, is_be.clone()))?;
 PResult::Ok(if ((|x: u32| PResult::Ok(x <= 1u32))(inner.clone()))? {
 inner
 } else {
@@ -8966,7 +9627,7 @@ return Err(ParseError::FalsifiedWhere);
 })
 }
 
-fn Decoder100<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
+fn Decoder103<'input>(_input: &mut Parser<'input>, is_be: bool) -> Result<u16, ParseError> {
 let _ = _input.skip_align(2)?;
 PResult::Ok(match is_be {
 true => {
@@ -8974,12 +9635,12 @@ true => {
 },
 
 false => {
-(Decoder101(_input))?
+(Decoder104(_input))?
 }
 })
 }
 
-fn Decoder101<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
+fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<u16, ParseError> {
 let inner = {
 let field0 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -8988,7 +9649,7 @@ let field1 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 PResult::Ok(((|x: (u8, u8)| PResult::Ok(u16le(x)))(inner))?)
 }
 
-fn Decoder102<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let inner = (Decoder25(_input))?;
 PResult::Ok(if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
 inner
@@ -8997,7 +9658,7 @@ return Err(ParseError::FalsifiedWhere);
 })
 }
 
-fn Decoder103<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let inner = (Decoder25(_input))?;
 PResult::Ok(if ((|x: u8| PResult::Ok(x <= 2u8))(inner.clone()))? {
 inner
@@ -9006,7 +9667,7 @@ return Err(ParseError::FalsifiedWhere);
 })
 }
 
-fn Decoder104<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder107<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let inner = (Decoder25(_input))?;
 PResult::Ok(if ((|x: u8| PResult::Ok(x <= 1u8))(inner.clone()))? {
 inner
@@ -9015,11 +9676,11 @@ return Err(ParseError::FalsifiedWhere);
 })
 }
 
-fn Decoder105<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder108<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 PResult::Ok((Decoder25(_input))?)
 }
 
-fn Decoder106<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder109<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 PResult::Ok((Decoder25(_input))?)
 }
 
@@ -9076,7 +9737,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9084,7 +9745,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9151,7 +9812,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9159,7 +9820,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9226,7 +9887,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9234,7 +9895,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9275,50 +9936,50 @@ ret
 let size = ((|| PResult::Ok({
 let inner = {
 let oA = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o9 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o8 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o7 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o6 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o5 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o4 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o3 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o2 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o1 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
 let o0 = ((|| PResult::Ok({
-let inner = (Decoder110(_input))?;
+let inner = (Decoder113(_input))?;
 ((|bit: u8| PResult::Ok(try_sub!(bit as u8, 48u8)))(inner))?
 }))())?;
-let __nil = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nil = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let value = ((|| PResult::Ok((((0u8 as u32) << 3u32 | (oA as u32)) << 6u32 | (o9 as u32) << 3u32 | (o8 as u32)) << 24u32 | (((o7 as u32) << 3u32 | (o6 as u32)) << 6u32 | (o5 as u32) << 3u32 | (o4 as u32)) << 12u32 | ((o3 as u32) << 3u32 | (o2 as u32)) << 6u32 | (o1 as u32) << 3u32 | (o0 as u32)))())?;
 tar_header_size_raw { oA, o9, o8, o7, o6, o5, o4, o3, o2, o1, o0, __nil, value }
 };
@@ -9353,7 +10014,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9361,7 +10022,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9428,7 +10089,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9436,7 +10097,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9474,11 +10135,11 @@ tar_header_uid { string, __nul_or_wsp, __padding }
 _input.end_slice()?;
 ret
 }))())?;
-let typeflag = ((|| PResult::Ok((Decoder112(_input))?))())?;
+let typeflag = ((|| PResult::Ok((Decoder115(_input))?))())?;
 let linkname = ((|| PResult::Ok({
 let sz = 100u16 as usize<>;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok((Decoder113(_input))?))())?;
+let ret = ((|| PResult::Ok((Decoder116(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
@@ -9595,7 +10256,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9603,7 +10264,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9670,7 +10331,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder110(_input))?;
+let next_elem = (Decoder113(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -9678,7 +10339,7 @@ break
 }
 accum
 }))())?;
-let __nul_or_wsp = ((|| PResult::Ok((Decoder111(_input))?))())?;
+let __nul_or_wsp = ((|| PResult::Ok((Decoder114(_input))?))())?;
 let __padding = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -9719,7 +10380,7 @@ ret
 let prefix = ((|| PResult::Ok({
 let sz = 155u16 as usize<>;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok((Decoder113(_input))?))())?;
+let ret = ((|| PResult::Ok((Decoder116(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
@@ -9823,7 +10484,7 @@ accum
 PResult::Ok(tar_ascii_string_opt0 { string, __padding })
 }
 
-fn Decoder110<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder113<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([71776119061217280, 0, 0, 0])).contains(b) {
 b
@@ -9832,7 +10493,7 @@ return Err(ParseError::ExcludedBranch(16196330650984947656u64));
 })
 }
 
-fn Decoder111<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder114<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([4294967297, 0, 0, 0])).contains(b) {
 b
@@ -9841,12 +10502,12 @@ return Err(ParseError::ExcludedBranch(9824667705306069359u64));
 })
 }
 
-fn Decoder112<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder115<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(b)
 }
 
-fn Decoder113<'input>(_input: &mut Parser<'input>) -> Result<tar_ascii_string_opt0, ParseError> {
+fn Decoder116<'input>(_input: &mut Parser<'input>) -> Result<tar_ascii_string_opt0, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -10003,7 +10664,7 @@ PResult::Ok(tar_ascii_string { string, padding })
 }
 
 fn Decoder_riff_subchunks<'input>(_input: &mut Parser<'input>) -> Result<riff_subchunks, ParseError> {
-let tag = ((|| PResult::Ok((Decoder116(_input))?))())?;
+let tag = ((|| PResult::Ok((Decoder119(_input))?))())?;
 let chunks = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -10028,17 +10689,17 @@ accum
 PResult::Ok(riff_subchunks { tag, chunks })
 }
 
-fn Decoder116<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
-let field0 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder112(_input))?))())?;
+fn Decoder119<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+let field0 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder115(_input))?))())?;
 PResult::Ok((field0, field1, field2, field3))
 }
 
 fn Decoder_riff_chunk<'input>(_input: &mut Parser<'input>) -> Result<riff_chunk, ParseError> {
-let tag = ((|| PResult::Ok((Decoder116(_input))?))())?;
-let length = ((|| PResult::Ok((Decoder89(_input))?))())?;
+let tag = ((|| PResult::Ok((Decoder119(_input))?))())?;
+let length = ((|| PResult::Ok((Decoder92(_input))?))())?;
 let data = ((|| PResult::Ok({
 let sz = length as usize<>;
 _input.start_slice(sz)?;
@@ -10079,7 +10740,7 @@ None
 PResult::Ok(riff_chunk { tag, length, data, pad })
 }
 
-fn Decoder118<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8, u8, u8, u8, u8), ParseError> {
+fn Decoder121<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8, u8, u8, u8, u8), ParseError> {
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 137 {
@@ -10156,7 +10817,7 @@ inner
 return Err(ParseError::FalsifiedWhere);
 }
 }))())?;
-let tag = ((|| PResult::Ok((Decoder165(_input))?))())?;
+let tag = ((|| PResult::Ok((Decoder168(_input))?))())?;
 let data = ((|| PResult::Ok({
 let sz = length as usize<>;
 _input.start_slice(sz)?;
@@ -10197,7 +10858,7 @@ return Err(ParseError::NegatedSuccess);
 };
 let mut accum = Vec::new();
 for _ in 0..4u32 {
-accum.push((Decoder136(_input))?);
+accum.push((Decoder139(_input))?);
 }
 accum
 }))())?;
@@ -10206,7 +10867,7 @@ let sz = length as usize<>;
 _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match tag.as_slice() {
 [80u8, 76u8, 84u8, 69u8] => {
-let inner = (Decoder137(_input))?;
+let inner = (Decoder140(_input))?;
 png_chunk_data::PLTE(inner)
 },
 
@@ -10321,11 +10982,11 @@ inner
 return Err(ParseError::FalsifiedWhere);
 }
 }))())?;
-let tag = ((|| PResult::Ok((Decoder134(_input))?))())?;
+let tag = ((|| PResult::Ok((Decoder137(_input))?))())?;
 let data = ((|| PResult::Ok({
 let sz = length as usize<>;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok((Decoder135(_input))?))())?;
+let ret = ((|| PResult::Ok((Decoder138(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
@@ -10379,11 +11040,11 @@ inner
 return Err(ParseError::FalsifiedWhere);
 }
 }))())?;
-let tag = ((|| PResult::Ok((Decoder124(_input))?))())?;
+let tag = ((|| PResult::Ok((Decoder127(_input))?))())?;
 let data = ((|| PResult::Ok({
 let sz = length as usize<>;
 _input.start_slice(sz)?;
-let ret = ((|| PResult::Ok((Decoder125(_input))?))())?;
+let ret = ((|| PResult::Ok((Decoder128(_input))?))())?;
 _input.end_slice()?;
 ret
 }))())?;
@@ -10391,7 +11052,7 @@ let crc = ((|| PResult::Ok((Decoder21(_input))?))())?;
 PResult::Ok(png_iend { length, tag, data, crc })
 }
 
-fn Decoder124<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder127<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 73 {
@@ -10427,7 +11088,7 @@ return Err(ParseError::ExcludedBranch(11087183532096489351u64));
 PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder125<'input>(_input: &mut Parser<'input>) -> Result<(), ParseError> {
+fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<(), ParseError> {
 PResult::Ok(())
 }
 
@@ -10446,26 +11107,26 @@ accum.push(elem);
 accum
 }))())?;
 let codes = ((|| PResult::Ok((try_flat_map_vec(blocks.iter().cloned(), |x: deflate_block| PResult::Ok(match x.data.clone() {
-deflate_main_codes::uncompressed(y) => {
+deflate_main_codes__dupX1::uncompressed(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::fixed_huffman(y) => {
+deflate_main_codes__dupX1::fixed_huffman(y) => {
 y.codes_values.clone()
 },
 
-deflate_main_codes::dynamic_huffman(y) => {
+deflate_main_codes__dupX1::dynamic_huffman(y) => {
 y.codes_values.clone()
 }
 })))?))())?;
-let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes__dupX1)| PResult::Ok(match tuple_var {
+let inflate = ((|| PResult::Ok((try_flat_map_append_vec(codes.iter().cloned(), |tuple_var: (&Vec<u8>, deflate_main_codes)| PResult::Ok(match tuple_var {
 (buffer, symbol) => {
 match symbol {
-deflate_main_codes__dupX1::literal(b) => {
+deflate_main_codes::literal(b) => {
 [b].to_vec()
 },
 
-deflate_main_codes__dupX1::reference(r) => {
+deflate_main_codes::reference(r) => {
 {
 let ix = (try_sub!((buffer.len()) as u32, (r.distance.clone()) as u32)) as usize;
 (slice_ext(&buffer, ix..ix + (((r.length.clone()) as u32) as usize))).to_vec()
@@ -10478,11 +11139,11 @@ PResult::Ok(deflate_main { blocks, codes, inflate })
 }
 
 fn Decoder_deflate_block<'input>(_input: &mut Parser<'input>) -> Result<deflate_block, ParseError> {
-let r#final = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let r#final = ((|| PResult::Ok((Decoder131(_input))?))())?;
 let r#type = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -10490,17 +11151,17 @@ let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 let data = ((|| PResult::Ok(match r#type {
 0u8 => {
 let inner = (Decoder_deflate_uncompressed(_input))?;
-deflate_main_codes::uncompressed(inner)
+deflate_main_codes__dupX1::uncompressed(inner)
 },
 
 1u8 => {
 let inner = (Decoder_deflate_fixed_huffman(_input))?;
-deflate_main_codes::fixed_huffman(inner)
+deflate_main_codes__dupX1::fixed_huffman(inner)
 },
 
 2u8 => {
 let inner = (Decoder_deflate_dynamic_huffman(_input))?;
-deflate_main_codes::dynamic_huffman(inner)
+deflate_main_codes__dupX1::dynamic_huffman(inner)
 },
 
 _other => {
@@ -10510,7 +11171,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 PResult::Ok(deflate_block { r#final, r#type, data })
 }
 
-fn Decoder128<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder131<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(b)
 }
@@ -10519,44 +11180,44 @@ fn Decoder_deflate_uncompressed<'input>(_input: &mut Parser<'input>) -> Result<d
 let align = ((|| PResult::Ok(_input.skip_align(8)?))())?;
 let len = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field10 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field11 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field12 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field13 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field14 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field15 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field9 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field10 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field11 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field12 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field13 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field14 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field15 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16 | ((bits.12.clone()) as u16) << 12u16 | ((bits.13.clone()) as u16) << 13u16 | ((bits.14.clone()) as u16) << 14u16 | ((bits.15.clone()) as u16) << 15u16))(inner))?
 }))())?;
 let nlen = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field10 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field11 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field12 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field13 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field14 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field15 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field9 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field10 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field11 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field12 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field13 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field14 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field15 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12, field13, field14, field15)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16 | ((bits.12.clone()) as u16) << 12u16 | ((bits.13.clone()) as u16) << 13u16 | ((bits.14.clone()) as u16) << 14u16 | ((bits.15.clone()) as u16) << 15u16))(inner))?
@@ -10566,14 +11227,14 @@ let mut accum = Vec::new();
 for _ in 0..len {
 accum.push({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8 | bits.5.clone() << 5u8 | bits.6.clone() << 6u8 | bits.7.clone() << 7u8))(inner))?
@@ -10581,7 +11242,7 @@ let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 }
 accum
 }))())?;
-let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes__dupX1::literal(x)].to_vec())))?))())?;
+let codes_values = ((|| PResult::Ok((try_flat_map_vec(bytes.iter().cloned(), |x: u8| PResult::Ok([deflate_main_codes::literal(x)].to_vec())))?))())?;
 PResult::Ok(deflate_uncompressed { align, len, nlen, bytes, codes_values })
 }
 
@@ -10601,7 +11262,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10621,7 +11282,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10641,7 +11302,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10661,7 +11322,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10681,7 +11342,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10701,7 +11362,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10721,7 +11382,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10741,7 +11402,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10757,7 +11418,7 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -10767,7 +11428,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10783,7 +11444,7 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -10793,7 +11454,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10809,7 +11470,7 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -10819,7 +11480,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10835,7 +11496,7 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -10845,7 +11506,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10861,8 +11522,8 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -10872,7 +11533,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10888,8 +11549,8 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -10899,7 +11560,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10915,8 +11576,8 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -10926,7 +11587,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10942,8 +11603,8 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -10953,7 +11614,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10969,9 +11630,9 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -10981,7 +11642,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -10997,9 +11658,9 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11009,7 +11670,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11025,9 +11686,9 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11037,7 +11698,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11053,9 +11714,9 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11065,7 +11726,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11081,10 +11742,10 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11094,7 +11755,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11110,10 +11771,10 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11123,7 +11784,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11139,10 +11800,10 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11152,7 +11813,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11168,10 +11829,10 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11181,7 +11842,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11197,11 +11858,11 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -11211,7 +11872,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11227,11 +11888,11 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -11241,7 +11902,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11257,11 +11918,11 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -11271,7 +11932,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11287,11 +11948,11 @@ deflate_fixed_huffman_codes_values { length_extra_bits, length, distance_code, d
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -11301,7 +11962,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11321,7 +11982,7 @@ let distance_code = ((|| PResult::Ok({
 let inner = {
 let mut accum = Vec::new();
 for _ in 0..5u32 {
-accum.push((Decoder128(_input))?);
+accum.push((Decoder131(_input))?);
 }
 accum
 };
@@ -11360,7 +12021,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -11374,7 +12035,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_fixed_huffman { codes, codes_values })
@@ -11383,32 +12044,32 @@ PResult::Ok(deflate_fixed_huffman { codes, codes_values })
 fn Decoder_deflate_dynamic_huffman<'input>(_input: &mut Parser<'input>) -> Result<deflate_dynamic_huffman, ParseError> {
 let hlit = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
 }))())?;
 let hdist = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
 }))())?;
 let hclen = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11418,9 +12079,9 @@ let mut accum = Vec::new();
 for _ in 0..hclen + 4u8 {
 accum.push({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11437,8 +12098,8 @@ let code = ((|| PResult::Ok((code_length_alphabet_format(_input))?))())?;
 let extra = ((|| PResult::Ok(match code as u8 {
 16u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -11446,9 +12107,9 @@ let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 17u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11456,13 +12117,13 @@ let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 18u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8 | bits.5.clone() << 5u8 | bits.6.clone() << 6u8))(inner))?
@@ -11646,7 +12307,7 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -11663,7 +12324,7 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -11680,7 +12341,7 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -11697,7 +12358,7 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok(bits.0.clone()))(inner))?
@@ -11714,8 +12375,8 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -11732,8 +12393,8 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -11750,8 +12411,8 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -11768,8 +12429,8 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8))(inner))?
@@ -11786,9 +12447,9 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11805,9 +12466,9 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11824,9 +12485,9 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11843,9 +12504,9 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8))(inner))?
@@ -11862,10 +12523,10 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11882,10 +12543,10 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11902,10 +12563,10 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11922,10 +12583,10 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8))(inner))?
@@ -11942,11 +12603,11 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -11963,11 +12624,11 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -11984,11 +12645,11 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -12005,11 +12666,11 @@ deflate_dynamic_huffman_codes_values { length_extra_bits, length, distance_code,
 let inner = {
 let length_extra_bits = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(bits.0.clone() << 0u8 | bits.1.clone() << 1u8 | bits.2.clone() << 2u8 | bits.3.clone() << 3u8 | bits.4.clone() << 4u8))(inner))?
@@ -12060,7 +12721,7 @@ let codes_values = ((|| PResult::Ok((try_flat_map_vec(codes.iter().cloned(), |x:
 257u16..=285u16 => {
 match x.extra.clone() {
 Some(ref rec) => {
-[deflate_main_codes__dupX1::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
+[deflate_main_codes::reference(deflate_main_codes_reference { length: rec.length.clone(), distance: rec.distance_record.distance.clone() })].to_vec()
 },
 
 _ => {
@@ -12074,7 +12735,7 @@ return Err(ParseError::ExcludedBranch(4350808036978594792u64));
 },
 
 _ => {
-[deflate_main_codes__dupX1::literal((x.code.clone()) as u8)].to_vec()
+[deflate_main_codes::literal((x.code.clone()) as u8)].to_vec()
 }
 })))?))())?;
 PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths, literal_length_distance_alphabet_code_lengths_value, literal_length_alphabet_code_lengths_value, distance_alphabet_code_lengths_value, codes, codes_values })
@@ -12083,123 +12744,123 @@ PResult::Ok(deflate_dynamic_huffman { hlit, hdist, hclen, code_length_alphabet_c
 fn Decoder_deflate_distance_record<'input>(_input: &mut Parser<'input>, distance_code: u16) -> Result<deflate_distance_record, ParseError> {
 PResult::Ok(match distance_code as u8 {
 0u8 => {
-(Decoder133(_input, 0u8, 1u16))?
+(Decoder136(_input, 0u8, 1u16))?
 },
 
 1u8 => {
-(Decoder133(_input, 0u8, 2u16))?
+(Decoder136(_input, 0u8, 2u16))?
 },
 
 2u8 => {
-(Decoder133(_input, 0u8, 3u16))?
+(Decoder136(_input, 0u8, 3u16))?
 },
 
 3u8 => {
-(Decoder133(_input, 0u8, 4u16))?
+(Decoder136(_input, 0u8, 4u16))?
 },
 
 4u8 => {
-(Decoder133(_input, 1u8, 5u16))?
+(Decoder136(_input, 1u8, 5u16))?
 },
 
 5u8 => {
-(Decoder133(_input, 1u8, 7u16))?
+(Decoder136(_input, 1u8, 7u16))?
 },
 
 6u8 => {
-(Decoder133(_input, 2u8, 9u16))?
+(Decoder136(_input, 2u8, 9u16))?
 },
 
 7u8 => {
-(Decoder133(_input, 2u8, 13u16))?
+(Decoder136(_input, 2u8, 13u16))?
 },
 
 8u8 => {
-(Decoder133(_input, 3u8, 17u16))?
+(Decoder136(_input, 3u8, 17u16))?
 },
 
 9u8 => {
-(Decoder133(_input, 3u8, 25u16))?
+(Decoder136(_input, 3u8, 25u16))?
 },
 
 10u8 => {
-(Decoder133(_input, 4u8, 33u16))?
+(Decoder136(_input, 4u8, 33u16))?
 },
 
 11u8 => {
-(Decoder133(_input, 4u8, 49u16))?
+(Decoder136(_input, 4u8, 49u16))?
 },
 
 12u8 => {
-(Decoder133(_input, 5u8, 65u16))?
+(Decoder136(_input, 5u8, 65u16))?
 },
 
 13u8 => {
-(Decoder133(_input, 5u8, 97u16))?
+(Decoder136(_input, 5u8, 97u16))?
 },
 
 14u8 => {
-(Decoder133(_input, 6u8, 129u16))?
+(Decoder136(_input, 6u8, 129u16))?
 },
 
 15u8 => {
-(Decoder133(_input, 6u8, 193u16))?
+(Decoder136(_input, 6u8, 193u16))?
 },
 
 16u8 => {
-(Decoder133(_input, 7u8, 257u16))?
+(Decoder136(_input, 7u8, 257u16))?
 },
 
 17u8 => {
-(Decoder133(_input, 7u8, 385u16))?
+(Decoder136(_input, 7u8, 385u16))?
 },
 
 18u8 => {
-(Decoder133(_input, 8u8, 513u16))?
+(Decoder136(_input, 8u8, 513u16))?
 },
 
 19u8 => {
-(Decoder133(_input, 8u8, 769u16))?
+(Decoder136(_input, 8u8, 769u16))?
 },
 
 20u8 => {
-(Decoder133(_input, 9u8, 1025u16))?
+(Decoder136(_input, 9u8, 1025u16))?
 },
 
 21u8 => {
-(Decoder133(_input, 9u8, 1537u16))?
+(Decoder136(_input, 9u8, 1537u16))?
 },
 
 22u8 => {
-(Decoder133(_input, 10u8, 2049u16))?
+(Decoder136(_input, 10u8, 2049u16))?
 },
 
 23u8 => {
-(Decoder133(_input, 10u8, 3073u16))?
+(Decoder136(_input, 10u8, 3073u16))?
 },
 
 24u8 => {
-(Decoder133(_input, 11u8, 4097u16))?
+(Decoder136(_input, 11u8, 4097u16))?
 },
 
 25u8 => {
-(Decoder133(_input, 11u8, 6145u16))?
+(Decoder136(_input, 11u8, 6145u16))?
 },
 
 26u8 => {
-(Decoder133(_input, 12u8, 8193u16))?
+(Decoder136(_input, 12u8, 8193u16))?
 },
 
 27u8 => {
-(Decoder133(_input, 12u8, 12289u16))?
+(Decoder136(_input, 12u8, 12289u16))?
 },
 
 28u8 => {
-(Decoder133(_input, 13u8, 16385u16))?
+(Decoder136(_input, 13u8, 16385u16))?
 },
 
 29u8 => {
-(Decoder133(_input, 13u8, 24577u16))?
+(Decoder136(_input, 13u8, 24577u16))?
 },
 
 30u8..=31u8 => {
@@ -12212,7 +12873,7 @@ unreachable!(r#"ExprMatch refuted: match refuted with unexpected value {_other:?
 })
 }
 
-fn Decoder133<'input>(_input: &mut Parser<'input>, extra_bits: u8, start: u16) -> Result<deflate_distance_record, ParseError> {
+fn Decoder136<'input>(_input: &mut Parser<'input>, extra_bits: u8, start: u16) -> Result<deflate_distance_record, ParseError> {
 let distance_extra_bits = ((|| PResult::Ok(match extra_bits {
 0u8 => {
 0u16
@@ -12220,7 +12881,7 @@ let distance_extra_bits = ((|| PResult::Ok(match extra_bits {
 
 1u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0,)
 };
 ((|bits: (u8,)| PResult::Ok((bits.0.clone()) as u16))(inner))?
@@ -12228,8 +12889,8 @@ let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 2u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1)
 };
 ((|bits: (u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16))(inner))?
@@ -12237,9 +12898,9 @@ let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 3u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2)
 };
 ((|bits: (u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16))(inner))?
@@ -12247,10 +12908,10 @@ let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 4u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3)
 };
 ((|bits: (u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16))(inner))?
@@ -12258,11 +12919,11 @@ let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 5u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4)
 };
 ((|bits: (u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16))(inner))?
@@ -12270,12 +12931,12 @@ let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 6u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16))(inner))?
@@ -12283,13 +12944,13 @@ let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 7u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16))(inner))?
@@ -12297,14 +12958,14 @@ let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 8u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16))(inner))?
@@ -12312,15 +12973,15 @@ let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 9u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16))(inner))?
@@ -12328,16 +12989,16 @@ let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 10u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field9 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16))(inner))?
@@ -12345,17 +13006,17 @@ let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 11u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field10 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field9 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field10 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16))(inner))?
@@ -12363,18 +13024,18 @@ let field10 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 12u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field10 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field11 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field9 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field10 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field11 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16))(inner))?
@@ -12382,19 +13043,19 @@ let field11 = ((|| PResult::Ok((Decoder128(_input))?))())?;
 
 13u8 => {
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field4 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field5 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field6 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field7 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field8 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field9 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field10 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field11 = ((|| PResult::Ok((Decoder128(_input))?))())?;
-let field12 = ((|| PResult::Ok((Decoder128(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field4 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field5 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field6 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field7 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field8 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field9 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field10 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field11 = ((|| PResult::Ok((Decoder131(_input))?))())?;
+let field12 = ((|| PResult::Ok((Decoder131(_input))?))())?;
 (field0, field1, field2, field3, field4, field5, field6, field7, field8, field9, field10, field11, field12)
 };
 ((|bits: (u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8)| PResult::Ok(((bits.0.clone()) as u16) << 0u16 | ((bits.1.clone()) as u16) << 1u16 | ((bits.2.clone()) as u16) << 2u16 | ((bits.3.clone()) as u16) << 3u16 | ((bits.4.clone()) as u16) << 4u16 | ((bits.5.clone()) as u16) << 5u16 | ((bits.6.clone()) as u16) << 6u16 | ((bits.7.clone()) as u16) << 7u16 | ((bits.8.clone()) as u16) << 8u16 | ((bits.9.clone()) as u16) << 9u16 | ((bits.10.clone()) as u16) << 10u16 | ((bits.11.clone()) as u16) << 11u16 | ((bits.12.clone()) as u16) << 12u16))(inner))?
@@ -12408,7 +13069,7 @@ let distance = ((|| PResult::Ok(start + distance_extra_bits))())?;
 PResult::Ok(deflate_distance_record { distance_extra_bits, distance })
 }
 
-fn Decoder134<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder137<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 73 {
@@ -12444,7 +13105,7 @@ return Err(ParseError::ExcludedBranch(145148447135656575u64));
 PResult::Ok((field0, field1, field2, field3))
 }
 
-fn Decoder135<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
+fn Decoder138<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -12466,7 +13127,7 @@ break
 PResult::Ok(accum)
 }
 
-fn Decoder136<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder139<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if (ByteSet::from_bits([18446744069414594048, 18446744073709551615, 0, 0])).contains(b) {
 b
@@ -12475,7 +13136,7 @@ return Err(ParseError::ExcludedBranch(3624518403832297354u64));
 })
 }
 
-fn Decoder137<'input>(_input: &mut Parser<'input>) -> Result<Vec<png_plte>, ParseError> {
+fn Decoder140<'input>(_input: &mut Parser<'input>) -> Result<Vec<png_plte>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -12580,7 +13241,7 @@ PResult::Ok(png_gama { gamma })
 fn Decoder_png_iccp<'input>(_input: &mut Parser<'input>) -> Result<png_iccp, ParseError> {
 let profile_name = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder163(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder166(_input))?))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -12605,7 +13266,7 @@ inner
 return Err(ParseError::FalsifiedWhere);
 }
 }))())?;
-let compressed_profile = ((|| PResult::Ok((Decoder164(_input))?))())?;
+let compressed_profile = ((|| PResult::Ok((Decoder167(_input))?))())?;
 PResult::Ok(png_iccp { profile_name, compression_method, compressed_profile })
 }
 
@@ -12680,7 +13341,7 @@ PResult::Ok(png_srgb { rendering_intent })
 fn Decoder_png_itxt<'input>(_input: &mut Parser<'input>) -> Result<png_itxt, ParseError> {
 let keyword = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder158(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder161(_input))?))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -12716,7 +13377,7 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 let language_tag = ((|| PResult::Ok((Decoder_base_asciiz_string(_input))?))())?;
 let translated_keyword = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder163(_input))?))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -12740,10 +13401,10 @@ _input.start_alt();
 let mut f_tmp = || PResult::Ok({
 let inner = {
 let inner = {
-let zlib = (Decoder161(_input))?;
+let zlib = (Decoder164(_input))?;
 let mut tmp = Parser::new(zlib.data.inflate.as_slice());
 let reparser = &mut tmp;
-(Decoder162(reparser))?
+(Decoder165(reparser))?
 };
 png_itxt_text_compressed::valid(inner)
 };
@@ -12800,7 +13461,7 @@ return Err(_e);
 },
 
 false => {
-let inner = (Decoder155(_input))?;
+let inner = (Decoder158(_input))?;
 png_itxt_text::uncompressed(inner)
 }
 }))())?;
@@ -12810,7 +13471,7 @@ PResult::Ok(png_itxt { keyword, compression_flag, compression_method, language_t
 fn Decoder_png_text<'input>(_input: &mut Parser<'input>) -> Result<png_text, ParseError> {
 let keyword = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder157(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder160(_input))?))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -12840,7 +13501,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder112(_input))?;
+let next_elem = (Decoder115(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -12854,7 +13515,7 @@ PResult::Ok(png_text { keyword, text })
 fn Decoder_png_ztxt<'input>(_input: &mut Parser<'input>) -> Result<png_ztxt, ParseError> {
 let keyword = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder153(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder156(_input))?))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -12880,10 +13541,10 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 }
 }))())?;
 let compressed_text = ((|| PResult::Ok({
-let zlib = (Decoder154(_input))?;
+let zlib = (Decoder157(_input))?;
 let mut tmp = Parser::new(zlib.data.inflate.as_slice());
 let reparser = &mut tmp;
-(Decoder155(reparser))?
+(Decoder158(reparser))?
 }))())?;
 PResult::Ok(png_ztxt { keyword, compression_method, compressed_text })
 }
@@ -12975,7 +13636,7 @@ PResult::Ok(png_phys { pixels_per_unit_x, pixels_per_unit_y, unit_specifier })
 fn Decoder_png_splt<'input>(_input: &mut Parser<'input>) -> Result<png_splt, ParseError> {
 let palette_name = ((|| PResult::Ok({
 let inner = {
-let field0 = ((|| PResult::Ok((Decoder152(_input))?))())?;
+let field0 = ((|| PResult::Ok((Decoder155(_input))?))())?;
 let field1 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 0 {
@@ -13082,7 +13743,7 @@ let second = ((|| PResult::Ok((Decoder25(_input))?))())?;
 PResult::Ok(png_time { year, month, day, hour, minute, second })
 }
 
-fn Decoder152<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
+fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -14137,7 +14798,7 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder153<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
+fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -15192,7 +15853,7 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder154<'input>(_input: &mut Parser<'input>) -> Result<zlib_main, ParseError> {
+fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = ((|| PResult::Ok({
 let inner = {
 let inner = {
@@ -15229,11 +15890,11 @@ let adler32 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-fn Decoder155<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
-PResult::Ok((Decoder156(_input))?)
+fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
+PResult::Ok((Decoder159(_input))?)
 }
 
-fn Decoder156<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
+fn Decoder159<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -15299,7 +15960,7 @@ break
 PResult::Ok(accum)
 }
 
-fn Decoder157<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
+fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -16354,7 +17015,7 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder158<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
+fn Decoder161<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -17461,7 +18122,7 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 PResult::Ok(base_asciiz_string { string, null })
 }
 
-fn Decoder160<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
+fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -17527,7 +18188,7 @@ break
 PResult::Ok(accum)
 }
 
-fn Decoder161<'input>(_input: &mut Parser<'input>) -> Result<zlib_main, ParseError> {
+fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = ((|| PResult::Ok({
 let inner = {
 let inner = {
@@ -17564,7 +18225,7 @@ let adler32 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-fn Decoder162<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
+fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<Vec<char>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -17626,7 +18287,7 @@ break
 PResult::Ok(accum)
 }
 
-fn Decoder163<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
+fn Decoder166<'input>(_input: &mut Parser<'input>) -> Result<Vec<u8>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -18681,7 +19342,7 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder164<'input>(_input: &mut Parser<'input>) -> Result<zlib_main, ParseError> {
+fn Decoder167<'input>(_input: &mut Parser<'input>) -> Result<zlib_main, ParseError> {
 let compression_method_flags = ((|| PResult::Ok({
 let inner = {
 let inner = {
@@ -18718,7 +19379,7 @@ let adler32 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 PResult::Ok(zlib_main { compression_method_flags, flags, dict_id, data, adler32 })
 }
 
-fn Decoder165<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+fn Decoder168<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
 let field0 = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 73 {
@@ -18767,14 +19428,14 @@ PResult::Ok(png_ihdr_data { width, height, bit_depth, color_type, compression_me
 
 fn Decoder_mpeg4_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -18788,7 +19449,7 @@ _input.start_slice(sz)?;
 let ret = ((|| PResult::Ok(match r#type {
 (102u8, 116u8, 121u8, 112u8) => {
 let inner = {
-let major_brand = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let major_brand = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let minor_version = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let compatible_brands = ((|| PResult::Ok({
 let mut accum = Vec::new();
@@ -18803,7 +19464,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder168(_input))?;
+let next_elem = (Decoder171(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -18906,24 +19567,24 @@ ret
 PResult::Ok(mpeg4_atom { size_field, r#type, size, data })
 }
 
-fn Decoder168<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
-let field0 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let field1 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let field2 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let field3 = ((|| PResult::Ok((Decoder112(_input))?))())?;
+fn Decoder171<'input>(_input: &mut Parser<'input>) -> Result<(u8, u8, u8, u8), ParseError> {
+let field0 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let field1 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let field2 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let field3 = ((|| PResult::Ok((Decoder115(_input))?))())?;
 PResult::Ok((field0, field1, field2, field3))
 }
 
 fn Decoder_mpeg4_meta_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_meta_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -18970,14 +19631,14 @@ let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 (field0, field1, field2)
 }))())?;
 let predefined = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let handler_type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let handler_type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let reserved = ((|| PResult::Ok({
 let field0 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let field1 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let field2 = ((|| PResult::Ok((Decoder21(_input))?))())?;
 (field0, field1, field2)
 }))())?;
-let name = ((|| PResult::Ok((Decoder175(_input))?))())?;
+let name = ((|| PResult::Ok((Decoder178(_input))?))())?;
 mpeg4_meta_atom_data_hdlr { version, flags, predefined, handler_type, reserved, name }
 };
 mpeg4_meta_atom_data::hdlr(inner)
@@ -19065,14 +19726,14 @@ ret
 if matching_ix == 0 {
 let next_elem = {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19126,14 +19787,14 @@ ret
 if matching_ix == 0 {
 let next_elem = {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19244,7 +19905,7 @@ let inner = (Decoder21(_input))?;
 },
 
 8u8 => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 _other => {
@@ -19267,7 +19928,7 @@ let inner = (Decoder21(_input))?;
 },
 
 8u8 => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 _other => {
@@ -19285,7 +19946,7 @@ let inner = (Decoder21(_input))?;
 },
 
 8u8 => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 _other => {
@@ -19303,7 +19964,7 @@ let inner = (Decoder21(_input))?;
 },
 
 8u8 => {
-(Decoder61(_input))?
+(Decoder64(_input))?
 },
 
 _other => {
@@ -19408,14 +20069,14 @@ PResult::Ok(mpeg4_meta_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_moov_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_moov_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19450,10 +20111,10 @@ mpeg4_moov_atom_data_mvhd_fields::version0(inner)
 
 1u8 => {
 let inner = {
-let creation_time = ((|| PResult::Ok((Decoder61(_input))?))())?;
-let modification_time = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let creation_time = ((|| PResult::Ok((Decoder64(_input))?))())?;
+let modification_time = ((|| PResult::Ok((Decoder64(_input))?))())?;
 let timescale = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let duration = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let duration = ((|| PResult::Ok((Decoder64(_input))?))())?;
 mpeg4_moov_atom_data_mvhd_fields_version1 { creation_time, modification_time, timescale, duration }
 };
 mpeg4_moov_atom_data_mvhd_fields::version1(inner)
@@ -19574,14 +20235,14 @@ PResult::Ok(mpeg4_moov_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_trak_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_trak_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19617,11 +20278,11 @@ mpeg4_trak_atom_data_tkhd_fields::version0(inner)
 
 1u8 => {
 let inner = {
-let creation_time = ((|| PResult::Ok((Decoder61(_input))?))())?;
-let modification_time = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let creation_time = ((|| PResult::Ok((Decoder64(_input))?))())?;
+let modification_time = ((|| PResult::Ok((Decoder64(_input))?))())?;
 let track_ID = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let reserved = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let duration = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let duration = ((|| PResult::Ok((Decoder64(_input))?))())?;
 mpeg4_trak_atom_data_tkhd_fields_version1 { creation_time, modification_time, track_ID, reserved, duration }
 };
 mpeg4_trak_atom_data_tkhd_fields::version1(inner)
@@ -19737,14 +20398,14 @@ PResult::Ok(mpeg4_trak_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_udta_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_udta_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19815,14 +20476,14 @@ PResult::Ok(mpeg4_udta_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_edts_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_edts_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19894,14 +20555,14 @@ PResult::Ok(mpeg4_edts_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_mdia_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_mdia_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -19923,11 +20584,11 @@ let field2 = ((|| PResult::Ok((Decoder25(_input))?))())?;
 (field0, field1, field2)
 }))())?;
 let component_type = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let component_subtype = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let component_subtype = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let component_manufacturer = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let component_flags = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let component_flags_mask = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let component_name = ((|| PResult::Ok((Decoder175(_input))?))())?;
+let component_name = ((|| PResult::Ok((Decoder178(_input))?))())?;
 mpeg4_mdia_atom_data_hdlr { version, flags, component_type, component_subtype, component_manufacturer, component_flags, component_flags_mask, component_name }
 };
 mpeg4_mdia_atom_data::hdlr(inner)
@@ -19956,10 +20617,10 @@ mpeg4_moov_atom_data_mvhd_fields::version0(inner)
 
 1u8 => {
 let inner = {
-let creation_time = ((|| PResult::Ok((Decoder61(_input))?))())?;
-let modification_time = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let creation_time = ((|| PResult::Ok((Decoder64(_input))?))())?;
+let modification_time = ((|| PResult::Ok((Decoder64(_input))?))())?;
 let timescale = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let duration = ((|| PResult::Ok((Decoder61(_input))?))())?;
+let duration = ((|| PResult::Ok((Decoder64(_input))?))())?;
 mpeg4_moov_atom_data_mvhd_fields_version1 { creation_time, modification_time, timescale, duration }
 };
 mpeg4_moov_atom_data_mvhd_fields::version1(inner)
@@ -20032,7 +20693,7 @@ ret
 PResult::Ok(mpeg4_mdia_atom { size_field, r#type, size, data })
 }
 
-fn Decoder175<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder178<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -20086,14 +20747,14 @@ PResult::Ok(base_asciiz_string { string, null })
 
 fn Decoder_mpeg4_minf_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_minf_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20226,14 +20887,14 @@ PResult::Ok(mpeg4_minf_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_dinf_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_dinf_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20270,14 +20931,14 @@ ret
 if matching_ix == 0 {
 let next_elem = {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20359,14 +21020,14 @@ PResult::Ok(mpeg4_dinf_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_stbl_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_stbl_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20393,14 +21054,14 @@ let mut accum = Vec::new();
 for _ in 0..entry_count {
 accum.push({
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20606,7 +21267,7 @@ let entry_count = ((|| PResult::Ok((Decoder21(_input))?))())?;
 let chunk_offset = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..entry_count {
-accum.push((Decoder61(_input))?);
+accum.push((Decoder64(_input))?);
 }
 accum
 }))())?;
@@ -20722,14 +21383,14 @@ PResult::Ok(mpeg4_stbl_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_iinf_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_iinf_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20755,9 +21416,9 @@ true => {
 let inner = {
 let item_ID = ((|| PResult::Ok((Decoder24(_input))?))())?;
 let item_protection_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let item_name = ((|| PResult::Ok((Decoder182(_input))?))())?;
-let content_type = ((|| PResult::Ok((Decoder183(_input))?))())?;
-let content_encoding = ((|| PResult::Ok((Decoder184(_input))?))())?;
+let item_name = ((|| PResult::Ok((Decoder185(_input))?))())?;
+let content_type = ((|| PResult::Ok((Decoder186(_input))?))())?;
+let content_encoding = ((|| PResult::Ok((Decoder187(_input))?))())?;
 mpeg4_iinf_atom_data_infe_fields_yes { item_ID, item_protection_index, item_name, content_type, content_encoding }
 };
 mpeg4_iinf_atom_data_infe_fields::yes(inner)
@@ -20776,12 +21437,12 @@ false => {
 }
 }))())?;
 let item_protection_index = ((|| PResult::Ok((Decoder24(_input))?))())?;
-let item_type = ((|| PResult::Ok((Decoder168(_input))?))())?;
-let item_name = ((|| PResult::Ok((Decoder185(_input))?))())?;
+let item_type = ((|| PResult::Ok((Decoder171(_input))?))())?;
+let item_name = ((|| PResult::Ok((Decoder188(_input))?))())?;
 let extra_fields = ((|| PResult::Ok(match item_type {
 (109u8, 105u8, 109u8, 101u8) => {
 let inner = {
-let content_type = ((|| PResult::Ok((Decoder186(_input))?))())?;
+let content_type = ((|| PResult::Ok((Decoder189(_input))?))())?;
 mpeg4_iinf_atom_data_infe_fields_no_extra_fields_mime { content_type }
 };
 mpeg4_iinf_atom_data_infe_fields_no_extra_fields::mime(inner)
@@ -20789,7 +21450,7 @@ mpeg4_iinf_atom_data_infe_fields_no_extra_fields::mime(inner)
 
 (117u8, 114u8, 105u8, 32u8) => {
 let inner = {
-let item_uri_type = ((|| PResult::Ok((Decoder186(_input))?))())?;
+let item_uri_type = ((|| PResult::Ok((Decoder189(_input))?))())?;
 mpeg4_iinf_atom_data_infe_fields_no_extra_fields_uri { item_uri_type }
 };
 mpeg4_iinf_atom_data_infe_fields_no_extra_fields::uri(inner)
@@ -20842,14 +21503,14 @@ PResult::Ok(mpeg4_iinf_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_ilst_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_ilst_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20919,14 +21580,14 @@ PResult::Ok(mpeg4_ilst_atom { size_field, r#type, size, data })
 
 fn Decoder_mpeg4_tool_atom<'input>(_input: &mut Parser<'input>) -> Result<mpeg4_tool_atom, ParseError> {
 let size_field = ((|| PResult::Ok((Decoder21(_input))?))())?;
-let r#type = ((|| PResult::Ok((Decoder168(_input))?))())?;
+let r#type = ((|| PResult::Ok((Decoder171(_input))?))())?;
 let size = ((|| PResult::Ok(match size_field {
 0u32 => {
 0u64
 },
 
 1u32 => {
-let inner = (Decoder61(_input))?;
+let inner = (Decoder64(_input))?;
 ((|x: u64| PResult::Ok(try_sub!(x, 16u64)))(inner))?
 },
 
@@ -20955,7 +21616,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder112(_input))?;
+let next_elem = (Decoder115(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -20997,162 +21658,6 @@ _input.end_slice()?;
 ret
 }))())?;
 PResult::Ok(mpeg4_tool_atom { size_field, r#type, size, data })
-}
-
-fn Decoder182<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
-let string = ((|| PResult::Ok({
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = match b {
-tmp if (tmp != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13862338712518612949u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(8606461246239977862u64));
-}
-};
-accum.push(next_elem);
-} else {
-break
-}
-}
-accum
-}))())?;
-let null = ((|| PResult::Ok({
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-}
-}))())?;
-PResult::Ok(base_asciiz_string { string, null })
-}
-
-fn Decoder183<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
-let string = ((|| PResult::Ok({
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = match b {
-tmp if (tmp != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13862338712518612949u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(8606461246239977862u64));
-}
-};
-accum.push(next_elem);
-} else {
-break
-}
-}
-accum
-}))())?;
-let null = ((|| PResult::Ok({
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-}
-}))())?;
-PResult::Ok(base_asciiz_string { string, null })
-}
-
-fn Decoder184<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
-let string = ((|| PResult::Ok({
-let mut accum = Vec::new();
-while _input.remaining() > 0 {
-let matching_ix = {
-_input.open_peek_context();
-let b = _input.read_byte()?;
-{
-let ret = match b {
-tmp if (tmp != 0) => {
-0
-},
-
-0u8 => {
-1
-},
-
-_ => {
-return Err(ParseError::ExcludedBranch(13862338712518612949u64));
-}
-};
-_input.close_peek_context()?;
-ret
-}
-};
-if matching_ix == 0 {
-let next_elem = {
-let b = _input.read_byte()?;
-if b != 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(8606461246239977862u64));
-}
-};
-accum.push(next_elem);
-} else {
-break
-}
-}
-accum
-}))())?;
-let null = ((|| PResult::Ok({
-let b = _input.read_byte()?;
-if b == 0 {
-b
-} else {
-return Err(ParseError::ExcludedBranch(10396965092922267801u64));
-}
-}))())?;
-PResult::Ok(base_asciiz_string { string, null })
 }
 
 fn Decoder185<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
@@ -21208,6 +21713,162 @@ PResult::Ok(base_asciiz_string { string, null })
 }
 
 fn Decoder186<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+let string = ((|| PResult::Ok({
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = match b {
+tmp if (tmp != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+}
+};
+accum.push(next_elem);
+} else {
+break
+}
+}
+accum
+}))())?;
+let null = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+}
+}))())?;
+PResult::Ok(base_asciiz_string { string, null })
+}
+
+fn Decoder187<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+let string = ((|| PResult::Ok({
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = match b {
+tmp if (tmp != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+}
+};
+accum.push(next_elem);
+} else {
+break
+}
+}
+accum
+}))())?;
+let null = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+}
+}))())?;
+PResult::Ok(base_asciiz_string { string, null })
+}
+
+fn Decoder188<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+let string = ((|| PResult::Ok({
+let mut accum = Vec::new();
+while _input.remaining() > 0 {
+let matching_ix = {
+_input.open_peek_context();
+let b = _input.read_byte()?;
+{
+let ret = match b {
+tmp if (tmp != 0) => {
+0
+},
+
+0u8 => {
+1
+},
+
+_ => {
+return Err(ParseError::ExcludedBranch(13862338712518612949u64));
+}
+};
+_input.close_peek_context()?;
+ret
+}
+};
+if matching_ix == 0 {
+let next_elem = {
+let b = _input.read_byte()?;
+if b != 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(8606461246239977862u64));
+}
+};
+accum.push(next_elem);
+} else {
+break
+}
+}
+accum
+}))())?;
+let null = ((|| PResult::Ok({
+let b = _input.read_byte()?;
+if b == 0 {
+b
+} else {
+return Err(ParseError::ExcludedBranch(10396965092922267801u64));
+}
+}))())?;
+PResult::Ok(base_asciiz_string { string, null })
+}
+
+fn Decoder189<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -21735,7 +22396,7 @@ ret
 }
 };
 if matching_ix == 0 {
-let next_elem = (Decoder196(_input))?;
+let next_elem = (Decoder199(_input))?;
 accum.push(next_elem);
 } else {
 break
@@ -21746,7 +22407,7 @@ accum
 PResult::Ok(jpeg_frame { initial_segment, segments, header, scan, dnl, scans })
 }
 
-fn Decoder189<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder192<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -21968,72 +22629,72 @@ jpeg_table_or_misc::app2(inner)
 },
 
 7 => {
-let inner = (Decoder232(_input))?;
+let inner = (Decoder235(_input))?;
 jpeg_table_or_misc::app3(inner)
 },
 
 8 => {
-let inner = (Decoder233(_input))?;
+let inner = (Decoder236(_input))?;
 jpeg_table_or_misc::app4(inner)
 },
 
 9 => {
-let inner = (Decoder234(_input))?;
+let inner = (Decoder237(_input))?;
 jpeg_table_or_misc::app5(inner)
 },
 
 10 => {
-let inner = (Decoder235(_input))?;
+let inner = (Decoder238(_input))?;
 jpeg_table_or_misc::app6(inner)
 },
 
 11 => {
-let inner = (Decoder236(_input))?;
+let inner = (Decoder239(_input))?;
 jpeg_table_or_misc::app7(inner)
 },
 
 12 => {
-let inner = (Decoder237(_input))?;
+let inner = (Decoder240(_input))?;
 jpeg_table_or_misc::app8(inner)
 },
 
 13 => {
-let inner = (Decoder238(_input))?;
+let inner = (Decoder241(_input))?;
 jpeg_table_or_misc::app9(inner)
 },
 
 14 => {
-let inner = (Decoder239(_input))?;
+let inner = (Decoder242(_input))?;
 jpeg_table_or_misc::app10(inner)
 },
 
 15 => {
-let inner = (Decoder240(_input))?;
+let inner = (Decoder243(_input))?;
 jpeg_table_or_misc::app11(inner)
 },
 
 16 => {
-let inner = (Decoder241(_input))?;
+let inner = (Decoder244(_input))?;
 jpeg_table_or_misc::app12(inner)
 },
 
 17 => {
-let inner = (Decoder242(_input))?;
+let inner = (Decoder245(_input))?;
 jpeg_table_or_misc::app13(inner)
 },
 
 18 => {
-let inner = (Decoder243(_input))?;
+let inner = (Decoder246(_input))?;
 jpeg_table_or_misc::app14(inner)
 },
 
 19 => {
-let inner = (Decoder244(_input))?;
+let inner = (Decoder247(_input))?;
 jpeg_table_or_misc::app15(inner)
 },
 
 20 => {
-let inner = (Decoder245(_input))?;
+let inner = (Decoder248(_input))?;
 jpeg_table_or_misc::com(inner)
 },
 
@@ -22121,62 +22782,62 @@ jpeg_frame_header::sof0(inner)
 },
 
 1 => {
-let inner = (Decoder213(_input))?;
+let inner = (Decoder216(_input))?;
 jpeg_frame_header::sof1(inner)
 },
 
 2 => {
-let inner = (Decoder214(_input))?;
+let inner = (Decoder217(_input))?;
 jpeg_frame_header::sof2(inner)
 },
 
 3 => {
-let inner = (Decoder215(_input))?;
+let inner = (Decoder218(_input))?;
 jpeg_frame_header::sof3(inner)
 },
 
 4 => {
-let inner = (Decoder216(_input))?;
+let inner = (Decoder219(_input))?;
 jpeg_frame_header::sof5(inner)
 },
 
 5 => {
-let inner = (Decoder217(_input))?;
+let inner = (Decoder220(_input))?;
 jpeg_frame_header::sof6(inner)
 },
 
 6 => {
-let inner = (Decoder218(_input))?;
+let inner = (Decoder221(_input))?;
 jpeg_frame_header::sof7(inner)
 },
 
 7 => {
-let inner = (Decoder219(_input))?;
+let inner = (Decoder222(_input))?;
 jpeg_frame_header::sof9(inner)
 },
 
 8 => {
-let inner = (Decoder220(_input))?;
+let inner = (Decoder223(_input))?;
 jpeg_frame_header::sof10(inner)
 },
 
 9 => {
-let inner = (Decoder221(_input))?;
+let inner = (Decoder224(_input))?;
 jpeg_frame_header::sof11(inner)
 },
 
 10 => {
-let inner = (Decoder222(_input))?;
+let inner = (Decoder225(_input))?;
 jpeg_frame_header::sof13(inner)
 },
 
 11 => {
-let inner = (Decoder223(_input))?;
+let inner = (Decoder226(_input))?;
 jpeg_frame_header::sof14(inner)
 },
 
 12 => {
-let inner = (Decoder224(_input))?;
+let inner = (Decoder227(_input))?;
 jpeg_frame_header::sof15(inner)
 },
 
@@ -22306,7 +22967,7 @@ break
 accum
 }))())?;
 let sos = ((|| PResult::Ok((Decoder_jpeg_sos(_input))?))())?;
-let data = ((|| PResult::Ok((Decoder211(_input))?))())?;
+let data = ((|| PResult::Ok((Decoder214(_input))?))())?;
 PResult::Ok(jpeg_scan { segments, sos, data })
 }
 
@@ -22341,7 +23002,7 @@ ret
 PResult::Ok(jpeg_dnl { marker, length, data })
 }
 
-fn Decoder196<'input>(_input: &mut Parser<'input>) -> Result<jpeg_scan, ParseError> {
+fn Decoder199<'input>(_input: &mut Parser<'input>) -> Result<jpeg_scan, ParseError> {
 let segments = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -22720,47 +23381,47 @@ ret
 };
 match tree_index {
 0 => {
-let inner = (Decoder199(_input))?;
+let inner = (Decoder202(_input))?;
 jpeg_scan_data_scan_data::mcu(inner)
 },
 
 1 => {
-let inner = (Decoder200(_input))?;
+let inner = (Decoder203(_input))?;
 jpeg_scan_data_scan_data::rst0(inner)
 },
 
 2 => {
-let inner = (Decoder201(_input))?;
+let inner = (Decoder204(_input))?;
 jpeg_scan_data_scan_data::rst1(inner)
 },
 
 3 => {
-let inner = (Decoder202(_input))?;
+let inner = (Decoder205(_input))?;
 jpeg_scan_data_scan_data::rst2(inner)
 },
 
 4 => {
-let inner = (Decoder203(_input))?;
+let inner = (Decoder206(_input))?;
 jpeg_scan_data_scan_data::rst3(inner)
 },
 
 5 => {
-let inner = (Decoder204(_input))?;
+let inner = (Decoder207(_input))?;
 jpeg_scan_data_scan_data::rst4(inner)
 },
 
 6 => {
-let inner = (Decoder205(_input))?;
+let inner = (Decoder208(_input))?;
 jpeg_scan_data_scan_data::rst5(inner)
 },
 
 7 => {
-let inner = (Decoder206(_input))?;
+let inner = (Decoder209(_input))?;
 jpeg_scan_data_scan_data::rst6(inner)
 },
 
 8 => {
-let inner = (Decoder207(_input))?;
+let inner = (Decoder210(_input))?;
 jpeg_scan_data_scan_data::rst7(inner)
 },
 
@@ -22816,7 +23477,7 @@ jpeg_scan_data_scan_data::rst7(..) => {
 PResult::Ok(jpeg_scan_data { scan_data, scan_data_stream })
 }
 
-fn Decoder199<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder202<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let tree_index = {
 _input.open_peek_context();
 let b = _input.read_byte()?;
@@ -22877,7 +23538,7 @@ return Err(ParseError::ExcludedBranch(4297833600800538456u64));
 })
 }
 
-fn Decoder200<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder203<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -22897,7 +23558,7 @@ return Err(ParseError::ExcludedBranch(5421268784727520761u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder201<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder204<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -22917,7 +23578,7 @@ return Err(ParseError::ExcludedBranch(10069632627653602280u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder202<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder205<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -22937,7 +23598,7 @@ return Err(ParseError::ExcludedBranch(7941505592535629367u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder203<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -22957,7 +23618,7 @@ return Err(ParseError::ExcludedBranch(4842764822111760355u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder204<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder207<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -22977,7 +23638,7 @@ return Err(ParseError::ExcludedBranch(172561454190383201u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder205<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder208<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -22997,7 +23658,7 @@ return Err(ParseError::ExcludedBranch(12052389963453405046u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder206<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder209<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -23017,7 +23678,7 @@ return Err(ParseError::ExcludedBranch(14545630498792155294u64));
 PResult::Ok(jpeg_eoi { ff, marker })
 }
 
-fn Decoder207<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
+fn Decoder210<'input>(_input: &mut Parser<'input>) -> Result<jpeg_eoi, ParseError> {
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
 if b == 255 {
@@ -23110,7 +23771,7 @@ return Err(ParseError::FalsifiedWhere);
 PResult::Ok(jpeg_dnl_data { num_lines })
 }
 
-fn Decoder211<'input>(_input: &mut Parser<'input>) -> Result<jpeg_scan_data, ParseError> {
+fn Decoder214<'input>(_input: &mut Parser<'input>) -> Result<jpeg_scan_data, ParseError> {
 let scan_data = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -23338,47 +23999,47 @@ ret
 };
 match tree_index {
 0 => {
-let inner = (Decoder199(_input))?;
+let inner = (Decoder202(_input))?;
 jpeg_scan_data_scan_data::mcu(inner)
 },
 
 1 => {
-let inner = (Decoder200(_input))?;
+let inner = (Decoder203(_input))?;
 jpeg_scan_data_scan_data::rst0(inner)
 },
 
 2 => {
-let inner = (Decoder201(_input))?;
+let inner = (Decoder204(_input))?;
 jpeg_scan_data_scan_data::rst1(inner)
 },
 
 3 => {
-let inner = (Decoder202(_input))?;
+let inner = (Decoder205(_input))?;
 jpeg_scan_data_scan_data::rst2(inner)
 },
 
 4 => {
-let inner = (Decoder203(_input))?;
+let inner = (Decoder206(_input))?;
 jpeg_scan_data_scan_data::rst3(inner)
 },
 
 5 => {
-let inner = (Decoder204(_input))?;
+let inner = (Decoder207(_input))?;
 jpeg_scan_data_scan_data::rst4(inner)
 },
 
 6 => {
-let inner = (Decoder205(_input))?;
+let inner = (Decoder208(_input))?;
 jpeg_scan_data_scan_data::rst5(inner)
 },
 
 7 => {
-let inner = (Decoder206(_input))?;
+let inner = (Decoder209(_input))?;
 jpeg_scan_data_scan_data::rst6(inner)
 },
 
 8 => {
-let inner = (Decoder207(_input))?;
+let inner = (Decoder210(_input))?;
 jpeg_scan_data_scan_data::rst7(inner)
 },
 
@@ -23465,7 +24126,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder213<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder216<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23496,7 +24157,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder214<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder217<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23527,7 +24188,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder215<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder218<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23558,7 +24219,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder216<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder219<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23589,7 +24250,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder217<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder220<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23620,7 +24281,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder218<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder221<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23651,7 +24312,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder219<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder222<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23682,7 +24343,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder220<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder223<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23713,7 +24374,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder221<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder224<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23744,7 +24405,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder222<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder225<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23775,7 +24436,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder223<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder226<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -23806,7 +24467,7 @@ ret
 PResult::Ok(jpeg_sof15 { marker, length, data })
 }
 
-fn Decoder224<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
+fn Decoder227<'input>(_input: &mut Parser<'input>) -> Result<jpeg_sof15, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24092,7 +24753,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder232<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder235<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24143,7 +24804,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder233<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder236<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24194,7 +24855,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder234<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder237<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24245,7 +24906,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder235<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder238<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24296,7 +24957,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder236<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder239<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24347,7 +25008,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder237<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder240<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24398,7 +25059,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder238<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder241<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24449,7 +25110,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder239<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder242<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24500,7 +25161,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder240<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder243<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24551,7 +25212,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder241<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder244<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24602,7 +25263,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder242<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder245<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24653,7 +25314,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder243<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder246<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24704,7 +25365,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder244<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder247<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24755,7 +25416,7 @@ ret
 PResult::Ok(jpeg_com { marker, length, data })
 }
 
-fn Decoder245<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
+fn Decoder248<'input>(_input: &mut Parser<'input>) -> Result<jpeg_com, ParseError> {
 let marker = ((|| PResult::Ok({
 let ff = ((|| PResult::Ok({
 let b = _input.read_byte()?;
@@ -24914,7 +25575,7 @@ PResult::Ok(jpeg_dqt_data { precision_table_id, elements })
 }
 
 fn Decoder_jpeg_app1_data<'input>(_input: &mut Parser<'input>) -> Result<jpeg_app1_data, ParseError> {
-let identifier = ((|| PResult::Ok((Decoder251(_input))?))())?;
+let identifier = ((|| PResult::Ok((Decoder254(_input))?))())?;
 let data = ((|| PResult::Ok(match identifier.string.as_slice() {
 [69u8, 120u8, 105u8, 102u8] => {
 let inner = (Decoder_jpeg_app1_exif(_input))?;
@@ -24954,7 +25615,7 @@ jpeg_app1_data_data::other(inner)
 PResult::Ok(jpeg_app1_data { identifier, data })
 }
 
-fn Decoder251<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder254<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25045,7 +25706,7 @@ PResult::Ok(jpeg_app1_xmp { xmp })
 }
 
 fn Decoder_jpeg_app0_data<'input>(_input: &mut Parser<'input>) -> Result<jpeg_app0_data, ParseError> {
-let identifier = ((|| PResult::Ok((Decoder255(_input))?))())?;
+let identifier = ((|| PResult::Ok((Decoder258(_input))?))())?;
 let data = ((|| PResult::Ok(match identifier.string.as_slice() {
 [74u8, 70u8, 73u8, 70u8] => {
 let inner = (Decoder_jpeg_app0_jfif(_input))?;
@@ -25080,7 +25741,7 @@ jpeg_app0_data_data::other(inner)
 PResult::Ok(jpeg_app0_data { identifier, data })
 }
 
-fn Decoder255<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder258<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25212,14 +25873,14 @@ b
 };
 ((|flagbits: u8| PResult::Ok(gzip_header_file_flags { fcomment: flagbits >> 4u8 & 1u8 != 0u8, fname: flagbits >> 3u8 & 1u8 != 0u8, fextra: flagbits >> 2u8 & 1u8 != 0u8, fhcrc: flagbits >> 1u8 & 1u8 != 0u8, ftext: flagbits >> 0u8 & 1u8 != 0u8 }))(inner))?
 }))())?;
-let timestamp = ((|| PResult::Ok((Decoder89(_input))?))())?;
+let timestamp = ((|| PResult::Ok((Decoder92(_input))?))())?;
 let compression_flags = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let os_id = ((|| PResult::Ok((Decoder25(_input))?))())?;
 PResult::Ok(gzip_header { magic, method, file_flags, timestamp, compression_flags, os_id })
 }
 
 fn Decoder_gzip_fextra<'input>(_input: &mut Parser<'input>) -> Result<gzip_fextra, ParseError> {
-let xlen = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let xlen = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let subfields = ((|| PResult::Ok({
 let sz = xlen as usize<>;
 _input.start_slice(sz)?;
@@ -25250,27 +25911,27 @@ ret
 PResult::Ok(gzip_fextra { xlen, subfields })
 }
 
-fn Decoder260<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
-PResult::Ok((Decoder265(_input))?)
+fn Decoder263<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+PResult::Ok((Decoder268(_input))?)
 }
 
 fn Decoder_gzip_fcomment<'input>(_input: &mut Parser<'input>) -> Result<gzip_fcomment, ParseError> {
-let comment = ((|| PResult::Ok((Decoder264(_input))?))())?;
+let comment = ((|| PResult::Ok((Decoder267(_input))?))())?;
 PResult::Ok(gzip_fcomment { comment })
 }
 
 fn Decoder_gzip_fhcrc<'input>(_input: &mut Parser<'input>) -> Result<gzip_fhcrc, ParseError> {
-let crc = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let crc = ((|| PResult::Ok((Decoder104(_input))?))())?;
 PResult::Ok(gzip_fhcrc { crc })
 }
 
 fn Decoder_gzip_footer<'input>(_input: &mut Parser<'input>) -> Result<gzip_footer, ParseError> {
-let crc = ((|| PResult::Ok((Decoder89(_input))?))())?;
-let length = ((|| PResult::Ok((Decoder89(_input))?))())?;
+let crc = ((|| PResult::Ok((Decoder92(_input))?))())?;
+let length = ((|| PResult::Ok((Decoder92(_input))?))())?;
 PResult::Ok(gzip_footer { crc, length })
 }
 
-fn Decoder264<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder267<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25322,7 +25983,7 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 PResult::Ok(base_asciiz_string { string, null })
 }
 
-fn Decoder265<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder268<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25375,9 +26036,9 @@ PResult::Ok(base_asciiz_string { string, null })
 }
 
 fn Decoder_gzip_fextra_subfield<'input>(_input: &mut Parser<'input>) -> Result<gzip_fextra_subfield, ParseError> {
-let si1 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let si2 = ((|| PResult::Ok((Decoder112(_input))?))())?;
-let len = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let si1 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let si2 = ((|| PResult::Ok((Decoder115(_input))?))())?;
+let len = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let data = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..len {
@@ -25388,7 +26049,7 @@ accum
 PResult::Ok(gzip_fextra_subfield { si1, si2, len, data })
 }
 
-fn Decoder267<'input>(_input: &mut Parser<'input>) -> Result<Vec<gzip_main>, ParseError> {
+fn Decoder270<'input>(_input: &mut Parser<'input>) -> Result<Vec<gzip_main>, ParseError> {
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
 let matching_ix = {
@@ -25419,12 +26080,12 @@ Some((Decoder_gzip_fextra(_input))?)
 None
 }))())?;
 let fname = ((|| PResult::Ok(if header.file_flags.fname.clone() {
-Some((Decoder268(_input))?)
+Some((Decoder271(_input))?)
 } else {
 None
 }))())?;
 let fcomment = ((|| PResult::Ok(if header.file_flags.fcomment.clone() {
-Some((Decoder269(_input))?)
+Some((Decoder272(_input))?)
 } else {
 None
 }))())?;
@@ -25448,16 +26109,16 @@ accum.push(next_elem);
 PResult::Ok(accum)
 }
 
-fn Decoder268<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
-PResult::Ok((Decoder271(_input))?)
+fn Decoder271<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+PResult::Ok((Decoder274(_input))?)
 }
 
-fn Decoder269<'input>(_input: &mut Parser<'input>) -> Result<gzip_fcomment, ParseError> {
-let comment = ((|| PResult::Ok((Decoder270(_input))?))())?;
+fn Decoder272<'input>(_input: &mut Parser<'input>) -> Result<gzip_fcomment, ParseError> {
+let comment = ((|| PResult::Ok((Decoder273(_input))?))())?;
 PResult::Ok(gzip_fcomment { comment })
 }
 
-fn Decoder270<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder273<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25509,7 +26170,7 @@ return Err(ParseError::ExcludedBranch(10396965092922267801u64));
 PResult::Ok(base_asciiz_string { string, null })
 }
 
-fn Decoder271<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
+fn Decoder274<'input>(_input: &mut Parser<'input>) -> Result<base_asciiz_string, ParseError> {
 let string = ((|| PResult::Ok({
 let mut accum = Vec::new();
 while _input.remaining() > 0 {
@@ -25592,7 +26253,7 @@ return Err(ParseError::ExcludedBranch(14049552398800766371u64));
 let version = ((|| PResult::Ok({
 let mut accum = Vec::new();
 for _ in 0..3u8 {
-accum.push((Decoder112(_input))?);
+accum.push((Decoder115(_input))?);
 }
 accum
 }))())?;
@@ -25604,7 +26265,7 @@ let descriptor = ((|| PResult::Ok((Decoder_gif_logical_screen_descriptor(_input)
 let global_color_table = ((|| PResult::Ok(if descriptor.flags.table_flag.clone() != 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
-accum.push((Decoder287(_input))?);
+accum.push((Decoder290(_input))?);
 }
 Some(accum)
 } else {
@@ -25856,7 +26517,7 @@ break
 }
 accum
 }))())?;
-let terminator = ((|| PResult::Ok((Decoder281(_input))?))())?;
+let terminator = ((|| PResult::Ok((Decoder284(_input))?))())?;
 PResult::Ok(gif_application_extension { separator, label, block_size, identifier, authentication_code, application_data, terminator })
 }
 
@@ -25910,7 +26571,7 @@ break
 }
 accum
 }))())?;
-let terminator = ((|| PResult::Ok((Decoder281(_input))?))())?;
+let terminator = ((|| PResult::Ok((Decoder284(_input))?))())?;
 PResult::Ok(gif_comment_extension { separator, label, comment_data, terminator })
 }
 
@@ -25933,7 +26594,7 @@ accum
 PResult::Ok(gif_subblock { len_bytes, data })
 }
 
-fn Decoder281<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
+fn Decoder284<'input>(_input: &mut Parser<'input>) -> Result<u8, ParseError> {
 let b = _input.read_byte()?;
 PResult::Ok(if b == 0 {
 b
@@ -25974,9 +26635,9 @@ b
 };
 ((|packedbits: u8| PResult::Ok(gif_graphic_control_extension_flags { reserved: packedbits >> 5u8 & 7u8, disposal_method: packedbits >> 2u8 & 7u8, user_input_flag: packedbits >> 1u8 & 1u8, transparent_color_flag: packedbits >> 0u8 & 1u8 }))(inner))?
 }))())?;
-let delay_time = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let delay_time = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let transparent_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
-let terminator = ((|| PResult::Ok((Decoder281(_input))?))())?;
+let terminator = ((|| PResult::Ok((Decoder284(_input))?))())?;
 PResult::Ok(gif_graphic_control_extension { separator, label, block_size, flags, delay_time, transparent_color_index, terminator })
 }
 
@@ -26024,7 +26685,7 @@ let descriptor = ((|| PResult::Ok((Decoder_gif_image_descriptor(_input))?))())?;
 let local_color_table = ((|| PResult::Ok(if descriptor.flags.table_flag.clone() != 0u8 {
 let mut accum = Vec::new();
 for _ in 0..2u16 << ((descriptor.flags.table_size.clone()) as u16) {
-accum.push((Decoder287(_input))?);
+accum.push((Decoder290(_input))?);
 }
 Some(accum)
 } else {
@@ -26059,10 +26720,10 @@ b
 return Err(ParseError::ExcludedBranch(15268554964885899593u64));
 }
 }))())?;
-let text_grid_left_position = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let text_grid_top_position = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let text_grid_width = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let text_grid_height = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let text_grid_left_position = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let text_grid_top_position = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let text_grid_width = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let text_grid_height = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let character_cell_width = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let character_cell_height = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let text_foreground_color_index = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -26100,7 +26761,7 @@ break
 }
 accum
 }))())?;
-let terminator = ((|| PResult::Ok((Decoder281(_input))?))())?;
+let terminator = ((|| PResult::Ok((Decoder284(_input))?))())?;
 PResult::Ok(gif_plain_text_extension { separator, label, block_size, text_grid_left_position, text_grid_top_position, text_grid_width, text_grid_height, character_cell_width, character_cell_height, text_foreground_color_index, text_background_color_index, plain_text_data, terminator })
 }
 
@@ -26113,10 +26774,10 @@ b
 return Err(ParseError::ExcludedBranch(957865226307229178u64));
 }
 }))())?;
-let image_left_position = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let image_top_position = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let image_width = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let image_height = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let image_left_position = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let image_top_position = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let image_width = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let image_height = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let flags = ((|| PResult::Ok({
 let inner = {
 let b = _input.read_byte()?;
@@ -26127,7 +26788,7 @@ b
 PResult::Ok(gif_image_descriptor { separator, image_left_position, image_top_position, image_width, image_height, flags })
 }
 
-fn Decoder287<'input>(_input: &mut Parser<'input>) -> Result<png_plte, ParseError> {
+fn Decoder290<'input>(_input: &mut Parser<'input>) -> Result<png_plte, ParseError> {
 let r = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let g = ((|| PResult::Ok((Decoder25(_input))?))())?;
 let b = ((|| PResult::Ok((Decoder25(_input))?))())?;
@@ -26169,13 +26830,13 @@ break
 }
 accum
 }))())?;
-let terminator = ((|| PResult::Ok((Decoder281(_input))?))())?;
+let terminator = ((|| PResult::Ok((Decoder284(_input))?))())?;
 PResult::Ok(gif_table_based_image_data { lzw_min_code_size, image_data, terminator })
 }
 
 fn Decoder_gif_logical_screen_descriptor<'input>(_input: &mut Parser<'input>) -> Result<gif_logical_screen_descriptor, ParseError> {
-let screen_width = ((|| PResult::Ok((Decoder101(_input))?))())?;
-let screen_height = ((|| PResult::Ok((Decoder101(_input))?))())?;
+let screen_width = ((|| PResult::Ok((Decoder104(_input))?))())?;
+let screen_height = ((|| PResult::Ok((Decoder104(_input))?))())?;
 let flags = ((|| PResult::Ok({
 let inner = {
 let b = _input.read_byte()?;
@@ -26188,7 +26849,7 @@ let pixel_aspect_ratio = ((|| PResult::Ok((Decoder25(_input))?))())?;
 PResult::Ok(gif_logical_screen_descriptor { screen_width, screen_height, flags, bg_color_index, pixel_aspect_ratio })
 }
 
-fn Decoder290<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
+fn Decoder293<'input>(_input: &mut Parser<'input>) -> Result<u32, ParseError> {
 let inner = {
 let field0 = ((|| PResult::Ok({
 let mut accum = Vec::new();

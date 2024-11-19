@@ -1,3 +1,4 @@
+use super::util::{U16Set, Wec};
 use super::*;
 use doodle::Label;
 use encoding::{
@@ -173,6 +174,7 @@ where
 
 // !SECTION
 
+// SECTION - *Metrics and mid- to low-level API-enrichment analogues for raw gencode types
 #[derive(Clone, Debug)]
 pub enum OpentypeMetrics {
     MultiFont(MultiFontMetrics),
@@ -1233,7 +1235,9 @@ impl TryPromote<OpentypeLookupSubtable> for LookupSubtable {
             &OpentypeLookupSubtable::MarkBaseAttach => LookupSubtable::MarkBaseAttach,
             &OpentypeLookupSubtable::MarkLigAttach => LookupSubtable::MarkLigAttach,
             &OpentypeLookupSubtable::MarkMarkAttach => LookupSubtable::MarkMarkAttach,
-            &OpentypeLookupSubtable::PairAdjust => LookupSubtable::PairAdjust,
+            OpentypeLookupSubtable::PairAdjust(pair_adjust) => {
+                LookupSubtable::PairAdjust(PairAdjust::try_promote(pair_adjust)?)
+            }
             OpentypeLookupSubtable::SingleAdjust(single_adjust) => {
                 LookupSubtable::SingleAdjust(SingleAdjust::try_promote(single_adjust)?)
             }
@@ -1252,8 +1256,157 @@ enum LookupSubtable {
     MarkBaseAttach,
     MarkLigAttach,
     MarkMarkAttach,
-    PairAdjust,
+    PairAdjust(PairAdjust),
     SingleAdjust(SingleAdjust),
+}
+
+pub type OpentypePairAdjust =
+    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust;
+
+pub type OpentypePairAdjustSubtable =
+    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable;
+pub type OpentypePairAdjustFormat1 =
+    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1;
+pub type OpentypePairAdjustFormat2 =
+    opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2;
+
+impl TryPromote<OpentypePairAdjust> for PairAdjust {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypePairAdjust) -> Result<Self, Self::Error> {
+        Self::try_promote(&orig.subtable)
+    }
+}
+
+impl TryPromote<OpentypePairAdjustSubtable> for PairAdjust {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypePairAdjustSubtable) -> Result<Self, Self::Error> {
+        Ok(match orig {
+            OpentypePairAdjustSubtable::Format1(f1) => {
+                PairAdjust::Format1(PairAdjustFormat1::try_promote(f1)?)
+            }
+            OpentypePairAdjustSubtable::Format2(f2) => {
+                PairAdjust::Format2(PairAdjustFormat2::try_promote(f2)?)
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+enum PairAdjust {
+    Format1(PairAdjustFormat1),
+    Format2(PairAdjustFormat2),
+}
+
+impl TryPromote<OpentypePairAdjustFormat1> for PairAdjustFormat1 {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypePairAdjustFormat1) -> Result<Self, Self::Error> {
+        let mut pair_sets = Vec::with_capacity(orig.pair_sets.len());
+        for offset in orig.pair_sets.iter() {
+            let pair_set = try_promote_opt(&offset.link)?;
+            pair_sets.push(pair_set)
+        }
+
+        Ok(PairAdjustFormat1 {
+            coverage: promote_opt(&orig.coverage.link),
+            pair_sets,
+        })
+    }
+}
+
+impl TryPromote<OpentypePairAdjustFormat2> for PairAdjustFormat2 {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypePairAdjustFormat2) -> Result<Self, Self::Error> {
+        let mut store = Vec::with_capacity(orig.class1_count as usize * orig.class2_count as usize);
+
+        for class1_record in orig.class1_records.iter() {
+            for class2_record in class1_record.class2_records.iter() {
+                store.push(Class2Record::try_promote(class2_record)?);
+            }
+        }
+        let class1_records = Wec::from_vec(store, orig.class2_count as usize);
+
+        Ok(PairAdjustFormat2 {
+            coverage: promote_opt(&orig.coverage.link),
+            class_def1: promote_opt(&orig.class_def1.link),
+            class_def2: promote_opt(&orig.class_def2.link),
+            class1_records,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PairAdjustFormat1 {
+    coverage: Option<CoverageTable>,
+    pair_sets: Vec<Option<PairSet>>,
+}
+
+#[derive(Debug, Clone)]
+struct PairAdjustFormat2 {
+    coverage: Option<CoverageTable>,
+    class_def1: Option<ClassDef>,
+    class_def2: Option<ClassDef>,
+    class1_records: Class1RecordList,
+}
+
+type Class1RecordList = Wec<Class2Record>;
+
+pub type OpentypeClass2Record = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format2_class1_records_class2_records;
+
+impl TryPromote<OpentypeClass2Record> for Class2Record {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypeClass2Record) -> Result<Self, Self::Error> {
+        Ok(Class2Record {
+            value_record1: try_promote_opt(&orig.value_record1)?,
+            value_record2: try_promote_opt(&orig.value_record2)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Class2Record {
+    value_record1: Option<ValueRecord>,
+    value_record2: Option<ValueRecord>,
+}
+
+pub type OpentypePairSet = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link;
+pub type OpentypePairValueRecord = opentype_gpos_table_lookup_list_link_lookups_link_subtables_link_PairAdjust_subtable_Format1_pair_sets_link_pair_value_records;
+
+type PairSet = Vec<PairValueRecord>;
+
+impl TryPromote<OpentypePairSet> for PairSet {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypePairSet) -> Result<Self, Self::Error> {
+        let mut accum = Vec::with_capacity(orig.pair_value_records.len());
+        for record in orig.pair_value_records.iter() {
+            accum.push(PairValueRecord::try_promote(record)?);
+        }
+        Ok(accum)
+    }
+}
+
+impl TryPromote<OpentypePairValueRecord> for PairValueRecord {
+    type Error = UnknownValueError<u16>;
+
+    fn try_promote(orig: &OpentypePairValueRecord) -> Result<Self, Self::Error> {
+        Ok(PairValueRecord {
+            second_glyph: orig.second_glyph,
+            value_record1: try_promote_opt(&orig.value_record1)?,
+            value_record2: try_promote_opt(&orig.value_record2)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PairValueRecord {
+    second_glyph: u16,
+    value_record1: Option<ValueRecord>,
+    value_record2: Option<ValueRecord>,
 }
 
 pub type OpentypeSingleAdjust =
@@ -1273,6 +1426,7 @@ impl TryPromote<OpentypeSingleAdjust> for SingleAdjust {
         Self::try_promote(&orig.subtable)
     }
 }
+
 impl TryPromote<OpentypeSingleAdjustSubtable> for SingleAdjust {
     type Error = UnknownValueError<u16>;
 
@@ -1492,6 +1646,7 @@ impl Ctxt {
         self.whence
     }
 }
+// !SECTION
 
 /// Common error type for marking a parsed value as unexpected/unknown relative to a set of predefined values we recognize
 #[derive(Debug)]
@@ -2177,7 +2332,67 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
             LookupSubtable::MarkBaseAttach => ("MarkBaseAttach", format!("(..)")),
             LookupSubtable::MarkLigAttach => ("MarkLigAttach", format!("(..)")),
             LookupSubtable::MarkMarkAttach => ("MarkMarkAttach", format!("(..)")),
-            LookupSubtable::PairAdjust => ("PairAdjust", format!("(..)")),
+            LookupSubtable::PairAdjust(pair_adjust) => {
+                let contents = {
+                    match pair_adjust {
+                        PairAdjust::Format1(PairAdjustFormat1 {
+                            coverage,
+                            pair_sets,
+                        }) => {
+                            if let Some(coverage_table) = coverage {
+                                format!("byGlyph({})", format_coverage_table(coverage_table))
+                            } else {
+                                assert!(pair_sets.is_empty(), "pair_sets is non-empty but has no coverage-table to correspond to");
+                                format!("byGlyph[0]")
+                            }
+                        }
+                        PairAdjust::Format2(PairAdjustFormat2 {
+                            coverage,
+                            class_def1,
+                            class_def2,
+                            class1_records,
+                        }) => {
+                            let rows = class1_records.rows();
+                            let cols = class1_records.width();
+
+                            validate_class_count(class_def1, rows);
+                            validate_class_count(class_def2, cols);
+
+                            if let Some(coverage_table) = coverage {
+                                // REVIEW - if not too verbose, we might want a compact overview of the Class1Record array, specifically which index-pairs constitute actual adjustments
+                                let _populated_class_pairs: Vec<(usize, usize)> = {
+                                    Iterator::zip(0..rows, 0..cols)
+                                        .filter(|ixpair| {
+                                            let it = &class1_records[*ixpair];
+                                            it.value_record1.is_some() || it.value_record2.is_some()
+                                        })
+                                        .collect()
+                                };
+                                // maximum number of index-pairs we are willing to display inline (chosen arbitrarily)
+                                // TODO - should this be a more general parameter in the Config type?
+                                const MAX_POPULATION: usize = 3;
+                                if _populated_class_pairs.len() <= MAX_POPULATION {
+                                    format!(
+                                        "byClass{:?}({})",
+                                        _populated_class_pairs,
+                                        format_coverage_table(coverage_table)
+                                    )
+                                } else {
+                                    format!(
+                                        "byClass[{} ∈ {rows} x {cols}]({})",
+                                        _populated_class_pairs.len(),
+                                        format_coverage_table(coverage_table)
+                                    )
+                                }
+                            } else {
+                                assert!(class1_records.is_empty(), "class1_records is non-empty but has no coverage-table to correspond to");
+                                format!("byClass[0 x 0]")
+                            }
+                        }
+                    }
+                };
+                ("PairAdjust", contents)
+            }
             LookupSubtable::SingleAdjust(single_adjust) => {
                 let contents = {
                     match single_adjust {
@@ -2209,6 +2424,62 @@ fn format_lookup_subtable(subtable: &Option<LookupSubtable>, show_lookup_type: b
         }
     } else {
         format!("<none>")
+    }
+}
+
+/// Checks that the given ClassDef (assumed to be Some) contains the expected number of classes.
+///
+/// Panics if opt_classdef is None.
+fn validate_class_count(opt_classdef: &Option<ClassDef>, expected_classes: usize) {
+    let Some(class_def) = opt_classdef else {
+        unreachable!(
+            "validate_class_count: expecting {expected_classes}-class ClassDef, found None instead"
+        )
+    };
+    match class_def {
+        ClassDef::Format1 {
+            class_value_array,
+            start_glyph_id: _start_id,
+        } => {
+            // REVIEW - this is a bit low-level, but there might be slightly better structures than BTreeSet (e.g. Vec<bool>)
+            let max = expected_classes as u16;
+            let mut actual_set = U16Set::new();
+            actual_set.insert(0);
+            for (_ix, value) in class_value_array.iter().enumerate() {
+                if *value >= max {
+                    panic!("expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph id: {})", *_start_id + _ix as u16);
+                }
+                let _ = actual_set.insert(*value);
+            }
+            assert_eq!(
+                actual_set.len(),
+                expected_classes,
+                "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
+                actual_set.len(),
+                actual_set
+            );
+        }
+        ClassDef::Format2 {
+            class_range_records,
+        } => {
+            let max = expected_classes as u16;
+            let mut actual_set = U16Set::new();
+            actual_set.insert(0);
+            for (_ix, rr) in class_range_records.iter().enumerate() {
+                let value = rr.value;
+                if value >= max {
+                    panic!("expecting {expected_classes} starting at 0, found ClassValue {value} (>= {max}) at index {_ix} (glyph range: {} -> {})", rr.start_glyph_id, rr.end_glyph_id);
+                }
+                let _ = actual_set.insert(value);
+            }
+            assert_eq!(
+                actual_set.len(),
+                expected_classes,
+                "expected to find {expected_classes} ClassDefs, found {}-element set {:?}",
+                actual_set.len(),
+                actual_set
+            );
+        }
     }
 }
 
@@ -2459,7 +2730,7 @@ fn format_coverage_table(cov: &CoverageTable) -> String {
                 .last()
                 .expect("empty RangeRecord-array")
                 .end_glyph_id;
-            format!("[{num_ranges} RangeRecords ({num_glyphs} total glyphs) spanning [{min_glyph},{max_glyph}]]")
+            format!("[{num_glyphs} glyphs ({num_ranges} ranges) in [{min_glyph},{max_glyph}]]")
         }
     }
 }
