@@ -2183,7 +2183,9 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ]),
             )
         };
-        let vf_flags_type = module.get_format_type(value_format_flags.get_level());
+        let vf_flags_type = module
+            .get_format_type(value_format_flags.get_level())
+            .clone();
 
         let value_record = {
             let opt_field = |field_name: &'static str, format: Format| {
@@ -2242,6 +2244,40 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
             )
         };
 
+        let optional_value_record = {
+            fn any_set(flags: Expr) -> Expr {
+                or(
+                    or(
+                        or(
+                            record_proj(flags.clone(), "x_placement"),
+                            record_proj(flags.clone(), "y_placement"),
+                        ),
+                        or(
+                            record_proj(flags.clone(), "x_advance"),
+                            record_proj(flags.clone(), "y_advance"),
+                        ),
+                    ),
+                    or(
+                        or(
+                            record_proj(flags.clone(), "x_placement_device"),
+                            record_proj(flags.clone(), "y_placement_device"),
+                        ),
+                        or(
+                            record_proj(flags.clone(), "x_advance_device"),
+                            record_proj(flags, "y_advance_device"),
+                        ),
+                    ),
+                )
+            }
+
+            |table_start: Expr, flags: Expr| {
+                cond_maybe(
+                    any_set(flags.clone()),
+                    value_record.call_args(vec![table_start, flags]),
+                )
+            }
+        };
+
         let single_substitution = /* STUB */ Format::EMPTY;
         let multiple_substitution = /* STUB */ Format::EMPTY;
         let alternate_substitution = /* STUB */ Format::EMPTY;
@@ -2251,7 +2287,7 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
         let extension_substitution = /* STUB */ Format::EMPTY;
         let reverse_chaining_contextual_single_substitution = /* STUB */ Format::EMPTY;
 
-        let single_adjustment = {
+        let single_pos = {
             let single_pos_format1 = |table_start: Expr| {
                 record([
                     (
@@ -2307,9 +2343,137 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                 ),
             ])
         };
-        let pair_adjustment = {
-            /* STUB */
-            Format::EMPTY
+        let pair_pos = {
+            let pair_value_record =
+                |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+                    record([
+                        // NOTE - first glyph id is listed in the Coverage table
+                        ("second_glyph", base.u16be()),
+                        (
+                            "value_record1",
+                            optional_value_record(table_start.clone(), value_format1),
+                        ),
+                        (
+                            "value_record2",
+                            optional_value_record(table_start, value_format2),
+                        ),
+                    ])
+                };
+            let pair_set = |value_format1: Expr, value_format2: Expr| {
+                record([
+                    ("table_start", pos32()),
+                    ("pair_value_count", base.u16be()),
+                    (
+                        "pair_value_records",
+                        repeat_count(
+                            var("pair_value_count"),
+                            pair_value_record(var("table_start"), value_format1, value_format2),
+                        ),
+                    ),
+                ])
+            };
+            let pair_pos_format1 = |table_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16(table_start, coverage_table.call(), base),
+                    ),
+                    ("value_format1", value_format_flags.call()),
+                    ("value_format2", value_format_flags.call()),
+                    ("pair_set_count", base.u16be()),
+                    (
+                        "pair_sets",
+                        repeat_count(
+                            var("pair_set_count"),
+                            offset16(
+                                var("table_start"),
+                                pair_set(var("value_format1"), var("value_format2")),
+                                base,
+                            ),
+                        ),
+                    ),
+                ])
+            };
+            let class2_record = |table_start: Expr, value_format1: Expr, value_format2: Expr| {
+                record([
+                    (
+                        "value_record1",
+                        optional_value_record(table_start.clone(), value_format1),
+                    ),
+                    (
+                        "value_record2",
+                        optional_value_record(table_start, value_format2),
+                    ),
+                ])
+            };
+            let class1_record = |table_start: Expr,
+                                 class2_count: Expr,
+                                 value_format1: Expr,
+                                 value_format2: Expr| {
+                record([(
+                    "class2_records",
+                    repeat_count(
+                        class2_count,
+                        class2_record(table_start, value_format1, value_format2),
+                    ),
+                )])
+            };
+            let pair_pos_format2 = |pair_pos_start: Expr| {
+                record([
+                    (
+                        "coverage",
+                        offset16(pair_pos_start.clone(), coverage_table.call(), base),
+                    ),
+                    ("value_format1", value_format_flags.call()),
+                    ("value_format2", value_format_flags.call()),
+                    (
+                        "class_def1",
+                        offset16(pair_pos_start.clone(), class_def.call(), base),
+                    ),
+                    (
+                        "class_def2",
+                        offset16(pair_pos_start.clone(), class_def.call(), base),
+                    ),
+                    ("class1_count", base.u16be()),
+                    ("class2_count", base.u16be()),
+                    (
+                        "class1_records",
+                        repeat_count(
+                            var("class1_count"),
+                            class1_record(
+                                pair_pos_start,
+                                var("class2_count"),
+                                var("value_format1"),
+                                var("value_format2"),
+                            ),
+                        ),
+                    ),
+                ])
+            };
+            record([
+                ("table_start", pos32()),
+                ("pos_format", base.u16be()),
+                (
+                    "subtable",
+                    match_variant(
+                        var("pos_format"),
+                        [
+                            (
+                                Pattern::U16(1),
+                                "Format1",
+                                pair_pos_format1(var("table_start")),
+                            ),
+                            (
+                                Pattern::U16(2),
+                                "Format2",
+                                pair_pos_format2(var("table_start")),
+                            ),
+                            // REVIEW - should this be a permanent hard-failure?
+                            (Pattern::Wildcard, "BadFormat", Format::Fail),
+                        ],
+                    ),
+                ),
+            ])
         };
         let cursive_attachment = /* STUB */ Format::EMPTY;
         let mark_to_base_attachment = /* STUB */ Format::EMPTY;
@@ -2359,8 +2523,8 @@ pub fn main(module: &mut FormatModule, base: &BaseModule) -> FormatRef {
                         match_variant(
                             lookup_type,
                             [
-                                (Pattern::U16(1), "SingleAdjust", single_adjustment),
-                                (Pattern::U16(2), "PairAdjust", pair_adjustment),
+                                (Pattern::U16(1), "SingleAdjust", single_pos),
+                                (Pattern::U16(2), "PairAdjust", pair_pos),
                                 (Pattern::U16(3), "CursAttach", cursive_attachment),
                                 (Pattern::U16(4), "MarkBaseAttach", mark_to_base_attachment),
                                 (

@@ -60,7 +60,9 @@ impl ToFragment for ModuleAttr {
                     .delimit(Fragment::Char('['), Fragment::Char(']')),
             ),
             ModuleAttr::RustFmtSkip => Fragment::string("#!").cat(
-                Fragment::string("rustfmt::skip").delimit(Fragment::Char('['), Fragment::Char(']')),
+                // NOTE - "rustfmt::skip" by itself is flagged as unstable and breaks compilation
+                Fragment::string("cfg_attr(rustfmt, rustfmt::skip)")
+                    .delimit(Fragment::Char('['), Fragment::Char(']')),
             ),
         }
     }
